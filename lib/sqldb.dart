@@ -1,67 +1,58 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-
 class SqlDb {
   static Database? _db;
 
-  Future <Database?> get db async{
-    if (_db == null){
-      _db = await initialDb();
-    }
-    else{
-      return _db;
-    }
+  Future<Database> get db async {
+    if (_db != null) return _db!;
+    _db = await initDb();
+    return _db!;
   }
 
-initialDb() async {
-  String databasepath = await getDatabasesPath();
-  String path = join(databasepath, 'chicopets.db');
-  Database mydb = await openDatabase(path, onCreate: _onCreate, version: 3, onUpgrade: _onUpgrade);
-  return mydb;
-}
+  Future<Database> initDb() async {
+    return openDatabase(
+      'cashdesk.db',
+      version: 1,
+      onCreate: (Database db, int version) async {
+        await db.execute('''
+          CREATE TABLE products(
+            code TEXT PRIMARY KEY,
+            designation TEXT,
+            quantity INTEGER,
+            prix_ht REAL,
+            taxe REAL,
+            prix_ttc REAL,
+            date_expiration TEXT
+          )
+        ''');
+      },
+    );
+  }
 
-_onUpgrade(Database db, int oldVersion, int newVersion){
+  Future<List<Map<String, dynamic>>> getProducts() async {
+    Database? db = await this.db;
+    List<Map<String, dynamic>> products = await db.query('products');
+    return products; // Returning a list of product rows
+  }
 
-}
-
-_onCreate(Database db, int version) async{
-  await db.execute('''
-  CREATE TABLE "product" (
-    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
-    codeabarre INTEGER UNIQUE
-    designation TEXT
-    quantite INTEGER
-    prixHT REAL
-    prixTTC REAL
-    dateexpiration DATE
-  )
-  ''');
-  print("table created successfully");
-}
-
-getProducts(String sql) async {
-  Database? mydb = await db;
-  List<Map> response = await mydb!.rawQuery(sql);
-  return response;
-}
-
-addProducts(String sql) async {
-  Database? mydb = await db;
-  int response = await mydb!.rawInsert(sql);
-  return response;
-}
-
-updateProducts(String sql) async {
-  Database? mydb = await db;
-  int response = await mydb!.rawUpdate(sql);
-  return response;
-}
-
-
-deleteProducts(String sql) async {
-  Database? mydb = await db;
-  int response = await mydb!.rawDelete(sql);
-  return response;
-}
+  Future<void> addProduct(
+      String code,
+      String designation,
+      int quantity,
+      double prixHT,
+      double taxe,
+      double prixTTC,
+      String date) async {
+    final dbClient = await db;
+    await dbClient.insert('products', {
+      'code': code,
+      'designation': designation,
+      'quantity': quantity,
+      'prix_ht': prixHT,
+      'taxe': taxe,
+      'prix_ttc': prixTTC,
+      'date_expiration': date
+    });
+  }
 
 }
