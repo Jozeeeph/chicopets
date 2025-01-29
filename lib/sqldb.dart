@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
 class SqlDb {
   static Database? _db;
 
@@ -11,13 +12,14 @@ class SqlDb {
 
   Future<Database> initDb() async {
     return openDatabase(
-      'cashdesk.db',
+      'cashdesk1.db',
       version: 1,
       onCreate: (Database db, int version) async {
         await db.execute('''
           CREATE TABLE products(
             code TEXT PRIMARY KEY,
             designation TEXT,
+            stock INTEGER,
             quantity INTEGER,
             prix_ht REAL,
             taxe REAL,
@@ -26,6 +28,7 @@ class SqlDb {
           )
         ''');
       },
+    onUpgrade: (db, oldVersion, newVersion) async {}
     );
   }
 
@@ -38,6 +41,7 @@ class SqlDb {
   Future<void> addProduct(
       String code,
       String designation,
+      int stock,
       int quantity,
       double prixHT,
       double taxe,
@@ -47,6 +51,7 @@ class SqlDb {
     await dbClient.insert('products', {
       'code': code,
       'designation': designation,
+      'stock': stock,
       'quantity': quantity,
       'prix_ht': prixHT,
       'taxe': taxe,
@@ -54,5 +59,4 @@ class SqlDb {
       'date_expiration': date
     });
   }
-
 }
