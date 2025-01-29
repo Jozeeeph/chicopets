@@ -39,6 +39,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   final SqlDb sqldb = SqlDb();
   Future<List<Map<String, dynamic>>>? products;
   List<Map<String, dynamic>> selectedProducts = [];
+  int? selectedProductIndex;
 
   @override
   void initState() {
@@ -99,35 +100,46 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     ),
                   ),
                   Expanded(
-                    child: selectedProducts.isEmpty
-                        ? const Center(
-                            child: Text('Aucune commande'),
-                          )
-                        : ListView.builder(
-                            itemCount: selectedProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = selectedProducts[index];
-                              return Padding(
+                  child: selectedProducts.isEmpty
+                      ? const Center(
+                          child: Text('Aucune commande'),
+                        )
+                      : ListView.builder(
+                          itemCount: selectedProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = selectedProducts[index];
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedProductIndex = index;
+                                });
+                              },
+                              child: Container(
+                                color: selectedProductIndex == index
+                                    ? Colors.blue.withOpacity(0.3)
+                                    : null,
                                 padding: const EdgeInsets.symmetric(vertical: 4),
                                 child: Row(
                                   children: [
                                     Expanded(child: Text(product['code'] ?? '')),
                                     Expanded(
-                                        child: Text(product['designation'] ?? '')),
+                                        child:
+                                            Text(product['designation'] ?? '')),
                                     Expanded(
-                                        child: Text(product['quantity']
-                                                .toString() ??
-                                            '1')),
-                                    Expanded(child: Text('0')), // Remise placeholder
+                                        child: Text(
+                                            product['quantity'].toString())),
+                                    Expanded(
+                                        child: Text('0')), // Remise placeholder
                                     Expanded(
                                         child: Text(product['prix_ht']
                                             .toString())), // Amount placeholder
                                   ],
                                 ),
-                              );
-                            },
-                          ),
-                  ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
                 ],
               ),
             ),
@@ -139,8 +151,14 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   child: Column(
                     children: [
                       ElevatedButton(
-                        onPressed: () {},
-                        child: const Text('Clients'),
+                        onPressed: () {
+                          if (selectedProductIndex != null) {
+                            _showQuantityInput(context);
+                          } else {
+                            _showMessage(context, 'Veuillez sélectionner une ligne.');
+                          }
+                        },
+                        child: const Text('Quantité'),
                       ),
                       ElevatedButton(
                         onPressed: () => _showAddProductPopup(context),
@@ -155,40 +173,40 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     ],
                   ),
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: buildNumberButton('1')),
-                          Expanded(child: buildNumberButton('2')),
-                          Expanded(child: buildNumberButton('3')),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(child: buildNumberButton('4')),
-                          Expanded(child: buildNumberButton('5')),
-                          Expanded(child: buildNumberButton('6')),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(child: buildNumberButton('7')),
-                          Expanded(child: buildNumberButton('8')),
-                          Expanded(child: buildNumberButton('9')),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(child: buildNumberButton('0')),
-                          Expanded(child: buildNumberButton('X')),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                // Expanded(
+                //   flex: 2,
+                //   child: Column(
+                //     children: [
+                //       Row(
+                //         children: [
+                //           Expanded(child: buildNumberButton('1')),
+                //           Expanded(child: buildNumberButton('2')),
+                //           Expanded(child: buildNumberButton('3')),
+                //         ],
+                //       ),
+                //       Row(
+                //         children: [
+                //           Expanded(child: buildNumberButton('4')),
+                //           Expanded(child: buildNumberButton('5')),
+                //           Expanded(child: buildNumberButton('6')),
+                //         ],
+                //       ),
+                //       Row(
+                //         children: [
+                //           Expanded(child: buildNumberButton('7')),
+                //           Expanded(child: buildNumberButton('8')),
+                //           Expanded(child: buildNumberButton('9')),
+                //         ],
+                //       ),
+                //       Row(
+                //         children: [
+                //           Expanded(child: buildNumberButton('0')),
+                //           Expanded(child: buildNumberButton('X')),
+                //         ],
+                //       ),
+                //     ],
+                //   ),
+                // ),
                 Expanded(
                   child: Column(
                     children: [
@@ -203,15 +221,22 @@ class _CashDeskPageState extends State<CashDeskPage> {
                       ElevatedButton(
                         onPressed: () {},
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green),
+                            backgroundColor: const Color.fromARGB(255, 59, 249, 66)),
                         child: const Text('Valider'),
                       ),
                       ElevatedButton(
-                        onPressed: () {},
-                        style:
-                            ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        child: const Text('Annuler'),
-                      ),
+            onPressed: () {
+              if (selectedProductIndex != null) {
+                _showDeleteConfirmation(context);
+              } else {
+                _showMessage(
+                    context, 'Veuillez sélectionner une ligne à supprimer.');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 255, 89, 77)),
+            child: const Text('Annuler'),
+          ),
                     ],
                   ),
                 ),
@@ -302,27 +327,27 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   Widget buildProductButton(String text) {
-    return Container(
-      margin: const EdgeInsets.all(2.0),
-      decoration: BoxDecoration(
-        color: Colors.blueGrey,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-          textAlign: TextAlign.center,
+  return Container(
+    margin: const EdgeInsets.all(2.0),
+    decoration: BoxDecoration(
+      color: Colors.blueGrey,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Center(
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
         ),
+        textAlign: TextAlign.center,
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget buildCategoryButton(String label, String imagePath) {
+Widget buildCategoryButton(String label, String imagePath) {
   return Container(
     margin: const EdgeInsets.all(4.0),
     decoration: BoxDecoration(
@@ -352,12 +377,12 @@ class _CashDeskPageState extends State<CashDeskPage> {
 }
 
 void _showProductSearchPopup(BuildContext context) async {
-  final products = await sqldb.getProducts();// Fetch products from the database
-  final TextEditingController SearchController = TextEditingController();
+  final products = await sqldb.getProducts(); // Fetch products from the database
+  final TextEditingController searchController = TextEditingController();
   ValueNotifier<List<Map<String, dynamic>>> filteredProducts = ValueNotifier(products);
 
-  SearchController.addListener(() {
-    String query = SearchController.text.toLowerCase();
+  searchController.addListener(() {
+    String query = searchController.text.toLowerCase();
     filteredProducts.value = products
         .where((product) =>
             (product['code']?.toLowerCase().contains(query) ?? false) ||
@@ -376,7 +401,7 @@ void _showProductSearchPopup(BuildContext context) async {
             child: Column(
               children: [
                 TextField(
-                  controller: SearchController,
+                  controller: searchController,
                   decoration: const InputDecoration(labelText: 'Recherche Produit'),
                 ),
                 ValueListenableBuilder<List<Map<String, dynamic>>>(
@@ -477,105 +502,174 @@ void _showProductSearchPopup(BuildContext context) async {
   );
 }
 
-
-
-  void _showAddProductPopup(BuildContext context) {
-    final TextEditingController codeController = TextEditingController();
-    final TextEditingController designationController = TextEditingController();
-    final TextEditingController quantityController = TextEditingController();
-    final TextEditingController priceHTController = TextEditingController();
-    final TextEditingController priceTTCController = TextEditingController();
-    final TextEditingController taxController = TextEditingController();
-    final TextEditingController dateController = TextEditingController();
-
-    taxController.addListener(() {
-      if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
-        double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-        double taxe = double.tryParse(taxController.text) ?? 0.0;
-        double prixTTC = prixHT + (prixHT * taxe / 100);
-        priceTTCController.text = prixTTC.toStringAsFixed(2);
-      }
-    });
-
-    priceHTController.addListener(() {
-      if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
-        double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-        double taxe = double.tryParse(taxController.text) ?? 0.0;
-        double prixTTC = prixHT + (prixHT * taxe / 100);
-        priceTTCController.text = prixTTC.toStringAsFixed(2);
-      }
-    });
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Ajouter un Produit'),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextField(
-                  controller: codeController,
-                  decoration: const InputDecoration(labelText: 'Code Barre'),
-                ),
-                TextField(
-                  controller: designationController,
-                  decoration: const InputDecoration(labelText: 'Désignation'),
-                ),
-                TextField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'Quantité'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: priceHTController,
-                  decoration: const InputDecoration(labelText: 'Prix HT'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: taxController,
-                  decoration: const InputDecoration(labelText: 'Taxe (%)'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: priceTTCController,
-                  decoration: const InputDecoration(labelText: 'Prix TTC'),
-                  enabled: false, // Make the TTC field read-only
-                ),
-                TextField(
-                  controller: dateController,
-                  decoration: const InputDecoration(labelText: 'Date Expiration'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () async {
-                // Retrieve values from controllers
-                String code = codeController.text;
-                String designation = designationController.text;
-                int quantity = int.tryParse(quantityController.text) ?? 0;
-                double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-                double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
-                double taxe = double.tryParse(taxController.text) ?? 0.0;
-                String date = dateController.text;
-
-                // Save to the database
-                await sqldb.addProduct(code, designation, quantity, prixHT, taxe, prixTTC, date);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Ajouter'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Annuler'),
-            ),
+void _showQuantityInput(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Changer la quantité'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var row in [
+              ['1', '2', '3'],
+              ['4', '5', '6'],
+              ['7', '8', '9'],
+              ['0']
+            ])
+              Row(
+                children: row.map((number) {
+                  return Expanded(child: _buildNumberButton(context, number));
+                }).toList(),
+              ),
           ],
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildNumberButton(BuildContext context, String number) {
+  return InkWell(
+    onTap: () {
+      setState(() {
+        if (selectedProductIndex != null) {
+          // Ensure `selectedProducts` is a mutable list of maps
+          Map<String, dynamic> selectedProduct = selectedProducts[selectedProductIndex!];
+          // Update the quantity with the selected number
+          String currentQuantity = selectedProduct['quantity'].toString();
+          String updatedQuantity = currentQuantity + number;
+
+          // Safely update the quantity
+          selectedProduct['quantity'] = int.tryParse(updatedQuantity) ?? 1;
+        }
+      });
+      Navigator.of(context).pop(); // Close the dialog after updating the quantity
+    },
+    child: Container(
+      margin: EdgeInsets.all(4.0),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue, // Customize the button color
+        ),
+        onPressed: () {},
+        child: Text(number, style: TextStyle(fontSize: 18)),
+      ),
+    ),
+  );
+}
+
+
+void _showMessage(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+void _showAddProductPopup(BuildContext context) {
+  final TextEditingController codeController = TextEditingController();
+  final TextEditingController designationController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController();
+  final TextEditingController priceHTController = TextEditingController();
+  final TextEditingController priceTTCController = TextEditingController();
+  final TextEditingController taxController = TextEditingController();
+  final TextEditingController dateController = TextEditingController();
+
+  // Listeners for tax and price calculation
+  void _calculatePriceTTC() {
+    if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
+      double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
+      double taxe = double.tryParse(taxController.text) ?? 0.0;
+      double prixTTC = prixHT + (prixHT * taxe / 100);
+      priceTTCController.text = prixTTC.toStringAsFixed(2);
+    }
   }
+
+  taxController.addListener(_calculatePriceTTC);
+  priceHTController.addListener(_calculatePriceTTC);
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Ajouter un Produit'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildTextField(codeController, 'Code Barre'),
+              _buildTextField(designationController, 'Désignation'),
+              _buildTextField(quantityController, 'Quantité', keyboardType: TextInputType.number),
+              _buildTextField(priceHTController, 'Prix HT', keyboardType: TextInputType.number),
+              _buildTextField(taxController, 'Taxe (%)', keyboardType: TextInputType.number),
+              _buildTextField(priceTTCController, 'Prix TTC', enabled: false),
+              _buildTextField(dateController, 'Date Expiration'),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () async {
+              // Save product to database
+              await sqldb.addProduct(
+                codeController.text,
+                designationController.text,
+                int.tryParse(quantityController.text) ?? 0,
+                double.tryParse(priceHTController.text) ?? 0.0,
+                double.tryParse(taxController.text) ?? 0.0,
+                double.tryParse(priceTTCController.text) ?? 0.0,
+                dateController.text,
+              );
+              Navigator.of(context).pop(); // Close popup
+            },
+            child: const Text('Ajouter'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close popup
+            },
+            child: const Text('Annuler'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Widget _buildTextField(TextEditingController controller, String label, {TextInputType keyboardType = TextInputType.text, bool enabled = true}) {
+  return TextField(
+    controller: controller,
+    decoration: InputDecoration(labelText: label),
+    keyboardType: keyboardType,
+    enabled: enabled,
+  );
+}
+
+void _showDeleteConfirmation(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Confirmation'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer cette ligne de la commande ?'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                selectedProducts.removeAt(selectedProductIndex!);
+                selectedProductIndex = null; // Reset selection
+              });
+              Navigator.of(context).pop(); // Close popup
+            },
+            child: const Text('Oui'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close popup
+            },
+            child: const Text('Non'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 }
