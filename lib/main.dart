@@ -5,7 +5,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-void main() {
+Future<void> main() async {
   // Initialize databaseFactory for desktop platforms
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.windows ||
@@ -15,6 +15,7 @@ void main() {
     databaseFactory =
         databaseFactoryFfi; // Correctly initialize the database factory
   }
+  // await SqlDb().copyDatabase();
   runApp(const MyApp());
 }
 
@@ -111,28 +112,57 @@ class _CashDeskPageState extends State<CashDeskPage> {
             Container(
               height: 200,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blue),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white, // Set the background color here
+                border: Border.all(color: Colors.blueAccent), // Border color
+                borderRadius: BorderRadius.circular(12), // Rounded corners
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
-                    color: Colors.blue,
+                    padding: const EdgeInsets.all(
+                        12), // Increased padding for header
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent, // Header background color
+                      borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(
+                              12)), // Optional: Rounded top corners
+                    ),
                     child: Row(
                       children: const [
-                        Expanded(child: Text('Code Art')),
-                        Expanded(child: Text('Designation')),
-                        Expanded(child: Text('Quantité')),
-                        Expanded(child: Text('Remise')),
-                        Expanded(child: Text('Montant')),
+                        Expanded(
+                            child: Text('Code Art',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white))),
+                        Expanded(
+                            child: Text('Designation',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white))),
+                        Expanded(
+                            child: Text('Quantité',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white))),
+                        Expanded(
+                            child: Text('Remise',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white))),
+                        Expanded(
+                            child: Text('Montant',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white))),
                       ],
                     ),
                   ),
                   Expanded(
                     child: selectedProducts.isEmpty
-                        ? const Center(child: Text('Aucune commande'))
+                        ? const Center(
+                            child: Text('Aucune commande',
+                                style: TextStyle(fontStyle: FontStyle.italic)))
                         : ListView.builder(
                             itemCount: selectedProducts.length,
                             itemBuilder: (context, index) {
@@ -144,21 +174,31 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                   });
                                 },
                                 child: Container(
-                                  color: selectedProductIndex == index
-                                      ? Colors.blue.withOpacity(0.3)
-                                      : null,
-                                  padding:
+                                  decoration: BoxDecoration(
+                                    color: selectedProductIndex == index
+                                        ? Colors.blue.withOpacity(
+                                            0.2) // Highlight selected row
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: Colors
+                                            .grey.shade300), // Subtle border
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 8, horizontal: 12),
+                                  margin:
                                       const EdgeInsets.symmetric(vertical: 4),
                                   child: Row(
                                     children: [
                                       Expanded(
-                                          child: Text(product['code'] ?? '')),
+                                          child: Text(product['code'] ?? '',
+                                              style: TextStyle(fontSize: 14))),
                                       Expanded(
                                           child: Text(
-                                              product['designation'] ?? '')),
+                                              product['designation'] ?? '',
+                                              style: TextStyle(fontSize: 14))),
                                       Expanded(
                                         child: Text(
-                                          // Ensure we show the updated quantity
                                           selectedProductIndex != null &&
                                                   selectedProductIndex == index
                                               ? selectedProducts[
@@ -171,8 +211,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                         ),
                                       ),
                                       Expanded(
-                                          child:
-                                              Text('0')), // Remise placeholder
+                                          child: Text('0',
+                                              style: TextStyle(
+                                                  color: Colors.grey))),
                                       Expanded(
                                         child: Text(
                                           (product['prix_ttc'] *
@@ -192,56 +233,155 @@ class _CashDeskPageState extends State<CashDeskPage> {
                 ],
               ),
             ),
+
             const SizedBox(height: 10),
             // Button Section
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          if (selectedProductIndex != null) {
-                            _showQuantityInput(context);
-                          } else {
-                            _showMessage(
-                                context, 'Veuillez sélectionner une ligne.');
-                          }
-                        },
-                        child: const Text('Quantité'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              if (selectedProductIndex != null) {
+                                _showQuantityInput(context);
+                              } else {
+                                _showMessage(context,
+                                    'Veuillez sélectionner une ligne.');
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'QUANTITÉ',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () => _showAddProductPopup(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'AJOUT PRODUIT',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              _showProductSearchPopup(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'RECHERCHE PRODUIT',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
-                      ElevatedButton(
-                        onPressed: () => _showAddProductPopup(context),
-                        child: const Text('Ajout Produit'),
+                    ),
+                    const SizedBox(width: 10), // Small spacing between columns
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  const Color.fromARGB(255, 188, 138, 0),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'IMPR TICKET',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'REMISE %',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'VALIDER',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                          ),
+                        ],
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          _showProductSearchPopup(context);
-                        },
-                        child: const Text('Recherche Produit'),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {},
-                        child: const Text('Impr Ticket'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {},
-                        child: const Text('Remise %'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                const Color.fromARGB(255, 59, 249, 66)),
-                        child: const Text('Valider'),
-                      ),
-                      ElevatedButton(
+                const SizedBox(height: 10), // Spacing before second row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
                         onPressed: () {
                           if (selectedProductIndex != null) {
                             _showDeleteConfirmation(context);
@@ -251,12 +391,22 @@ class _CashDeskPageState extends State<CashDeskPage> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                const Color.fromARGB(255, 255, 89, 77)),
-                        child: const Text('Annuler'),
+                          backgroundColor: Colors.red.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'ANNULER',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -372,29 +522,67 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   Widget buildCategoryButton(String label, String imagePath) {
     return Container(
-      margin: const EdgeInsets.all(4.0),
+      margin: const EdgeInsets.all(6.0),
+      width: 80, // Adjust size for smaller buttons
+      height: 80,
       decoration: BoxDecoration(
+        shape: BoxShape.circle, // Makes the button circular
         color: Colors.blue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue, width: 1),
+        border: Border.all(color: Colors.blue, width: 2),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
+          ClipOval(
             child: Image.asset(
               imagePath,
-              fit: BoxFit.contain,
+              width: 80, // Adjust image size
+              height: 80,
+              fit: BoxFit.cover,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-                color: Colors.black, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+          const SizedBox(height: 5),
+          SizedBox(
+            width: 60, // Ensure text fits inside the circle
+            child: Text(
+              label,
+              style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Helper Widgets for Clean Code
+  Widget TableHeaderCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget TableDataCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 14),
+        textAlign: TextAlign.center,
       ),
     );
   }
@@ -419,113 +607,98 @@ class _CashDeskPageState extends State<CashDeskPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Liste des Produits'),
-          content: Container(
-            width: 600, // Set the width of the popup
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12), // Rounded corners
+          ),
+          title: const Text(
+            'Liste des Produits',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
+          content: SizedBox(
+            width: 600, // Set the popup width
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  TextField(
-                    controller: searchController,
-                    decoration:
-                        const InputDecoration(labelText: 'Recherche Produit'),
+                  // Search Bar with Styling
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        labelText: 'Recherche Produit',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
                   ),
+
+                  // Product Table
                   ValueListenableBuilder<List<Map<String, dynamic>>>(
                     valueListenable: filteredProducts,
                     builder: (context, currentProducts, child) {
                       return Table(
-                        border: TableBorder.all(color: Colors.grey),
+                        border: TableBorder.all(color: Colors.grey.shade300),
                         columnWidths: const {
                           0: FixedColumnWidth(80), // Code column
                           1: FlexColumnWidth(), // Designation column
                           2: FixedColumnWidth(80), // Quantity column
                         },
                         children: [
-                          // Header row
+                          // Header Row
                           TableRow(
-                            decoration:
-                                const BoxDecoration(color: Colors.blueAccent),
-                            children: const [
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Code',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Désignation',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Quantité',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Prix HT',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text('Date Expiration',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            children: [
+                              TableHeaderCell('Code'),
+                              TableHeaderCell('Désignation'),
+                              TableHeaderCell('Quantité'),
+                              TableHeaderCell('Prix HT'),
+                              TableHeaderCell('Date Expiration'),
                             ],
                           ),
-                          // Data rows
+
+                          // Data Rows
                           if (currentProducts.isEmpty)
                             TableRow(
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text('Aucun produit trouvé',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontStyle: FontStyle.italic)),
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    'Aucun produit trouvé',
+                                    textAlign: TextAlign.center,
+                                    style:
+                                        TextStyle(fontStyle: FontStyle.italic),
+                                  ),
                                 ),
-                                const SizedBox.shrink(),
-                                const SizedBox.shrink(),
-                                const SizedBox.shrink(),
-                                const SizedBox.shrink(),
+                                for (int i = 0; i < 4; i++)
+                                  const SizedBox.shrink(),
                               ],
                             )
                           else
-                            for (var product in currentProducts)
+                            for (var i = 0; i < currentProducts.length; i++)
                               TableRow(
+                                decoration: BoxDecoration(
+                                  color: i.isEven
+                                      ? Colors.grey.shade100
+                                      : Colors.white,
+                                ),
                                 children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(product['code'] ?? 'N/A'),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child:
-                                        Text(product['designation'] ?? 'N/A'),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(product['stock'].toString()),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(product['prix_ht'].toString()),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                        product['date_expiration'].toString()),
-                                  ),
+                                  TableDataCell(
+                                      currentProducts[i]['code'] ?? 'N/A'),
+                                  TableDataCell(currentProducts[i]
+                                          ['designation'] ??
+                                      'N/A'),
+                                  TableDataCell(
+                                      currentProducts[i]['stock'].toString()),
+                                  TableDataCell(
+                                      currentProducts[i]['prix_ht'].toString()),
+                                  TableDataCell(currentProducts[i]
+                                          ['date_expiration']
+                                      .toString()),
                                 ],
                               ),
                         ],
@@ -536,12 +709,28 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ),
             ),
           ),
+
+          // Popup Buttons
           actions: [
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the popup
+                Navigator.of(context).pop(); // Close popup
               },
-              child: const Text('Fermer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, // Red for cancel
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Fermer',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
             ),
           ],
         );
@@ -715,13 +904,42 @@ class _CashDeskPageState extends State<CashDeskPage> {
                 );
                 Navigator.of(context).pop(); // Close popup
               },
-              child: const Text('Ajouter'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green, // Green for confirmation
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Ajouter',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
             ),
+            const SizedBox(width: 20), // Space between buttons
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Close popup
               },
-              child: const Text('Annuler'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, // Red for cancel
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Annuler',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
             ),
           ],
         );
