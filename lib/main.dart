@@ -398,7 +398,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                           ),
                         ),
                         child: const Text(
-                          'ANNULER',
+                          'SUPPRIMER LIGNE',
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -598,7 +598,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
       String query = searchController.text.toLowerCase();
       filteredProducts.value = products
           .where((product) =>
-              (product['code']?.toLowerCase().contains(query) ?? false) ||
+              (product['code']?.contains(query) ?? false) ||
               (product['designation']?.toLowerCase().contains(query) ?? false))
           .toList();
     });
@@ -683,7 +683,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                               TableRow(
                                 decoration: BoxDecoration(
                                   color: i.isEven
-                                      ? Colors.grey.shade100
+                                      ? const Color.fromARGB(255, 148, 146, 146)
                                       : Colors.white,
                                 ),
                                 children: [
