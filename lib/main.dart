@@ -199,13 +199,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                               style: TextStyle(fontSize: 14))),
                                       Expanded(
                                         child: Text(
-                                          selectedProductIndex != null &&
-                                                  selectedProductIndex == index
-                                              ? selectedProducts[
-                                                          selectedProductIndex!]
-                                                      ['quantity']
-                                                  .toString()
-                                              : product['quantity'].toString(),
+                                         (int.tryParse(product['stock'].toString()) ?? 0).toString(), 
                                           style: const TextStyle(
                                               fontWeight: FontWeight.bold),
                                         ),
@@ -216,8 +210,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                                   color: Colors.grey))),
                                       Expanded(
                                         child: Text(
-                                          (product['prix_ttc'] *
-                                                  (product['quantity'] ?? 1))
+                                           ((double.tryParse(product['prix_ttc'].toString()) ?? 0) * 1)
                                               .toStringAsFixed(2),
                                           style: const TextStyle(
                                               fontWeight: FontWeight.bold),
@@ -778,10 +771,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                     final newQuantity =
                                         int.tryParse(enteredQuantity) ?? 1;
 
-                                    setState(() {
-                                      selectedProducts[selectedProductIndex!]
-                                          ['quantity'] = newQuantity;
-                                    });
+                                    setState(() {});
 
                                     Navigator.of(context)
                                         .pop(); // Close the dialog
@@ -819,19 +809,13 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   double calculateTotal() {
     return selectedProducts.fold(
-        0, (sum, product) => sum + (product['prix_ttc'] * product['quantity']));
+        0, (sum, product) => sum + (product['prix_ttc'] * 1));
   }
 
   Widget _buildNumberButton(BuildContext context, String number) {
     return ElevatedButton(
       onPressed: () {
-        setState(() {
-          if (selectedProductIndex != null) {
-            // Ensure the selected product is mutable
-            selectedProducts[selectedProductIndex!]['quantity'] =
-                int.tryParse(number) ?? 1;
-          }
-        });
+        setState(() {});
         Navigator.of(context).pop(); // Close the dialog
       },
       child: Text(number),
@@ -847,7 +831,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
     final TextEditingController codeController = TextEditingController();
     final TextEditingController designationController = TextEditingController();
     final TextEditingController stockController = TextEditingController();
-    final TextEditingController quantityController = TextEditingController();
     final TextEditingController priceHTController = TextEditingController();
     final TextEditingController priceTTCController = TextEditingController();
     final TextEditingController taxController = TextEditingController();
@@ -878,8 +861,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
                 _buildTextField(designationController, 'Désignation'),
                 _buildTextField(stockController, 'Stock',
                     keyboardType: TextInputType.number),
-                _buildTextField(quantityController, 'Quantité',
-                    keyboardType: TextInputType.number),
                 _buildTextField(priceHTController, 'Prix HT',
                     keyboardType: TextInputType.number),
                 _buildTextField(taxController, 'Taxe (%)',
@@ -896,7 +877,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   codeController.text,
                   designationController.text,
                   int.tryParse(stockController.text) ?? 0,
-                  int.tryParse(quantityController.text) ?? 0,
                   double.tryParse(priceHTController.text) ?? 0.0,
                   double.tryParse(taxController.text) ?? 0.0,
                   double.tryParse(priceTTCController.text) ?? 0.0,
