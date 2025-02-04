@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:caissechicopets/product.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
@@ -55,11 +56,13 @@ class SqlDb {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getProducts() async {
-    Database db = await this.db;
-    List<Map<String, dynamic>> products = await db.query('products');
-    return products;
-  }
+  Future<List<Product>> getProducts() async {
+  Database db = await this.db;
+  List<Map<String, dynamic>> maps = await db.query('products');
+  return maps.map((map) => Product.fromMap(map)).toList();
+}
+
+
 
   Future<void> addProduct(
     String code,
