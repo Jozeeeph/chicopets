@@ -10,6 +10,8 @@ class TableCmd extends StatefulWidget {
   final VoidCallback onAddProduct;
   final VoidCallback onSearchProduct;
   final VoidCallback onQuantityChange;
+  final VoidCallback onPlaceOrder;
+
 
   const TableCmd({
     super.key,
@@ -19,6 +21,7 @@ class TableCmd extends StatefulWidget {
     required this.onAddProduct,
     required this.onSearchProduct,
     required this.onQuantityChange,
+    required this.onPlaceOrder,
   });
 
   @override
@@ -166,7 +169,7 @@ class _TableCmdState extends State<TableCmd> {
           children: [
             ElevatedButton(
               onPressed: widget.onAddProduct,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 76, 93, 177)),
               child: const Text('AJOUT PRODUIT',
                   style: TextStyle(color: Colors.white)),
             ),
@@ -194,6 +197,12 @@ class _TableCmdState extends State<TableCmd> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               child:
                   const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),
+            ),
+            ElevatedButton(
+              onPressed: widget.onPlaceOrder,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 74, 239, 96)),
+              child:
+                  const Text('VALIDER', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),

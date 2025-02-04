@@ -1,3 +1,4 @@
+import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +49,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
   int? selectedProductIndex;
   String enteredQuantity = "";
   void handleQuantityChange() {}
+  void handlePlaceOrder(){
+    _showPlaceOrderPopup(context);
+  }
   void handleSearchProduct() {
     _showProductSearchPopup(context);
   }
@@ -82,7 +86,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onAddProduct: handleAddProduct,
               onDeleteProduct: handleDeleteProduct,
               onSearchProduct: handleSearchProduct, // Ensure this is passed
-              onQuantityChange: handleQuantityChange, // Ensure this is passed
+              onQuantityChange: handleQuantityChange,
+              onPlaceOrder: handlePlaceOrder, // Ensure this is passed
             ),
 
             const SizedBox(height: 10), // Add some spacing
@@ -258,6 +263,43 @@ class _CashDeskPageState extends State<CashDeskPage> {
       ),
     );
   }
+
+  void _showPlaceOrderPopup(BuildContext context) async {
+  if (selectedProducts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Aucun produit sélectionné.")),
+    );
+    return;
+  }
+
+  double total = calculateTotal();
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text("Confirmer la commande"),
+        content: Text("Total : ${total.toStringAsFixed(2)}\nVoulez-vous passer la commande ?"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text("Annuler"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Fermer la popup
+              handlePlaceOrder(); // Passer la commande
+            },
+            child: Text("Confirmer"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   void _showProductSearchPopup(BuildContext context) async {
     final products =
