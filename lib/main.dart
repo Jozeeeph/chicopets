@@ -5,6 +5,8 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:caissechicopets/components/header.dart';
+import 'package:caissechicopets/components/tableCmd.dart';
 
 Future<void> main() async {
   // Initialize databaseFactory for desktop platforms
@@ -45,357 +47,47 @@ class _CashDeskPageState extends State<CashDeskPage> {
   List<Product> selectedProducts = [];
   int? selectedProductIndex;
   String enteredQuantity = "";
+  void handleQuantityChange() {}
+  void handleSearchProduct() {
+    _showProductSearchPopup(context);
+  }
+
+  void handleAddProduct() {
+    _showAddProductPopup(context); // Open the popup
+  }
+
+  void handleDeleteProduct(int index) {
+    _showDeleteConfirmation(index,context);
+  }
 
   @override
   void initState() {
-  super.initState();
-  products = sqldb.getProducts(); // Modifier getProducts() pour renvoyer List<Product>
-}
-
+    super.initState();
+    products = sqldb
+        .getProducts(); // Modifier getProducts() pour renvoyer List<Product>
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cash-Desk'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () {},
-              child: const Text('Logout'),
-            ),
-          ),
-        ],
-      ),
+      appBar: Header(),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            // Header Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Caissier : foulen ben foulen',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const Text(
-                  'Avec Ticket : Vrai',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Total: ${calculateTotal().toStringAsFixed(2)} DT',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-                Text(
-                  DateFormat('dd/MM/yyyy HH:mm')
-                      .format(DateTime.now()), // Get system time
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ],
+            // Table Command Section
+            TableCmd(
+              total: calculateTotal(),
+              selectedProducts: selectedProducts,
+              onAddProduct: handleAddProduct,
+              onDeleteProduct: handleDeleteProduct,
+              onSearchProduct: handleSearchProduct, // Ensure this is passed
+              onQuantityChange: handleQuantityChange, // Ensure this is passed
             ),
 
-            const SizedBox(height: 10),
-            // Order Section
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.white, // Set the background color here
-                border: Border.all(color: Colors.blueAccent), // Border color
-                borderRadius: BorderRadius.circular(12), // Rounded corners
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(
-                        12), // Increased padding for header
-                    decoration: BoxDecoration(
-                      color: Colors.blueAccent, // Header background color
-                      borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(
-                              12)), // Optional: Rounded top corners
-                    ),
-                    child: Row(
-                      children: const [
-                        Expanded(
-                            child: Text('Code Art',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white))),
-                        Expanded(
-                            child: Text('Designation',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white))),
-                        Expanded(
-                            child: Text('Quantité',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white))),
-                        Expanded(
-                            child: Text('Remise',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white))),
-                        Expanded(
-                            child: Text('Montant',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white))),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-  child: selectedProducts.isEmpty
-      ? const Center(
-          child: Text('Aucune commande',
-              style: TextStyle(fontStyle: FontStyle.italic)))
-      : ListView.builder(
-          itemCount: selectedProducts.length,
-          itemBuilder: (context, index) {
-            final Product product = selectedProducts[index];
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedProductIndex = index;
-                });
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: selectedProductIndex == index
-                      ? Colors.blue.withOpacity(0.2) // Highlight selected row
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300), // Subtle border
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                        child: Text(product.code,
-                            style: const TextStyle(fontSize: 14))),
-                    Expanded(
-                        child: Text(product.designation,
-                            style: const TextStyle(fontSize: 14))),
-                    Expanded(
-                      child: Text(
-                        "1", // Remplace int.tryParse("1") inutile ici
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Expanded(
-                        child: Text('0',
-                            style: const TextStyle(color: Colors.grey))),
-                    Expanded(
-                      child: Text(
-                        (product.prixTTC * 1).toStringAsFixed(2), // Multiplication inutile ici aussi
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-),
-                ],
-              ),
-            ),
+            const SizedBox(height: 10), // Add some spacing
 
-            const SizedBox(height: 10),
-            // Button Section
-            Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              if (selectedProductIndex != null) {
-                                _showQuantityInput(context);
-                              } else {
-                                _showMessage(context,
-                                    'Veuillez sélectionner une ligne.');
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'QUANTITÉ',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () => _showAddProductPopup(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'AJOUT PRODUIT',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {
-                              _showProductSearchPopup(context);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'RECHERCHE PRODUIT',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10), // Small spacing between columns
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color.fromARGB(255, 188, 138, 0),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'IMPR TICKET',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'REMISE %',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade700,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'VALIDER',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10), // Spacing before second row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (selectedProductIndex != null) {
-                            _showDeleteConfirmation(context);
-                          } else {
-                            _showMessage(context,
-                                'Veuillez sélectionner une ligne à supprimer.');
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'SUPPRIMER LIGNE',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
+            // Main Content (Images + Products)
             Expanded(
               child: Row(
                 children: [
@@ -419,18 +111,14 @@ class _CashDeskPageState extends State<CashDeskPage> {
                       ],
                     ),
                   ),
-                  // Divider between sections
+
+                  // Divider
                   VerticalDivider(
                     width: 1,
                     color: Colors.grey.shade400,
                     thickness: 1,
                   ),
-                  // Product List Section
-                  VerticalDivider(
-                    width: 1,
-                    color: Colors.grey.shade400,
-                    thickness: 1,
-                  ),
+
                   // Product List Section
                   Expanded(
                     child: FutureBuilder<List<Product>>(
@@ -459,8 +147,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                   });
                                 },
                                 child: buildProductButton(
-                                    product.designation ??
-                                        'Unknown Product'),
+                                    product.designation ?? 'Unknown Product'),
                               );
                             }).toList(),
                           );
@@ -576,9 +263,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
     final products =
         await sqldb.getProducts(); // Fetch products from the database
     final TextEditingController searchController = TextEditingController();
-    ValueNotifier<List<Product>> filteredProducts =
-        ValueNotifier(products);
+    ValueNotifier<List<Product>> filteredProducts = ValueNotifier(products);
 
+    // Filtering logic for search
     searchController.addListener(() {
       String query = searchController.text.toLowerCase();
       filteredProducts.value = products
@@ -623,67 +310,75 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   ValueListenableBuilder<List<Product>>(
                     valueListenable: filteredProducts,
                     builder: (context, currentProducts, child) {
-                      return Table(
-                        border: TableBorder.all(color: Colors.grey.shade300),
-                        columnWidths: const {
-                          0: FixedColumnWidth(80), // Code column
-                          1: FlexColumnWidth(), // Designation column
-                          2: FixedColumnWidth(80), // Quantity column
-                        },
+                      return Column(
                         children: [
-                          // Header Row
-                          TableRow(
-                            decoration: BoxDecoration(
-                              color: Colors.blueAccent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                          // Header Row (only once)
+                          Row(
                             children: [
-                              TableHeaderCell('Code'),
-                              TableHeaderCell('Désignation'),
-                              TableHeaderCell('Quantité'),
-                              TableHeaderCell('Prix HT'),
-                              TableHeaderCell('Date Expiration'),
+                              Expanded(
+                                  child: Text('Code',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              Expanded(
+                                  child: Text('Désignation',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              Expanded(
+                                  child: Text('Stock',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              Expanded(
+                                  child: Text('Prix HT',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
+                              Expanded(
+                                  child: Text('Date Expiration',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold))),
                             ],
                           ),
+                          // Product Data Rows
+                          ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: currentProducts.length,
+                            itemBuilder: (context, index) {
+                              final product = currentProducts[index];
+                              // Date format handling
+                              String formattedDate = 'N/A';
+                              if (product.dateExpiration != null) {
+                                try {
+                                  formattedDate = DateFormat('dd/MM/yyyy')
+                                      .format(DateFormat('yyyy-MM-dd')
+                                          .parse(product.dateExpiration!));
+                                } catch (e) {
+                                  formattedDate = 'Invalid Date';
+                                }
+                              }
 
-                          // Data Rows
-                          if (currentProducts.isEmpty)
-                            TableRow(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                    'Aucun produit trouvé',
-                                    textAlign: TextAlign.center,
-                                    style:
-                                        TextStyle(fontStyle: FontStyle.italic),
+                              return InkWell(
+                                child: Container(
+                                  color: index.isEven
+                                      ? Colors.grey.shade200
+                                      : Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 8, horizontal: 12),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                          child: Text(product.code ?? 'N/A')),
+                                      Expanded(
+                                          child: Text(
+                                              product.designation ?? 'N/A')),
+                                      Expanded(child: Text('${product.stock}')),
+                                      Expanded(
+                                          child: Text('${product.prixHT} DT')),
+                                      Expanded(child: Text(formattedDate)),
+                                    ],
                                   ),
                                 ),
-                                for (int i = 0; i < 4; i++)
-                                  const SizedBox.shrink(),
-                              ],
-                            )
-                          else
-                            for (var i = 0; i < currentProducts.length; i++)
-                              TableRow(
-                                decoration: BoxDecoration(
-                                  color: i.isEven
-                                      ? const Color.fromARGB(255, 213, 213, 213)
-                                      : Colors.white,
-                                ),
-                                children: [
-                                  TableDataCell(
-                                      currentProducts[i].code ?? 'N/A'),
-                                  TableDataCell(currentProducts[i].designation ??
-                                      'N/A'),
-                                  TableDataCell(
-                                      currentProducts[i].stock.toString()),
-                                  TableDataCell(
-                                      currentProducts[i].prixHT.toString()),
-                                  TableDataCell(currentProducts[i].dateExpiration
-                                      .toString()),
-                                ],
-                              ),
+                              );
+                            },
+                          ),
                         ],
                       );
                     },
@@ -692,7 +387,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ),
             ),
           ),
-
           // Popup Buttons
           actions: [
             ElevatedButton(
@@ -805,7 +499,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
   Widget _buildNumberButton(BuildContext context, String number) {
     return ElevatedButton(
       onPressed: () {
-        setState(() {});
+        // Assuming you need to append this number somewhere, update state
+        setState(() {
+          // Example: If you have a controller for input, append the number
+          // myNumberController.text += number;
+        });
         Navigator.of(context).pop(); // Close the dialog
       },
       child: Text(number),
@@ -826,13 +524,15 @@ class _CashDeskPageState extends State<CashDeskPage> {
     final TextEditingController taxController = TextEditingController();
     final TextEditingController dateController = TextEditingController();
 
-    // Listeners for tax and price calculation
+    // Function to update Price TTC dynamically
     void calculatePriceTTC() {
       if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
         double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
         double taxe = double.tryParse(taxController.text) ?? 0.0;
         double prixTTC = prixHT + (prixHT * taxe / 100);
         priceTTCController.text = prixTTC.toStringAsFixed(2);
+      } else {
+        priceTTCController.clear();
       }
     }
 
@@ -846,6 +546,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
           title: const Text('Ajouter un Produit'),
           content: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildTextField(codeController, 'Code Barre'),
                 _buildTextField(designationController, 'Désignation'),
@@ -863,6 +564,18 @@ class _CashDeskPageState extends State<CashDeskPage> {
           actions: [
             ElevatedButton(
               onPressed: () async {
+                // Validate input before adding product
+                if (codeController.text.isEmpty ||
+                    designationController.text.isEmpty ||
+                    stockController.text.isEmpty ||
+                    priceHTController.text.isEmpty ||
+                    taxController.text.isEmpty ||
+                    priceTTCController.text.isEmpty ||
+                    dateController.text.isEmpty) {
+                  _showMessage(context, "Veuillez remplir tous les champs !");
+                  return;
+                }
+
                 await sqldb.addProduct(
                   codeController.text,
                   designationController.text,
@@ -872,6 +585,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   double.tryParse(priceTTCController.text) ?? 0.0,
                   dateController.text,
                 );
+
                 Navigator.of(context).pop(); // Close popup
               },
               style: ElevatedButton.styleFrom(
@@ -927,7 +641,12 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context) {
+  void _showDeleteConfirmation(int index,BuildContext context) {
+    if (index == null || index! < 0) {
+      _showMessage(context, "Aucun produit sélectionné !");
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -939,8 +658,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
             ElevatedButton(
               onPressed: () {
                 setState(() {
-                  selectedProducts.removeAt(selectedProductIndex!);
-                  selectedProductIndex = null; // Reset selection
+                  if (index != null &&
+                      index! < selectedProducts.length) {
+                    selectedProducts.removeAt(index!);
+                    index = 0; // Reset selection
+                  }
                 });
                 Navigator.of(context).pop(); // Close popup
               },
