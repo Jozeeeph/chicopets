@@ -1,3 +1,4 @@
+import 'package:caissechicopets/product.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -40,16 +41,17 @@ class CashDeskPage extends StatefulWidget {
 
 class _CashDeskPageState extends State<CashDeskPage> {
   final SqlDb sqldb = SqlDb();
-  Future<List<Map<String, dynamic>>>? products;
-  List<Map<String, dynamic>> selectedProducts = [];
+  Future<List<Product>>? products;
+  List<Product> selectedProducts = [];
   int? selectedProductIndex;
   String enteredQuantity = "";
 
   @override
   void initState() {
-    super.initState();
-    products = sqldb.getProducts();
-  }
+  super.initState();
+  products = sqldb.getProducts(); // Modifier getProducts() pour renvoyer List<Product>
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -159,70 +161,60 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     ),
                   ),
                   Expanded(
-                    child: selectedProducts.isEmpty
-                        ? const Center(
-                            child: Text('Aucune commande',
-                                style: TextStyle(fontStyle: FontStyle.italic)))
-                        : ListView.builder(
-                            itemCount: selectedProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = selectedProducts[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedProductIndex = index;
-                                  });
-                                },
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: selectedProductIndex == index
-                                        ? Colors.blue.withOpacity(
-                                            0.2) // Highlight selected row
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: Colors
-                                            .grey.shade300), // Subtle border
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 8, horizontal: 12),
-                                  margin:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                          child: Text(product['code'] ?? '',
-                                              style: TextStyle(fontSize: 14))),
-                                      Expanded(
-                                          child: Text(
-                                              product['designation'] ?? '',
-                                              style: TextStyle(fontSize: 14))),
-                                      Expanded(
-                                        child: Text(
-                                         (int.tryParse(product['stock'].toString()) ?? 0).toString(), 
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      Expanded(
-                                          child: Text('0',
-                                              style: TextStyle(
-                                                  color: Colors.grey))),
-                                      Expanded(
-                                        child: Text(
-                                           ((double.tryParse(product['prix_ttc'].toString()) ?? 0) * 1)
-                                              .toStringAsFixed(2),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
+  child: selectedProducts.isEmpty
+      ? const Center(
+          child: Text('Aucune commande',
+              style: TextStyle(fontStyle: FontStyle.italic)))
+      : ListView.builder(
+          itemCount: selectedProducts.length,
+          itemBuilder: (context, index) {
+            final Product product = selectedProducts[index];
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  selectedProductIndex = index;
+                });
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: selectedProductIndex == index
+                      ? Colors.blue.withOpacity(0.2) // Highlight selected row
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300), // Subtle border
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: Text(product.code,
+                            style: const TextStyle(fontSize: 14))),
+                    Expanded(
+                        child: Text(product.designation,
+                            style: const TextStyle(fontSize: 14))),
+                    Expanded(
+                      child: Text(
+                        "1", // Remplace int.tryParse("1") inutile ici
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                        child: Text('0',
+                            style: const TextStyle(color: Colors.grey))),
+                    Expanded(
+                      child: Text(
+                        (product.prixTTC * 1).toStringAsFixed(2), // Multiplication inutile ici aussi
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+),
                 ],
               ),
             ),
@@ -441,7 +433,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   ),
                   // Product List Section
                   Expanded(
-                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                    child: FutureBuilder<List<Product>>(
                       future: sqldb.getProducts(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -456,7 +448,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                           return const Center(
                               child: Text('No products available'));
                         } else {
-                          List<Map<String, dynamic>> products = snapshot.data!;
+                          List<Product> products = snapshot.data!;
                           return GridView.count(
                             crossAxisCount: 4, // Number of columns
                             children: products.map((product) {
@@ -467,7 +459,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                   });
                                 },
                                 child: buildProductButton(
-                                    product['designation'] ??
+                                    product.designation ??
                                         'Unknown Product'),
                               );
                             }).toList(),
@@ -584,15 +576,15 @@ class _CashDeskPageState extends State<CashDeskPage> {
     final products =
         await sqldb.getProducts(); // Fetch products from the database
     final TextEditingController searchController = TextEditingController();
-    ValueNotifier<List<Map<String, dynamic>>> filteredProducts =
+    ValueNotifier<List<Product>> filteredProducts =
         ValueNotifier(products);
 
     searchController.addListener(() {
       String query = searchController.text.toLowerCase();
       filteredProducts.value = products
           .where((product) =>
-              (product['code']?.contains(query) ?? false) ||
-              (product['designation']?.toLowerCase().contains(query) ?? false))
+              (product.code?.contains(query) ?? false) ||
+              (product.designation?.toLowerCase().contains(query) ?? false))
           .toList();
     });
 
@@ -628,7 +620,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   ),
 
                   // Product Table
-                  ValueListenableBuilder<List<Map<String, dynamic>>>(
+                  ValueListenableBuilder<List<Product>>(
                     valueListenable: filteredProducts,
                     builder: (context, currentProducts, child) {
                       return Table(
@@ -676,21 +668,19 @@ class _CashDeskPageState extends State<CashDeskPage> {
                               TableRow(
                                 decoration: BoxDecoration(
                                   color: i.isEven
-                                      ? const Color.fromARGB(255, 148, 146, 146)
+                                      ? const Color.fromARGB(255, 213, 213, 213)
                                       : Colors.white,
                                 ),
                                 children: [
                                   TableDataCell(
-                                      currentProducts[i]['code'] ?? 'N/A'),
-                                  TableDataCell(currentProducts[i]
-                                          ['designation'] ??
+                                      currentProducts[i].code ?? 'N/A'),
+                                  TableDataCell(currentProducts[i].designation ??
                                       'N/A'),
                                   TableDataCell(
-                                      currentProducts[i]['stock'].toString()),
+                                      currentProducts[i].stock.toString()),
                                   TableDataCell(
-                                      currentProducts[i]['prix_ht'].toString()),
-                                  TableDataCell(currentProducts[i]
-                                          ['date_expiration']
+                                      currentProducts[i].prixHT.toString()),
+                                  TableDataCell(currentProducts[i].dateExpiration
                                       .toString()),
                                 ],
                               ),
@@ -809,7 +799,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   double calculateTotal() {
     return selectedProducts.fold(
-        0, (sum, product) => sum + (product['prix_ttc'] * 1));
+        0, (sum, product) => sum + (product.prixTTC * 1));
   }
 
   Widget _buildNumberButton(BuildContext context, String number) {
