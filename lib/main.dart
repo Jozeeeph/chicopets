@@ -264,7 +264,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  void _showPlaceOrderPopup(BuildContext context) async {
+void _showPlaceOrderPopup(BuildContext context) async {
   if (selectedProducts.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Aucun produit sélectionné.")),
@@ -290,7 +290,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Fermer la popup
-              handlePlaceOrder(); // Passer la commande
+              _confirmPlaceOrder(); // 🔥 Nouvelle méthode pour enregistrer la commande
             },
             child: Text("Confirmer"),
           ),
@@ -298,6 +298,45 @@ class _CashDeskPageState extends State<CashDeskPage> {
       );
     },
   );
+}
+
+
+void _confirmPlaceOrder() async {
+  if (selectedProducts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Aucun produit sélectionné.")),
+    );
+    return;
+  }
+
+  double total = calculateTotal();
+  String date = DateTime.now().toIso8601String();
+  String modePaiement = "Espèces"; // Tu peux ajouter un champ pour le choix du paiement
+  
+  Order order = Order(
+    date: date,
+    listeProduits: List.from(selectedProducts),
+    total: total,
+    modePaiement: modePaiement,
+  );
+
+  // 🔥 Enregistrer la commande dans la base de données
+  int orderId = await SqlDb().addOrder(order);
+
+  if (orderId > 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Commande passée avec succès !")),
+    );
+
+    // ✅ Effacer les produits sélectionnés après confirmation
+    setState(() {
+      selectedProducts.clear();
+    });
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Erreur lors de l'enregistrement de la commande.")),
+    );
+  }
 }
 
 

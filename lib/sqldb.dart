@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
@@ -30,31 +31,68 @@ class SqlDb {
 // }
 
   Future<Database> initDb() async {
-    // Get the correct path for the database file
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final dbPath = join(documentsDirectory.path, 'cashdesk1.db');
+  // Get the correct path for the database file
+  final documentsDirectory = await getApplicationDocumentsDirectory();
+  final dbPath = join(documentsDirectory.path, 'cashdesk1.db');
 
-    return openDatabase(
-      dbPath, // Use the correct path
-      version: 1,
-      onCreate: (Database db, int version) async {
-        await db.execute('''
-          CREATE TABLE products(
-            code TEXT PRIMARY KEY,
-            designation TEXT,
-            stock INTEGER,
-            prix_ht REAL,
-            taxe REAL,
-            prix_ttc REAL,
-            date_expiration TEXT
-          )
-        ''');
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        // Handle database upgrades if needed
-      },
-    );
+
+  return openDatabase(
+    dbPath, // Use the correct path
+    version: 1,
+    onCreate: (Database db, int version) async {
+        print("Creating tables...");
+      await db.execute('''
+        CREATE TABLE products(
+          code TEXT PRIMARY KEY,
+          designation TEXT,
+          stock INTEGER,
+          prix_ht REAL,
+          taxe REAL,
+          prix_ttc REAL,
+          date_expiration TEXT
+        )
+      ''');
+  print("Products table created");
+
+      await db.execute('''
+        CREATE TABLE orders(
+          id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT,
+          total REAL,
+          mode_paiement TEXT,
+          id_client INTEGER
+        )
+      ''');
+  print("Orders table created");
+
+      await db.execute('''
+        CREATE TABLE order_items(
+          id_order INTEGER,
+          product_code TEXT,
+          quantity INTEGER,
+          FOREIGN KEY(id_order) REFERENCES orders(id_order),
+          FOREIGN KEY(product_code) REFERENCES products(code)
+        )
+      ''');
+        print("Order items table created");
+
+    },
+    onUpgrade: (db, oldVersion, newVersion) async {
+  if (oldVersion < 2) {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS orders(
+        id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT,
+        total REAL,
+        mode_paiement TEXT,
+        id_client INTEGER
+      )
+    ''');
   }
+},
+
+  );
+}
 
   Future<List<Product>> getProducts() async {
   Database db = await this.db;
@@ -89,5 +127,76 @@ class SqlDb {
     );
   }
 
-  // Add more methods for update, delete, etc., as needed
+  Future<int> addOrder(Order order) async {
+    final dbClient = await db;
+    int orderId = await dbClient.transaction((txn) async {
+      // Insert the order into the orders table
+      int orderId = await txn.insert(
+        'orders',
+        order.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // Insert each product in the order into the order_items table
+      for (var product in order.listeProduits) {
+        await txn.insert(
+          'order_items',
+          {
+            'id_order': orderId,
+            'product_code': product.code,
+            'quantity': 1, // Assuming quantity is 1 for each product
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      return orderId;
+    });
+
+    return orderId;
+  }
+
+  Future<List<Order>> getOrders() async {
+    final dbClient = await db;
+    List<Map<String, dynamic>> orderMaps = await dbClient.query('orders');
+
+    List<Order> orders = [];
+    for (var orderMap in orderMaps) {
+      int orderId = orderMap['id_order'];
+      List<Map<String, dynamic>> itemMaps = await dbClient.query(
+        'order_items',
+        where: 'id_order = ?',
+        whereArgs: [orderId],
+      );
+
+      List<Product> products = [];
+      for (var itemMap in itemMaps) {
+        List<Map<String, dynamic>> productMaps = await dbClient.query(
+          'products',
+          where: 'code = ?',
+          whereArgs: [itemMap['product_code']],
+        );
+
+        if (productMaps.isNotEmpty) {
+          products.add(Product.fromMap(productMaps.first));
+        }
+      }
+
+      orders.add(Order(
+        idOrder: orderId,
+        date: orderMap['date'],
+        listeProduits: products,
+        total: orderMap['total'],
+        modePaiement: orderMap['mode_paiement'],
+        idClient: orderMap['id_client'],
+      ));
+    }
+
+    return orders;
+  }
+
 }
+
+
+
+  
