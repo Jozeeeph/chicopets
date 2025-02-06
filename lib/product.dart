@@ -42,4 +42,9 @@ class Product {
       dateExpiration: map['date_expiration'],
     );
   }
+
+  @override
+  String toString() {
+    return 'Product(code: $code, name: $designation, stock: $stock, price: $prixTTC DT, exp: $dateExpiration)';
+  }
 }

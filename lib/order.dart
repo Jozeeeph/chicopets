@@ -1,9 +1,9 @@
-import 'product.dart';
+import 'package:caissechicopets/orderline.dart';
 
 class Order {
   int? idOrder; 
   String date;
-  List<Product> listeProduits;
+  List<OrderLine> orderLines; // ✅ Change from List<Product> to List<OrderLine>
   double total;
   String modePaiement;
   int? idClient; 
@@ -11,7 +11,7 @@ class Order {
   Order({
     this.idOrder, 
     required this.date,
-    required this.listeProduits,
+    required this.orderLines, // ✅ Updated
     required this.total,
     required this.modePaiement,
     this.idClient,
@@ -31,7 +31,7 @@ class Order {
     return Order(
       idOrder: map['id_order'],
       date: map['date'],
-      listeProduits: [], 
+      orderLines: [], 
       total: map['total'].toDouble(),
       modePaiement: map['mode_paiement'],
       idClient: map['id_client'],
