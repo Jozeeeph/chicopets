@@ -1,4 +1,5 @@
 import 'package:caissechicopets/order.dart';
+import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -49,9 +50,17 @@ class _CashDeskPageState extends State<CashDeskPage> {
   int? selectedProductIndex;
   String enteredQuantity = "";
   void handleQuantityChange() {}
-  void handlePlaceOrder(){
-    _showPlaceOrderPopup(context);
+
+  void handlePlaceOrder() {
+    Order order = Order(
+      date: DateTime.now().toIso8601String(),
+      orderLines: [], // Empty list for orderLines
+      total: calculateTotal(),
+      modePaiement: "Espèces", // Default payment method
+    );
+    _showPlaceOrderPopup(context, order);
   }
+
   void handleSearchProduct() {
     _showProductSearchPopup(context);
   }
@@ -61,7 +70,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void handleDeleteProduct(int index) {
-    _showDeleteConfirmation(index,context);
+    _showDeleteConfirmation(index, context);
+  }
+
+  void handleFetchOrders() {
+    _showListOrdersPopUp(context);
   }
 
   @override
@@ -87,6 +100,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onDeleteProduct: handleDeleteProduct,
               onSearchProduct: handleSearchProduct, // Ensure this is passed
               onQuantityChange: handleQuantityChange,
+              onFetchOrders: handleFetchOrders,
               onPlaceOrder: handlePlaceOrder, // Ensure this is passed
             ),
 
@@ -149,6 +163,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                 onTap: () {
                                   setState(() {
                                     selectedProducts.add(product);
+                                    print(
+                                        "Selected Products: $selectedProducts");
                                   });
                                 },
                                 child: buildProductButton(
@@ -264,81 +280,375 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-void _showPlaceOrderPopup(BuildContext context) async {
-  if (selectedProducts.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Aucun produit sélectionné.")),
-    );
-    return;
-  }
-
-  double total = calculateTotal();
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text("Confirmer la commande"),
-        content: Text("Total : ${total.toStringAsFixed(2)}\nVoulez-vous passer la commande ?"),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text("Annuler"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Fermer la popup
-              _confirmPlaceOrder(); // 🔥 Nouvelle méthode pour enregistrer la commande
-            },
-            child: Text("Confirmer"),
-          ),
-        ],
+  void _showPlaceOrderPopup(BuildContext context, Order order) async {
+    if (selectedProducts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucun produit sélectionné.")),
       );
-    },
-  );
-}
+      return;
+    }
 
+    double amountGiven = 0.0;
+    double changeReturned = 0.0;
+    TextEditingController amountGivenController = TextEditingController();
+    TextEditingController changeReturnedController = TextEditingController();
 
-void _confirmPlaceOrder() async {
-  if (selectedProducts.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Aucun produit sélectionné.")),
+    double total = calculateTotal();
+    String selectedPaymentMethod = "Espèce"; // Default payment method
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Text(
+                "Confirmer la commande",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Static list of products and quantities
+                  // Styled product list (receipt look)
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.black,
+                          width: 1), // Border for ticket feel
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: Offset(2, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Center(
+                          child: Text(
+                            "🧾 Ticket de Commande",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              fontFamily:
+                                  'Courier', // Monospace for receipt style
+                            ),
+                          ),
+                        ),
+                        Divider(
+                            thickness: 1,
+                            color: Colors.black), // Separator line
+
+                        // Product List from OrderLine
+                        if (selectedProducts.isNotEmpty)
+                          ...selectedProducts.map((product) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      product.designation,
+                                      style: TextStyle(
+                                          fontSize: 16, fontFamily: 'Courier'),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    "x1  ", // Default quantity to 1 unless modified elsewhere
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Courier'),
+                                  ),
+                                  Text(
+                                    "${product.prixTTC.toStringAsFixed(2)} DT",
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Courier'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList()
+                        else
+                          Center(child: Text("Aucun produit sélectionné.")),
+
+                        Divider(
+                            thickness: 1,
+                            color: Colors.black), // Bottom separator
+
+                        // Total
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Total:",
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Courier'),
+                            ),
+                            Text(
+                              "${total.toStringAsFixed(2)} DT", // Display total from order
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Courier'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Payment Method Selection
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Mode de Paiement:",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: "Espèce",
+                            groupValue: selectedPaymentMethod,
+                            onChanged: (value) {
+                              setState(() {
+                                selectedPaymentMethod = value!;
+                              });
+                            },
+                          ),
+                          Text("Espèce"),
+                          Radio<String>(
+                            value: "Carte Bancaire",
+                            groupValue: selectedPaymentMethod,
+                            onChanged: (value) {
+                              setState(() {
+                                selectedPaymentMethod = value!;
+                              });
+                            },
+                          ),
+                          Text("Carte Bancaire"),
+                          Radio<String>(
+                            value: "Chèque",
+                            groupValue: selectedPaymentMethod,
+                            onChanged: (value) {
+                              setState(() {
+                                selectedPaymentMethod = value!;
+                              });
+                            },
+                          ),
+                          Text("Chèque"),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Total Amount
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Input for "Donnée" (Amount Given)
+                      TextField(
+                        controller: amountGivenController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: "Donnée (DT)",
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            // 🔥 This ensures UI updates
+                            amountGiven = double.tryParse(value) ?? 0.0;
+                            changeReturned = amountGiven - total;
+                            changeReturnedController.text =
+                                changeReturned.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+
+                      SizedBox(height: 10),
+
+                      // "Rendu" (Change Returned) - Readonly
+                      TextField(
+                        controller: changeReturnedController,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          labelText: "Rendu (DT)",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Annuler"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close popup
+                    _confirmPlaceOrder();
+                  },
+                  child: Text("Confirmer"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
-    return;
   }
 
-  double total = calculateTotal();
-  String date = DateTime.now().toIso8601String();
-  String modePaiement = "Espèces"; // Tu peux ajouter un champ pour le choix du paiement
-  
-  Order order = Order(
-    date: date,
-    listeProduits: List.from(selectedProducts),
-    total: total,
-    modePaiement: modePaiement,
-  );
+  void _confirmPlaceOrder() async {
+    if (selectedProducts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucun produit sélectionné.")),
+      );
+      return;
+    }
 
-  // 🔥 Enregistrer la commande dans la base de données
-  int orderId = await SqlDb().addOrder(order);
+    double total = calculateTotal();
+    String date = DateTime.now().toIso8601String();
+    String modePaiement =
+        "Espèces"; // You can change this to reflect the selected payment mode
 
-  if (orderId > 0) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Commande passée avec succès !")),
+    // Prepare order lines based on selected products
+    List<OrderLine> orderLines = selectedProducts.map((product) {
+      return OrderLine(
+        idOrder: 0, // Temporary ID, will be set once the order is saved
+        idProduct: product.code,
+        quantite:1,
+        prixUnitaire: product.prixTTC,
+      );
+    }).toList();
+
+    // Create an Order object with selected products and total
+    Order order = Order(
+      date: date,
+      orderLines: orderLines,
+      total: total,
+      modePaiement: modePaiement,
     );
 
-    // ✅ Effacer les produits sélectionnés après confirmation
-    setState(() {
-      selectedProducts.clear();
-    });
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Erreur lors de l'enregistrement de la commande.")),
+    // Enregistrer la commande dans la base de données
+    int orderId = await SqlDb().addOrder(order);
+
+    if (orderId > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Commande passée avec succès !")),
+      );
+
+      setState(() {
+        selectedProducts.clear();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Erreur lors de l'enregistrement de la commande.")),
+      );
+    }
+  }
+
+  void _showListOrdersPopUp(BuildContext context) async {
+    List<Order> orders =
+        await sqldb.getOrdersWithOrderLines(); // Fetch orders with orderLines
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            "Liste des Commandes",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: orders.isEmpty
+              ? const Text("Aucune commande disponible.")
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: orders.length,
+                    itemBuilder: (context, index) {
+                      Order order = orders[index];
+                      return ExpansionTile(
+                        title: Text(
+                          "Commande #${order.idOrder} - ${_formatDate(order.date)}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        children: order.orderLines.map((orderLine) {
+                          return FutureBuilder<Product?>(
+                            future: sqldb.getProductByCode(orderLine.idProduct),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+
+                              if (snapshot.hasError ||
+                                  !snapshot.hasData ||
+                                  snapshot.data == null) {
+                                return const ListTile(
+                                    title: Text("Produit introuvable"));
+                              }
+
+                              Product product = snapshot.data!;
+                              return ListTile(
+                                title: Text(product.designation),
+                                subtitle:
+                                    Text("Quantité: ${orderLine.quantite}"),
+                                trailing: Text(
+                                  "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Fermer"),
+            ),
+          ],
+        );
+      },
     );
   }
-}
 
+
+String _formatDate(String date) {
+  DateTime parsedDate = DateTime.parse(date);
+  return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
+}
 
   void _showProductSearchPopup(BuildContext context) async {
     final products =
@@ -722,7 +1032,7 @@ void _confirmPlaceOrder() async {
     );
   }
 
-  void _showDeleteConfirmation(int index,BuildContext context) {
+  void _showDeleteConfirmation(int index, BuildContext context) {
     if (index == null || index! < 0) {
       _showMessage(context, "Aucun produit sélectionné !");
       return;
@@ -739,8 +1049,7 @@ void _confirmPlaceOrder() async {
             ElevatedButton(
               onPressed: () {
                 setState(() {
-                  if (index != null &&
-                      index! < selectedProducts.length) {
+                  if (index != null && index! < selectedProducts.length) {
                     selectedProducts.removeAt(index!);
                     index = 0; // Reset selection
                   }

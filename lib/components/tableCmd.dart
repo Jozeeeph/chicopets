@@ -10,8 +10,8 @@ class TableCmd extends StatefulWidget {
   final VoidCallback onAddProduct;
   final VoidCallback onSearchProduct;
   final VoidCallback onQuantityChange;
+  final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
-
 
   const TableCmd({
     super.key,
@@ -21,6 +21,7 @@ class TableCmd extends StatefulWidget {
     required this.onAddProduct,
     required this.onSearchProduct,
     required this.onQuantityChange,
+    required this.onFetchOrders,
     required this.onPlaceOrder,
   });
 
@@ -169,7 +170,8 @@ class _TableCmdState extends State<TableCmd> {
           children: [
             ElevatedButton(
               onPressed: widget.onAddProduct,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 76, 93, 177)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 76, 93, 177)),
               child: const Text('AJOUT PRODUIT',
                   style: TextStyle(color: Colors.white)),
             ),
@@ -199,8 +201,15 @@ class _TableCmdState extends State<TableCmd> {
                   const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
+              onPressed: widget.onFetchOrders,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+              child: const Text('CHARGER COMMANDES',
+                  style: TextStyle(color: Colors.white)),
+            ),
+            ElevatedButton(
               onPressed: widget.onPlaceOrder,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 74, 239, 96)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 74, 239, 96)),
               child:
                   const Text('VALIDER', style: TextStyle(color: Colors.white)),
             ),
