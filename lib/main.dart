@@ -64,7 +64,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(),
+      total: calculateTotal(selectedProducts, quantityProducts),
       modePaiement: "Espèces", // Default payment method
     );
     _showPlaceOrderPopup(context, order);
@@ -103,9 +103,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
           children: [
             // Table Command Section
             TableCmd(
-              total: calculateTotal(),
+              total: calculateTotal(selectedProducts, quantityProducts),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
+              calculateTotal: calculateTotal,
               onAddProduct: handleAddProduct,
               onDeleteProduct: handleDeleteProduct,
               onSearchProduct: handleSearchProduct, // Ensure this is passed
@@ -308,7 +309,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController changeReturnedController = TextEditingController();
 
-    double total = calculateTotal();
+    double total = calculateTotal(selectedProducts, quantityProducts);
     String selectedPaymentMethod = "Espèce"; // Default payment method
 
     showDialog(
@@ -330,6 +331,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   // Static list of products and quantities
                   // Styled product list (receipt look)
                   Container(
+                    width: double.infinity, // Ensure full width
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -364,9 +366,65 @@ class _CashDeskPageState extends State<CashDeskPage> {
                             thickness: 1,
                             color: Colors.black), // Separator line
 
+                        // Header Row
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "Qt",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier'),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  "Article",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier'),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "Prix U",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier'),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "Montant",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Courier'),
+                                  textAlign: TextAlign.end,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(
+                            thickness: 1,
+                            color: Colors.black), // Separator line
+
                         // Product List from OrderLine
                         if (selectedProducts.isNotEmpty)
                           ...selectedProducts.map((product) {
+                            int index = selectedProducts.indexOf(product);
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
@@ -374,6 +432,15 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      "${quantityProducts[index]}X",
+                                      style: TextStyle(
+                                          fontSize: 16, fontFamily: 'Courier'),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
                                     child: Text(
                                       product.designation,
                                       style: TextStyle(
@@ -381,19 +448,25 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  Text(
-                                    "${quantityProducts[selectedProducts.indexOf(product)]}X  ", // Default quantity to 1 unless modified elsewhere
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      "${product.prixTTC.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontSize: 16, fontFamily: 'Courier'),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
-                                  Text(
-                                    "${product.prixTTC.toStringAsFixed(2)} DT",
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      "${(product.prixTTC * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Courier'),
+                                      textAlign: TextAlign.end,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -491,7 +564,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                         ),
                         onChanged: (value) {
                           setState(() {
-                            // 🔥 This ensures UI updates
+                            // This ensures UI updates
                             amountGiven = double.tryParse(value) ?? 0.0;
                             changeReturned = amountGiven - total;
                             changeReturnedController.text =
@@ -545,19 +618,20 @@ class _CashDeskPageState extends State<CashDeskPage> {
       return;
     }
 
-    double total = calculateTotal();
+    double total = calculateTotal(selectedProducts, quantityProducts);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces"; // You can change this if needed
 
     // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex = selectedProducts.indexOf(product); // Find correct index
+      int productIndex =
+          selectedProducts.indexOf(product); // Find correct index
 
       return OrderLine(
         idOrder: 0, // Temporary ID
         idProduct: product.code,
-        quantite: quantityProducts[
-            productIndex], // Correct quantity for this product
+        quantite:
+            quantityProducts[productIndex], // Correct quantity for this product
         prixUnitaire: product.prixTTC,
       );
     }).toList();
@@ -590,195 +664,298 @@ class _CashDeskPageState extends State<CashDeskPage> {
     }
   }
 
-void _showListOrdersPopUp(BuildContext context) async {
-  List<Order> orders = await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
+  void _showListOrdersPopUp(BuildContext context) async {
+    List<Order> orders =
+        await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
 
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text(
-          "Liste des Commandes",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: orders.isEmpty
-            ? const Text("Aucune commande disponible.")
-            : SizedBox(
-                width: double.maxFinite,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    Order order = orders[index];
-                    return ExpansionTile(
-                      title: Text(
-                        "Commande #${order.idOrder} - ${_formatDate(order.date)}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      children: [
-                        ...order.orderLines.map((orderLine) {
-                          return FutureBuilder<Product?>(
-                            future: sqldb.getProductByCode(orderLine.idProduct),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            "Liste des Commandes",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: orders.isEmpty
+              ? const Text("Aucune commande disponible.")
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: orders.length,
+                    itemBuilder: (context, index) {
+                      Order order = orders[index];
+                      return ExpansionTile(
+                        title: Text(
+                          "Commande #${order.idOrder} - ${_formatDate(order.date)}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        children: [
+                          ...order.orderLines.map((orderLine) {
+                            return FutureBuilder<Product?>(
+                              future:
+                                  sqldb.getProductByCode(orderLine.idProduct),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
 
-                              if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                                return const ListTile(title: Text("Produit introuvable"));
-                              }
+                                if (snapshot.hasError ||
+                                    !snapshot.hasData ||
+                                    snapshot.data == null) {
+                                  return const ListTile(
+                                      title: Text("Produit introuvable"));
+                                }
 
-                              Product product = snapshot.data!;
-                              return ListTile(
-                                title: Text(product.designation),
-                                subtitle: Text("Quantité: ${orderLine.quantite}"),
-                                trailing: Text(
-                                  "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              );
-                            },
-                          );
-                        }).toList(),
+                                Product product = snapshot.data!;
+                                return ListTile(
+                                  title: Text(product.designation),
+                                  subtitle:
+                                      Text("Quantité: ${orderLine.quantite}"),
+                                  trailing: Text(
+                                    "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
 
-                        // 🔹 Bouton "Imprimer Ticket"
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              _showOrderTicketPopup(context, order);
-                            },
-                            icon: Icon(Icons.print),
-                            label: Text("Imprimer Ticket"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
+                          // 🔹 Bouton "Imprimer Ticket"
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                _showOrderTicketPopup(context, order);
+                              },
+                              icon: Icon(Icons.print),
+                              label: Text("Imprimer Ticket"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Fermer"),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
-void _showOrderTicketPopup(BuildContext context, Order order) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Center(
-          child: Text(
-            "🧾 Ticket de Commande",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Courier'),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Divider(thickness: 1, color: Colors.black),
-            
-            // Numéro de commande et date
-            Text(
-              "Commande #${order.idOrder}\nDate: ${_formatDate(order.date)}",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Fermer"),
             ),
-            
-            Divider(thickness: 1, color: Colors.black),
+          ],
+        );
+      },
+    );
+  }
 
-            // Liste des produits
-            ...order.orderLines.map((orderLine) {
-              return FutureBuilder<Product?>(
-                future: sqldb.getProductByCode(orderLine.idProduct),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                    return const ListTile(title: Text("Produit introuvable"));
-                  }
-
-                  Product product = snapshot.data!;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            product.designation,
-                            style: TextStyle(fontSize: 16, fontFamily: 'Courier'),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          "x${orderLine.quantite}  ",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
-                        ),
-                        Text(
-                          "${(orderLine.prixUnitaire).toStringAsFixed(2)} DT",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            }).toList(),
-
-            Divider(thickness: 1, color: Colors.black),
-
-            // Total et Mode de paiement
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  void _showOrderTicketPopup(BuildContext context, Order order) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Center(
+            child: Text(
+              "🧾 Ticket de Commande",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  fontFamily: 'Courier'),
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Divider(thickness: 1, color: Colors.black),
+
+                // Numéro de commande et date
                 Text(
-                  "Total:",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                  "Commande #${order.idOrder}\nDate: ${_formatDate(order.date)}",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Courier'),
                 ),
+
+                Divider(thickness: 1, color: Colors.black),
+
+                // Header Row
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          "Qt",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Courier'),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          "Article",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Courier'),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          "Prix U",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Courier'),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          "Montant",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Courier'),
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(thickness: 1, color: Colors.black),
+
+                // Liste des produits
+                ...order.orderLines.map((orderLine) {
+                  return FutureBuilder<Product?>(
+                    future: sqldb.getProductByCode(orderLine.idProduct),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data == null) {
+                        return const ListTile(
+                            title: Text("Produit introuvable"));
+                      }
+
+                      Product product = snapshot.data!;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                "x${orderLine.quantite}",
+                                style: TextStyle(
+                                    fontSize: 16, fontFamily: 'Courier'),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                product.designation,
+                                style: TextStyle(
+                                    fontSize: 16, fontFamily: 'Courier'),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                style: TextStyle(
+                                    fontSize: 16, fontFamily: 'Courier'),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Courier'),
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+
+                Divider(thickness: 1, color: Colors.black),
+
+                // Total et Mode de paiement
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Total:",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier'),
+                    ),
+                    Text(
+                      "${order.total.toStringAsFixed(2)} DT",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier'),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 10),
+
                 Text(
-                  "${order.total.toStringAsFixed(2)} DT",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                  "Mode de Paiement: ${order.modePaiement}",
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Courier'),
                 ),
               ],
             ),
-
-            SizedBox(height: 10),
-
-            Text(
-              "Mode de Paiement: ${order.modePaiement}",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("Fermer"),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text("Fermer"),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-
+        );
+      },
+    );
+  }
 
   String _formatDate(String date) {
     DateTime parsedDate = DateTime.parse(date);
@@ -947,8 +1124,7 @@ void _showOrderTicketPopup(BuildContext context, Order order) {
       return;
     }
 
-    String enteredQuantity = quantityProducts[productIndex]
-        .toString(); // Start with current quantity
+    String enteredQuantity = ""; // Start empty instead of showing default value
 
     showDialog(
       context: context,
@@ -961,7 +1137,7 @@ void _showOrderTicketPopup(BuildContext context, Order order) {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    enteredQuantity,
+                    enteredQuantity.isEmpty ? "0" : enteredQuantity,
                     style: const TextStyle(
                         fontSize: 24, fontWeight: FontWeight.bold),
                   ),
@@ -984,14 +1160,10 @@ void _showOrderTicketPopup(BuildContext context, Order order) {
                                 } else if (number == "OK") {
                                   if (enteredQuantity.isNotEmpty) {
                                     setState(() {
-                                      // Ensure quantity list is updated correctly
-                                      if (productIndex <
-                                          quantityProducts.length) {
-                                        quantityProducts[productIndex] =
-                                            int.parse(enteredQuantity);
-                                        print(
-                                            "Updated quantity: $enteredQuantity for index: $productIndex");
-                                      }
+                                      quantityProducts[productIndex] =
+                                          int.parse(enteredQuantity);
+                                      print(
+                                          "Updated quantity: $enteredQuantity for index: $productIndex");
                                     });
                                   }
                                   Navigator.of(context).pop(); // Close dialog
@@ -1028,9 +1200,13 @@ void _showOrderTicketPopup(BuildContext context, Order order) {
     );
   }
 
-  double calculateTotal() {
-    return selectedProducts.fold(
-        0, (sum, product) => sum + (product.prixTTC * 1));
+  double calculateTotal(
+      List<Product> selectedProducts, List<int> quantityProducts) {
+    double total = 0.0;
+    for (int i = 0; i < selectedProducts.length; i++) {
+      total += selectedProducts[i].prixTTC * quantityProducts[i];
+    }
+    return total;
   }
 
   Widget _buildNumberButton(BuildContext context, String number) {
