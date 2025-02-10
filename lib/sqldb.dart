@@ -35,6 +35,7 @@ class SqlDb {
     // Get the correct path for the database file
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final dbPath = join(documentsDirectory.path, 'cashdesk1.db');
+    print(dbPath);
 
     return openDatabase(
       dbPath, // Use the correct path

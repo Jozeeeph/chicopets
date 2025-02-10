@@ -572,77 +572,195 @@ class _CashDeskPageState extends State<CashDeskPage> {
     }
   }
 
-  void _showListOrdersPopUp(BuildContext context) async {
-    List<Order> orders =
-        await sqldb.getOrdersWithOrderLines(); // Fetch orders with orderLines
+void _showListOrdersPopUp(BuildContext context) async {
+  List<Order> orders = await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            "Liste des Commandes",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: orders.isEmpty
-              ? const Text("Aucune commande disponible.")
-              : SizedBox(
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      Order order = orders[index];
-                      return ExpansionTile(
-                        title: Text(
-                          "Commande #${order.idOrder} - ${_formatDate(order.date)}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        children: order.orderLines.map((orderLine) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text(
+          "Liste des Commandes",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: orders.isEmpty
+            ? const Text("Aucune commande disponible.")
+            : SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    Order order = orders[index];
+                    return ExpansionTile(
+                      title: Text(
+                        "Commande #${order.idOrder} - ${_formatDate(order.date)}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      children: [
+                        ...order.orderLines.map((orderLine) {
                           return FutureBuilder<Product?>(
                             future: sqldb.getProductByCode(orderLine.idProduct),
                             builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Center(
-                                    child: CircularProgressIndicator());
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
                               }
 
-                              if (snapshot.hasError ||
-                                  !snapshot.hasData ||
-                                  snapshot.data == null) {
-                                return const ListTile(
-                                    title: Text("Produit introuvable"));
+                              if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+                                return const ListTile(title: Text("Produit introuvable"));
                               }
 
                               Product product = snapshot.data!;
                               return ListTile(
                                 title: Text(product.designation),
-                                subtitle:
-                                    Text("Quantité: ${orderLine.quantite}"),
+                                subtitle: Text("Quantité: ${orderLine.quantite}"),
                                 trailing: Text(
                                   "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               );
                             },
                           );
                         }).toList(),
-                      );
-                    },
-                  ),
+
+                        // 🔹 Bouton "Imprimer Ticket"
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _showOrderTicketPopup(context, order);
+                            },
+                            icon: Icon(Icons.print),
+                            label: Text("Imprimer Ticket"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Fermer"),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Fermer"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
+void _showOrderTicketPopup(BuildContext context, Order order) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Center(
+          child: Text(
+            "🧾 Ticket de Commande",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Courier'),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Divider(thickness: 1, color: Colors.black),
+            
+            // Numéro de commande et date
+            Text(
+              "Commande #${order.idOrder}\nDate: ${_formatDate(order.date)}",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+            ),
+            
+            Divider(thickness: 1, color: Colors.black),
+
+            // Liste des produits
+            ...order.orderLines.map((orderLine) {
+              return FutureBuilder<Product?>(
+                future: sqldb.getProductByCode(orderLine.idProduct),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+                    return const ListTile(title: Text("Produit introuvable"));
+                  }
+
+                  Product product = snapshot.data!;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.designation,
+                            style: TextStyle(fontSize: 16, fontFamily: 'Courier'),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          "x${orderLine.quantite}  ",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                        ),
+                        Text(
+                          "${(orderLine.prixUnitaire).toStringAsFixed(2)} DT",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+
+            Divider(thickness: 1, color: Colors.black),
+
+            // Total et Mode de paiement
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Total:",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                ),
+                Text(
+                  "${order.total.toStringAsFixed(2)} DT",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
+                ),
+              ],
+            ),
+
+            SizedBox(height: 10),
+
+            Text(
+              "Mode de Paiement: ${order.modePaiement}",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Courier'),
             ),
           ],
-        );
-      },
-    );
-  }
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text("Fermer"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
 
 
 String _formatDate(String date) {
