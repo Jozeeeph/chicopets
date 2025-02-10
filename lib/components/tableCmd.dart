@@ -158,8 +158,9 @@ class _TableCmdState extends State<TableCmd> {
                                   '${widget.quantityProducts[index]}'), // Get quantity from quantityProducts
                             ),
                             Expanded(
-                                child: Text(
-                                    '${product.prixTTC.toStringAsFixed(2)} DT')),
+                              child: Text(
+                                  '${product.prixTTC.toStringAsFixed(2)} DT'),
+                            ),
                           ],
                         ),
                       ),
