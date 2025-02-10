@@ -173,13 +173,23 @@ class _CashDeskPageState extends State<CashDeskPage> {
                               return InkWell(
                                 onTap: () {
                                   setState(() {
-                                    selectedProducts.add(product);
-                                    quantityProducts.add(1);
+                                    int index = selectedProducts.indexWhere(
+                                        (p) => p.code == product.code);
+                                    if (index == -1) {
+                                      // Product not in the list, add it
+                                      selectedProducts.add(product);
+                                      quantityProducts.add(
+                                          1); // Initialize the quantity as 1
+                                    } else {
+                                      // Product is already in the list, increase quantity
+                                      quantityProducts[index]++;
+                                    }
+
+                                    // Keep track of the selected product index
                                     selectedProductIndex =
                                         selectedProducts.length - 1;
                                     print(
-                                      "Selected Products: $selectedProducts",
-                                    );
+                                        "Selected Products: $selectedProducts");
                                     print("Quantities : $quantityProducts");
                                   });
                                 },
@@ -1047,14 +1057,34 @@ class _CashDeskPageState extends State<CashDeskPage> {
                             itemBuilder: (context, index) {
                               final product = currentProducts[index];
                               // Date format handling
-                              String formattedDate = 'N/A';
-                              if (product.dateExpiration != null) {
-                                try {
-                                  formattedDate = DateFormat('dd/MM/yyyy')
-                                      .format(DateFormat('yyyy-MM-dd')
-                                          .parse(product.dateExpiration!));
-                                } catch (e) {
-                                  formattedDate = 'Invalid Date';
+
+                              List<String> formattedDatePatterns = [
+                                'yyyy-MM-dd',
+                                'dd/MM/yyyy',
+                                'MM/dd/yyyy',
+                                'yyyy/MM/dd',
+                                'dd-MM-yyyy',
+                                'MM-dd-yyyy'
+                              ];
+
+                              String formattedDate =
+                                  'Invalid Date'; // Default value in case of an invalid date
+
+                              if (product.dateExpiration?.isNotEmpty ?? false) {
+                                for (var pattern in formattedDatePatterns) {
+                                  try {
+                                    // Try parsing the date with the current pattern
+                                    DateTime parsedDate = DateFormat(pattern)
+                                        .parseStrict(product.dateExpiration!);
+
+                                    // If parsing is successful, format it in 'dd/MM/yyyy' and break the loop
+                                    formattedDate = DateFormat('dd/MM/yyyy')
+                                        .format(parsedDate);
+                                    break; // Stop looping once a valid format is found
+                                  } catch (e) {
+                                    // If parsing fails, continue to the next pattern
+                                    continue;
+                                  }
                                 }
                               }
 
