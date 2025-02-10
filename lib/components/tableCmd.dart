@@ -11,6 +11,7 @@ class TableCmd extends StatefulWidget {
   final VoidCallback onAddProduct;
   final VoidCallback onSearchProduct;
   final Function(int) onQuantityChange;
+  final double Function(List<Product>, List<int>) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -23,6 +24,7 @@ class TableCmd extends StatefulWidget {
     required this.onAddProduct,
     required this.onSearchProduct,
     required this.onQuantityChange,
+    required this.calculateTotal,
     required this.onFetchOrders,
     required this.onPlaceOrder,
   });
@@ -62,7 +64,7 @@ class _TableCmdState extends State<TableCmd> {
                         color: Color.fromARGB(255, 230, 229, 234)),
                   ),
                   Text(
-                    '${widget.total.toStringAsFixed(2)} DT',
+                    '${calculateTotal().toStringAsFixed(2)} DT', // ✅ Calcul dynamique
                     style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -122,7 +124,10 @@ class _TableCmdState extends State<TableCmd> {
                         child: Text('Quantité',
                             style: TextStyle(color: Colors.white))),
                     Expanded(
-                        child: Text('Prix',
+                        child: Text('Prix U',
+                            style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Montant',
                             style: TextStyle(color: Colors.white))),
                   ],
                 ),
@@ -160,6 +165,11 @@ class _TableCmdState extends State<TableCmd> {
                             Expanded(
                                 child: Text(
                                     '${product.prixTTC.toStringAsFixed(2)} DT')),
+                            Expanded(
+                              child: Text(
+                                '${(product.prixTTC * widget.quantityProducts[index]).toStringAsFixed(2)} DT',
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -226,5 +236,13 @@ class _TableCmdState extends State<TableCmd> {
         ),
       ],
     );
+  }
+
+  double calculateTotal() {
+    double total = 0.0;
+    for (int i = 0; i < widget.selectedProducts.length; i++) {
+      total += widget.selectedProducts[i].prixTTC * widget.quantityProducts[i];
+    }
+    return total;
   }
 }
