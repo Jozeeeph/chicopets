@@ -6,10 +6,11 @@ import 'package:intl/intl.dart';
 class TableCmd extends StatefulWidget {
   final double total;
   final List<Product> selectedProducts;
+  final List<int> quantityProducts;
   final Function(int) onDeleteProduct;
   final VoidCallback onAddProduct;
   final VoidCallback onSearchProduct;
-  final VoidCallback onQuantityChange;
+  final Function(int) onQuantityChange;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -17,6 +18,7 @@ class TableCmd extends StatefulWidget {
     super.key,
     required this.total,
     required this.selectedProducts,
+    required this.quantityProducts,
     required this.onDeleteProduct,
     required this.onAddProduct,
     required this.onSearchProduct,
@@ -42,7 +44,7 @@ class _TableCmdState extends State<TableCmd> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 47, 208, 80),
+            color: const Color.fromARGB(255, 1, 35, 8),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -93,6 +95,8 @@ class _TableCmdState extends State<TableCmd> {
           ),
         ),
 
+        const SizedBox(height: 10),
+
         // Order Section
         Container(
           height: 200,
@@ -134,8 +138,10 @@ class _TableCmdState extends State<TableCmd> {
                     return GestureDetector(
                       onTap: () {
                         setState(() {
-                          selectedProductIndex = index;
+                          selectedProductIndex = index; // Set the correct index
                         });
+                        print(
+                            "Product Selected! New Index: $selectedProductIndex");
                       },
                       child: Container(
                         color: isSelected
@@ -147,7 +153,10 @@ class _TableCmdState extends State<TableCmd> {
                           children: [
                             Expanded(child: Text(product.code)),
                             Expanded(child: Text(product.designation)),
-                            Expanded(child: Text("1")), // Example Quantity
+                            Expanded(
+                              child: Text(
+                                  '${widget.quantityProducts[index]}'), // Get quantity from quantityProducts
+                            ),
                             Expanded(
                                 child: Text(
                                     '${product.prixTTC.toStringAsFixed(2)} DT')),
@@ -195,7 +204,7 @@ class _TableCmdState extends State<TableCmd> {
                   style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
-              onPressed: widget.onQuantityChange,
+              onPressed: () => widget.onQuantityChange(selectedProductIndex!),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               child:
                   const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),

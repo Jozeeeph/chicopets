@@ -47,9 +47,18 @@ class _CashDeskPageState extends State<CashDeskPage> {
   final SqlDb sqldb = SqlDb();
   Future<List<Product>>? products;
   List<Product> selectedProducts = [];
+  List<int> quantityProducts = [];
   int? selectedProductIndex;
   String enteredQuantity = "";
-  void handleQuantityChange() {}
+
+  void handleQuantityChange(int index) {
+    if (index >= 0 && index < quantityProducts.length) {
+      print("Changing quantity for product index: $index");
+      _showQuantityInput(context, index);
+    } else {
+      print("Invalid product index: $index");
+    }
+  }
 
   void handlePlaceOrder() {
     Order order = Order(
@@ -96,6 +105,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
             TableCmd(
               total: calculateTotal(),
               selectedProducts: selectedProducts,
+              quantityProducts: quantityProducts,
               onAddProduct: handleAddProduct,
               onDeleteProduct: handleDeleteProduct,
               onSearchProduct: handleSearchProduct, // Ensure this is passed
@@ -163,8 +173,13 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                 onTap: () {
                                   setState(() {
                                     selectedProducts.add(product);
+                                    quantityProducts.add(1);
+                                    selectedProductIndex =
+                                        selectedProducts.length - 1;
                                     print(
-                                        "Selected Products: $selectedProducts");
+                                      "Selected Products: $selectedProducts",
+                                    );
+                                    print("Quantities : $quantityProducts");
                                   });
                                 },
                                 child: buildProductButton(
@@ -367,7 +382,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                     ),
                                   ),
                                   Text(
-                                    "x1  ", // Default quantity to 1 unless modified elsewhere
+                                    "${quantityProducts[selectedProducts.indexOf(product)]}X  ", // Default quantity to 1 unless modified elsewhere
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -532,20 +547,22 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
     double total = calculateTotal();
     String date = DateTime.now().toIso8601String();
-    String modePaiement =
-        "Espèces"; // You can change this to reflect the selected payment mode
+    String modePaiement = "Espèces"; // You can change this if needed
 
-    // Prepare order lines based on selected products
+    // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
+      int productIndex = selectedProducts.indexOf(product); // Find correct index
+
       return OrderLine(
-        idOrder: 0, // Temporary ID, will be set once the order is saved
+        idOrder: 0, // Temporary ID
         idProduct: product.code,
-        quantite:1,
+        quantite: quantityProducts[
+            productIndex], // Correct quantity for this product
         prixUnitaire: product.prixTTC,
       );
     }).toList();
 
-    // Create an Order object with selected products and total
+    // Create an Order object
     Order order = Order(
       date: date,
       orderLines: orderLines,
@@ -553,7 +570,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
       modePaiement: modePaiement,
     );
 
-    // Enregistrer la commande dans la base de données
+    // Save order to database
     int orderId = await SqlDb().addOrder(order);
 
     if (orderId > 0) {
@@ -563,6 +580,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
       setState(() {
         selectedProducts.clear();
+        quantityProducts.clear(); // Clear quantities after order
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -762,11 +780,10 @@ void _showOrderTicketPopup(BuildContext context, Order order) {
 
 
 
-
-String _formatDate(String date) {
-  DateTime parsedDate = DateTime.parse(date);
-  return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
-}
+  String _formatDate(String date) {
+    DateTime parsedDate = DateTime.parse(date);
+    return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
+  }
 
   void _showProductSearchPopup(BuildContext context) async {
     final products =
@@ -924,7 +941,15 @@ String _formatDate(String date) {
     );
   }
 
-  void _showQuantityInput(BuildContext context) {
+  void _showQuantityInput(BuildContext context, int productIndex) {
+    if (productIndex < 0 || productIndex >= quantityProducts.length) {
+      print("Error: Invalid product index ($productIndex)");
+      return;
+    }
+
+    String enteredQuantity = quantityProducts[productIndex]
+        .toString(); // Start with current quantity
+
     showDialog(
       context: context,
       builder: (context) {
@@ -936,7 +961,7 @@ String _formatDate(String date) {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    enteredQuantity.isEmpty ? "0" : enteredQuantity,
+                    enteredQuantity,
                     style: const TextStyle(
                         fontSize: 24, fontWeight: FontWeight.bold),
                   ),
@@ -957,18 +982,19 @@ String _formatDate(String date) {
                                 if (number == "C") {
                                   enteredQuantity = ""; // Clear input
                                 } else if (number == "OK") {
-                                  // Only update if there's a valid selectedProductIndex and enteredQuantity
-                                  if (selectedProductIndex != null &&
-                                      enteredQuantity.isNotEmpty) {
-                                    // Parse the entered quantity
-                                    final newQuantity =
-                                        int.tryParse(enteredQuantity) ?? 1;
-
-                                    setState(() {});
-
-                                    Navigator.of(context)
-                                        .pop(); // Close the dialog
+                                  if (enteredQuantity.isNotEmpty) {
+                                    setState(() {
+                                      // Ensure quantity list is updated correctly
+                                      if (productIndex <
+                                          quantityProducts.length) {
+                                        quantityProducts[productIndex] =
+                                            int.parse(enteredQuantity);
+                                        print(
+                                            "Updated quantity: $enteredQuantity for index: $productIndex");
+                                      }
+                                    });
                                   }
+                                  Navigator.of(context).pop(); // Close dialog
                                 } else {
                                   enteredQuantity += number; // Append number
                                 }
@@ -982,9 +1008,11 @@ String _formatDate(String date) {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
-                                child: Text(number,
-                                    style: const TextStyle(
-                                        fontSize: 18, color: Colors.white)),
+                                child: Text(
+                                  number,
+                                  style: const TextStyle(
+                                      fontSize: 18, color: Colors.white),
+                                ),
                               ),
                             ),
                           ),
@@ -1169,6 +1197,7 @@ String _formatDate(String date) {
                 setState(() {
                   if (index != null && index! < selectedProducts.length) {
                     selectedProducts.removeAt(index!);
+                    quantityProducts.removeAt(index!);
                     index = 0; // Reset selection
                   }
                 });

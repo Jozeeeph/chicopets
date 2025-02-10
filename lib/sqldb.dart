@@ -143,7 +143,7 @@ class SqlDb {
           {
             'id_order': orderId,
             'product_code': product.idProduct,
-            'quantity': 1,
+            'quantity': product.quantite,
             'prix_unitaire': product.prixUnitaire,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
