@@ -64,7 +64,7 @@ class _TableCmdState extends State<TableCmd> {
                         color: Color.fromARGB(255, 230, 229, 234)),
                   ),
                   Text(
-                    '${calculateTotal().toStringAsFixed(2)} DT', // ✅ Calcul dynamique
+                    '${calculateTotal().toStringAsFixed(2)} DT', //Calcul dynamique
                     style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
