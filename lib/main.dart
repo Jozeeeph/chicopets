@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
@@ -9,6 +10,9 @@ import 'package:intl/intl.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:caissechicopets/components/header.dart';
 import 'package:caissechicopets/components/tableCmd.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:printing/printing.dart';
 
 Future<void> main() async {
   // Initialize databaseFactory for desktop platforms
@@ -961,9 +965,99 @@ class _CashDeskPageState extends State<CashDeskPage> {
               },
               child: Text("Fermer"),
             ),
+            TextButton(
+              onPressed: () {
+                generateAndSavePDF(context, order);
+              },
+              child: Text("Imprimer"),
+            ),
           ],
         );
       },
+    );
+  }
+
+//Convert to PDF
+  Future<void> generateAndSavePDF(BuildContext context, Order order) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Center(
+              child: pw.Text("Ticket de Commande",
+                  style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
+            ),
+            pw.Divider(),
+
+            // Numéro de commande et date
+            pw.Text("Commande #${order.idOrder}"),
+            pw.Text("Date: ${_formatDate(order.date)}"),
+            pw.Divider(),
+
+            // Header de la liste des articles
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text("Qt",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("Article",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("Prix U",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("Montant",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+            pw.Divider(),
+
+            // Liste des produits
+            ...order.orderLines.map((orderLine) {
+              return pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text("x${orderLine.quantite}"),
+                  pw.Text(orderLine.idProduct),
+                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)} DT"),
+                  pw.Text(
+                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                ],
+              );
+            }).toList(),
+
+            pw.Divider(),
+
+            // Total et mode de paiement
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text("Total:",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("${order.total.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text("Mode de Paiement: ${order.modePaiement}"),
+          ],
+        ),
+      ),
+    );
+
+    // Obtenir le répertoire de téléchargement
+    final directory = await getDownloadsDirectory();
+    final filePath = "${directory!.path}/ticket_commande_${order.idOrder}.pdf";
+
+    // Sauvegarde du fichier
+    final file = File(filePath);
+    await file.writeAsBytes(await pdf.save());
+
+    // Afficher une notification de succès
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("PDF enregistré dans: $filePath")),
     );
   }
 

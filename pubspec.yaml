@@ -30,6 +30,8 @@ environment:
 dependencies:
   sqflite: ^2.4.1
   sqflite_common_ffi: ^2.2.0
+  pdf: ^3.10.7
+  printing: ^5.11.0
   flutter:
     sdk: flutter
     
