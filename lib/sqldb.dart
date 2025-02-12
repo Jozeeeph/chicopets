@@ -32,18 +32,33 @@ class SqlDb {
 // }
 
   Future<Database> initDb() async {
-    // Get the correct path for the database file
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final dbPath = join(documentsDirectory.path, 'cashdesk1.db');
-    print(dbPath);
+    // Get the application support directory for storing the database
+    final appSupportDir = await getApplicationSupportDirectory();
+    final dbPath = join(appSupportDir.path, 'cashdesk1.db');
+    print("Database path: $dbPath");
 
+    // Ensure the directory exists
+    if (!Directory(appSupportDir.path).existsSync()) {
+      Directory(appSupportDir.path).createSync(recursive: true);
+    }
+
+    // Copy the database from assets if it doesn't exist
+    if (!File(dbPath).existsSync()) {
+      print("Copying database from assets...");
+      ByteData data = await rootBundle.load('assets/database/cashdesk1.db');
+      List<int> bytes = data.buffer.asUint8List();
+      await File(dbPath).writeAsBytes(bytes, flush: true);
+      print("Database copied successfully.");
+    }
+
+    // Open the database
     return openDatabase(
-      dbPath, // Use the correct path
+      dbPath,
       version: 1,
       onCreate: (Database db, int version) async {
         print("Creating tables...");
         await db.execute('''
-        CREATE TABLE products(
+        CREATE TABLE IF NOT EXISTS products(
           code TEXT PRIMARY KEY,
           designation TEXT,
           stock INTEGER,
@@ -56,7 +71,7 @@ class SqlDb {
         print("Products table created");
 
         await db.execute('''
-        CREATE TABLE orders(
+        CREATE TABLE IF NOT EXISTS orders(
           id_order INTEGER PRIMARY KEY AUTOINCREMENT,
           date TEXT,
           total REAL,
@@ -67,7 +82,7 @@ class SqlDb {
         print("Orders table created");
 
         await db.execute('''
-        CREATE TABLE order_items(
+        CREATE TABLE IF NOT EXISTS order_items(
           id_order INTEGER,
           product_code TEXT,
           quantity INTEGER,
@@ -81,14 +96,14 @@ class SqlDb {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('''
-      CREATE TABLE IF NOT EXISTS orders(
-        id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT,
-        total REAL,
-        mode_paiement TEXT,
-        id_client INTEGER
-      )
-    ''');
+          CREATE TABLE IF NOT EXISTS orders(
+            id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            total REAL,
+            mode_paiement TEXT,
+            id_client INTEGER
+          )
+        ''');
         }
       },
     );
