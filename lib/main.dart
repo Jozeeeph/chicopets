@@ -12,7 +12,6 @@ import 'package:caissechicopets/components/header.dart';
 import 'package:caissechicopets/components/tableCmd.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
-import 'package:printing/printing.dart';
 
 Future<void> main() async {
   // Initialize databaseFactory for desktop platforms
@@ -182,13 +181,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
                                     if (index == -1) {
                                       // Product not in the list, add it
                                       selectedProducts.add(product);
-                                      quantityProducts.add(
-                                          1); // Initialize the quantity as 1
+                                      quantityProducts.add(1);
                                     } else {
                                       // Product is already in the list, increase quantity
                                       quantityProducts[index]++;
                                     }
-
                                     // Keep track of the selected product index
                                     selectedProductIndex =
                                         selectedProducts.length - 1;
