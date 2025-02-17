@@ -6,6 +6,8 @@ class Product {
   double taxe;
   double prixTTC;
   String dateExpiration;
+  int categoryId;
+  String? categoryName; // Champ optionnel pour le nom de la catégorie
 
   Product({
     required this.code,
@@ -15,9 +17,10 @@ class Product {
     required this.taxe,
     required this.prixTTC,
     required this.dateExpiration,
+    required this.categoryId,
+    this.categoryName,
   });
 
-  // Convertir un objet Product en Map pour SQLite
   Map<String, dynamic> toMap() {
     return {
       'code': code,
@@ -27,10 +30,11 @@ class Product {
       'taxe': taxe,
       'prix_ttc': prixTTC,
       'date_expiration': dateExpiration,
+      'category_id': categoryId,
+      // Note : Vous n'avez pas besoin de sauvegarder categoryName si c'est uniquement utilisé pour l'affichage
     };
   }
 
-  // Créer un objet Product à partir d'un Map (données SQLite)
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
       code: map['code'],
@@ -40,11 +44,13 @@ class Product {
       taxe: map['taxe'],
       prixTTC: map['prix_ttc'],
       dateExpiration: map['date_expiration'],
+      categoryId: map['category_id'] ?? 0,
+      categoryName: map['category_name'], // Récupération du nom de la catégorie si présent
     );
   }
 
   @override
   String toString() {
-    return 'Product(code: $code, name: $designation, stock: $stock, price: $prixTTC DT, exp: $dateExpiration)';
+    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"})';
   }
 }
