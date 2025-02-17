@@ -111,7 +111,6 @@ class Getorderlist {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  fontFamily: 'Courier',
                   color: Color(0xFF000000)), // Deep Blue
             ),
           ),
@@ -128,7 +127,6 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Courier',
                       color: Color(0xFF000000)), // Deep Blue
                 ),
 
@@ -147,7 +145,6 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Courier',
                               color: Color(0xFF000000)), // Deep Blue
                         ),
                       ),
@@ -158,7 +155,6 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Courier',
                               color: Color(0xFF000000)), // Deep Blue
                         ),
                       ),
@@ -169,7 +165,6 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Courier',
                               color: Color(0xFF000000)), // Deep Blue
                           textAlign: TextAlign.center,
                         ),
@@ -181,7 +176,6 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              fontFamily: 'Courier',
                               color: Color(0xFF000000)), // Deep Blue
                           textAlign: TextAlign.end,
                         ),
@@ -220,7 +214,7 @@ class Getorderlist {
                               child: Text(
                                 "x${orderLine.quantite}",
                                 style: TextStyle(
-                                    fontSize: 16, fontFamily: 'Courier', color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)), // Deep Blue
                               ),
                             ),
                             Expanded(
@@ -228,7 +222,7 @@ class Getorderlist {
                               child: Text(
                                 product.designation,
                                 style: TextStyle(
-                                    fontSize: 16, fontFamily: 'Courier', color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16,  color: Color(0xFF000000)), // Deep Blue
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -237,7 +231,7 @@ class Getorderlist {
                               child: Text(
                                 "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                 style: TextStyle(
-                                    fontSize: 16, fontFamily: 'Courier', color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)), // Deep Blue
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -248,7 +242,6 @@ class Getorderlist {
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    fontFamily: 'Courier',
                                     color: Color(0xFF000000)), // Deep Blue
                                 textAlign: TextAlign.end,
                               ),
@@ -271,7 +264,6 @@ class Getorderlist {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Courier',
                           color: Color(0xFF000000)), // Deep Blue
                     ),
                     Text(
@@ -279,7 +271,6 @@ class Getorderlist {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontFamily: 'Courier',
                           color: Color(0xFF000000)), // Deep Blue
                     ),
                   ],
@@ -292,7 +283,6 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Courier',
                       color: Color(0xFF000000)), // Deep Blue
                 ),
               ],
