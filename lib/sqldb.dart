@@ -17,20 +17,6 @@ class SqlDb {
     return _db!;
   }
 
-//   Future<void> copyDatabase() async {
-//   // Get the path to the app's documents directory
-//   final documentsDirectory = await getApplicationDocumentsDirectory();
-//   final dbPath = join(documentsDirectory.path, 'cashdesk1.db');
-
-//   // Check if the database file already exists
-//   if (!File(dbPath).existsSync()) {
-//     // Load the database file from assets
-//     final data = await rootBundle.load('assets/database/cashdesk.db');
-//     // Write the database file to the app's documents directory
-//     await File(dbPath).writeAsBytes(data.buffer.asUint8List());
-//   }
-// }
-
   Future<Database> initDb() async {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
@@ -40,15 +26,6 @@ class SqlDb {
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
       Directory(appSupportDir.path).createSync(recursive: true);
-    }
-
-    // Copy the database from assets if it doesn't exist
-    if (!File(dbPath).existsSync()) {
-      print("Copying database from assets...");
-      ByteData data = await rootBundle.load('assets/database/cashdesk1.db');
-      List<int> bytes = data.buffer.asUint8List();
-      await File(dbPath).writeAsBytes(bytes, flush: true);
-      print("Database copied successfully.");
     }
 
     // Open the database
@@ -65,7 +42,9 @@ class SqlDb {
           prix_ht REAL,
           taxe REAL,
           prix_ttc REAL,
-          date_expiration TEXT
+          date_expiration TEXT,
+          category_id INTEGER,
+          FOREIGN KEY(category_id) REFERENCES categories(id_category) ON DELETE SET NULL
         )
       ''');
         print("Products table created");
@@ -92,6 +71,13 @@ class SqlDb {
         )
       ''');
         print("Order items table created");
+
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+          id_category INTEGER PRIMARY KEY AUTOINCREMENT,
+          category_name TEXT NOT NULL,
+          image_path TEXT
+        )''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -115,6 +101,16 @@ class SqlDb {
     return maps.map((map) => Product.fromMap(map)).toList();
   }
 
+ Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
+  final dbClient = await db;
+  return await dbClient.rawQuery('''
+    SELECT p.*, c.category_name 
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id_category
+  ''');
+}
+
+
   Future<void> addProduct(
     String code,
     String designation,
@@ -123,6 +119,9 @@ class SqlDb {
     double taxe,
     double prixTTC,
     String date,
+    int categoryId,
+
+
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -135,6 +134,7 @@ class SqlDb {
         'taxe': taxe,
         'prix_ttc': prixTTC,
         'date_expiration': date,
+        'category_id':categoryId,
       },
       conflictAlgorithm: ConflictAlgorithm
           .replace, // Handle conflicts if the same code is inserted
@@ -242,7 +242,7 @@ class SqlDb {
     for (var orderMap in orderMaps) {
       int orderId = orderMap['id_order'];
 
-      // Fetch order lines from `order_items`
+      // Fetch order lines from order_items
       List<Map<String, dynamic>> itemMaps = await dbClient.query(
         'order_items',
         where: 'id_order = ?',
@@ -262,7 +262,7 @@ class SqlDb {
         if (productMaps.isNotEmpty) {
           Product product = Product.fromMap(productMaps.first);
 
-          // Create an OrderLine for each item, pass the correct `idProduct`
+          // Create an OrderLine for each item, pass the correct idProduct
           orderLines.add(OrderLine(
             idOrder: orderId,
             idProduct: itemMap['product_code'], // Pass the product code
@@ -277,7 +277,7 @@ class SqlDb {
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        orderLines: orderLines, // ✅ Assign correct list
+        orderLines: orderLines, //Assign correct list
         total: orderMap['total'].toDouble(),
         modePaiement: orderMap['mode_paiement'],
         idClient: orderMap['id_client'],
@@ -286,4 +286,38 @@ class SqlDb {
 
     return orders;
   }
+   Future<int> addCategory(String name, String imagePath) async {
+    final dbClient = await db;
+    return await dbClient.insert('categories', {
+      'category_name': name,
+      'image_path': imagePath
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<int> updateCategory(int id, String name, String imagePath) async {
+    final dbClient = await db;
+    return await dbClient.update(
+      'categories',
+      {'category_name': name, 'image_path': imagePath},
+      where: 'id_category = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteCategory(int id) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'categories',
+      where: 'id_category = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+  final dbClient = await db;
+  var result = await dbClient.query('categories');
+  print('Fetched categories: $result'); // Add this line to check the fetched data
+  return result;
+}
+
 }

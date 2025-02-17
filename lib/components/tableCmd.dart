@@ -12,6 +12,7 @@ class TableCmd extends StatefulWidget {
   final Function(int) onDeleteProduct;
   final VoidCallback onAddProduct;
   final VoidCallback onSearchProduct;
+  final VoidCallback onAddCategory;
   final Function(int) onQuantityChange;
   final double Function(List<Product>, List<int>) calculateTotal;
   final VoidCallback onFetchOrders;
@@ -29,6 +30,7 @@ class TableCmd extends StatefulWidget {
     required this.calculateTotal,
     required this.onFetchOrders,
     required this.onPlaceOrder,
+    required this.onAddCategory,
   });
 
   @override
@@ -94,6 +96,7 @@ class _TableCmdState extends State<TableCmd> {
         const SnackBar(content: Text("Produit introuvable !")),
       );
     }
+    barcodeController.clear();
   }
 
   @override
@@ -221,6 +224,11 @@ class _TableCmdState extends State<TableCmd> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            ElevatedButton(
+              onPressed: widget.onAddCategory,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 190, 0, 248)),
+              child: const Text('AJOUT CATEGORIE', style: TextStyle(color: Colors.white)),
+            ),
             ElevatedButton(
               onPressed: widget.onAddProduct,
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
