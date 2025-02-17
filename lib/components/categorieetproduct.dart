@@ -25,6 +25,15 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   late Future<List<Category>> categories;
   late Future<List<Product>> products;
 
+  // Define the color palette
+  final Color deepBlue = const Color(0xFF0056A6); // Primary deep blue
+  final Color skyBlue = const Color(0xFF26A9E0);  // Accent sky blue
+  final Color white = Colors.white;               // White
+  final Color lightGray = const Color(0xFFE0E0E0);  // Light gray
+  final Color tealGreen = const Color(0xFF009688);  // Accent teal green
+  final Color softOrange = const Color(0xFFFF9800); // Accent soft orange
+  final Color warmRed = const Color(0xFFE53935);    // Accent warm red
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +56,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Expanded(
       child: Row(
         children: [
+          // Categories Column
           Expanded(
             child: FutureBuilder<List<Category>>(
               future: categories,
@@ -76,7 +86,11 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               },
             ),
           ),
-          VerticalDivider(color: Colors.grey.shade400, thickness: 1),
+          VerticalDivider(
+            color: lightGray,
+            thickness: 1,
+          ),
+          // Products Column
           Expanded(
             child: FutureBuilder<List<Product>>(
               future: products,
@@ -109,18 +123,19 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     );
   }
 
+  // Product button uses sky blue background and white text.
   Widget buildProductButton(String text) {
     return Container(
       margin: const EdgeInsets.all(2.0),
       decoration: BoxDecoration(
-        color: Colors.blueGrey,
+        color: skyBlue,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
         child: Text(
           text,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: white,
             fontWeight: FontWeight.bold,
             fontSize: 12,
           ),
@@ -130,6 +145,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     );
   }
 
+  // Category button uses deep blue border with a light blue background.
   Widget buildCategoryButton(String? name, String? imagePath) {
     final categoryName = name ?? 'Unknown Category';
     final categoryImagePath = imagePath ?? 'assets/images/default.jpg';
@@ -144,8 +160,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
         height: 80,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.blue.withOpacity(0.1),
-          border: Border.all(color: Colors.blue, width: 2),
+          color: skyBlue.withOpacity(0.1), // light sky blue background
+          border: Border.all(color: deepBlue, width: 2),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -158,7 +174,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       height: 100,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        return Icon(Icons.error, size: 60, color: Colors.grey);
+                        return Icon(Icons.error, size: 60, color: lightGray);
                       },
                     )
                   : (File(categoryImagePath).existsSync()
@@ -168,15 +184,18 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                           height: 100,
                           fit: BoxFit.cover,
                         )
-                      : Icon(Icons.error, size: 60, color: Colors.grey)),
+                      : Icon(Icons.error, size: 60, color: lightGray)),
             ),
             const SizedBox(height: 5),
             SizedBox(
               width: 60,
               child: Text(
                 categoryName,
-                style: const TextStyle(
-                    color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: deepBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

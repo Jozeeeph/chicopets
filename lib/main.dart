@@ -14,6 +14,7 @@ import 'package:caissechicopets/components/header.dart';
 import 'package:caissechicopets/components/tableCmd.dart';
 import 'package:caissechicopets/gestionproduit/addprod.dart';
 import 'package:caissechicopets/gestionproduit/searchprod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 Future<void> main() async {
   // Initialize databaseFactory for desktop platforms
@@ -35,6 +36,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      theme: ThemeData(
+        textTheme: GoogleFonts.poppinsTextTheme(), // Appliquer Poppins globalement
+      ),
       debugShowCheckedModeBanner: false,
       home: CashDeskPage(),
     );

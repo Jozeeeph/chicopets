@@ -33,6 +33,7 @@ dependencies:
   pdf: ^3.10.7
   printing: ^5.11.0
   image_picker: ^1.0.7
+  google_fonts: ^6.1.0
   flutter_barcode_scanner: ^2.0.0
   flutter:
     sdk: flutter

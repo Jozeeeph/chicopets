@@ -73,17 +73,17 @@ class _TableCmdState extends State<TableCmd> {
     }
   }
 
-
   void handleBarcodeScan(String barcodeScanRes) async {
     print("Code scanné : $barcodeScanRes");
 
     if (barcodeScanRes.isEmpty) return;
 
     Product? scannedProduct = await sqldb.getProductByCode(barcodeScanRes);
-    
+
     if (scannedProduct != null) {
       setState(() {
-        int index = widget.selectedProducts.indexWhere((p) => p.code == barcodeScanRes);
+        int index =
+            widget.selectedProducts.indexWhere((p) => p.code == barcodeScanRes);
         if (index != -1) {
           widget.quantityProducts[index]++;
         } else {
@@ -119,7 +119,7 @@ class _TableCmdState extends State<TableCmd> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 1, 35, 8),
+            color: const Color(0xFF0056A6), // Deep Blue
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -130,11 +130,17 @@ class _TableCmdState extends State<TableCmd> {
                 children: [
                   const Text(
                     'TOTAL:',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                   Text(
                     '${calculateTotal().toStringAsFixed(2)} DT',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ],
               ),
@@ -143,11 +149,17 @@ class _TableCmdState extends State<TableCmd> {
                 children: [
                   const Text(
                     'Caissier: foulen ben foulen',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                   Text(
                     'Time: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ],
               ),
@@ -161,21 +173,35 @@ class _TableCmdState extends State<TableCmd> {
         Container(
           height: 200,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.blueAccent),
+            border: Border.all(color: const Color(0xFF26A9E0)), // Sky Blue
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                color: Colors.blueAccent,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF26A9E0), // Sky Blue
+                  borderRadius:
+                      BorderRadius.circular(12), // Circular border radius
+                ),
                 child: Row(
                   children: const [
-                    Expanded(child: Text('Code', style: TextStyle(color: Colors.white))),
-                    Expanded(child: Text('Désignation', style: TextStyle(color: Colors.white))),
-                    Expanded(child: Text('Quantité', style: TextStyle(color: Colors.white))),
-                    Expanded(child: Text('Prix U', style: TextStyle(color: Colors.white))),
-                    Expanded(child: Text('Montant', style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Code',
+                            style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Désignation',
+                            style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Quantité',
+                            style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Prix U',
+                            style: TextStyle(color: Colors.white))),
+                    Expanded(
+                        child: Text('Montant',
+                            style: TextStyle(color: Colors.white))),
                   ],
                 ),
               ),
@@ -194,14 +220,21 @@ class _TableCmdState extends State<TableCmd> {
                         print("Produit sélectionné : ${product.code}");
                       },
                       child: Container(
-                        color: isSelected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        color: isSelected
+                            ? const Color(0xFF26A9E0).withOpacity(0.2)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 12),
                         child: Row(
                           children: [
                             Expanded(child: Text(product.code)),
                             Expanded(child: Text(product.designation)),
-                            Expanded(child: Text('${widget.quantityProducts[index]}')),
-                            Expanded(child: Text('${product.prixTTC.toStringAsFixed(2)} DT')),
+                            Expanded(
+                                child:
+                                    Text('${widget.quantityProducts[index]}')),
+                            Expanded(
+                                child: Text(
+                                    '${product.prixTTC.toStringAsFixed(2)} DT')),
                             Expanded(
                               child: Text(
                                 "${(product.prixTTC * widget.quantityProducts[index]).toStringAsFixed(2)} DT",
@@ -226,13 +259,17 @@ class _TableCmdState extends State<TableCmd> {
           children: [
             ElevatedButton(
               onPressed: widget.onAddCategory,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 190, 0, 248)),
-              child: const Text('AJOUT CATEGORIE', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF009688)), // Teal Green
+              child: const Text('AJOUT CATEGORIE',
+                  style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: widget.onAddProduct,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-              child: const Text('AJOUT PRODUIT', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0056A6)), // Deep Blue
+              child: const Text('AJOUT PRODUIT',
+                  style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: selectedProductIndex != null
@@ -243,28 +280,38 @@ class _TableCmdState extends State<TableCmd> {
                       });
                     }
                   : null,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('SUPPRIMER', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE53935)), // Warm Red
+              child: const Text('SUPPRIMER',
+                  style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: widget.onSearchProduct,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text('RECHERCHE PRODUIT', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF9800)), // Soft Orange
+              child: const Text('RECHERCHE PRODUIT',
+                  style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: () => widget.onQuantityChange(selectedProductIndex!),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-              child: const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0056A6)), // Deep Blue
+              child:
+                  const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: widget.onFetchOrders,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-              child: const Text('CHARGER COMMANDES', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF009688)), // Teal Green
+              child: const Text('CHARGER COMMANDES',
+                  style: TextStyle(color: Colors.white)),
             ),
             ElevatedButton(
               onPressed: widget.onPlaceOrder,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('VALIDER', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF26A9E0)), // Sky Blue
+              child:
+                  const Text('VALIDER', style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
