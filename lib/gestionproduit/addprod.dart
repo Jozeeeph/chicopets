@@ -1,3 +1,4 @@
+import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart'; // Ensure correct import
@@ -53,7 +54,7 @@ class Addprod {
                             _buildTextField(designationController, 'Désignation'),
                             _buildTextField(stockController, 'Stock',
                                 keyboardType: TextInputType.number),
-                            _buildTextField(priceHTController, 'Prix HT',
+                            _buildTextField(priceHTController, 'Prix dachat',
                                 keyboardType: TextInputType.number),
                             _buildTextField(taxController, 'Taxe (%)',
                                 keyboardType: TextInputType.number),
@@ -66,13 +67,13 @@ class Addprod {
                             Row(
                               children: [
                                 Expanded(
-                                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                                  child: FutureBuilder<List<Category>>(
                                     future: sqldb.getCategories(),
                                     builder: (context, snapshot) {
                                       if (!snapshot.hasData) {
                                         return const CircularProgressIndicator();
                                       }
-                                      List<Map<String, dynamic>> categories = snapshot.data!;
+                                      List<Category> categories = snapshot.data!;
                                       if (categories.isEmpty) {
                                         return const Text("Aucune catégorie disponible");
                                       }
@@ -84,8 +85,8 @@ class Addprod {
                                         value: selectedCategoryId,
                                         items: categories.map((cat) {
                                           return DropdownMenuItem<int>(
-                                            value: cat['id_category'],
-                                            child: Text(cat['category_name']),
+                                            value: cat.id,
+                                            child: Text(cat.name),
                                           );
                                         }).toList(),
                                         onChanged: (val) {

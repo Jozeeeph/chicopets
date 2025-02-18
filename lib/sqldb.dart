@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/subcategory.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
@@ -21,7 +23,6 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    print("Database path: $dbPath");
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -73,13 +74,23 @@ class SqlDb {
         print("Order items table created");
 
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS categories (
-          id_category INTEGER PRIMARY KEY AUTOINCREMENT,
-          category_name TEXT NOT NULL,
-          image_path TEXT
-        )''');
-        print("categories items table created");
-        
+          CREATE TABLE IF NOT EXISTS categories (
+            id_category INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT NOT NULL,
+            image_path TEXT
+          )
+        ''');
+        print("Categories table created");
+
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sub_categories (
+            id_sub_category INTEGER PRIMARY KEY AUTOINCREMENT,
+            sub_category_name TEXT NOT NULL,
+            category_id INTEGER NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories (id_category) ON DELETE CASCADE
+          )
+        ''');
+        print("Sub-categories table created");
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -98,20 +109,24 @@ class SqlDb {
   }
 
   Future<List<Product>> getProducts() async {
-    Database db = await this.db;
-    List<Map<String, dynamic>> maps = await db.query('products');
-    return maps.map((map) => Product.fromMap(map)).toList();
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
+      SELECT p.*, c.category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id_category
+    ''');
+
+    return result.map((e) => Product.fromMap(e)).toList();
   }
 
- Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
-  final dbClient = await db;
-  return await dbClient.rawQuery('''
+  Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
+    final dbClient = await db;
+    return await dbClient.rawQuery('''
     SELECT p.*, c.category_name 
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id_category
   ''');
-}
-
+  }
 
   Future<void> addProduct(
     String code,
@@ -122,8 +137,6 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
-
-
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -136,7 +149,7 @@ class SqlDb {
         'taxe': taxe,
         'prix_ttc': prixTTC,
         'date_expiration': date,
-        'category_id':categoryId,
+        'category_id': categoryId,
       },
       conflictAlgorithm: ConflictAlgorithm
           .replace, // Handle conflicts if the same code is inserted
@@ -288,12 +301,12 @@ class SqlDb {
 
     return orders;
   }
-   Future<int> addCategory(String name, String imagePath) async {
+
+  Future<int> addCategory(String name, String imagePath) async {
     final dbClient = await db;
-    return await dbClient.insert('categories', {
-      'category_name': name,
-      'image_path': imagePath
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return await dbClient.insert(
+        'categories', {'category_name': name, 'image_path': imagePath},
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<int> updateCategory(int id, String name, String imagePath) async {
@@ -315,11 +328,107 @@ class SqlDb {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getCategories() async {
-  final dbClient = await db;
-  var result = await dbClient.query('categories');
-  print('Fetched categories: $result'); // Add this line to check the fetched data
-  return result;
-}
+  Future<List<Category>> getCategories() async {
+    final dbClient = await db;
+    // Fetch categories as maps from the 'categories' table
+    var categoryMaps = await dbClient.query('categories');
+    print(
+        'Fetched categories: $categoryMaps'); // Debugging: Check the fetched categories
+    // Create a list to store the categories
+    List<Category> categories = [];
+    // Iterate over each category and fetch its subcategories
+    for (var categoryMap in categoryMaps) {
+      // Fetch subcategories for the current category
+      var subCategoryMaps = await dbClient.query(
+        'sub_categories',
+        where: 'category_id = ?',
+        whereArgs: [
+          categoryMap['id_category']
+        ], // Ensure this is the correct field
+      );
+      // Map the subcategories into SubCategory objects
+      List<SubCategory> subCategories = subCategoryMaps
+          .map((subCategoryMap) => SubCategory.fromMap(subCategoryMap))
+          .toList();
+      // Map the category from map to a Category object, passing the subcategories
+      Category category =
+          Category.fromMap(categoryMap, subCategories: subCategories);
+      // Add the category to the list
+      categories.add(category);
+    }
+    return categories;
+  }
 
+  /// **Créer une sous-catégorie**
+  Future<int> addSubCategory(SubCategory subCategory) async {
+    try {
+      final dbClient = await db;
+      return await dbClient.insert(
+        'sub_categories',
+        subCategory.toMap(),
+        conflictAlgorithm:
+            ConflictAlgorithm.replace, // Évite les conflits d'insertion
+      );
+    } catch (e) {
+      print("Erreur lors de l'ajout de la sous-catégorie: $e");
+      return -1; // Retourne une valeur négative en cas d'échec
+    }
+  }
+
+  /// **Lire toutes les sous-catégories d'une catégorie spécifique**
+  Future<List<SubCategory>> getSubCategories(int categoryId) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps = await dbClient.query(
+      'sub_categories',
+      where: 'category_id = ?',
+      whereArgs: [categoryId],
+    );
+    return List.generate(maps.length, (i) => SubCategory.fromMap(maps[i]));
+  }
+
+  /// **Mettre à jour une sous-catégorie**
+  Future<int> updateSubCategory(SubCategory subCategory) async {
+    final dbClient = await db;
+    return await dbClient.update(
+      'sub_categories',
+      subCategory.toMap(),
+      where: 'id_sub_category = ?',
+      whereArgs: [subCategory.id],
+    );
+  }
+
+  /// **Supprimer une sous-catégorie**
+  Future<int> deleteSubCategory(int subCategoryId) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'sub_categories',
+      where: 'id_sub_category = ?',
+      whereArgs: [subCategoryId],
+    );
+  }
+
+  /// **Lire toutes les sous-catégories (sans filtrer par catégorie)**
+  Future<List<SubCategory>> getAllSubCategories() async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps =
+        await dbClient.query('sub_categories');
+    return List.generate(maps.length, (i) => SubCategory.fromMap(maps[i]));
+  }
+
+  Future<List<Map<String, dynamic>>> getSubCategoriesByCategory(
+      int categoryId) async {
+    final dbClient = await db;
+    try {
+      var result = await dbClient.query(
+        'sub_categories',
+        where: 'category_id = ?',
+        whereArgs: [categoryId],
+      );
+      print('Subcategories fetched: $result'); // Debugging print
+      return result;
+    } catch (e) {
+      print("Error fetching subcategories from database: $e");
+      return [];
+    }
+  }
 }
