@@ -7,7 +7,7 @@ class Product {
   double prixTTC;
   String dateExpiration;
   int categoryId;
-  String? categoryName; // Champ optionnel pour le nom de la catégorie
+  String? categoryName;
 
   Product({
     required this.code,
@@ -45,7 +45,7 @@ class Product {
       prixTTC: map['prix_ttc'],
       dateExpiration: map['date_expiration'],
       categoryId: map['category_id'] ?? 0,
-      categoryName: map['category_name'], // Récupération du nom de la catégorie si présent
+      categoryName: map['category_name'],
     );
   }
 

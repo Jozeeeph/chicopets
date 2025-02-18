@@ -1,7 +1,7 @@
-import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../product.dart';
 
 class Searchprod {
   
@@ -37,7 +37,7 @@ class Searchprod {
             ),
           ),
           content: SizedBox(
-            width: 600,
+            width: 800,
             child: SingleChildScrollView(
               child: Column(
                 children: [
@@ -46,7 +46,7 @@ class Searchprod {
                     child: TextField(
                       controller: searchController,
                       decoration: InputDecoration(
-                        labelText: 'Recherche Produit',
+                        labelText: 'Recherche Produit (code ou designation)',
                         prefixIcon: const Icon(Icons.search, color: Color(0xFF0056A6)), // Deep Blue
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
