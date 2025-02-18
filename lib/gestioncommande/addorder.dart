@@ -4,9 +4,11 @@ import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 
+
 class Addorder {
+  
   static void showPlaceOrderPopup(BuildContext context, Order order,
-      List<Product> selectedProducts, List<int> quantityProducts) async {
+    List<Product> selectedProducts, List<int> quantityProducts) async {
     print("seee ${selectedProducts.length}");
 
     if (selectedProducts.isEmpty) {
@@ -35,21 +37,23 @@ class Addorder {
               ),
               title: Text(
                 "Confirmer la commande",
-                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0056A6)), // Deep Blue
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              content: SingleChildScrollView(
+              content: SingleChildScrollView( // Wrap the content in SingleChildScrollView
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Static list of products and quantities
+                    // Styled product list (receipt look)
                     Container(
-                      width: double.infinity,
+                      width: double.infinity, // Ensure full width
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: Color(0xFFE0E0E0), // Light Gray
-                            width: 1),
+                            color: Colors.black,
+                            width: 1), // Border for ticket feel
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black26,
@@ -61,20 +65,23 @@ class Addorder {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Title
                           Center(
                             child: Text(
                               "🧾 Ticket de Commande",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                color: Color(0xFF0056A6), // Deep Blue
+                                fontFamily:
+                                    'Courier', // Monospace for receipt style
                               ),
                             ),
                           ),
                           Divider(
                               thickness: 1,
-                              color: Color(0xFFE0E0E0)), // Light Gray
+                              color: Colors.black), // Separator line
 
+                          // Header Row
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
@@ -87,7 +94,7 @@ class Addorder {
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF000000)), // Deep Blue
+                                        fontFamily: 'Courier'),
                                   ),
                                 ),
                                 Expanded(
@@ -97,7 +104,7 @@ class Addorder {
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF000000)), // Deep Blue
+                                        fontFamily: 'Courier'),
                                   ),
                                 ),
                                 Expanded(
@@ -107,7 +114,7 @@ class Addorder {
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF000000)), // Deep Blue
+                                        fontFamily: 'Courier'),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -118,7 +125,7 @@ class Addorder {
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF000000)), // Deep Blue
+                                        fontFamily: 'Courier'),
                                     textAlign: TextAlign.end,
                                   ),
                                 ),
@@ -127,8 +134,9 @@ class Addorder {
                           ),
                           Divider(
                               thickness: 1,
-                              color: Color(0xFFE0E0E0)), // Light Gray
+                              color: Colors.black), // Separator line
 
+                          // Product List from OrderLine
                           if (selectedProducts.isNotEmpty)
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
@@ -143,8 +151,7 @@ class Addorder {
                                       child: Text(
                                         "${quantityProducts[index]}X",
                                         style: TextStyle(
-                                            fontSize: 16, 
-                                            color: Color(0xFF000000)), // Deep Blue
+                                            fontSize: 16, fontFamily: 'Courier'),
                                       ),
                                     ),
                                     Expanded(
@@ -152,8 +159,7 @@ class Addorder {
                                       child: Text(
                                         product.designation,
                                         style: TextStyle(
-                                            fontSize: 16, 
-                                            color: Color(0xFF000000)), // Deep Blue
+                                            fontSize: 16, fontFamily: 'Courier'),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -162,8 +168,7 @@ class Addorder {
                                       child: Text(
                                         "${product.prixTTC.toStringAsFixed(2)} DT",
                                         style: TextStyle(
-                                            fontSize: 16, 
-                                            color: Color(0xFF000000)), // Deep Blue
+                                            fontSize: 16, fontFamily: 'Courier'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -174,7 +179,7 @@ class Addorder {
                                         style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF000000)), // Deep Blue
+                                            fontFamily: 'Courier'),
                                         textAlign: TextAlign.end,
                                       ),
                                     ),
@@ -183,12 +188,13 @@ class Addorder {
                               );
                             }).toList()
                           else
-                            Center(child: Text("Aucun produit sélectionné.", style: TextStyle(color: Color(0xFF0056A6)))), // Deep Blue
+                            Center(child: Text("Aucun produit sélectionné.")),
 
                           Divider(
                               thickness: 1,
-                              color: Color(0xFFE0E0E0)), // Light Gray
+                              color: Colors.black), // Bottom separator
 
+                          // Total
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -197,14 +203,14 @@ class Addorder {
                                 style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0056A6)), // Deep Blue
+                                    fontFamily: 'Courier'),
                               ),
                               Text(
-                                "${total.toStringAsFixed(2)} DT",
+                                "${total.toStringAsFixed(2)} DT", // Display total from order
                                 style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontFamily: 'Courier'),
                               ),
                             ],
                           ),
@@ -214,11 +220,12 @@ class Addorder {
 
                     SizedBox(height: 16),
 
+                    // Payment Method Selection
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Mode de Paiement:",
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0056A6))), // Deep Blue
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Row(
                           children: [
                             Radio<String>(
@@ -229,9 +236,8 @@ class Addorder {
                                   selectedPaymentMethod = value!;
                                 });
                               },
-                              activeColor: Color(0xFF009688), // Teal Green
                             ),
-                            Text("Espèce", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+                            Text("Espèce"),
                             Radio<String>(
                               value: "Carte Bancaire",
                               groupValue: selectedPaymentMethod,
@@ -240,9 +246,8 @@ class Addorder {
                                   selectedPaymentMethod = value!;
                                 });
                               },
-                              activeColor: Color(0xFF009688), // Teal Green
                             ),
-                            Text("Carte Bancaire", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+                            Text("Carte Bancaire"),
                             Radio<String>(
                               value: "Chèque",
                               groupValue: selectedPaymentMethod,
@@ -251,9 +256,8 @@ class Addorder {
                                   selectedPaymentMethod = value!;
                                 });
                               },
-                              activeColor: Color(0xFF009688), // Teal Green
                             ),
-                            Text("Chèque", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+                            Text("Chèque"),
                           ],
                         ),
                       ],
@@ -261,18 +265,17 @@ class Addorder {
 
                     SizedBox(height: 16),
 
+                    // Total Amount
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Input for "Donnée" (Amount Given)
                         TextField(
                           controller: amountGivenController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: "Donnée (DT)",
-                            labelStyle: TextStyle(color: Color(0xFF0056A6)), // Deep Blue
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide(color: Color(0xFF26A9E0)), // Sky Blue
-                            ),
+                            border: OutlineInputBorder(),
                           ),
                           onChanged: (value) {
                             setState(() {
@@ -286,15 +289,13 @@ class Addorder {
 
                         SizedBox(height: 10),
 
+                        // "Rendu" (Change Returned) - Readonly
                         TextField(
                           controller: changeReturnedController,
                           readOnly: true,
                           decoration: InputDecoration(
                             labelText: "Rendu (DT)",
-                            labelStyle: TextStyle(color: Color(0xFF0056A6)), // Deep Blue
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide(color: Color(0xFF26A9E0)), // Sky Blue
-                            ),
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ],
@@ -307,15 +308,15 @@ class Addorder {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: Text("Annuler", style: TextStyle(color: Color(0xFFE53935))), // Warm Red
+                  child: Text("Annuler"),
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // Close popup
                     _confirmPlaceOrder(
                         context, selectedProducts, quantityProducts);
                   },
-                  child: Text("Confirmer", style: TextStyle(color: Color(0xFF009688))), // Teal Green
+                  child: Text("Confirmer"),
                 ),
               ],
             );
@@ -325,30 +326,35 @@ class Addorder {
     );
   }
 
+
   static void _confirmPlaceOrder(BuildContext context,
       List<Product> selectedProducts, List<int> quantityProducts) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Aucun produit sélectionné.", style: TextStyle(color: Colors.white))),
+        SnackBar(content: Text("Aucun produit sélectionné.")),
       );
       return;
     }
 
     double total = calculateTotal(selectedProducts, quantityProducts);
     String date = DateTime.now().toIso8601String();
-    String modePaiement = "Espèces";
+    String modePaiement = "Espèces"; // You can change this if needed
 
+    // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex = selectedProducts.indexOf(product);
+      int productIndex =
+          selectedProducts.indexOf(product); // Find correct index
 
       return OrderLine(
-        idOrder: 0,
+        idOrder: 0, // Temporary ID
         idProduct: product.code,
-        quantite: quantityProducts[productIndex],
+        quantite:
+            quantityProducts[productIndex], // Correct quantity for this product
         prixUnitaire: product.prixTTC,
       );
     }).toList();
 
+    // Create an Order object
     Order order = Order(
       date: date,
       orderLines: orderLines,
@@ -356,11 +362,12 @@ class Addorder {
       modePaiement: modePaiement,
     );
 
+    // Save order to database
     int orderId = await SqlDb().addOrder(order);
 
     if (orderId > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Commande passée avec succès !", style: TextStyle(color: Colors.white))),
+        SnackBar(content: Text("Commande passée avec succès !")),
       );
 
       selectedProducts.clear();
@@ -368,7 +375,7 @@ class Addorder {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text("Erreur lors de l'enregistrement de la commande.", style: TextStyle(color: Colors.white))),
+            content: Text("Erreur lors de l'enregistrement de la commande.")),
       );
     }
   }
