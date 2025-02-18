@@ -2,6 +2,7 @@ import 'package:caissechicopets/components/categorieetproduct.dart';
 import 'package:caissechicopets/gestioncommande/addorder.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
+import 'package:caissechicopets/gestionproduit/addcategory.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/passagecommande/deleteline.dart';
 import 'package:caissechicopets/passagecommande/modifyquantity.dart';
@@ -97,9 +98,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
     });
   }
 
-  void handleAddCategory(){
-    Addcategory.showAddCategoryPopUp(context);
-  }
+  // void handleAddCategory(){
+  //   AddCategory(context);
+  // }
 
   void handleFetchOrders() {
     Getorderlist.showListOrdersPopUp(context);
@@ -133,7 +134,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onQuantityChange: handleQuantityChange,
               onFetchOrders: handleFetchOrders,
               onPlaceOrder: handlePlaceOrder, 
-              onAddCategory: handleAddCategory, // Ensure this is passed
+              // onAddCategory: handleAddCategory, // Ensure this is passed
             ),
 
             const SizedBox(height: 10), // Add some spacing

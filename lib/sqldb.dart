@@ -78,6 +78,8 @@ class SqlDb {
           category_name TEXT NOT NULL,
           image_path TEXT
         )''');
+        print("categories items table created");
+        
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
