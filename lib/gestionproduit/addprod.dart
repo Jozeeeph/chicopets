@@ -1,7 +1,9 @@
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/variantprod.dart';
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/gestionproduit/addCategory.dart'; // Ensure correct import
+import 'package:caissechicopets/gestionproduit/addCategory.dart'; // Assurez-vous que l'import est correct
+import 'package:caissechicopets/gestionproduit/addvariant.dart';
 
 class Addprod {
   static void showAddProductPopup(BuildContext context) {
@@ -16,6 +18,8 @@ class Addprod {
 
     int? selectedCategoryId;
     bool isCategoryFormVisible = false;
+    bool hasVariants = false;
+    List<VariantProd> variants = [];
 
     void calculatePriceTTC() {
       if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
@@ -40,10 +44,9 @@ class Addprod {
               title: const Text('Ajouter un Produit'),
               content: SizedBox(
                 width: 800,
-                height: 400,
+                height: 600,
                 child: Row(
                   children: [
-                    // Left Side: Product Form
                     Expanded(
                       flex: 1,
                       child: SingleChildScrollView(
@@ -52,18 +55,52 @@ class Addprod {
                           children: [
                             _buildTextField(codeController, 'Code Barre'),
                             _buildTextField(designationController, 'Désignation'),
-                            _buildTextField(stockController, 'Stock',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(priceHTController, 'Prix dachat',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(taxController, 'Taxe (%)',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(priceTTCController, 'Prix TTC',
-                                enabled: false),
+                            _buildTextField(stockController, 'Stock', keyboardType: TextInputType.number),
+                            CheckboxListTile(
+                              title: const Text('Ce produit a des variantes'),
+                              value: hasVariants,
+                              onChanged: (value) {
+                                setState(() {
+                                  hasVariants = value ?? false;
+                                });
+                              },
+                            ),
+                            if (!hasVariants) ...[
+                              _buildTextField(priceHTController, 'Prix d\'achat', keyboardType: TextInputType.number),
+                              _buildTextField(taxController, 'Taxe (%)', keyboardType: TextInputType.number),
+                              _buildTextField(priceTTCController, 'Prix TTC', enabled: false),
+                            ],
                             _buildTextField(dateController, 'Date Expiration'),
                             const SizedBox(height: 16),
-
-                            // Category Selection with Add Button
+                            if (hasVariants) ...[
+                              ...variants.map((variant) {
+                                return AddVariant.buildVariantFields(
+                                  context,
+                                  variant,
+                                  (updatedVariant) {
+                                    setState(() {
+                                      variants[variants.indexOf(variant)] = updatedVariant;
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                              ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    variants.add(VariantProd(
+                                      id: UniqueKey().toString(),
+                                      productCode: codeController.text,
+                                      size: '',
+                                      prixHT: 0.0,
+                                      taxe: 0.0,
+                                      prixTTC: 0.0,
+                                    ));
+                                  });
+                                },
+                                child: const Text('Ajouter une variante'),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             Row(
                               children: [
                                 Expanded(
@@ -105,7 +142,6 @@ class Addprod {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                // Add category button
                                 IconButton(
                                   icon: const Icon(Icons.add, color: Colors.blue),
                                   onPressed: () {
@@ -120,10 +156,7 @@ class Addprod {
                         ),
                       ),
                     ),
-
                     const VerticalDivider(width: 20, thickness: 2),
-
-                    // Right Side: Category Form (Visible on "+" Click)
                     Expanded(
                       flex: 1,
                       child: isCategoryFormVisible
@@ -145,27 +178,44 @@ class Addprod {
                     if (codeController.text.isEmpty ||
                         designationController.text.isEmpty ||
                         stockController.text.isEmpty ||
-                        priceHTController.text.isEmpty ||
-                        taxController.text.isEmpty ||
-                        priceTTCController.text.isEmpty ||
                         dateController.text.isEmpty ||
                         selectedCategoryId == null) {
                       _showMessage(context, "Veuillez remplir tous les champs !");
                       return;
                     }
 
-                    await sqldb.addProduct(
-                      codeController.text,
-                      designationController.text,
-                      int.tryParse(stockController.text) ?? 0,
-                      double.tryParse(priceHTController.text) ?? 0.0,
-                      double.tryParse(taxController.text) ?? 0.0,
-                      double.tryParse(priceTTCController.text) ?? 0.0,
-                      dateController.text,
-                      selectedCategoryId!,
-                    );
+                    if (!hasVariants &&
+                        (priceHTController.text.isEmpty ||
+                            taxController.text.isEmpty ||
+                            priceTTCController.text.isEmpty)) {
+                      _showMessage(context, "Veuillez remplir tous les champs !");
+                      return;
+                    }
 
-                    Navigator.of(context).pop();
+                    try {
+                      await sqldb.addProduct(
+                        codeController.text,
+                        designationController.text,
+                        int.tryParse(stockController.text) ?? 0,
+                        double.tryParse(priceHTController.text) ?? 0.0,
+                        double.tryParse(taxController.text) ?? 0.0,
+                        double.tryParse(priceTTCController.text) ?? 0.0,
+                        dateController.text,
+                        selectedCategoryId!,
+                        hasVariants: hasVariants,
+                      );
+
+                      if (hasVariants) {
+                        for (var variant in variants) {
+                          await sqldb.addProductVariant(variant);
+                        }
+                        print(variants);
+                      }
+
+                      Navigator.of(context).pop();
+                    } catch (e) {
+                      _showMessage(context, "Erreur lors de l'ajout du produit: $e");
+                    }
                   },
                   child: const Text('Ajouter'),
                 ),
@@ -184,7 +234,7 @@ class Addprod {
   }
 
   static Widget _buildTextField(TextEditingController controller, String label,
-      {TextInputType keyboardType = TextInputType.text, bool enabled = true}) {
+      {TextInputType keyboardType = TextInputType.text, bool enabled = true, Function(String)? onChanged}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
@@ -195,6 +245,7 @@ class Addprod {
         ),
         keyboardType: keyboardType,
         enabled: enabled,
+        onChanged: onChanged,
       ),
     );
   }

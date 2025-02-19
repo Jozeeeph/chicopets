@@ -4,6 +4,7 @@ import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/variantprod.dart';
 import 'package:caissechicopets/subcategory.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
@@ -12,6 +13,7 @@ import 'package:path_provider/path_provider.dart'; // Added to get the correct d
 
 class SqlDb {
   static Database? _db;
+
 
   Future<Database> get db async {
     if (_db != null) return _db!;
@@ -36,18 +38,19 @@ class SqlDb {
       onCreate: (Database db, int version) async {
         print("Creating tables...");
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS products(
-          code TEXT PRIMARY KEY,
-          designation TEXT,
-          stock INTEGER,
-          prix_ht REAL,
-          taxe REAL,
-          prix_ttc REAL,
-          date_expiration TEXT,
-          category_id INTEGER,
-          FOREIGN KEY(category_id) REFERENCES categories(id_category) ON DELETE SET NULL
-        )
-      ''');
+  CREATE TABLE IF NOT EXISTS products(
+    code TEXT PRIMARY KEY,
+    designation TEXT,
+    stock INTEGER,
+    prix_ht REAL,
+    taxe REAL,
+    prix_ttc REAL,
+    date_expiration TEXT,
+    category_id INTEGER,
+    has_variants INTEGER DEFAULT 0,
+    FOREIGN KEY(category_id) REFERENCES categories(id_category) ON DELETE SET NULL
+  )
+''');
         print("Products table created");
 
         await db.execute('''
@@ -91,6 +94,17 @@ class SqlDb {
           )
         ''');
         print("Sub-categories table created");
+        await db.execute('''
+  CREATE TABLE IF NOT EXISTS product_variants (
+    id TEXT PRIMARY KEY,
+    product_code TEXT,
+    size TEXT,
+    prix_ht REAL,
+    taxe REAL,
+    prix_ttc REAL,
+    FOREIGN KEY(product_code) REFERENCES products(code) ON DELETE CASCADE
+  )
+''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -108,16 +122,24 @@ class SqlDb {
     );
   }
 
-  Future<List<Product>> getProducts() async {
-    final dbClient = await db;
-    final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
-      SELECT p.*, c.category_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id_category
-    ''');
+Future<List<Product>> getProducts() async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
+    SELECT p.*, c.category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id_category
+  ''');
 
-    return result.map((e) => Product.fromMap(e)).toList();
+  List<Product> products = [];
+  for (var productMap in result) {
+    Product product = Product.fromMap(productMap);
+    if (product.hasVariants) {
+      product.variants = await getProductVariants(product.code);
+    }
+    products.add(product);
   }
+  return products;
+}
 
   Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
     final dbClient = await db;
@@ -129,32 +151,33 @@ class SqlDb {
   }
 
   Future<void> addProduct(
-    String code,
-    String designation,
-    int stock,
-    double prixHT,
-    double taxe,
-    double prixTTC,
-    String date,
-    int categoryId,
-  ) async {
-    final dbClient = await db;
-    await dbClient.insert(
-      'products',
-      {
-        'code': code,
-        'designation': designation,
-        'stock': stock,
-        'prix_ht': prixHT,
-        'taxe': taxe,
-        'prix_ttc': prixTTC,
-        'date_expiration': date,
-        'category_id': categoryId,
-      },
-      conflictAlgorithm: ConflictAlgorithm
-          .replace, // Handle conflicts if the same code is inserted
-    );
-  }
+  String code,
+  String designation,
+  int stock,
+  double prixHT,
+  double taxe,
+  double prixTTC,
+  String date,
+  int categoryId,
+  {bool hasVariants = false}
+) async {
+  final dbClient = await db;
+  await dbClient.insert(
+    'products',
+    {
+      'code': code,
+      'designation': designation,
+      'stock': stock,
+      'prix_ht': prixHT,
+      'taxe': taxe,
+      'prix_ttc': prixTTC,
+      'date_expiration': date,
+      'category_id': categoryId,
+      'has_variants': hasVariants ? 1 : 0,
+    },
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
@@ -431,4 +454,50 @@ class SqlDb {
       return [];
     }
   }
+
+    Future<void> addProductVariant(VariantProd variant) async {
+  final dbClient = await db;
+  await dbClient.insert(
+    'product_variants',
+    variant.toMap(),
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
+
+Future<List<VariantProd>> getProductVariants(String productCode) async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> result = await dbClient.query(
+    'product_variants',
+    where: 'product_code = ?',
+    whereArgs: [productCode],
+  );
+  return result.map((e) => VariantProd.fromMap(e)).toList();
+}
+Future<List<Product>> getProductsWithVariants() async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
+    SELECT p.*, c.category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id_category
+  ''');
+
+  List<Product> products = [];
+  for (var productMap in result) {
+    Product product = Product.fromMap(productMap);
+    if (product.hasVariants) {
+      product.variants = await getProductVariants(product.code);
+    }
+    products.add(product);
+  }
+  return products;
+}
+
+Future<void> deleteProductVariants(String productCode) async {
+  final dbClient = await db;
+  await dbClient.delete(
+    'product_variants',
+    where: 'product_code = ?',
+    whereArgs: [productCode],
+  );
+}
 }

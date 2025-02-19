@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../product.dart';
 
 class Searchprod {
-  
   static void showProductSearchPopup(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
     final products = await sqldb.getProducts();
@@ -130,21 +129,31 @@ class Searchprod {
                                 }
                               }
 
-                              return InkWell(
-                                child: Container(
-                                  color: index.isEven ? Color(0xFFE0E0E0) : Colors.white, // Light Gray and White alternation
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    children: [
-                                      Expanded(child: Text(product.code)),
-                                      Expanded(child: Text(product.designation)),
-                                      Expanded(child: Text(product.categoryName ?? 'Sans catégorie')),
-                                      Expanded(child: Text('${product.stock}')),
-                                      Expanded(child: Text('${product.prixHT} DT')),
-                                      Expanded(child: Text(formattedDate)),
-                                    ],
+                              return ExpansionTile(
+                                title: InkWell(
+                                  child: Container(
+                                    color: index.isEven ? Color(0xFFE0E0E0) : Colors.white, // Light Gray and White alternation
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                    child: Row(
+                                      children: [
+                                        Expanded(child: Text(product.code)),
+                                        Expanded(child: Text(product.designation)),
+                                        Expanded(child: Text(product.categoryName ?? 'Sans catégorie')),
+                                        Expanded(child: Text('${product.stock}')),
+                                        Expanded(child: Text(product.hasVariants ? 'Variante' : '${product.prixHT} DT')),
+                                        Expanded(child: Text(formattedDate)),
+                                      ],
+                                    ),
                                   ),
                                 ),
+                                children: product.hasVariants
+                                    ? product.variants.map((variant) {
+                                        return ListTile(
+                                          title: Text('Taille: ${variant.size}'),
+                                          subtitle: Text('Prix HT: ${variant.prixHT} DT, Taxe: ${variant.taxe}%, Prix TTC: ${variant.prixTTC} DT'),
+                                        );
+                                      }).toList()
+                                    : [ListTile(title: Text('Pas de variantes'))],
                               );
                             },
                           ),
