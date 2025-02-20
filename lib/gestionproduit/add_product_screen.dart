@@ -1,13 +1,19 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
+import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:intl/intl.dart';
 
 class AddProductScreen extends StatefulWidget {
+  final Product? product;
   final Function refreshData;
 
-  const AddProductScreen({super.key, required this.refreshData});
+  const AddProductScreen({
+    Key? key,
+    this.product,
+    required this.refreshData,
+  }) : super(key: key);
 
   @override
   _AddProductScreenState createState() => _AddProductScreenState();

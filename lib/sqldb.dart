@@ -119,6 +119,27 @@ class SqlDb {
     return result.map((e) => Product.fromMap(e)).toList();
   }
 
+  // Ajoutez ces méthodes dans la classe SqlDb
+
+  Future<int> updateProduct(Product product) async {
+    final dbClient = await db;
+    return await dbClient.update(
+      'products',
+      product.toMap(),
+      where: 'code = ?',
+      whereArgs: [product.code],
+    );
+  }
+
+  Future<int> deleteProduct(String productCode) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'products',
+      where: 'code = ?',
+      whereArgs: [productCode],
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
     final dbClient = await db;
     return await dbClient.rawQuery('''
