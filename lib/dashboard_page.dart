@@ -1,4 +1,4 @@
-import 'package:caissechicopets/gestionproduit/add_product_screen.dart';
+import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:flutter/material.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -16,11 +16,7 @@ class DashboardPage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AddProductScreen(
-                  refreshData: () {
-                    // Rafraîchir les données si nécessaire
-                  },
-                ),
+                builder: (context) => const ManageProductPage(),
               ),
             );
           },
