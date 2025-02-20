@@ -21,6 +21,11 @@ class _AddCategoryState extends State<AddCategory> {
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
 
+   void refreshData() {
+    fetchCategories(); // Rafraîchir les catégories
+    fetchSubCategories(selectedCategoryId ?? 0); // Rafraîchir les sous-catégories
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,27 +46,25 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   Future<void> fetchSubCategories(int categoryId) async {
-  try {
-    List<Map<String, dynamic>> fetchedSubCategories =
-        await sqldb.getSubCategoriesByCategory(categoryId);
+    try {
+      List<Map<String, dynamic>> fetchedSubCategories =
+          await sqldb.getSubCategoriesByCategory(categoryId);
 
-    print('Fetched subcategories: $fetchedSubCategories');
+      print('Fetched subcategories: $fetchedSubCategories');
 
-    setState(() {
-      subCategories = fetchedSubCategories.map((map) {
-        return SubCategory(
-          name: map['sub_category_name'] ?? 'Unknown',
-          categoryId: map['category_id'] ?? 0,
-        );
-      }).toList();
-    });
-  } catch (e) {
-    print("Error fetching subcategories: $e");
-    _showMessage("Erreur lors du chargement des sous-catégories !");
+      setState(() {
+        subCategories = fetchedSubCategories.map((map) {
+          return SubCategory(
+            name: map['sub_category_name'] ?? 'Unknown',
+            categoryId: map['category_id'] ?? 0,
+          );
+        }).toList();
+      });
+    } catch (e) {
+      print("Error fetching subcategories: $e");
+      _showMessage("Erreur lors du chargement des sous-catégories !");
+    }
   }
-}
-
-
 
   Future<void> pickImage() async {
     final pickedFile =
@@ -72,6 +75,7 @@ class _AddCategoryState extends State<AddCategory> {
       });
     }
   }
+  
 
   void addCategory() async {
     if (nameController.text.isEmpty || selectedImage == null) {
@@ -89,6 +93,7 @@ class _AddCategoryState extends State<AddCategory> {
         selectedImage = null;
         fetchCategories(); // Rafraîchir les catégories
       });
+      refreshData(); // Rafraîchir les données après l'ajout
     } else {
       _showMessage("Échec de l'ajout de la catégorie !");
     }

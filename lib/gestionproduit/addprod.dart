@@ -2,9 +2,12 @@ import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart'; // Ensure correct import
+import 'package:intl/intl.dart';
+
 
 class Addprod {
-  static void showAddProductPopup(BuildContext context) {
+  static void showAddProductPopup(BuildContext context, Function refreshData) {
+    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
     final TextEditingController codeController = TextEditingController();
     final TextEditingController designationController = TextEditingController();
     final TextEditingController stockController = TextEditingController();
@@ -41,131 +44,230 @@ class Addprod {
               content: SizedBox(
                 width: 800,
                 height: 400,
-                child: Row(
-                  children: [
-                    // Left Side: Product Form
-                    Expanded(
-                      flex: 1,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildTextField(codeController, 'Code Barre'),
-                            _buildTextField(designationController, 'Désignation'),
-                            _buildTextField(stockController, 'Stock',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(priceHTController, 'Prix dachat',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(taxController, 'Taxe (%)',
-                                keyboardType: TextInputType.number),
-                            _buildTextField(priceTTCController, 'Prix TTC',
-                                enabled: false),
-                            _buildTextField(dateController, 'Date Expiration'),
-                            const SizedBox(height: 16),
+                child: Form(
+                  key: _formKey,
+                  child: Row(
+                    children: [
+                      // Left Side: Product Form
+                      Expanded(
+                        flex: 1,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildTextFormField(
+                                controller: codeController,
+                                label: 'Code à Barre',
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Code à Barre" ne doit pas être vide.';
+                                  }
+                                  if (int.tryParse(value) == null) {
+                                    return 'Le "Code à Barre" doit être un nombre.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              _buildTextFormField(
+                                controller: designationController,
+                                label: 'Désignation',
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Désignation" ne doit pas être vide.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              _buildTextFormField(
+                                controller: stockController,
+                                label: 'Stock',
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Stock" ne doit pas être vide.';
+                                  }
+                                  if (int.tryParse(value) == null ||
+                                      int.parse(value) <= 0) {
+                                    return 'Le stock doit être un nombre entier positif.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              _buildTextFormField(
+                                controller: priceHTController,
+                                label: 'Prix dachat',
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Prix dachat" ne doit pas être vide.';
+                                  }
+                                  if (double.tryParse(value) == null ||
+                                      double.parse(value) <= 0) {
+                                    return 'Le prix doit être un nombre positif.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              _buildTextFormField(
+                                controller: taxController,
+                                label: 'Taxe (%)',
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Taxe (%)" ne doit pas être vide.';
+                                  }
+                                  if (double.tryParse(value) == null ||
+                                      double.parse(value) <= 0) {
+                                    return 'La taxe doit être un nombre positif.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              _buildTextFormField(
+                                controller: priceTTCController,
+                                label: 'Prix TTC',
+                                enabled: false,
+                              ),
+                              _buildTextFormField(
+                                controller: dateController,
+                                label: 'Date Expiration',
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Le champ "Date Expiration" ne doit pas être vide.';
+                                  }
 
-                            // Category Selection with Add Button
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: FutureBuilder<List<Category>>(
-                                    future: sqldb.getCategories(),
-                                    builder: (context, snapshot) {
-                                      if (!snapshot.hasData) {
-                                        return const CircularProgressIndicator();
-                                      }
-                                      List<Category> categories = snapshot.data!;
-                                      if (categories.isEmpty) {
-                                        return const Text("Aucune catégorie disponible");
-                                      }
-                                      return DropdownButtonFormField<int>(
-                                        decoration: const InputDecoration(
-                                          labelText: "Catégorie",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        value: selectedCategoryId,
-                                        items: categories.map((cat) {
-                                          return DropdownMenuItem<int>(
-                                            value: cat.id,
-                                            child: Text(cat.name),
-                                          );
-                                        }).toList(),
-                                        onChanged: (val) {
-                                          setState(() {
-                                            selectedCategoryId = val;
-                                          });
-                                        },
-                                        validator: (value) {
-                                          if (value == null) {
-                                            return "Veuillez sélectionner une catégorie";
-                                          }
-                                          return null;
-                                        },
-                                      );
+                                  List<String> possibleFormats = [
+                                    "dd-MM-yyyy",
+                                    "MM-dd-yyyy",
+                                    "yyyy-MM-dd",
+                                    "dd/MM/yyyy",
+                                    "MM/dd/yyyy"
+                                  ];
+
+                                  DateTime? date;
+
+                                  for (String format in possibleFormats) {
+                                    try {
+                                      date =
+                                          DateFormat(format).parseStrict(value);
+                                      break; // Dès qu'un format fonctionne, on arrête la boucle
+                                    } catch (e) {
+                                      continue;
+                                    }
+                                  }
+
+                                  if (date == null) {
+                                    return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
+                                  }
+
+                                  if (!date.isAfter(DateTime.now())) {
+                                    return 'La date doit être dans le futur.';
+                                  }
+
+                                  return null; // Aucun problème, validation réussie !
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Category Selection with Add Button
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FutureBuilder<List<Category>>(
+                                      future: sqldb.getCategories(),
+                                      builder: (context, snapshot) {
+                                        if (!snapshot.hasData) {
+                                          return const CircularProgressIndicator();
+                                        }
+                                        List<Category> categories =
+                                            snapshot.data!;
+                                        if (categories.isEmpty) {
+                                          return const Text(
+                                              "Aucune catégorie disponible");
+                                        }
+                                        return DropdownButtonFormField<int>(
+                                          decoration: const InputDecoration(
+                                            labelText: "Catégorie",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          value: selectedCategoryId,
+                                          items: categories.map((cat) {
+                                            return DropdownMenuItem<int>(
+                                              value: cat.id,
+                                              child: Text(cat.name),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            setState(() {
+                                              selectedCategoryId = val;
+                                            });
+                                          },
+                                          validator: (value) {
+                                            if (value == null) {
+                                              return "Veuillez sélectionner une catégorie";
+                                            }
+                                            return null;
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // Add category button
+                                  IconButton(
+                                    icon: const Icon(Icons.add,
+                                        color: Colors.blue),
+                                    onPressed: () {
+                                      setState(() {
+                                        isCategoryFormVisible =
+                                            !isCategoryFormVisible;
+                                      });
                                     },
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                // Add category button
-                                IconButton(
-                                  icon: const Icon(Icons.add, color: Colors.blue),
-                                  onPressed: () {
-                                    setState(() {
-                                      isCategoryFormVisible = !isCategoryFormVisible;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
-                    const VerticalDivider(width: 20, thickness: 2),
+                      const VerticalDivider(width: 20, thickness: 2),
 
-                    // Right Side: Category Form (Visible on "+" Click)
-                    Expanded(
-                      flex: 1,
-                      child: isCategoryFormVisible
-                          ? AddCategory()
-                          : Center(
-                              child: Text(
-                                "Cliquez sur '+' pour ajouter une catégorie",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey[600]),
+                      // Right Side: Category Form (Visible on "+" Click)
+                      Expanded(
+                        flex: 1,
+                        child: isCategoryFormVisible
+                            ? AddCategory()
+                            : Center(
+                                child: Text(
+                                  "Cliquez sur '+' pour ajouter une catégorie",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
                               ),
-                            ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 ElevatedButton(
                   onPressed: () async {
-                    if (codeController.text.isEmpty ||
-                        designationController.text.isEmpty ||
-                        stockController.text.isEmpty ||
-                        priceHTController.text.isEmpty ||
-                        taxController.text.isEmpty ||
-                        priceTTCController.text.isEmpty ||
-                        dateController.text.isEmpty ||
-                        selectedCategoryId == null) {
-                      _showMessage(context, "Veuillez remplir tous les champs !");
-                      return;
+                    if (_formKey.currentState!.validate()) {
+                      await sqldb.addProduct(
+                        codeController.text,
+                        designationController.text,
+                        int.tryParse(stockController.text) ?? 0,
+                        double.tryParse(priceHTController.text) ?? 0.0,
+                        double.tryParse(taxController.text) ?? 0.0,
+                        double.tryParse(priceTTCController.text) ?? 0.0,
+                        dateController.text,
+                        selectedCategoryId!,
+                      );
+
+                      refreshData(); // Rafraîchir les données après l'ajout
+                      Navigator.of(context).pop();
                     }
-
-                    await sqldb.addProduct(
-                      codeController.text,
-                      designationController.text,
-                      int.tryParse(stockController.text) ?? 0,
-                      double.tryParse(priceHTController.text) ?? 0.0,
-                      double.tryParse(taxController.text) ?? 0.0,
-                      double.tryParse(priceTTCController.text) ?? 0.0,
-                      dateController.text,
-                      selectedCategoryId!,
-                    );
-
-                    Navigator.of(context).pop();
                   },
                   child: const Text('Ajouter'),
                 ),
@@ -183,11 +285,16 @@ class Addprod {
     );
   }
 
-  static Widget _buildTextField(TextEditingController controller, String label,
-      {TextInputType keyboardType = TextInputType.text, bool enabled = true}) {
+  static Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String label,
+    TextInputType keyboardType = TextInputType.text,
+    bool enabled = true,
+    String? Function(String?)? validator,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
         decoration: InputDecoration(
           labelText: label,
@@ -195,11 +302,13 @@ class Addprod {
         ),
         keyboardType: keyboardType,
         enabled: enabled,
+        validator: validator,
       ),
     );
   }
 
   static void _showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

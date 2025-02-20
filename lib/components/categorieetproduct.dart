@@ -42,6 +42,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     products = _fetchProducts();
   }
 
+  void refreshData() {
+    setState(() {
+      categories = _fetchCategories();
+      products = _fetchProducts();
+    });
+  }
+
   Future<List<Category>> _fetchCategories() async {
     try {
       // Fetch categories from the database
@@ -94,37 +101,43 @@ class _CategorieetproductState extends State<Categorieetproduct> {
         children: [
           // Categories Column
           Expanded(
-            child: FutureBuilder<List<Category>>(
-              future: categories,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                      child: Text('Erreur de chargement: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                      child: Text('Aucune catégorie disponible'));
-                }
-
-                return GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 1,
-                    mainAxisSpacing: 8.0,
-                    crossAxisSpacing: 8.0,
-                  ),
-                  padding: const EdgeInsets.all(8.0),
-                  itemCount: snapshot.data!.length,
-                  itemBuilder: (context, index) {
-                    final category = snapshot.data![index];
-                    print(
-                        "Category Name: ${category.name}, Image Path: ${category.imagePath}");
-                    return buildCategoryButton(
-                        category.name, category.imagePath);
-                  },
-                );
+            child: RefreshIndicator(
+              onRefresh: () async {
+                refreshData();
               },
+              child: FutureBuilder<List<Category>>(
+                future: categories,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                        child: Text('Aucune catégorie disponible'));
+                  }
+
+                  return GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 1,
+                      mainAxisSpacing: 8.0,
+                      crossAxisSpacing: 8.0,
+                    ),
+                    padding: const EdgeInsets.all(8.0),
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, index) {
+                      final category = snapshot.data![index];
+                      print(
+                          "Category Name: ${category.name}, Image Path: ${category.imagePath}");
+                      return buildCategoryButton(
+                          category.name, category.imagePath);
+                    },
+                  );
+                },
+              ),
             ),
           ),
           VerticalDivider(
@@ -133,31 +146,37 @@ class _CategorieetproductState extends State<Categorieetproduct> {
           ),
           // Products Column
           Expanded(
-            child: FutureBuilder<List<Product>>(
-              future: products,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                      child: Text('Erreur de chargement: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('Aucun produit disponible'));
-                }
-
-                return GridView.count(
-                  crossAxisCount: 4,
-                  children: snapshot.data!.map((product) {
-                    return InkWell(
-                      onTap: () {
-                        widget.onProductSelected(product);
-                      },
-                      child: buildProductButton(
-                          "${product.designation} (${product.categoryName ?? 'Sans catégorie'})"),
-                    );
-                  }).toList(),
-                );
+            child: RefreshIndicator(
+              onRefresh: () async {
+                refreshData();
               },
+              child: FutureBuilder<List<Product>>(
+                future: products,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                        child: Text('Aucun produit disponible'));
+                  }
+
+                  return GridView.count(
+                    crossAxisCount: 4,
+                    children: snapshot.data!.map((product) {
+                      return InkWell(
+                        onTap: () {
+                          widget.onProductSelected(product);
+                        },
+                        child: buildProductButton(
+                            "${product.designation} (${product.categoryName ?? 'Sans catégorie'})"),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ),
           ),
         ],

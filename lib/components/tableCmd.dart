@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+typedef RefreshCallback = void Function(Function refreshData);
+
+
 class TableCmd extends StatefulWidget {
   final double total;
   final List<Product> selectedProducts;
   final List<int> quantityProducts;
   final Function(int) onDeleteProduct;
-  final VoidCallback onAddProduct;
+  final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
   // final VoidCallback onAddCategory;
   final Function(int) onQuantityChange;
@@ -264,13 +267,7 @@ class _TableCmdState extends State<TableCmd> {
             //   child: const Text('AJOUT CATEGORIE',
             //       style: TextStyle(color: Colors.white)),
             // ),
-            ElevatedButton(
-              onPressed: widget.onAddProduct,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0056A6)), // Deep Blue
-              child: const Text('AJOUT PRODUIT',
-                  style: TextStyle(color: Colors.white)),
-            ),
+
             ElevatedButton(
               onPressed: selectedProductIndex != null
                   ? () {
