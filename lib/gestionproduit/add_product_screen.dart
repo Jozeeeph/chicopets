@@ -31,11 +31,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final SqlDb sqldb = SqlDb();
 
   int? selectedCategoryId;
+  int? selectedSubCategoryId;
   bool isCategoryFormVisible = false;
+  List<Category> categories = [];
+  List<DropdownMenuItem<int>> subCategoryItems = [];
 
   @override
   void initState() {
     super.initState();
+    // If a product is passed, populate the fields with the product data
+    if (widget.product != null) {
+      codeController.text = widget.product!.code;
+      designationController.text = widget.product!.designation;
+      stockController.text = widget.product!.stock.toString();
+      priceHTController.text = widget.product!.prixHT.toString();
+      taxController.text = widget.product!.taxe.toString();
+      priceTTCController.text = widget.product!.prixTTC.toString();
+      dateController.text = widget.product!.dateExpiration;
+      selectedCategoryId = widget.product!.categoryId;
+      selectedSubCategoryId = widget.product!.subCategoryId;
+    }
+
     taxController.addListener(calculatePriceTTC);
     priceHTController.addListener(calculatePriceTTC);
   }
@@ -55,7 +71,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ajouter un Produit'),
+        title: widget.product == null
+            ? const Text('Ajouter un Produit')
+            : const Text('Modifier le Produit'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -178,7 +196,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             return 'La date doit être dans le futur.';
                           }
 
-                          return null; // Aucun problème, validation réussie !
+                          return null;
                         },
                       ),
                       const SizedBox(height: 16),
@@ -193,7 +211,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 if (!snapshot.hasData) {
                                   return const CircularProgressIndicator();
                                 }
-                                List<Category> categories = snapshot.data!;
+                                categories = snapshot.data!;
                                 if (categories.isEmpty) {
                                   return const Text(
                                       "Aucune catégorie disponible");
@@ -213,6 +231,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   onChanged: (val) {
                                     setState(() {
                                       selectedCategoryId = val;
+                                      selectedSubCategoryId = null;
+                                      subCategoryItems = categories
+                                          .firstWhere((cat) => cat.id == val)
+                                          .subCategories
+                                          .map(
+                                              (subCat) => DropdownMenuItem<int>(
+                                                    value: subCat.id,
+                                                    child: Text(subCat.name),
+                                                  ))
+                                          .toList();
                                     });
                                   },
                                   validator: (value) {
@@ -236,6 +264,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             },
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Subcategory Dropdown (Visible when a category is selected)
+                      Visibility(
+                        visible: selectedCategoryId != null,
+                        child: DropdownButtonFormField<int>(
+                          decoration: const InputDecoration(
+                            labelText: "Sous-catégorie",
+                            border: OutlineInputBorder(),
+                          ),
+                          value: selectedSubCategoryId,
+                          items: subCategoryItems,
+                          onChanged: (val) {
+                            setState(() {
+                              selectedSubCategoryId = val;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null) {
+                              return "Veuillez sélectionner une sous-catégorie";
+                            }
+                            return null;
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -264,18 +316,47 @@ class _AddProductScreenState extends State<AddProductScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           if (_formKey.currentState!.validate()) {
-            await sqldb.addProduct(
-              codeController.text,
-              designationController.text,
-              int.tryParse(stockController.text) ?? 0,
-              double.tryParse(priceHTController.text) ?? 0.0,
-              double.tryParse(taxController.text) ?? 0.0,
-              double.tryParse(priceTTCController.text) ?? 0.0,
-              dateController.text,
-              selectedCategoryId!,
+            if (selectedCategoryId == null || selectedSubCategoryId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text(
+                        'Veuillez sélectionner une catégorie et une sous-catégorie.')),
+              );
+              return;
+            }
+
+            final updatedProduct = Product(
+              code: codeController.text,
+              designation: designationController.text,
+              stock: int.tryParse(stockController.text) ?? 0,
+              prixHT: double.tryParse(priceHTController.text) ?? 0.0,
+              taxe: double.tryParse(taxController.text) ?? 0.0,
+              prixTTC: double.tryParse(priceTTCController.text) ?? 0.0,
+              dateExpiration: dateController.text,
+              categoryId: selectedCategoryId!,
+              subCategoryId: selectedSubCategoryId!,
             );
 
-            widget.refreshData(); // Rafraîchir les données après l'ajout
+            if (widget.product == null) {
+              // Adding a new product
+              await sqldb.addProduct(
+                codeController.text,
+                designationController.text,
+                int.tryParse(stockController.text) ?? 0,
+                double.tryParse(priceHTController.text) ?? 0.0,
+                double.tryParse(taxController.text) ?? 0.0,
+                double.tryParse(priceTTCController.text) ?? 0.0,
+                dateController.text,
+                selectedCategoryId!,
+                selectedSubCategoryId!,
+              );
+            } else {
+              // Editing the existing product
+              await sqldb.updateProduct(updatedProduct);
+              print("update product done");
+            }
+
+            widget.refreshData(); // Refresh the product list after saving
             Navigator.of(context).pop();
           }
         },

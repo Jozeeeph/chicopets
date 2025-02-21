@@ -8,6 +8,8 @@ class Product {
   String dateExpiration;
   int categoryId;
   String? categoryName;
+  int subCategoryId; 
+  String? subCategoryName; 
 
   Product({
     required this.code,
@@ -19,6 +21,8 @@ class Product {
     required this.dateExpiration,
     required this.categoryId,
     this.categoryName,
+    required this.subCategoryId,
+    this.subCategoryName,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,7 +35,9 @@ class Product {
       'prix_ttc': prixTTC,
       'date_expiration': dateExpiration,
       'category_id': categoryId,
-      // Note : Vous n'avez pas besoin de sauvegarder categoryName si c'est uniquement utilisé pour l'affichage
+      'sub_category_id': subCategoryId,
+      'category_name': categoryName,
+      'sub_category_name': subCategoryName,
     };
   }
 
@@ -46,11 +52,13 @@ class Product {
       dateExpiration: map['date_expiration'],
       categoryId: map['category_id'] ?? 0,
       categoryName: map['category_name'],
+      subCategoryId: map['sub_category_id'] ?? 0,
+      subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
     );
   }
 
   @override
   String toString() {
-    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"})';
+    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryName: ${subCategoryName ?? "N/A"})';
   }
 }

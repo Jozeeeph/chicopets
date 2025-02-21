@@ -41,7 +41,9 @@ class _ManageProductPageState extends State<ManageProductPage> {
           .where((product) =>
               product.code.toLowerCase().contains(query.toLowerCase()) ||
               product.designation.toLowerCase().contains(query.toLowerCase()) ||
-              (product.categoryName ?? '').toLowerCase().contains(query.toLowerCase()))
+              (product.categoryName ?? '')
+                  .toLowerCase()
+                  .contains(query.toLowerCase()))
           .toList();
     });
   }
@@ -71,7 +73,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                 Navigator.of(context).pop(); // Fermer la boîte de dialogue
                 await _deleteProduct(productCode);
               },
-              child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+              child:
+                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -152,7 +155,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => AddProductScreen(
-                                      product: product,
+                                      product: product, // Pass the product here
                                       refreshData: _refreshProducts,
                                     ),
                                   ),
