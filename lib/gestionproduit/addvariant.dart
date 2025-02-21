@@ -1,8 +1,6 @@
 import 'package:caissechicopets/variantprod.dart';
 import 'package:flutter/material.dart';
 
-
-
 class AddVariant {
   static Widget buildVariantFields(
     BuildContext context,
@@ -12,12 +10,15 @@ class AddVariant {
     TextEditingController sizeController = TextEditingController(text: variant.size);
     TextEditingController prixHTController = TextEditingController(text: variant.prixHT.toString());
     TextEditingController taxController = TextEditingController(text: variant.taxe.toString());
-    TextEditingController prixTTCController = TextEditingController(text: variant.prixTTC.toStringAsFixed(2));
+    TextEditingController prixTTCController = TextEditingController(text: variant.prixTTC.toString());
 
     void updateVariant() {
       double prixHT = double.tryParse(prixHTController.text) ?? 0.0;
       double taxe = double.tryParse(taxController.text) ?? 0.0;
       double prixTTC = prixHT + (prixHT * taxe / 100);
+
+      // Update the Prix TTC field
+      prixTTCController.text = prixTTC.toStringAsFixed(2);
 
       onUpdate(VariantProd(
         id: variant.id,
@@ -51,7 +52,7 @@ class AddVariant {
         TextField(
           controller: prixTTCController,
           decoration: InputDecoration(labelText: 'Prix TTC'),
-          enabled: false,
+          enabled: false, // Disable manual input
         ),
         SizedBox(height: 10),
       ],

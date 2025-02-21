@@ -23,6 +23,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -36,7 +37,7 @@ class SqlDb {
       onCreate: (Database db, int version) async {
         print("Creating tables...");
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS products(
+        CREATE TABLE products (
           code TEXT PRIMARY KEY,
           designation TEXT,
           stock INTEGER,
@@ -45,8 +46,10 @@ class SqlDb {
           prix_ttc REAL,
           date_expiration TEXT,
           category_id INTEGER,
-          FOREIGN KEY(category_id) REFERENCES categories(id_category) ON DELETE SET NULL
-        )
+          sub_category_id INTEGER,
+          category_name TEXT,
+          sub_category_name TEXT
+        );
       ''');
         print("Products table created");
 
@@ -126,8 +129,8 @@ class SqlDb {
     return await dbClient.update(
       'products',
       product.toMap(),
-      where: 'code = ?',
-      whereArgs: [product.code],
+      where: 'code = ?', // Assuming 'code' is unique for the product
+      whereArgs: [product.code], // Using 'code' to identify the product
     );
   }
 
@@ -158,6 +161,7 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
+    int i,
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -451,5 +455,56 @@ class SqlDb {
       print("Error fetching subcategories from database: $e");
       return [];
     }
+  }
+
+  // Fetch categories with their subcategories
+  Future<List<Category>> getCategoriesWithSubcategories() async {
+    final dbClient = await db;
+
+    List<Map<String, dynamic>> results = await dbClient.rawQuery('''
+    SELECT 
+      c.id_category, c.category_name, c.image_path,
+      s.id_sub_category, s.sub_category_name
+    FROM categories c
+    LEFT JOIN subcategories s ON c.id_category = s.category_id
+  ''');
+
+    // Organiser les résultats dans une structure de données correcte
+    Map<int, Category> categoryMap = {};
+
+    for (var row in results) {
+      int categoryId = row['id_category'];
+
+      if (!categoryMap.containsKey(categoryId)) {
+        categoryMap[categoryId] = Category(
+          id: categoryId,
+          name: row['category_name'],
+          imagePath: row['image_path'],
+          subCategories: [],
+        );
+      }
+
+      if (row['id_sub_category'] != null) {
+        categoryMap[categoryId]!.subCategories.add(
+              SubCategory(
+                id: row['id_sub_category'],
+                name: row['sub_category_name'],
+                categoryId: categoryId,
+              ),
+            );
+      }
+    }
+    return categoryMap.values.toList();
+  }
+
+  Future<Object?> getSubcategoryNameById(int subcategoryId) async {
+    final dbClient = await db;
+    var result = await dbClient.query(
+        'SELECT name FROM subcategories WHERE id = ?',
+        whereArgs: [subcategoryId]);
+    if (result.isNotEmpty) {
+      return result[0]['name']; // Assuming the column is named 'name'
+    }
+    return 'Sans sous-catégorie'; // Return default text if subcategory is not found
   }
 }

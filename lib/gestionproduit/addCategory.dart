@@ -83,8 +83,7 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    int result =
-        await sqldb.addCategory(nameController.text, selectedImage!.path);
+    int result = await sqldb.addCategory(nameController.text, selectedImage!.path);
     if (result > 0) {
       _showMessage("Catégorie ajoutée avec succès !");
       setState(() {
