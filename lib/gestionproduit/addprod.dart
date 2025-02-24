@@ -53,6 +53,7 @@ class Addprod {
                       _buildTextFormField(
                           controller: codeController,
                           label: 'Code à Barre',
+                          keyboardType: TextInputType.number,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Le champ "Code à Barre" ne doit pas être vide.';
@@ -61,6 +62,9 @@ class Addprod {
                               return 'Le "Code à Barre" doit être un nombre.';
                             }
                             return null;
+                          },
+                          onChanged: (value) {
+                            // Handle barcode input, and if it's not a scan, you can process the value here
                           }),
                       FutureBuilder<List<Category>>(
                         future: sqldb.getCategories(),
@@ -145,7 +149,8 @@ class Addprod {
                       if (selectedSubCategoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text("Veuillez sélectionner une sous-catégorie")),
+                              content: Text(
+                                  "Veuillez sélectionner une sous-catégorie")),
                         );
                         return;
                       }
@@ -188,6 +193,7 @@ class Addprod {
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
     String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -198,6 +204,7 @@ class Addprod {
         keyboardType: keyboardType,
         enabled: enabled,
         validator: validator,
+        onChanged: onChanged,
       ),
     );
   }
