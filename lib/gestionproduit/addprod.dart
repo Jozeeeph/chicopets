@@ -159,7 +159,7 @@ class Addprod {
                         double.tryParse(priceTTCController.text) ?? 0.0,
                         dateController.text,
                         selectedCategoryId!,
-                        selectedSubCategoryId!, // S'assurer que ce n'est pas null
+                        selectedSubCategoryId!,
                       );
 
                       refreshData();

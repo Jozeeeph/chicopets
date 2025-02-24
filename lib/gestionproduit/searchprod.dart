@@ -20,14 +20,15 @@ class Searchprod {
 
       // Filter the products based on the query
       List<Product> newFilteredProducts = products.where((product) {
-        String code = product.code?.toLowerCase() ?? '';
-        String designation = product.designation?.toLowerCase() ?? '';
+        String code = product.code.toLowerCase();
+        String designation = product.designation.toLowerCase();
         String category = (product.categoryName ?? '').toLowerCase();
 
         return code.contains(query) ||
             designation.contains(query) ||
             category.contains(query);
       }).toList();
+
       // If no products match, print a message for debugging
       if (newFilteredProducts.isEmpty) {
         print("No products found for query: $query");
@@ -51,7 +52,7 @@ class Searchprod {
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
                 color: Color(0xFF0056A6) // Deep Blue
-                ),
+            ),
           ),
           content: SizedBox(
             width: 800,
@@ -142,54 +143,69 @@ class Searchprod {
                             itemBuilder: (context, index) {
                               final product = currentProducts[index];
 
-                              List<String> formattedDatePatterns = [
-                                'yyyy-MM-dd',
-                                'dd/MM/yyyy',
-                                'MM/dd/yyyy',
-                                'yyyy/MM/dd',
-                                'dd-MM-yyyy',
-                                'MM-dd-yyyy'
-                              ];
+                              // If subcategoryId is null, return default subcategory name
+                              Future<String> subCategoryNameFuture = product.subCategoryId != null
+                                  ? sqldb
+                                      .getSubCategoryById(product.subCategoryId, product.categoryId)
+                                      .then((subCategoryResult) {
+                                        return subCategoryResult.isNotEmpty
+                                            ? subCategoryResult.first['sub_category_name'] ?? 'Sans sous-catégorie'
+                                            : 'Sans sous-catégorie';
+                                      })
+                                  : Future.value('Sans sous-catégorie'); // Default value if no subcategory ID
 
-                              String formattedDate = 'Invalid Date';
-                              if (product.dateExpiration.isNotEmpty) {
-                                for (var pattern in formattedDatePatterns) {
-                                  try {
-                                    DateTime parsedDate = DateFormat(pattern)
-                                        .parseStrict(product.dateExpiration);
-                                    formattedDate = DateFormat('dd/MM/yyyy')
-                                        .format(parsedDate);
-                                    break;
-                                  } catch (e) {
-                                    continue;
-                                  }
-                                }
-                              }
+                              return FutureBuilder(
+                                future: subCategoryNameFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  } else if (snapshot.hasError) {
+                                    return Center(child: Text('Erreur: ${snapshot.error}'));
+                                  } else {
+                                    String subCategoryName = snapshot.data as String;
 
-                              return InkWell(
-                                child: Container(
-                                  color: index.isEven
-                                      ? Color(0xFFE0E0E0)
-                                      : Colors
-                                          .white, // Light Gray and White alternation
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 8, horizontal: 12),
-                                  child: Row(
-                                    children: [
-                                      Expanded(child: Text(product.code)),
-                                      Expanded(
-                                          child: Text(product.designation)),
-                                      Expanded(
-                                        child: Text(
-                                            '${product.categoryName} / ${product.subCategoryName}'),
+                                    List<String> formattedDatePatterns = [
+                                      'yyyy-MM-dd',
+                                      'dd/MM/yyyy',
+                                      'MM/dd/yyyy',
+                                      'yyyy/MM/dd',
+                                      'dd-MM-yyyy',
+                                      'MM-dd-yyyy'
+                                    ];
+
+                                    String formattedDate = 'Invalid Date';
+                                    if (product.dateExpiration.isNotEmpty) {
+                                      for (var pattern in formattedDatePatterns) {
+                                        try {
+                                          DateTime parsedDate = DateFormat(pattern).parseStrict(product.dateExpiration);
+                                          formattedDate = DateFormat('dd/MM/yyyy').format(parsedDate);
+                                          break;
+                                        } catch (e) {
+                                          continue;
+                                        }
+                                      }
+                                    }
+
+                                    return InkWell(
+                                      child: Container(
+                                        color: index.isEven
+                                            ? const Color(0xFFE0E0E0)
+                                            : Colors.white, // Light Gray and White alternation
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                        child: Row(
+                                          children: [
+                                            Expanded(child: Text(product.code)),
+                                            Expanded(child: Text(product.designation)),
+                                            Expanded(child: Text('${product.categoryName} / $subCategoryName')),
+                                            Expanded(child: Text('${product.stock}')),
+                                            Expanded(child: Text('${product.prixHT} DT')),
+                                            Expanded(child: Text(formattedDate)),
+                                          ],
+                                        ),
                                       ),
-                                      Expanded(child: Text('${product.stock}')),
-                                      Expanded(
-                                          child: Text('${product.prixHT} DT')),
-                                      Expanded(child: Text(formattedDate)),
-                                    ],
-                                  ),
-                                ),
+                                    );
+                                  }
+                                },
                               );
                             },
                           ),
@@ -207,9 +223,8 @@ class Searchprod {
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFE53935), // Warm Red for cancel
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                backgroundColor: const Color(0xFFE53935), // Warm Red for cancel
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
