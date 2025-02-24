@@ -72,8 +72,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return Scaffold(
       appBar: AppBar(
         title: widget.product == null
-            ? const Text('Ajouter un Produit')
-            : const Text('Modifier le Produit'),
+            ? const Text(
+                'Ajouter un Produit',
+                style: TextStyle(color: Colors.white), // White text for contrast
+              )
+            : const Text(
+                'Modifier le Produit',
+                style: TextStyle(color: Colors.white), // White text for contrast
+              ),
+        backgroundColor: const Color(0xFF0056A6), // Deep Blue for app bar
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -209,24 +216,27 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               future: sqldb.getCategories(),
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) {
-                                  return const CircularProgressIndicator();
+                                  return const CircularProgressIndicator(
+                                    color: Color(0xFF0056A6), // Deep Blue for loader
+                                  );
                                 }
                                 categories = snapshot.data!;
                                 if (categories.isEmpty) {
                                   return const Text(
-                                      "Aucune catégorie disponible");
+                                    "Aucune catégorie disponible",
+                                    style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                                  );
                                 }
                                 return DropdownButtonFormField<int>(
-                                  decoration: const InputDecoration(
-                                    labelText: "Catégorie",
-                                    border: OutlineInputBorder(),
-                                  ),
+                                  decoration: _inputDecoration('Catégorie'),
                                   value: selectedCategoryId,
                                   items: categories.map((cat) {
                                     return DropdownMenuItem<int>(
                                       value: cat.id,
-                                      child: Text(cat.name),
-                                    );
+                                      child: Text(
+                                        cat.name,
+                                        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
+                                    ));
                                   }).toList(),
                                   onChanged: (val) {
                                     setState(() {
@@ -235,11 +245,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                       subCategoryItems = categories
                                           .firstWhere((cat) => cat.id == val)
                                           .subCategories
-                                          .map(
-                                              (subCat) => DropdownMenuItem<int>(
-                                                    value: subCat.id,
-                                                    child: Text(subCat.name),
-                                                  ))
+                                          .map((subCat) => DropdownMenuItem<int>(
+                                                value: subCat.id,
+                                                child: Text(
+                                                  subCat.name,
+                                                  style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
+                                                ),
+                                              ))
                                           .toList();
                                     });
                                   },
@@ -256,7 +268,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           const SizedBox(width: 10),
                           // Add category button
                           IconButton(
-                            icon: const Icon(Icons.add, color: Colors.blue),
+                            icon: const Icon(Icons.add, color: Color(0xFF26A9E0)), // Sky Blue icon
                             onPressed: () {
                               setState(() {
                                 isCategoryFormVisible = !isCategoryFormVisible;
@@ -270,10 +282,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       Visibility(
                         visible: selectedCategoryId != null,
                         child: DropdownButtonFormField<int>(
-                          decoration: const InputDecoration(
-                            labelText: "Sous-catégorie",
-                            border: OutlineInputBorder(),
-                          ),
+                          decoration: _inputDecoration('Sous-catégorie'),
                           value: selectedSubCategoryId,
                           items: subCategoryItems,
                           onChanged: (val) {
@@ -294,7 +303,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               ),
 
-              const VerticalDivider(width: 20, thickness: 2),
+              const VerticalDivider(width: 20, thickness: 2, color: Color(0xFFE0E0E0)), // Light Gray divider
 
               // Right Side: Category Form (Visible on "+" Click)
               Expanded(
@@ -319,8 +328,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
             if (selectedCategoryId == null || selectedSubCategoryId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                    content: Text(
-                        'Veuillez sélectionner une catégorie et une sous-catégorie.')),
+                  content: const Text(
+                    'Veuillez sélectionner une catégorie et une sous-catégorie.',
+                    style: TextStyle(color: Colors.white), // White text for contrast
+                  ),
+                  backgroundColor: const Color(0xFFE53935), // Warm Red for error
+                ),
               );
               return;
             }
@@ -360,7 +373,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
             Navigator.of(context).pop();
           }
         },
-        child: const Icon(Icons.save),
+        backgroundColor: const Color(0xFF009688), // Teal Green for FAB
+        child: const Icon(Icons.save, color: Colors.white), // White icon for contrast
       ),
     );
   }
@@ -376,13 +390,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
         controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(),
-        ),
+        decoration: _inputDecoration(label),
         keyboardType: keyboardType,
         enabled: enabled,
         validator: validator,
+        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
       ),
     );
   }
