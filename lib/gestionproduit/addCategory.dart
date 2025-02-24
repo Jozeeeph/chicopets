@@ -12,7 +12,7 @@ class AddCategory extends StatefulWidget {
 
 class _AddCategoryState extends State<AddCategory> {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController subCategoryNameController =TextEditingController();
+  final TextEditingController subCategoryNameController = TextEditingController();
   File? selectedImage;
   final SqlDb sqldb = SqlDb();
   bool isVisible = false;
@@ -20,9 +20,9 @@ class _AddCategoryState extends State<AddCategory> {
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
 
-   void refreshData() {
-    fetchCategories(); // Rafraîchir les catégories
-    fetchSubCategories(selectedCategoryId ?? 0); // Rafraîchir les sous-catégories
+  void refreshData() {
+    fetchCategories(); // Refresh categories
+    fetchSubCategories(selectedCategoryId ?? 0); // Refresh subcategories
   }
 
   @override
@@ -33,11 +33,9 @@ class _AddCategoryState extends State<AddCategory> {
 
   Future<void> fetchCategories() async {
     try {
-      // This will now return a list of Category objects correctly mapped
       List<Category> fetchedCategories = await sqldb.getCategories();
       setState(() {
-        categories =
-            fetchedCategories; // Update the state with the fetched categories
+        categories = fetchedCategories;
       });
     } catch (e) {
       _showMessage("Erreur lors du chargement des catégories !");
@@ -48,8 +46,6 @@ class _AddCategoryState extends State<AddCategory> {
     try {
       List<Map<String, dynamic>> fetchedSubCategories =
           await sqldb.getSubCategoriesByCategory(categoryId);
-
-      print('Fetched subcategories: $fetchedSubCategories');
 
       setState(() {
         subCategories = fetchedSubCategories.map((map) {
@@ -74,7 +70,6 @@ class _AddCategoryState extends State<AddCategory> {
       });
     }
   }
-  
 
   void addCategory() async {
     if (nameController.text.isEmpty || selectedImage == null) {
@@ -82,16 +77,17 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    int result = await sqldb.addCategory(nameController.text, selectedImage!.path);
+    int result =
+        await sqldb.addCategory(nameController.text, selectedImage!.path);
     if (result > 0) {
       _showMessage("Catégorie ajoutée avec succès !");
       setState(() {
         isVisible = false;
         nameController.clear();
         selectedImage = null;
-        fetchCategories(); // Rafraîchir les catégories
+        fetchCategories();
       });
-      refreshData(); // Rafraîchir les données après l'ajout
+      refreshData();
     } else {
       _showMessage("Échec de l'ajout de la catégorie !");
     }
@@ -122,19 +118,29 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935), // Warm Red for error
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           IconButton(
-            icon:
-                Icon(isVisible ? Icons.remove : Icons.add, color: Colors.blue),
+            icon: Icon(
+              isVisible ? Icons.remove : Icons.add,
+              color: const Color(0xFF26A9E0), // Sky Blue icon
+            ),
             onPressed: () {
               setState(() {
                 isVisible = !isVisible;
@@ -142,36 +148,65 @@ class _AddCategoryState extends State<AddCategory> {
             },
           ),
           if (isVisible) ...[
-            TextField(
+            _buildTextFormField(
               controller: nameController,
-              decoration: InputDecoration(
-                  labelText: 'Nom de la catégorie',
-                  border: OutlineInputBorder()),
+              label: 'Nom de la catégorie',
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 16),
             selectedImage == null
-                ? Text("Aucune image sélectionnée")
+                ? Text(
+                    "Aucune image sélectionnée",
+                    style: TextStyle(color: Colors.grey[600]),
+                  )
                 : Image.file(selectedImage!, height: 100),
-            SizedBox(height: 10),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: pickImage,
-              child: Text("Choisir une image"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF26A9E0), // Sky Blue
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                "Choisir une image",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: addCategory,
-              child: Text("Ajouter"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF009688), // Teal Green
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                "Ajouter",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
-            Divider(),
+            const Divider(
+              color: Color(0xFFE0E0E0), // Light Gray divider
+              thickness: 2,
+            ),
+            const SizedBox(height: 16),
 
-            // Sélection de la catégorie
+            // Category Dropdown
             DropdownButtonFormField<int>(
               value: selectedCategoryId,
-              hint: Text("Sélectionner une catégorie"),
+              hint: const Text(
+                "Sélectionner une catégorie",
+                style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue
+              ),
               items: categories.map((category) {
                 return DropdownMenuItem<int>(
                   value: category.id,
-                  child: Text(category.name),
+                  child: Text(
+                    category.name,
+                    style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -180,50 +215,92 @@ class _AddCategoryState extends State<AddCategory> {
                   fetchSubCategories(value!);
                 });
               },
-              decoration: InputDecoration(border: OutlineInputBorder()),
+              decoration: _inputDecoration('Catégorie'),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            // Liste des sous-catégories (with scrolling)
+            // Subcategories List
             if (selectedCategoryId != null) ...[
-              Text("Sous-catégories :",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                "Sous-catégories :",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0056A6)), // Deep Blue
+              ),
+              const SizedBox(height: 8),
               subCategories.isEmpty
-                  ? Text("Aucune sous-catégorie trouvée")
+                  ? Text(
+                      "Aucune sous-catégorie trouvée",
+                      style: TextStyle(color: Colors.grey[600]),
+                    )
                   : SingleChildScrollView(
                       child: Column(
                         children: subCategories.map((subCategory) {
                           return ListTile(
-                            title: Text(subCategory.name),
+                            title: Text(
+                              subCategory.name,
+                              style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+                            ),
                           );
                         }).toList(),
                       ),
                     ),
-              SizedBox(height: 10),
+              const SizedBox(height: 16),
             ],
 
-            // Ajout d'une sous-catégorie
+            // Add Subcategory
             if (selectedCategoryId != null) ...[
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: _buildTextFormField(
                       controller: subCategoryNameController,
-                      decoration: InputDecoration(
-                          labelText: 'Nom de la sous-catégorie',
-                          border: OutlineInputBorder()),
+                      label: 'Nom de la sous-catégorie',
                     ),
                   ),
+                  const SizedBox(width: 10),
                   IconButton(
-                    icon: Icon(Icons.add, color: Colors.green),
+                    icon: const Icon(
+                      Icons.add,
+                      color: Color(0xFF26A9E0), // Sky Blue icon
+                    ),
                     onPressed: addSubCategory,
                   ),
                 ],
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 16),
             ],
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String label,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: controller,
+        decoration: _inputDecoration(label),
+        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
       ),
     );
   }
