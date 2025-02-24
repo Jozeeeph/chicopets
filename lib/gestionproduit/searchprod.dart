@@ -166,6 +166,8 @@ class Searchprod {
 
                                     List<String> formattedDatePatterns = [
                                       'yyyy-MM-dd',
+                                      'yyyy-dd-MM',
+                                      'yyyy/dd/MM',
                                       'dd/MM/yyyy',
                                       'MM/dd/yyyy',
                                       'yyyy/MM/dd',
