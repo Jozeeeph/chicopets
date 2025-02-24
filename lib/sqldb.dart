@@ -23,7 +23,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -495,5 +495,22 @@ class SqlDb {
       }
     }
     return categoryMap.values.toList();
+  }
+
+  // Fetch subcategory by id and category_id
+  Future<List<Map<String, dynamic>>> getSubCategoryById(int subCategoryId, int categoryId) async {
+    final dbClient = await db;
+    try {
+      List<Map<String, dynamic>> result = await dbClient.query(
+        'sub_categories',
+        where: 'id_sub_category = ? AND category_id = ?',
+        whereArgs: [subCategoryId, categoryId],
+      );
+
+      return result;
+    } catch (e) {
+      print('Error fetching subcategory: $e');
+      return [];
+    }
   }
 }

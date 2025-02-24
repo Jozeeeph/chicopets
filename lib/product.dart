@@ -42,23 +42,23 @@ class Product {
   }
 
   factory Product.fromMap(Map<String, dynamic> map) {
-    return Product(
-      code: map['code'],
-      designation: map['designation'],
-      stock: map['stock'],
-      prixHT: map['prix_ht'],
-      taxe: map['taxe'],
-      prixTTC: map['prix_ttc'],
-      dateExpiration: map['date_expiration'],
-      categoryId: map['category_id'] ?? 0,
-      categoryName: map['category_name'],
-      subCategoryId: map['sub_category_id'] ?? 0,
-      subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
-    );
-  }
+  return Product(
+    code: map['code'],
+    designation: map['designation'],
+    stock: map['stock'],
+    prixHT: map['prix_ht'],
+    taxe: map['taxe'],
+    prixTTC: map['prix_ttc'],
+    dateExpiration: map['date_expiration'],
+    categoryId: map['category_id'] ?? 0,
+    categoryName: map['category_name'],
+    subCategoryId: map['sub_category_id'] ?? 0,
+    subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
+  );
+}
 
   @override
   String toString() {
-    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryName: ${subCategoryName ?? "N/A"})';
+    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"},idSub: $subCategoryId ,  subCategoryName: ${subCategoryName ?? "N/A"})';
   }
 }
