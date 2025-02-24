@@ -23,7 +23,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -161,7 +161,7 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
-    int i,
+    int subCategoryId,
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -175,9 +175,9 @@ class SqlDb {
         'prix_ttc': prixTTC,
         'date_expiration': date,
         'category_id': categoryId,
+        'sub_category_id': subCategoryId,
       },
-      conflictAlgorithm: ConflictAlgorithm
-          .replace, // Handle conflicts if the same code is inserted
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
@@ -495,16 +495,5 @@ class SqlDb {
       }
     }
     return categoryMap.values.toList();
-  }
-
-  Future<Object?> getSubcategoryNameById(int subcategoryId) async {
-    final dbClient = await db;
-    var result = await dbClient.query(
-        'SELECT name FROM subcategories WHERE id = ?',
-        whereArgs: [subcategoryId]);
-    if (result.isNotEmpty) {
-      return result[0]['name']; // Assuming the column is named 'name'
-    }
-    return 'Sans sous-catégorie'; // Return default text if subcategory is not found
   }
 }
