@@ -41,9 +41,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
           .where((product) =>
               product.code.toLowerCase().contains(query.toLowerCase()) ||
               product.designation.toLowerCase().contains(query.toLowerCase()) ||
-              (product.categoryName ?? '')
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
+              (product.categoryName ?? '').toLowerCase().contains(query.toLowerCase()))
           .toList();
     });
   }
@@ -63,18 +61,15 @@ class _ManageProductPageState extends State<ManageProductPage> {
           content: const Text('Voulez-vous vraiment supprimer ce produit ?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Fermer la boîte de dialogue
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Annuler'),
             ),
             TextButton(
               onPressed: () async {
-                Navigator.of(context).pop(); // Fermer la boîte de dialogue
+                Navigator.of(context).pop();
                 await _deleteProduct(productCode);
               },
-              child:
-                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
+              child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -92,9 +87,15 @@ class _ManageProductPageState extends State<ManageProductPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestion des Produits'),
+        backgroundColor: const Color(0xFF0056A6),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, color: Colors.white),
             onPressed: () {
               Navigator.push(
                 context,
@@ -110,15 +111,20 @@ class _ManageProductPageState extends State<ManageProductPage> {
       ),
       body: Column(
         children: [
+          // Barre de recherche stylisée
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(10),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Rechercher un produit',
-                prefixIcon: const Icon(Icons.search),
+                labelStyle: const TextStyle(color: Colors.black54),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF26A9E0)),
+                filled: true,
+                fillColor: const Color(0xFFE0E0E0),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -132,43 +138,69 @@ class _ManageProductPageState extends State<ManageProductPage> {
                 } else if (snapshot.hasError) {
                   return Center(child: Text('Erreur: ${snapshot.error}'));
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('Aucun produit trouvé'));
+                  return const Center(
+                    child: Text(
+                      'Aucun produit trouvé',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  );
                 } else {
                   final products = _searchController.text.isEmpty
                       ? snapshot.data!
                       : _filteredProducts;
                   return ListView.builder(
+                    padding: const EdgeInsets.all(10),
                     itemCount: products.length,
                     itemBuilder: (context, index) {
                       final product = products[index];
-                      return ListTile(
-                        title: Text(product.designation),
-                        subtitle: Text(
-                            'Code: ${product.code} - Stock: ${product.stock}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AddProductScreen(
-                                      product: product, // Pass the product here
-                                      refreshData: _refreshProducts,
+                      return Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 3,
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(15),
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF26A9E0),
+                            child: Text(
+                              product.designation[0].toUpperCase(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                            product.designation,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            'Code: ${product.code} - Stock: ${product.stock}',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Color(0xFF009688)),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => AddProductScreen(
+                                        product: product,
+                                        refreshData: _refreshProducts,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () {
-                                _confirmDeleteProduct(product.code);
-                              },
-                            ),
-                          ],
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
+                                onPressed: () {
+                                  _confirmDeleteProduct(product.code);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

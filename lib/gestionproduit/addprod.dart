@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
@@ -42,15 +41,27 @@ class Addprod {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Ajouter un Produit'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              backgroundColor: Colors.white, // White background for clarity
+              title: const Text(
+                'Ajouter un Produit',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0056A6), // Deep Blue for title
+                ),
+              ),
               content: SizedBox(
                 width: 800,
                 height: 500,
                 child: Form(
                   key: _formKey,
-                  child: Column(
-                    children: [
-                      _buildTextFormField(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildTextFormField(
                           controller: codeController,
                           label: 'Code à Barre',
                           keyboardType: TextInputType.number,
@@ -63,94 +74,101 @@ class Addprod {
                             }
                             return null;
                           },
-                          onChanged: (value) {
-                            // Handle barcode input, and if it's not a scan, you can process the value here
-                          }),
-                      FutureBuilder<List<Category>>(
-                        future: sqldb.getCategories(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) {
-                            return const CircularProgressIndicator();
-                          }
+                        ),
+                        FutureBuilder<List<Category>>(
+                          future: sqldb.getCategories(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const CircularProgressIndicator(
+                                color: Color(0xFF0056A6), // Deep Blue for loader
+                            );
+                            }
 
-                          categories = snapshot.data!;
-                          return DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                                labelText: "Catégorie",
-                                border: OutlineInputBorder()),
-                            value: selectedCategoryId,
-                            items: categories.map((category) {
-                              return DropdownMenuItem<int>(
-                                value: category.id,
-                                child: Text(category.name),
-                              );
-                            }).toList(),
+                            categories = snapshot.data!;
+                            return DropdownButtonFormField<int>(
+                              decoration: _inputDecoration('Catégorie'),
+                              value: selectedCategoryId,
+                              items: categories.map((category) {
+                                return DropdownMenuItem<int>(
+                                  value: category.id,
+                                  child: Text(
+                                    category.name,
+                                    style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                                ));
+                              }).toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  selectedCategoryId = val;
+                                  selectedSubCategoryId = null;
+                                  subCategoryItems = categories
+                                      .firstWhere((cat) => cat.id == val)
+                                      .subCategories
+                                      .map((subCat) => DropdownMenuItem<int>(
+                                            value: subCat.id,
+                                            child: Text(
+                                              subCat.name,
+                                              style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                                            ),
+                                          ))
+                                      .toList();
+                                });
+                              },
+                              validator: (value) => value == null
+                                  ? "Veuillez sélectionner une catégorie"
+                                  : null,
+                            );
+                          },
+                        ),
+                        Visibility(
+                          visible: selectedCategoryId != null,
+                          child: DropdownButtonFormField<int>(
+                            decoration: _inputDecoration('Sous-catégorie'),
+                            value: selectedSubCategoryId,
+                            items: subCategoryItems,
                             onChanged: (val) {
                               setState(() {
-                                selectedCategoryId = val;
-                                selectedSubCategoryId = null;
-                                subCategoryItems = categories
-                                    .firstWhere((cat) => cat.id == val)
-                                    .subCategories
-                                    .map((subCat) => DropdownMenuItem<int>(
-                                          value: subCat.id,
-                                          child: Text(subCat.name),
-                                        ))
-                                    .toList();
+                                selectedSubCategoryId = val;
                               });
                             },
                             validator: (value) => value == null
-                                ? "Veuillez sélectionner une catégorie"
+                                ? "Veuillez sélectionner une sous-catégorie"
                                 : null,
-                          );
-                        },
-                      ),
-                      Visibility(
-                        visible: selectedCategoryId != null,
-                        child: DropdownButtonFormField<int>(
-                          decoration: const InputDecoration(
-                              labelText: "Sous-catégorie",
-                              border: OutlineInputBorder()),
-                          value: selectedSubCategoryId,
-                          items: subCategoryItems,
-                          onChanged: (val) {
-                            setState(() {
-                              selectedSubCategoryId = val;
-                            });
-                          },
-                          validator: (value) => value == null
-                              ? "Veuillez sélectionner une sous-catégorie"
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          const Text("Ajouter une catégorie:"),
-                          IconButton(
-                            icon: const Icon(Icons.add, color: Colors.blue),
-                            onPressed: () {
-                              setState(() {
-                                isCategoryFormVisible = !isCategoryFormVisible;
-                              });
-                            },
                           ),
-                        ],
-                      ),
-                      if (isCategoryFormVisible) AddCategory(),
-                    ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Text(
+                              "Ajouter une catégorie:",
+                              style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add, color: Color(0xFF26A9E0)), // Sky Blue icon
+                              onPressed: () {
+                                setState(() {
+                                  isCategoryFormVisible = !isCategoryFormVisible;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        if (isCategoryFormVisible) AddCategory(),
+                      ],
+                    ),
                   ),
                 ),
               ),
               actions: [
                 ElevatedButton(
+                  style: _buttonStyle(const Color(0xFF009688)), // Teal Green for success
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
                       if (selectedSubCategoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  "Veuillez sélectionner une sous-catégorie")),
+                            content: Text("Veuillez sélectionner une sous-catégorie"),
+                            backgroundColor: Color(0xFFE53935), // Warm Red for error
+                          ),
                         );
                         return;
                       }
@@ -171,19 +189,51 @@ class Addprod {
                       Navigator.of(context).pop();
                     }
                   },
-                  child: const Text('Ajouter'),
+                  child: const Text(
+                    'Ajouter',
+                    style: TextStyle(color: Colors.white), // White text for contrast
+                  ),
                 ),
                 ElevatedButton(
+                  style: _buttonStyle(const Color(0xFFE53935)), // Warm Red for cancel
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Annuler'),
+                  child: const Text(
+                    'Annuler',
+                    style: TextStyle(color: Colors.white), // White text for contrast
+                  ),
                 ),
               ],
             );
           },
         );
       },
+    );
+  }
+
+  static InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+      ),
+    );
+  }
+
+  static ButtonStyle _buttonStyle(Color color) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: color,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     );
   }
 
@@ -199,12 +249,12 @@ class Addprod {
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
         controller: controller,
-        decoration:
-            InputDecoration(labelText: label, border: OutlineInputBorder()),
+        decoration: _inputDecoration(label),
         keyboardType: keyboardType,
         enabled: enabled,
         validator: validator,
         onChanged: onChanged,
+        style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
       ),
     );
   }
