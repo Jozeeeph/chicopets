@@ -166,13 +166,6 @@ class Searchprod {
                                 }
                               }
 
-                              // Check if subCategoryId is null before passing it to the function
-                              final subCategoryId = product.subCategoryId;
-                              print("subcats id = $subCategoryId");
-                              if (subCategoryId == null) {
-                                return Container();
-                              }
-
                               return InkWell(
                                 child: Container(
                                   color: index.isEven
@@ -187,30 +180,8 @@ class Searchprod {
                                       Expanded(
                                           child: Text(product.designation)),
                                       Expanded(
-                                        child: FutureBuilder<Object?>(
-                                          future: sqldb.getSubcategoryNameById(
-                                              subCategoryId),
-                                          builder: (context, snapshot) {
-                                            if (snapshot.connectionState ==
-                                                ConnectionState.waiting) {
-                                              return const CircularProgressIndicator(); // Show a loading indicator while fetching
-                                            } else if (snapshot.hasError) {
-                                              return Text(
-                                                  'Error: ${snapshot.error}');
-                                            } else {
-                                              // Cast snapshot.data to String to use `isNotEmpty`
-                                              String subcategoryName = snapshot
-                                                              .data !=
-                                                          null &&
-                                                      (snapshot.data as String)
-                                                          .isNotEmpty
-                                                  ? snapshot.data as String
-                                                  : 'Sans sous-catégorie'; // Default to 'Sans sous-catégorie' if not found
-                                              return Text(
-                                                  '${product.categoryName} / $subcategoryName');
-                                            }
-                                          },
-                                        ),
+                                        child: Text(
+                                            '${product.categoryName} / ${product.subCategoryName}'),
                                       ),
                                       Expanded(child: Text('${product.stock}')),
                                       Expanded(

@@ -12,8 +12,7 @@ class AddCategory extends StatefulWidget {
 
 class _AddCategoryState extends State<AddCategory> {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController subCategoryNameController =
-      TextEditingController();
+  final TextEditingController subCategoryNameController =TextEditingController();
   File? selectedImage;
   final SqlDb sqldb = SqlDb();
   bool isVisible = false;

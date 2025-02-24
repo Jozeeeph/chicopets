@@ -50,16 +50,18 @@ class Addprod {
                   key: _formKey,
                   child: Column(
                     children: [
-                      _buildTextFormField(controller: codeController, label: 'Code à Barre', validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Le champ "Code à Barre" ne doit pas être vide.';
-                        }
-                        if (int.tryParse(value) == null) {
-                          return 'Le "Code à Barre" doit être un nombre.';
-                        }
-                        return null;
-                      }),
-                      
+                      _buildTextFormField(
+                          controller: codeController,
+                          label: 'Code à Barre',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Code à Barre" ne doit pas être vide.';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Le "Code à Barre" doit être un nombre.';
+                            }
+                            return null;
+                          }),
                       FutureBuilder<List<Category>>(
                         future: sqldb.getCategories(),
                         builder: (context, snapshot) {
@@ -69,7 +71,9 @@ class Addprod {
 
                           categories = snapshot.data!;
                           return DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(labelText: "Catégorie", border: OutlineInputBorder()),
+                            decoration: const InputDecoration(
+                                labelText: "Catégorie",
+                                border: OutlineInputBorder()),
                             value: selectedCategoryId,
                             items: categories.map((category) {
                               return DropdownMenuItem<int>(
@@ -91,15 +95,18 @@ class Addprod {
                                     .toList();
                               });
                             },
-                            validator: (value) => value == null ? "Veuillez sélectionner une catégorie" : null,
+                            validator: (value) => value == null
+                                ? "Veuillez sélectionner une catégorie"
+                                : null,
                           );
                         },
                       ),
-                      
                       Visibility(
                         visible: selectedCategoryId != null,
                         child: DropdownButtonFormField<int>(
-                          decoration: const InputDecoration(labelText: "Sous-catégorie", border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                              labelText: "Sous-catégorie",
+                              border: OutlineInputBorder()),
                           value: selectedSubCategoryId,
                           items: subCategoryItems,
                           onChanged: (val) {
@@ -107,10 +114,11 @@ class Addprod {
                               selectedSubCategoryId = val;
                             });
                           },
-                          validator: (value) => value == null ? "Veuillez sélectionner une sous-catégorie" : null,
+                          validator: (value) => value == null
+                              ? "Veuillez sélectionner une sous-catégorie"
+                              : null,
                         ),
                       ),
-                      
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -125,7 +133,6 @@ class Addprod {
                           ),
                         ],
                       ),
-                      
                       if (isCategoryFormVisible) AddCategory(),
                     ],
                   ),
@@ -135,6 +142,14 @@ class Addprod {
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
+                      if (selectedSubCategoryId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("Veuillez sélectionner une sous-catégorie")),
+                        );
+                        return;
+                      }
+
                       await sqldb.addProduct(
                         codeController.text,
                         designationController.text,
@@ -144,7 +159,7 @@ class Addprod {
                         double.tryParse(priceTTCController.text) ?? 0.0,
                         dateController.text,
                         selectedCategoryId!,
-                        selectedSubCategoryId!,
+                        selectedSubCategoryId!, // S'assurer que ce n'est pas null
                       );
 
                       refreshData();
@@ -178,7 +193,8 @@ class Addprod {
       padding: const EdgeInsets.only(bottom: 10),
       child: TextFormField(
         controller: controller,
-        decoration: InputDecoration(labelText: label, border: OutlineInputBorder()),
+        decoration:
+            InputDecoration(labelText: label, border: OutlineInputBorder()),
         keyboardType: keyboardType,
         enabled: enabled,
         validator: validator,

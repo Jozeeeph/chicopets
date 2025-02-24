@@ -132,8 +132,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       final category = snapshot.data![index];
                       print(
                           "Category Name: ${category.name}, Image Path: ${category.imagePath}");
-                      return buildCategoryButton(
-                          category.name, category.imagePath);
+                      return buildCategoryButton(category.name, category.imagePath);
                     },
                   );
                 },
