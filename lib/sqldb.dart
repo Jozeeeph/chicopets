@@ -251,6 +251,16 @@ class SqlDb {
     return orders;
   }
 
+  Future<int> updateProductStock(String productCode, int newStock) async {
+    final db1 = await db;
+    return await db1.update(
+      'products', // Table name
+      {'stock': newStock}, // Update stock column
+      where: 'code = ?', // Condition
+      whereArgs: [productCode], // Pass product code
+    );
+  }
+
   Future<Product?> getProductByCode(String productCode) async {
     try {
       var dbC = await db;
@@ -498,7 +508,8 @@ class SqlDb {
   }
 
   // Fetch subcategory by id and category_id
-  Future<List<Map<String, dynamic>>> getSubCategoryById(int subCategoryId, int categoryId) async {
+  Future<List<Map<String, dynamic>>> getSubCategoryById(
+      int subCategoryId, int categoryId) async {
     final dbClient = await db;
     try {
       List<Map<String, dynamic>> result = await dbClient.query(
