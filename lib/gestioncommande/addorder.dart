@@ -4,16 +4,31 @@ import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 
-
 class Addorder {
-  
   static void showPlaceOrderPopup(BuildContext context, Order order,
-    List<Product> selectedProducts, List<int> quantityProducts) async {
+      List<Product> selectedProducts, List<int> quantityProducts) async {
     print("seee ${selectedProducts.length}");
 
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Aucun produit sélectionné.")),
+        SnackBar(
+          content: Text(
+            "Aucun produit sélectionné.",
+            style: TextStyle(color: Colors.white), // White text for contrast
+          ),
+          backgroundColor: Color(0xFFE53935), // Warm Red for error
+          behavior: SnackBarBehavior.floating, // Floating style
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10), // Rounded corners
+          ),
+          action: SnackBarAction(
+            label: "OK",
+            textColor: Colors.white, // White text for contrast
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
       );
       return;
     }
@@ -37,9 +52,13 @@ class Addorder {
               ),
               title: Text(
                 "Confirmer la commande",
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0056A6), // Deep Blue for title
+                ),
               ),
-              content: SingleChildScrollView( // Wrap the content in SingleChildScrollView
+              content: SingleChildScrollView(
+                // Wrap the content in SingleChildScrollView
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -141,7 +160,8 @@ class Addorder {
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
                               return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
                                 child: Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -151,7 +171,8 @@ class Addorder {
                                       child: Text(
                                         "${quantityProducts[index]}X",
                                         style: TextStyle(
-                                            fontSize: 16, fontFamily: 'Courier'),
+                                            fontSize: 16,
+                                            fontFamily: 'Courier'),
                                       ),
                                     ),
                                     Expanded(
@@ -159,7 +180,8 @@ class Addorder {
                                       child: Text(
                                         product.designation,
                                         style: TextStyle(
-                                            fontSize: 16, fontFamily: 'Courier'),
+                                            fontSize: 16,
+                                            fontFamily: 'Courier'),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -168,7 +190,8 @@ class Addorder {
                                       child: Text(
                                         "${product.prixTTC.toStringAsFixed(2)} DT",
                                         style: TextStyle(
-                                            fontSize: 16, fontFamily: 'Courier'),
+                                            fontSize: 16,
+                                            fontFamily: 'Courier'),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -308,7 +331,11 @@ class Addorder {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: Text("Annuler"),
+                  child: Text(
+                    "Annuler",
+                    style: TextStyle(
+                        color: Color(0xFFE53935)), // Warm Red for cancel
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -316,7 +343,11 @@ class Addorder {
                     _confirmPlaceOrder(
                         context, selectedProducts, quantityProducts);
                   },
-                  child: Text("Confirmer"),
+                  child: Text(
+                    "Confirmer",
+                    style: TextStyle(
+                        color: Color(0xFF009688)), // Teal Green for confirm
+                  ),
                 ),
               ],
             );
@@ -325,7 +356,6 @@ class Addorder {
       },
     );
   }
-
 
   static void _confirmPlaceOrder(BuildContext context,
       List<Product> selectedProducts, List<int> quantityProducts) async {
@@ -348,8 +378,7 @@ class Addorder {
       return OrderLine(
         idOrder: 0, // Temporary ID
         idProduct: product.code,
-        quantite:
-            quantityProducts[productIndex], // Correct quantity for this product
+        quantite: quantityProducts[productIndex], // Correct quantity
         prixUnitaire: product.prixTTC,
       );
     }).toList();
@@ -366,8 +395,47 @@ class Addorder {
     int orderId = await SqlDb().addOrder(order);
 
     if (orderId > 0) {
+      bool isValidOrder = true; // To check order validity
+
+      for (int i = 0; i < selectedProducts.length; i++) {
+        if (selectedProducts[i].stock == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "${selectedProducts[i].designation} est en rupture de stock !"),
+              backgroundColor: Colors.red,
+            ),
+          );
+          isValidOrder = false;
+        } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                " Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}.",
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          isValidOrder = false;
+        }
+      }
+
+      if (!isValidOrder) {
+        return; // Stop order processing if any product has insufficient stock
+      }
+
+      // Proceed with order if stock conditions are met
+      for (int i = 0; i < selectedProducts.length; i++) {
+        selectedProducts[i].stock -= quantityProducts[i]; // Decrease stock
+        await SqlDb().updateProductStock(
+            selectedProducts[i].code, selectedProducts[i].stock);
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Commande passée avec succès !")),
+        SnackBar(
+          content: Text("Commande passée avec succès !"),
+          backgroundColor: Colors.green,
+        ),
       );
 
       selectedProducts.clear();
@@ -375,7 +443,9 @@ class Addorder {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text("Erreur lors de l'enregistrement de la commande.")),
+          content: Text("Erreur lors de l'enregistrement de la commande."),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
