@@ -41,7 +41,9 @@ class _ManageProductPageState extends State<ManageProductPage> {
           .where((product) =>
               product.code.toLowerCase().contains(query.toLowerCase()) ||
               product.designation.toLowerCase().contains(query.toLowerCase()) ||
-              (product.categoryName ?? '').toLowerCase().contains(query.toLowerCase()))
+              (product.categoryName ?? '')
+                  .toLowerCase()
+                  .contains(query.toLowerCase()))
           .toList();
     });
   }
@@ -53,25 +55,93 @@ class _ManageProductPageState extends State<ManageProductPage> {
   }
 
   Future<void> _confirmDeleteProduct(String productCode) async {
-    showDialog(
+    TextEditingController _confirmController = TextEditingController();
+    bool isConfirmed = false;
+
+    await showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirmation'),
-          content: const Text('Voulez-vous vraiment supprimer ce produit ?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _deleteProduct(productCode);
-              },
-              child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-            ),
-          ],
+        return StatefulBuilder(
+          // Allows dynamic UI updates
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15), // Rounded corners
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red), // Warning Icon
+                  SizedBox(width: 10),
+                  Text(
+                    'Confirmation',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Tapez "confirmer" pour supprimer ce produit :',
+                    style: TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _confirmController,
+                    onChanged: (value) {
+                      setState(() {
+                        isConfirmed =
+                            (value.toLowerCase().trim() == "confirmer");
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'confirmer',
+                      hintStyle: TextStyle(color: Colors.grey[500]),
+                      filled: true,
+                      fillColor: Colors.grey[200], // Light background
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none, // Remove default border
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 12,
+                      ),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.black87, // Dark text
+                  ),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: isConfirmed
+                      ? () async {
+                          Navigator.of(context).pop();
+                          await _deleteProduct(productCode);
+                        }
+                      : null, // Disable button if not confirmed
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isConfirmed ? Colors.red : Colors.grey[400],
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Supprimer'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -79,6 +149,13 @@ class _ManageProductPageState extends State<ManageProductPage> {
 
   Future<void> _deleteProduct(String productCode) async {
     await sqldb.deleteProduct(productCode);
+    ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "Produit $productCode supprimée avec Succés"),
+              backgroundColor: const Color.fromARGB(255, 69, 231, 0),
+            ),
+          );
     _refreshProducts();
   }
 
@@ -141,7 +218,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   return const Center(
                     child: Text(
                       'Aucun produit trouvé',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   );
                 } else {
@@ -170,7 +248,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                           ),
                           title: Text(
                             product.designation,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             'Code: ${product.code} - Stock: ${product.stock}',
@@ -180,7 +259,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit, color: Color(0xFF009688)),
+                                icon: const Icon(Icons.edit,
+                                    color: Color(0xFF009688)),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -194,7 +274,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
+                                icon: const Icon(Icons.delete,
+                                    color: Color(0xFFE53935)),
                                 onPressed: () {
                                   _confirmDeleteProduct(product.code);
                                 },
