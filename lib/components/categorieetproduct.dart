@@ -85,9 +85,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   Future<List<Product>> _fetchProducts() async {
     try {
-      final productsMap = await sqldb.getProductsWithCategory();
+      final productsMap = await sqldb.getProducts();
       print("Fetched products: $productsMap"); // Log the fetched products
-      return productsMap.map((map) => Product.fromMap(map)).toList();
+      return productsMap.toList();
     } catch (e) {
       print("Error fetching products: $e");
       return []; // Return an empty list in case of error

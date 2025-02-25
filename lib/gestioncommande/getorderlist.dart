@@ -10,7 +10,8 @@ import 'package:path_provider/path_provider.dart';
 class Getorderlist {
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
-    List<Order> orders = await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
+    List<Order> orders =
+        await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
 
     showDialog(
       context: context,
@@ -19,10 +20,13 @@ class Getorderlist {
           backgroundColor: Colors.white, // White background for clarity
           title: const Text(
             "Liste des Commandes",
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0056A6)), // Deep Blue
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0056A6)), // Deep Blue
           ),
           content: orders.isEmpty
-              ? const Text("Aucune commande disponible.", style: TextStyle(color: Color(0xFF000000))) // Deep Blue
+              ? const Text("Aucune commande disponible.",
+                  style: TextStyle(color: Color(0xFF000000))) // Deep Blue
               : SizedBox(
                   width: double.maxFinite,
                   child: ListView.builder(
@@ -33,34 +37,43 @@ class Getorderlist {
                       return ExpansionTile(
                         title: Text(
                           "Commande #${order.idOrder} - ${formatDate(order.date)}",
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF000000)), // Deep Blue
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000)), // Deep Blue
                         ),
                         children: [
                           ...order.orderLines.map((orderLine) {
                             return FutureBuilder<Product?>(
-                              future: sqldb.getProductByCode(orderLine.idProduct),
+                              future:
+                                  sqldb.getProductByCode(orderLine.idProduct),
                               builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
                                   return const Center(
-                                      child: CircularProgressIndicator(
-                                        color: Color(0xFF26A9E0), // Sky Blue
-                                      ));
+                                      child: CircularProgressIndicator());
                                 }
 
-                                if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-                                  return const ListTile(
-                                      title: Text("Produit introuvable", style: TextStyle(color: Color(0xFFE53935)))); // Warm Red
+                                if (snapshot.hasError ||
+                                    !snapshot.hasData ||
+                                    snapshot.data == null) {
+                                  return ListTile(
+                                    title: Text(
+                                        "Produit supprimé (${orderLine.idProduct})",
+                                        style: TextStyle(color: Colors.red)),
+                                    subtitle:
+                                        Text("Quantité: ${orderLine.quantite}"),
+                                    trailing: Text(
+                                        "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                  );
                                 }
 
                                 Product product = snapshot.data!;
                                 return ListTile(
-                                  title: Text(product.designation, style: TextStyle(color: Color(0xFF000000))), // Deep Blue
-                                  subtitle: Text("Quantité: ${orderLine.quantite}", style: TextStyle(color: Color(0xFF0056A6))), // Teal Green
+                                  title: Text(product.designation),
+                                  subtitle:
+                                      Text("Quantité: ${orderLine.quantite}"),
                                   trailing: Text(
-                                    "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, color: Color(0xFF000000)), // Deep Blue
-                                  ),
+                                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
                                 );
                               },
                             );
@@ -74,7 +87,8 @@ class Getorderlist {
                                 _showOrderTicketPopup(context, order);
                               },
                               icon: Icon(Icons.print, color: Colors.white),
-                              label: Text("Imprimer Ticket", style: TextStyle(color: Colors.white)),
+                              label: Text("Imprimer Ticket",
+                                  style: TextStyle(color: Colors.white)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Color(0xFF26A9E0), // Deep Blue
                                 foregroundColor: Colors.white,
@@ -89,7 +103,8 @@ class Getorderlist {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Fermer", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: const Text("Fermer",
+                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
             ),
           ],
         );
@@ -104,7 +119,8 @@ class Getorderlist {
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: Colors.white, // White background for clarity
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Center(
             child: Text(
               "🧾 Ticket de Commande",
@@ -194,13 +210,17 @@ class Getorderlist {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                             child: CircularProgressIndicator(
-                              color: Color(0xFF26A9E0), // Sky Blue
-                            ));
+                          color: Color(0xFF26A9E0), // Sky Blue
+                        ));
                       }
 
-                      if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+                      if (snapshot.hasError ||
+                          !snapshot.hasData ||
+                          snapshot.data == null) {
                         return const ListTile(
-                            title: Text("Produit introuvable", style: TextStyle(color: Color(0xFFE53935)))); // Warm Red
+                            title: Text("Produit introuvable",
+                                style: TextStyle(
+                                    color: Color(0xFFE53935)))); // Warm Red
                       }
 
                       Product product = snapshot.data!;
@@ -214,7 +234,8 @@ class Getorderlist {
                               child: Text(
                                 "x${orderLine.quantite}",
                                 style: TextStyle(
-                                    fontSize: 16, color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16,
+                                    color: Color(0xFF000000)), // Deep Blue
                               ),
                             ),
                             Expanded(
@@ -222,7 +243,8 @@ class Getorderlist {
                               child: Text(
                                 product.designation,
                                 style: TextStyle(
-                                    fontSize: 16,  color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16,
+                                    color: Color(0xFF000000)), // Deep Blue
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -231,7 +253,8 @@ class Getorderlist {
                               child: Text(
                                 "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                 style: TextStyle(
-                                    fontSize: 16, color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16,
+                                    color: Color(0xFF000000)), // Deep Blue
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -293,13 +316,15 @@ class Getorderlist {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Fermer", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: Text("Fermer",
+                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
             ),
             TextButton(
               onPressed: () {
                 generateAndSavePDF(context, order);
               },
-              child: Text("Imprimer", style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: Text("Imprimer",
+                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
             ),
           ],
         );
@@ -313,7 +338,8 @@ class Getorderlist {
   }
 
   //Convert to PDF
-  static Future<void> generateAndSavePDF(BuildContext context, Order order) async {
+  static Future<void> generateAndSavePDF(
+      BuildContext context, Order order) async {
     final pdf = pw.Document();
 
     pdf.addPage(

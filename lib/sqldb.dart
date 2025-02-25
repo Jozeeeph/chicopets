@@ -23,7 +23,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -37,20 +37,21 @@ class SqlDb {
       onCreate: (Database db, int version) async {
         print("Creating tables...");
         await db.execute('''
-        CREATE TABLE products (
-          code TEXT PRIMARY KEY,
-          designation TEXT,
-          stock INTEGER,
-          prix_ht REAL,
-          taxe REAL,
-          prix_ttc REAL,
-          date_expiration TEXT,
-          category_id INTEGER,
-          sub_category_id INTEGER,
-          category_name TEXT,
-          sub_category_name TEXT
-        );
-      ''');
+    CREATE TABLE products (
+      code TEXT PRIMARY KEY,
+      designation TEXT,
+      stock INTEGER,
+      prix_ht REAL,
+      taxe REAL,
+      prix_ttc REAL,
+      date_expiration TEXT,
+      category_id INTEGER,
+      sub_category_id INTEGER,
+      category_name TEXT,
+      sub_category_name TEXT,
+      is_deleted INTEGER DEFAULT 0
+    );
+''');
         print("Products table created");
 
         await db.execute('''
@@ -114,10 +115,11 @@ class SqlDb {
   Future<List<Product>> getProducts() async {
     final dbClient = await db;
     final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
-      SELECT p.*, c.category_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id_category
-    ''');
+    SELECT p.*, c.category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id_category
+    WHERE p.is_deleted = 0
+  ''');
 
     return result.map((e) => Product.fromMap(e)).toList();
   }
@@ -136,8 +138,9 @@ class SqlDb {
 
   Future<int> deleteProduct(String productCode) async {
     final dbClient = await db;
-    return await dbClient.delete(
+    return await dbClient.update(
       'products',
+      {'is_deleted': 1},
       where: 'code = ?',
       whereArgs: [productCode],
     );
@@ -220,10 +223,9 @@ class SqlDb {
     List<Order> orders = [];
 
     for (var orderMap in ordersData) {
-      int orderId =
-          orderMap['id_order']; // Ensure this matches your table schema
+      int orderId = orderMap['id_order'];
       List<Map<String, dynamic>> orderLinesData = await db1.query(
-        "order_items", // Fixed table name
+        "order_items",
         where: "id_order = ?",
         whereArgs: [orderId],
       );
@@ -232,18 +234,16 @@ class SqlDb {
         return OrderLine(
           idOrder: orderId,
           idProduct: line['product_code'].toString(),
-          quantite: (line['quantity'] ?? 1) as int, // Default to 1 if null
-          prixUnitaire: (line['prix_unitaire'] ?? 0.0)
-              as double, // Default to 0.0 if null
+          quantite: (line['quantity'] ?? 1) as int,
+          prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
         );
       }).toList();
 
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        total: (orderMap['total'] ?? 0.0) as double, // Default to 0.0 if null
-        modePaiement:
-            orderMap['mode_paiement'] ?? "N/A", // Default value if null
+        total: (orderMap['total'] ?? 0.0) as double,
+        modePaiement: orderMap['mode_paiement'] ?? "N/A",
         orderLines: orderLines,
       ));
     }
@@ -265,18 +265,16 @@ class SqlDb {
     try {
       var dbC = await db;
 
-      // Query the database to get the product by its code
       List<Map<String, dynamic>> result = await dbC.query(
         'products',
         where: 'code = ?',
-        whereArgs: [productCode], // Passing the productCode as a string
+        whereArgs: [productCode],
       );
 
       if (result.isNotEmpty) {
-        return Product.fromMap(
-            result.first); // If found, convert the first result
+        return Product.fromMap(result.first);
       } else {
-        return null; // Return null if no product found
+        return null;
       }
     } catch (e) {
       print('Error fetching product by code: $e');
