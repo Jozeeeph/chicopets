@@ -44,9 +44,10 @@ class _ImportProductPageState extends State<ImportProductPage> {
               String dateExpiration = row[6]?.value.toString() ?? '';
               String categoryName = row[7]?.value.toString() ?? '';
               String subCategoryName = row[8]?.value.toString() ?? '';
+              String categoryImagePath = row[9]?.value.toString() ?? 'assets/images/default.jpg';
 
-              int categoryId = await _getCategoryIdByName(categoryName);
-              int subCategoryId = await _getSubCategoryIdByName(subCategoryName, categoryId);
+              int categoryId = await _getOrCreateCategoryIdByName(categoryName, categoryImagePath);
+              int subCategoryId = await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
 
               await _sqlDb.addProduct(
                 code,
@@ -74,24 +75,44 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
-  Future<int> _getCategoryIdByName(String categoryName) async {
+  Future<int> _getOrCreateCategoryIdByName(String categoryName, String categoryImagePath) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'categories',
       where: 'category_name = ?',
       whereArgs: [categoryName],
     );
-    return result.isNotEmpty ? result.first['id_category'] : 0;
+
+    if (result.isNotEmpty) {
+      return result.first['id_category'];
+    } else {
+      // Si la catégorie n'existe pas, on la crée
+      int newCategoryId = await dbClient.insert(
+        'categories',
+        {'category_name': categoryName, 'image_path': categoryImagePath},
+      );
+      return newCategoryId;
+    }
   }
 
-  Future<int> _getSubCategoryIdByName(String subCategoryName, int categoryId) async {
+  Future<int> _getOrCreateSubCategoryIdByName(String subCategoryName, int categoryId) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'sub_categories',
       where: 'sub_category_name = ? AND category_id = ?',
       whereArgs: [subCategoryName, categoryId],
     );
-    return result.isNotEmpty ? result.first['id_sub_category'] : 0;
+
+    if (result.isNotEmpty) {
+      return result.first['id_sub_category'];
+    } else {
+      // Si la sous-catégorie n'existe pas, on la crée
+      int newSubCategoryId = await dbClient.insert(
+        'sub_categories',
+        {'sub_category_name': subCategoryName, 'category_id': categoryId},
+      );
+      return newSubCategoryId;
+    }
   }
 
   @override
