@@ -1,3 +1,4 @@
+import 'package:caissechicopets/gestioncommande/managecommande.dart';
 import 'package:caissechicopets/import_product.dart'; // Importez le nouveau fichier
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +47,14 @@ class DashboardPage extends StatelessWidget {
                 icon: Icons.inventory,
                 page: const ManageProductPage(),
                 color: const Color(0xFF009688),
+              ),
+              const SizedBox(height: 20),
+              _buildButton(
+                context,
+                label: 'Gestion de commandes',
+                icon: Icons.inventory,
+                page: const ManageCommand(),
+                color: const Color.fromARGB(255, 86, 0, 207),
               ),
               const SizedBox(height: 20),
               _buildButton(

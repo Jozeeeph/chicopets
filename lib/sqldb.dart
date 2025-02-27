@@ -5,7 +5,6 @@ import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/subcategory.dart';
-import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart'; // Added to get the correct database path
@@ -23,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -60,6 +59,7 @@ class SqlDb {
           date TEXT,
           total REAL,
           mode_paiement TEXT,
+          status TEXT,
           id_client INTEGER
         )
       ''');
@@ -244,6 +244,7 @@ class SqlDb {
         date: orderMap['date'],
         total: (orderMap['total'] ?? 0.0) as double,
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
+        status: orderMap['status'],
         orderLines: orderLines,
       ));
     }
@@ -328,11 +329,24 @@ class SqlDb {
         orderLines: orderLines, //Assign correct list
         total: orderMap['total'].toDouble(),
         modePaiement: orderMap['mode_paiement'],
+        status: orderMap['status'],
         idClient: orderMap['id_client'],
       ));
     }
 
     return orders;
+  }
+
+  Future<int> cancelOrder(int idOrder) async {
+    final dbClient = await db;
+    
+    // Update the status of the order to "Annulée"
+    return await dbClient.update(
+      'orders',
+      {'status': 'Annulée'},
+      where: 'id_order = ?',
+      whereArgs: [idOrder],
+    );
   }
 
   Future<int> addCategory(String name, String imagePath) async {

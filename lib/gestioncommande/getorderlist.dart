@@ -10,8 +10,7 @@ import 'package:path_provider/path_provider.dart';
 class Getorderlist {
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
-    List<Order> orders =
-        await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
+    List<Order> orders = await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
 
     showDialog(
       context: context,

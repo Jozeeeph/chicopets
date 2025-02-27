@@ -12,14 +12,14 @@ class ManageProductPage extends StatefulWidget {
 
 class _ManageProductPageState extends State<ManageProductPage> {
   final SqlDb sqldb = SqlDb();
-  late Future<List<Product>> _productsFuture;
-  final TextEditingController _searchController = TextEditingController();
+  List<Product> _products = [];
   List<Product> _filteredProducts = [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _productsFuture = sqldb.getProducts();
+    _loadProducts();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -30,27 +30,22 @@ class _ManageProductPageState extends State<ManageProductPage> {
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    _filterProducts(_searchController.text);
-  }
-
-  Future<void> _filterProducts(String query) async {
-    final products = await _productsFuture;
+  Future<void> _loadProducts() async {
+    List<Product> products = await sqldb.getProducts();
     setState(() {
-      _filteredProducts = products
-          .where((product) =>
-              product.code.toLowerCase().contains(query.toLowerCase()) ||
-              product.designation.toLowerCase().contains(query.toLowerCase()) ||
-              (product.categoryName ?? '')
-                  .toLowerCase()
-                  .contains(query.toLowerCase()))
-          .toList();
+      _products = products;
+      _filteredProducts = products;
     });
   }
 
-  Future<void> _refreshProducts() async {
+  void _onSearchChanged() {
+    String query = _searchController.text.toLowerCase();
     setState(() {
-      _productsFuture = sqldb.getProducts();
+      _filteredProducts = _products.where((product) {
+        return product.code.toLowerCase().contains(query) ||
+            product.designation.toLowerCase().contains(query) ||
+            (product.categoryName ?? '').toLowerCase().contains(query);
+      }).toList();
     });
   }
 
@@ -62,17 +57,16 @@ class _ManageProductPageState extends State<ManageProductPage> {
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
-          // Allows dynamic UI updates
           builder: (context, setState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15), // Rounded corners
+                borderRadius: BorderRadius.circular(15),
               ),
               title: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red), // Warning Icon
-                  SizedBox(width: 10),
-                  Text(
+                  const Icon(Icons.warning, color: Colors.red),
+                  const SizedBox(width: 10),
+                  const Text(
                     'Confirmation',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -81,7 +75,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  const Text(
                     'Tapez "confirmer" pour supprimer ce produit :',
                     style: TextStyle(fontSize: 16),
                     textAlign: TextAlign.center,
@@ -91,22 +85,16 @@ class _ManageProductPageState extends State<ManageProductPage> {
                     controller: _confirmController,
                     onChanged: (value) {
                       setState(() {
-                        isConfirmed =
-                            (value.toLowerCase().trim() == "confirmer");
+                        isConfirmed = (value.toLowerCase().trim() == "confirmer");
                       });
                     },
                     decoration: InputDecoration(
                       hintText: 'confirmer',
-                      hintStyle: TextStyle(color: Colors.grey[500]),
                       filled: true,
-                      fillColor: Colors.grey[200], // Light background
+                      fillColor: Colors.grey[200],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none, // Remove default border
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 15,
-                        vertical: 12,
+                        borderSide: BorderSide.none,
                       ),
                     ),
                     textAlign: TextAlign.center,
@@ -116,9 +104,6 @@ class _ManageProductPageState extends State<ManageProductPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.black87, // Dark text
-                  ),
                   child: const Text('Annuler'),
                 ),
                 ElevatedButton(
@@ -127,15 +112,9 @@ class _ManageProductPageState extends State<ManageProductPage> {
                           Navigator.of(context).pop();
                           await _deleteProduct(productCode);
                         }
-                      : null, // Disable button if not confirmed
+                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isConfirmed ? Colors.red : Colors.grey[400],
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    backgroundColor: isConfirmed ? Colors.red : Colors.grey[400],
                   ),
                   child: const Text('Supprimer'),
                 ),
@@ -150,13 +129,12 @@ class _ManageProductPageState extends State<ManageProductPage> {
   Future<void> _deleteProduct(String productCode) async {
     await sqldb.deleteProduct(productCode);
     ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  "Produit $productCode supprimée avec Succés"),
-              backgroundColor: const Color.fromARGB(255, 69, 231, 0),
-            ),
-          );
-    _refreshProducts();
+      SnackBar(
+        content: Text("Produit $productCode supprimé avec succès"),
+        backgroundColor: Colors.green,
+      ),
+    );
+    _loadProducts(); // Recharge directement la liste des produits
   }
 
   @override
@@ -178,7 +156,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => AddProductScreen(
-                    refreshData: _refreshProducts,
+                    refreshData: _loadProducts,
                   ),
                 ),
               );
@@ -188,14 +166,12 @@ class _ManageProductPageState extends State<ManageProductPage> {
       ),
       body: Column(
         children: [
-          // Barre de recherche stylisée
           Padding(
             padding: const EdgeInsets.all(10),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Rechercher un produit',
-                labelStyle: const TextStyle(color: Colors.black54),
                 prefixIcon: const Icon(Icons.search, color: Color(0xFF26A9E0)),
                 filled: true,
                 fillColor: const Color(0xFFE0E0E0),
@@ -207,30 +183,18 @@ class _ManageProductPageState extends State<ManageProductPage> {
             ),
           ),
           Expanded(
-            child: FutureBuilder<List<Product>>(
-              future: _productsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Erreur: ${snapshot.error}'));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
+            child: _filteredProducts.isEmpty
+                ? const Center(
                     child: Text(
                       'Aucun produit trouvé',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
-                  );
-                } else {
-                  final products = _searchController.text.isEmpty
-                      ? snapshot.data!
-                      : _filteredProducts;
-                  return ListView.builder(
+                  )
+                : ListView.builder(
                     padding: const EdgeInsets.all(10),
-                    itemCount: products.length,
+                    itemCount: _filteredProducts.length,
                     itemBuilder: (context, index) {
-                      final product = products[index];
+                      final product = _filteredProducts[index];
                       return Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -248,8 +212,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                           ),
                           title: Text(
                             product.designation,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             'Code: ${product.code} - Stock: ${product.stock}',
@@ -259,23 +222,21 @@ class _ManageProductPageState extends State<ManageProductPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit,
-                                    color: Color(0xFF009688)),
+                                icon: const Icon(Icons.edit, color: Color(0xFF009688)),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => AddProductScreen(
                                         product: product,
-                                        refreshData: _refreshProducts,
+                                        refreshData: _loadProducts,
                                       ),
                                     ),
                                   );
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Color(0xFFE53935)),
+                                icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
                                 onPressed: () {
                                   _confirmDeleteProduct(product.code);
                                 },
@@ -285,10 +246,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                         ),
                       );
                     },
-                  );
-                }
-              },
-            ),
+                  ),
           ),
         ],
       ),
