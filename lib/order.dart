@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:caissechicopets/orderline.dart';
 
 class Order {
@@ -6,6 +8,7 @@ class Order {
   List<OrderLine> orderLines; // ✅ Change from List<Product> to List<OrderLine>
   double total;
   String modePaiement;
+  String? status;
   int? idClient; 
 
   Order({
@@ -14,6 +17,7 @@ class Order {
     required this.orderLines, // ✅ Updated
     required this.total,
     required this.modePaiement,
+    this.status,
     this.idClient,
   });
 
@@ -23,6 +27,7 @@ class Order {
       'date': date,
       'total': total,
       'mode_paiement': modePaiement,
+      'status': status,
       'id_client': idClient,
     };
   }
@@ -34,6 +39,7 @@ class Order {
       orderLines: [], 
       total: map['total'].toDouble(),
       modePaiement: map['mode_paiement'],
+      status: map['status'],
       idClient: map['id_client'],
     );
   }
