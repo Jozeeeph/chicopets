@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
@@ -124,6 +123,16 @@ class SqlDb {
     return result.map((e) => Product.fromMap(e)).toList();
   }
 
+  Future<void> updateOrderStatus(int idOrder, String status) async {
+    final dbClient = await db;
+    await dbClient!.update(
+      'orders',
+      {'status': status},
+      where: 'id_order = ?',
+      whereArgs: [idOrder],
+    );
+  }
+
   // Ajoutez ces méthodes dans la classe SqlDb
 
   Future<int> updateProduct(Product product) async {
@@ -143,6 +152,15 @@ class SqlDb {
       {'is_deleted': 1},
       where: 'code = ?',
       whereArgs: [productCode],
+    );
+  }
+
+  Future<void> deleteOrderLine(int idOrder, String idProduct) async {
+    final dbClient = await db;
+    await dbClient.delete(
+      'order_items',
+      where: 'id_order = ? AND product_code = ?',
+      whereArgs: [idOrder, idProduct],
     );
   }
 
@@ -337,9 +355,27 @@ class SqlDb {
     return orders;
   }
 
+  Future<void> cancelOrderLine(int idOrder, String idProduct) async {
+    final dbClient = await db;
+    await dbClient.delete(
+      'order_items',
+      where: 'id_order = ? AND product_code = ?',
+      whereArgs: [idOrder, idProduct],
+    );
+  }
+
+  Future<void> deleteOrder(int idOrder) async {
+    final dbClient = await db;
+    await dbClient.delete(
+      'orders',
+      where: 'id_order = ?',
+      whereArgs: [idOrder],
+    );
+  }
+
   Future<int> cancelOrder(int idOrder) async {
     final dbClient = await db;
-    
+
     // Update the status of the order to "Annulée"
     return await dbClient.update(
       'orders',
