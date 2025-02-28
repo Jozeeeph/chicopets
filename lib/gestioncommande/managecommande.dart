@@ -1,3 +1,4 @@
+import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -184,14 +185,15 @@ class _ManageCommandState extends State<ManageCommand> {
                     title: Text(
                       'Commande #${order.idOrder} - ${formatDate(order.date)}',
                       style: TextStyle(
-                        color: isCancelled ? Colors.red : const Color(0xFF0056A6),
+                        color:
+                            isCancelled ? Colors.red : const Color(0xFF0056A6),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     subtitle: Text(
                       isCancelled
                           ? 'Commande annulée'
-                          : 'Total: \$${order.total.toStringAsFixed(2)}',
+                          : 'Total: ${order.total.toStringAsFixed(2)} DT',
                       style: TextStyle(
                           color: isCancelled
                               ? Colors.red
@@ -200,13 +202,37 @@ class _ManageCommandState extends State<ManageCommand> {
                     ),
                     children: [
                       ...order.orderLines.map((orderLine) {
-                        return ListTile(
-                          title: Text('Produit: ${orderLine.idProduct}',
-                              style: const TextStyle(color: Color(0xFF0056A6))),
-                          subtitle: Text(
-                            'Quantité: ${orderLine.quantite} - Prix: \$${orderLine.prixUnitaire.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Color(0xFF26A9E0)),
-                          ),
+                        return FutureBuilder<Product?>(
+                          future: sqlDb.getDesignationByCode(
+                              orderLine.idProduct), // Async call
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return ListTile(
+                                title: const Text('Chargement...'),
+                              );
+                            } else if (snapshot.hasError) {
+                              return ListTile(
+                                title: Text('Erreur: ${snapshot.error}'),
+                              );
+                            } else if (!snapshot.hasData) {
+                              return ListTile(
+                                title: const Text('Produit introuvable'),
+                              );
+                            } else {
+                              Product product = snapshot.data!;
+                              return ListTile(
+                                title: Text('Produit: ${product.designation}',
+                                    style: const TextStyle(
+                                        color: Color(0xFF0056A6))),
+                                subtitle: Text(
+                                  'Quantité: ${orderLine.quantite} - Prix: ${((orderLine.quantite) * (orderLine.prixUnitaire)).toStringAsFixed(2)} DT',
+                                  style:
+                                      const TextStyle(color: Color(0xFF26A9E0)),
+                                ),
+                              );
+                            }
+                          },
                         );
                       }).toList(),
                       if (!isCancelled)

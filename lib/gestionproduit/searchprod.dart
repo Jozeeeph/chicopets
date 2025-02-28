@@ -12,6 +12,7 @@ class Searchprod {
     final TextEditingController searchController = TextEditingController();
     ValueNotifier<List<Product>> filteredProducts = ValueNotifier(products);
 
+    // Listener to filter the products when the search text changes
     searchController.addListener(() {
       String query = searchController.text.toLowerCase();
 
@@ -63,6 +64,7 @@ class Searchprod {
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: TextField(
                       controller: searchController,
+                      autofocus: true, // Ensures the field is focused
                       decoration: InputDecoration(
                         labelText: 'Recherche Produit (code ou designation)',
                         prefixIcon: const Icon(Icons.search,
