@@ -17,14 +17,19 @@ class _ManageCommandState extends State<ManageCommand> {
   @override
   void initState() {
     super.initState();
-    futureOrders = sqlDb.getOrdersWithOrderLines();
+    refreshOrders();
   }
 
-  Future<void> cancelOrder(Order order) async {
+  void refreshOrders() {
+    setState(() {
+      futureOrders = sqlDb.getOrdersWithOrderLines();
+    });
+  }
+
+  Future<void> cancelOrder(BuildContext context, Order order) async {
     TextEditingController _confirmController = TextEditingController();
     bool isConfirmed = false;
 
-    // Show a confirmation dialog with an input field
     bool? confirmCancel = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -98,10 +103,9 @@ class _ManageCommandState extends State<ManageCommand> {
     );
 
     if (confirmCancel == true) {
-      // Step 1: Cancel the order in the database
-      await sqlDb.cancelOrder(order.idOrder!);
+      await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
 
-      // Step 2: Retrieve the order lines (products and quantities) for the canceled order
+      // Restock products from the canceled order
       final dbClient = await sqlDb.db;
       final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
         'order_items',
@@ -109,12 +113,10 @@ class _ManageCommandState extends State<ManageCommand> {
         whereArgs: [order.idOrder],
       );
 
-      // Step 3: Update the stock of each product in the order
       for (var line in orderLinesData) {
         String productCode = line['product_code'].toString();
         int canceledQuantity = line['quantity'] as int;
 
-        // Fetch the current stock of the product
         final List<Map<String, dynamic>> productData = await dbClient.query(
           'products',
           where: 'code = ?',
@@ -125,7 +127,6 @@ class _ManageCommandState extends State<ManageCommand> {
           int currentStock = productData.first['stock'] as int;
           int newStock = currentStock + canceledQuantity;
 
-          // Update the product's stock in the database
           await dbClient.update(
             'products',
             {'stock': newStock},
@@ -135,11 +136,8 @@ class _ManageCommandState extends State<ManageCommand> {
         }
       }
 
-      // Step 4: Update the order's status locally to reflect the cancellation
-      setState(() {
-        order.status = 'Annulée'; // Update status to "Annulée"
-        futureOrders = sqlDb.getOrdersWithOrderLines(); // Refresh the orders
-      });
+      // Refresh the order list
+      refreshOrders();
     }
   }
 
@@ -174,7 +172,7 @@ class _ManageCommandState extends State<ManageCommand> {
               itemCount: snapshot.data!.length,
               itemBuilder: (context, index) {
                 Order order = snapshot.data![index];
-                bool isCancelled = order.status == 'Annulée';
+                bool isCancelled = order.status == 'annulée';
 
                 return Card(
                   margin: const EdgeInsets.all(8.0),
@@ -186,14 +184,13 @@ class _ManageCommandState extends State<ManageCommand> {
                     title: Text(
                       'Commande #${order.idOrder} - ${formatDate(order.date)}',
                       style: TextStyle(
-                        color:
-                            isCancelled ? Colors.red : const Color(0xFF0056A6),
+                        color: isCancelled ? Colors.red : const Color(0xFF0056A6),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     subtitle: Text(
                       isCancelled
-                          ? 'Client a annulé cette commande'
+                          ? 'Commande annulée'
                           : 'Total: \$${order.total.toStringAsFixed(2)}',
                       style: TextStyle(
                           color: isCancelled
@@ -214,7 +211,7 @@ class _ManageCommandState extends State<ManageCommand> {
                       }).toList(),
                       if (!isCancelled)
                         TextButton.icon(
-                          onPressed: () => cancelOrder(order),
+                          onPressed: () => cancelOrder(context, order),
                           icon: const Icon(Icons.cancel, color: Colors.red),
                           label: const Text('Annuler la commande',
                               style: TextStyle(color: Colors.red)),

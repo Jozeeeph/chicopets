@@ -26,48 +26,46 @@ class _ImportProductPageState extends State<ImportProductPage> {
         PlatformFile file = result.files.first;
         String? filePath = file.path;
 
-        if (filePath != null) {
-          var bytes = File(filePath).readAsBytesSync();
-          var excel = Excel.decodeBytes(bytes);
+        var bytes = File(filePath!).readAsBytesSync();
+        var excel = Excel.decodeBytes(bytes);
 
-          for (var table in excel.tables.keys) {
-            var sheet = excel.tables[table]!;
-            for (var row in sheet.rows) {
-              if (row == sheet.rows.first) continue;
+        for (var table in excel.tables.keys) {
+          var sheet = excel.tables[table]!;
+          for (var row in sheet.rows) {
+            if (row == sheet.rows.first) continue;
 
-              String code = row[0]?.value.toString() ?? '';
-              String designation = row[1]?.value.toString() ?? '';
-              int stock = int.tryParse(row[2]?.value.toString() ?? '0') ?? 0;
-              double prixHT = double.tryParse(row[3]?.value.toString() ?? '0.0') ?? 0.0;
-              double taxe = double.tryParse(row[4]?.value.toString() ?? '0.0') ?? 0.0;
-              double prixTTC = double.tryParse(row[5]?.value.toString() ?? '0.0') ?? 0.0;
-              String dateExpiration = row[6]?.value.toString() ?? '';
-              String categoryName = row[7]?.value.toString() ?? '';
-              String subCategoryName = row[8]?.value.toString() ?? '';
-              String categoryImagePath = row[9]?.value.toString() ?? 'assets/images/default.jpg';
+            String code = row[0]?.value.toString() ?? '';
+            String designation = row[1]?.value.toString() ?? '';
+            int stock = int.tryParse(row[2]?.value.toString() ?? '0') ?? 0;
+            double prixHT = double.tryParse(row[3]?.value.toString() ?? '0.0') ?? 0.0;
+            double taxe = double.tryParse(row[4]?.value.toString() ?? '0.0') ?? 0.0;
+            double prixTTC = double.tryParse(row[5]?.value.toString() ?? '0.0') ?? 0.0;
+            String dateExpiration = row[6]?.value.toString() ?? '';
+            String categoryName = row[7]?.value.toString() ?? '';
+            String subCategoryName = row[8]?.value.toString() ?? '';
+            String categoryImagePath = row[9]?.value.toString() ?? 'assets/images/default.jpg';
 
-              int categoryId = await _getOrCreateCategoryIdByName(categoryName, categoryImagePath);
-              int subCategoryId = await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
+            int categoryId = await _getOrCreateCategoryIdByName(categoryName, categoryImagePath);
+            int subCategoryId = await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
 
-              await _sqlDb.addProduct(
-                code,
-                designation,
-                stock,
-                prixHT,
-                taxe,
-                prixTTC,
-                dateExpiration,
-                categoryId,
-                subCategoryId,
-              );
-            }
+            await _sqlDb.addProduct(
+              code,
+              designation,
+              stock,
+              prixHT,
+              taxe,
+              prixTTC,
+              dateExpiration,
+              categoryId,
+              subCategoryId,
+            );
           }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Importation réussie!')),
-          );
         }
-      }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Importation réussie!')),
+        );
+            }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors de l\'importation: $e')),

@@ -8,9 +8,130 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 
 class Getorderlist {
+  static Future<void> cancelOrder(
+      BuildContext context, Order order, Function() onOrderCanceled) async {
+    TextEditingController _confirmController = TextEditingController();
+    bool isConfirmed = false;
+    final SqlDb sqlDb = SqlDb();
+
+    bool? confirmCancel = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Row(
+                children: const [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 10),
+                  Text(
+                    'Confirmation',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Tapez "Annuler" pour confirmer l\'annulation de cette commande.',
+                    style: TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _confirmController,
+                    onChanged: (value) {
+                      setState(() {
+                        isConfirmed = (value.toLowerCase().trim() == "annuler");
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Annuler',
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Non'),
+                ),
+                ElevatedButton(
+                  onPressed: isConfirmed
+                      ? () async {
+                          Navigator.of(context).pop(true);
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isConfirmed ? Colors.red : Colors.grey[400],
+                  ),
+                  child: const Text('Annuler la commande'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmCancel == true) {
+      await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
+
+      // Restocker les produits de la commande annulée
+      final dbClient = await sqlDb.db;
+      final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
+        'order_items',
+        where: 'id_order = ?',
+        whereArgs: [order.idOrder],
+      );
+
+      for (var line in orderLinesData) {
+        String productCode = line['product_code'].toString();
+        int canceledQuantity = line['quantity'] as int;
+
+        final List<Map<String, dynamic>> productData = await dbClient.query(
+          'products',
+          where: 'code = ?',
+          whereArgs: [productCode],
+        );
+
+        if (productData.isNotEmpty) {
+          int currentStock = productData.first['stock'] as int;
+          int newStock = currentStock + canceledQuantity;
+
+          await dbClient.update(
+            'products',
+            {'stock': newStock},
+            where: 'code = ?',
+            whereArgs: [productCode],
+          );
+        }
+      }
+
+      // Appeler le callback pour mettre à jour l'interface utilisateur
+      onOrderCanceled();
+    }
+  }
+
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
-    List<Order> orders = await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
+    List<Order> orders =
+        await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
+
+    // Filtrer les commandes non annulées
+    orders = orders.where((order) => order.status != 'annulée').toList();
 
     showDialog(
       context: context,
@@ -71,27 +192,129 @@ class Getorderlist {
                                   title: Text(product.designation),
                                   subtitle:
                                       Text("Quantité: ${orderLine.quantite}"),
-                                  trailing: Text(
-                                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                          "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                      IconButton(
+                                        icon: Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () async {
+                                          // Show confirmation dialog
+                                          bool? confirmDelete =
+                                              await showDialog<bool>(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                    "Confirmer la suppression"),
+                                                content: const Text(
+                                                    "Êtes-vous sûr de vouloir supprimer ce produit de la commande ? La quantité de ce produit sera restockée"),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(context)
+                                                            .pop(false),
+                                                    child: const Text("Non"),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.of(context)
+                                                            .pop(true),
+                                                    child: const Text("Oui"),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+
+                                          // If user confirms, delete the order line
+                                          if (confirmDelete == true) {
+                                            // Annuler la ligne de commande
+                                            await sqldb.cancelOrderLine(
+                                                order.idOrder!,
+                                                orderLine.idProduct);
+
+                                            // Restocker le produit
+                                            await sqldb.updateProductStock(
+                                                orderLine.idProduct,
+                                                orderLine.quantite);
+
+                                            // Check if the order has any remaining order lines
+                                            final dbClient = await sqldb
+                                                .db; // Access the database instance
+                                            final List<Map<String, dynamic>>remainingOrderLines =
+                                                await dbClient.query(
+                                              'order_items',
+                                              where: 'id_order = ?',
+                                              whereArgs: [order.idOrder],
+                                            );
+                                            // If no order lines remain, delete the order
+                                            if (remainingOrderLines.isEmpty) {
+                                              await sqldb
+                                                  .deleteOrder(order.idOrder!);
+                                            }
+
+                                            // Rafraîchir la liste des commandes
+                                            orders = await sqldb
+                                                .getOrdersWithOrderLines();
+                                            Navigator.pop(
+                                                context); // Fermer la boîte de dialogue
+                                            showListOrdersPopUp(
+                                                context); // Rouvrir la boîte de dialogue avec les données mises à jour
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 );
                               },
                             );
                           }).toList(),
 
-                          // 🔹 Bouton "Imprimer Ticket"
+                          // 🔹 Boutons alignés horizontalement
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                _showOrderTicketPopup(context, order);
-                              },
-                              icon: Icon(Icons.print, color: Colors.white),
-                              label: Text("Imprimer Ticket",
-                                  style: TextStyle(color: Colors.white)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF26A9E0), // Deep Blue
-                                foregroundColor: Colors.white,
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment
+                                  .spaceEvenly, // Align buttons evenly
+                              children: [
+                                // Bouton "Imprimer Ticket"
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    _showOrderTicketPopup(context, order);
+                                  },
+                                  icon: Icon(Icons.print, color: Colors.white),
+                                  label: Text("Imprimer Ticket",
+                                      style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        Color(0xFF26A9E0), // Deep Blue
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+
+                                // Bouton "Annuler Commande"
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    // Annuler la commande
+                                    await cancelOrder(context, order, () {
+                                      // Fermer la boîte de dialogue et mettre à jour la liste
+                                      Navigator.pop(context);
+                                      showListOrdersPopUp(context);
+                                    });
+                                  },
+                                  icon: Icon(Icons.cancel, color: Colors.white),
+                                  label: Text("Annuler Commande",
+                                      style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors
+                                        .red, // Red color for cancellation
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -102,8 +325,10 @@ class Getorderlist {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Fermer",
-                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: const Text(
+                "Fermer",
+                style: TextStyle(color: Color(0xFF000000)), // Deep Blue
+              ),
             ),
           ],
         );
