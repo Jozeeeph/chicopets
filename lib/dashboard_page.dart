@@ -1,4 +1,5 @@
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
+import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
 import 'package:caissechicopets/import_product.dart'; // Importez le nouveau fichier
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +17,8 @@ class DashboardPage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Tableau de bord', style: TextStyle(color: Colors.white)),
+        title: const Text('Tableau de bord',
+            style: TextStyle(color: Colors.white)),
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -52,10 +54,11 @@ class DashboardPage extends StatelessWidget {
               _buildButton(
                 context,
                 label: 'Gestion de commandes',
-                icon: Icons.inventory,
+                icon: Icons.shopping_cart, // Icône mise à jour
                 page: const ManageCommand(),
                 color: const Color.fromARGB(255, 86, 0, 207),
               ),
+
               const SizedBox(height: 20),
               _buildButton(
                 context,
@@ -64,6 +67,15 @@ class DashboardPage extends StatelessWidget {
                 page: const ImportProductPage(),
                 color: const Color(0xFFFF9800),
               ),
+              const SizedBox(height: 20), // Ajoutez cet espace
+              _buildButton(
+                context,
+                label: 'Gestion de catégorie', // Nouveau label
+                icon: Icons.category, // Icône pour le bouton de catégorie
+                page:
+                    const ManageCategoriePage(), // Page de gestion de catégorie
+                color: const Color(0xFF673AB7), // Couleur que vous souhaitez
+              ),
             ],
           ),
         ),
@@ -71,7 +83,8 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(BuildContext context, {
+  Widget _buildButton(
+    BuildContext context, {
     required String label,
     required IconData icon,
     required Widget page,

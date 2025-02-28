@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 
 typedef RefreshCallback = void Function(Function refreshData);
 
-
 class TableCmd extends StatefulWidget {
   final double total;
   final List<Product> selectedProducts;
@@ -104,213 +103,325 @@ class _TableCmdState extends State<TableCmd> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start, // Align items to the top
       children: [
-        // Champ de saisie invisible pour le scanner USB
-        TextField(
-          controller: barcodeController,
-          focusNode: barcodeFocusNode, // Keep focus on input
-          decoration: const InputDecoration(
-            labelText: "Scanner Code-Barres",
-            border: InputBorder.none, // Hidden input
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // Total Section
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0056A6), // Deep Blue
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'TOTAL:',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  Text(
-                    '${calculateTotal().toStringAsFixed(2)} DT',
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    'Caissier: foulen ben foulen',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  Text(
-                    'Time: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        // Order Section
-        Container(
-          height: 200,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF26A9E0)), // Sky Blue
-            borderRadius: BorderRadius.circular(12),
-          ),
+        // Table on the left
+        Expanded(
+          flex: 2, // Adjust the size of the table
           child: Column(
             children: [
+              // Scanner (invisible)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF26A9E0), // Sky Blue
-                  borderRadius:
-                      BorderRadius.circular(12), // Circular border radius
+                  color: const Color.fromARGB(255, 1, 42, 79),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
-                  children: const [
-                    Expanded(
-                        child: Text('Code',
-                            style: TextStyle(color: Colors.white))),
-                    Expanded(
-                        child: Text('Désignation',
-                            style: TextStyle(color: Colors.white))),
-                    Expanded(
-                        child: Text('Quantité',
-                            style: TextStyle(color: Colors.white))),
-                    Expanded(
-                        child: Text('Prix U',
-                            style: TextStyle(color: Colors.white))),
-                    Expanded(
-                        child: Text('Montant',
-                            style: TextStyle(color: Colors.white))),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'TOTAL:',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                        Text(
+                          '${calculateTotal().toStringAsFixed(2)} DT',
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 27, 229, 67)),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Caissier: foulen ben foulen',
+                          style: TextStyle(
+                              fontSize:18 ,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                        Text(
+                          'Time: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                          style: const TextStyle(
+                              fontSize:18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: widget.selectedProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = widget.selectedProducts[index];
-                    bool isSelected = selectedProductIndex == index;
+              const SizedBox(height: 15),
 
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedProductIndex = index;
-                        });
-                        print("Produit sélectionné : ${product.code}");
-                      },
-                      child: Container(
-                        color: isSelected
-                            ? const Color(0xFF26A9E0).withOpacity(0.2)
-                            : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8, horizontal: 12),
-                        child: Row(
-                          children: [
-                            Expanded(child: Text(product.code)),
-                            Expanded(child: Text(product.designation)),
-                            Expanded(
-                                child:
-                                    Text('${widget.quantityProducts[index]}')),
-                            Expanded(
-                                child: Text(
-                                    '${product.prixTTC.toStringAsFixed(2)} DT')),
-                            Expanded(
-                              child: Text(
-                                "${(product.prixTTC * widget.quantityProducts[index]).toStringAsFixed(2)} DT",
+              TextField(
+                controller: barcodeController,
+                focusNode: barcodeFocusNode,
+                decoration: const InputDecoration(
+                  labelText: "Scanner Code-Barres",
+                  border: InputBorder.none,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Total
+
+              // Product table
+              Container(
+                height: 270,
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF26A9E0)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF26A9E0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: const [
+                          Expanded(
+                              child: Text('Code',
+                                  style: TextStyle(color: Colors.white))),
+                          Expanded(
+                              child: Text('Désignation',
+                                  style: TextStyle(color: Colors.white))),
+                          Expanded(
+                              child: Text('Quantité',
+                                  style: TextStyle(color: Colors.white))),
+                          Expanded(
+                              child: Text('Prix U',
+                                  style: TextStyle(color: Colors.white))),
+                          Expanded(
+                              child: Text('Montant',
+                                  style: TextStyle(color: Colors.white))),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RawScrollbar(
+                        thumbColor: const Color.fromARGB(
+                            255, 132, 132, 132)!, // Gris sombre
+                        radius: const Radius.circular(10), // Coins arrondis
+                        thickness: 7, // Épaisseur de la barre
+                        thumbVisibility: true, // Toujours visible
+                        scrollbarOrientation:
+                            ScrollbarOrientation.right, // À droite
+                        child: ListView.builder(
+                          itemCount: widget.selectedProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = widget.selectedProducts[index];
+                            bool isSelected = selectedProductIndex == index;
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedProductIndex = index;
+                                });
+                              },
+                              child: Container(
+                                color: isSelected
+                                    ? const Color(0xFF26A9E0).withOpacity(0.2)
+                                    : Colors.transparent,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Text(product.code)),
+                                    Expanded(child: Text(product.designation)),
+                                    Expanded(
+                                        child: Text(
+                                            '${widget.quantityProducts[index]}')),
+                                    Expanded(
+                                        child: Text(
+                                            '${product.prixTTC.toStringAsFixed(2)} DT')),
+                                    Expanded(
+                                      child: Text(
+                                        "${(product.prixTTC * widget.quantityProducts[index]).toStringAsFixed(2)} DT",
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 10),
+        const SizedBox(width: 15),
 
-        // Buttons
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // ElevatedButton(
-            //   onPressed: widget.onAddCategory,
-            //   style: ElevatedButton.styleFrom(
-            //       backgroundColor: const Color(0xFF009688)), // Teal Green
-            //   child: const Text('AJOUT CATEGORIE',
-            //       style: TextStyle(color: Colors.white)),
-            // ),
+        // Buttons on the right
+        Expanded(
+          flex: 1, // Colonne plus petite pour les boutons
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start, // Alignement en haut
+            children: [
+              const SizedBox(height: 170), // Espacement en haut
 
-            ElevatedButton(
-              onPressed: selectedProductIndex != null
-                  ? () {
-                      widget.onDeleteProduct(selectedProductIndex!);
-                      setState(() {
-                        selectedProductIndex = null;
-                      });
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE53935)), // Warm Red
-              child: const Text('SUPPRIMER',
-                  style: TextStyle(color: Colors.white)),
-            ),
-            ElevatedButton(
-              onPressed: widget.onSearchProduct,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF9800)), // Soft Orange
-              child: const Text('RECHERCHE PRODUIT',
-                  style: TextStyle(color: Colors.white)),
-            ),
-            ElevatedButton(
-              onPressed: () => widget.onQuantityChange(selectedProductIndex!),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0056A6)), // Deep Blue
-              child:
-                  const Text('QUANTITÉ', style: TextStyle(color: Colors.white)),
-            ),
-            ElevatedButton(
-              onPressed: widget.onFetchOrders,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF009688)), // Teal Green
-              child: const Text('CHARGER COMMANDES',
-                  style: TextStyle(color: Colors.white)),
-            ),
-            ElevatedButton(
-              onPressed: widget.onPlaceOrder,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF26A9E0)), // Sky Blue
-              child:
-                  const Text('VALIDER', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+              GestureDetector(
+                onTap: selectedProductIndex != null
+                    ? () {
+                        widget.onDeleteProduct(selectedProductIndex!);
+                        setState(() {
+                          selectedProductIndex = null;
+                        });
+                      }
+                    : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 10), // Réduction du padding
+                  decoration: BoxDecoration(
+                    color: selectedProductIndex != null
+                        ? const Color(0xFFE53935)
+                        : Colors.grey,
+                    borderRadius:
+                        BorderRadius.circular(8), // Légèrement plus arrondi
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete,
+                          color: Colors.white,
+                          size: 18), // Taille icône réduite
+                      SizedBox(width: 8),
+                      Text('SUPPRIMER LIGNE',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8), // Réduction de l'espacement
+              GestureDetector(
+                onTap: selectedProductIndex != null
+                    ? () => widget.onQuantityChange(selectedProductIndex!)
+                    : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selectedProductIndex != null
+                        ? const Color(0xFF0056A6)
+                        : Colors.grey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('CHANGER QUANTITÉ',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              GestureDetector(
+                onTap: widget.onSearchProduct,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0056A6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('RECHERCHER PRODUITS',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              
+
+              GestureDetector(
+                onTap: widget.onFetchOrders,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0056A6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.list, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('AFFICHER COMMANDES',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              GestureDetector(
+                onTap: widget.onPlaceOrder,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF009688),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('VALIDER COMMANDE',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

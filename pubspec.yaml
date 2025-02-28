@@ -77,6 +77,7 @@ flutter:
    - assets/images/brosse.jpg
    - assets/images/collier.jpg
    - assets/database/cashdesk1.db
+   - assets/images/categorie.png
   #  - C:\Users\user\Documents\cashdesk1.db
 
   # An image asset can refer to one or more resolution-specific "variants", see
