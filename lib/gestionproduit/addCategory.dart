@@ -6,29 +6,42 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddCategory extends StatefulWidget {
+  const AddCategory({super.key});
+
   @override
   _AddCategoryState createState() => _AddCategoryState();
 }
 
 class _AddCategoryState extends State<AddCategory> {
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController subCategoryNameController = TextEditingController();
+  final TextEditingController subCategoryNameController =
+      TextEditingController();
   File? selectedImage;
   final SqlDb sqldb = SqlDb();
   bool isVisible = false;
   int? selectedCategoryId;
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
-
-  void refreshData() {
-    fetchCategories(); // Refresh categories
-    fetchSubCategories(selectedCategoryId ?? 0); // Refresh subcategories
-  }
+  Category? categoryToEdit;
 
   @override
   void initState() {
     super.initState();
     fetchCategories();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args != null && args is Category) {
+      categoryToEdit = args;
+      nameController.text = categoryToEdit!.name;
+      selectedCategoryId = categoryToEdit!.id;
+      if (categoryToEdit!.imagePath != null) {
+        selectedImage = File(categoryToEdit!.imagePath!);
+      }
+    }
   }
 
   Future<void> fetchCategories() async {
@@ -87,9 +100,28 @@ class _AddCategoryState extends State<AddCategory> {
         selectedImage = null;
         fetchCategories();
       });
-      refreshData();
     } else {
       _showMessage("Échec de l'ajout de la catégorie !");
+    }
+  }
+
+  void updateCategory() async {
+    if (nameController.text.isEmpty || selectedImage == null) {
+      _showMessage("Veuillez remplir tous les champs !");
+      return;
+    }
+
+    int result = await sqldb.updateCategory(
+      categoryToEdit!.id!,
+      nameController.text,
+      selectedImage!.path,
+    );
+
+    if (result > 0) {
+      _showMessage("Catégorie mise à jour avec succès !");
+      Navigator.pop(context);
+    } else {
+      _showMessage("Échec de la mise à jour de la catégorie !");
     }
   }
 
@@ -120,10 +152,7 @@ class _AddCategoryState extends State<AddCategory> {
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(color: Colors.white),
-        ),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFE53935), // Warm Red for error
       ),
     );
@@ -131,23 +160,17 @@ class _AddCategoryState extends State<AddCategory> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconButton(
-            icon: Icon(
-              isVisible ? Icons.remove : Icons.add,
-              color: const Color(0xFF26A9E0), // Sky Blue icon
-            ),
-            onPressed: () {
-              setState(() {
-                isVisible = !isVisible;
-              });
-            },
-          ),
-          if (isVisible) ...[
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(categoryToEdit == null
+            ? 'Ajouter une catégorie'
+            : 'Modifier la catégorie'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             _buildTextFormField(
               controller: nameController,
               label: 'Nom de la catégorie',
@@ -175,16 +198,16 @@ class _AddCategoryState extends State<AddCategory> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: addCategory,
+              onPressed: categoryToEdit == null ? addCategory : updateCategory,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF009688), // Teal Green
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                "Ajouter",
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                categoryToEdit == null ? "Ajouter" : "Mettre à jour",
+                style: const TextStyle(color: Colors.white),
               ),
             ),
             const Divider(
@@ -193,6 +216,7 @@ class _AddCategoryState extends State<AddCategory> {
             ),
             const SizedBox(height: 16),
 
+            // Category Dropdown
             // Category Dropdown
             DropdownButtonFormField<int>(
               value: selectedCategoryId,
@@ -205,7 +229,8 @@ class _AddCategoryState extends State<AddCategory> {
                   value: category.id,
                   child: Text(
                     category.name,
-                    style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+                    style: const TextStyle(
+                        color: Color.fromARGB(255, 0, 0, 0)), // Black text
                   ),
                 );
               }).toList(),
@@ -224,8 +249,8 @@ class _AddCategoryState extends State<AddCategory> {
               const Text(
                 "Sous-catégories :",
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056A6)), // Deep Blue
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0056A6)), // Deep Blue
               ),
               const SizedBox(height: 8),
               subCategories.isEmpty
@@ -239,7 +264,9 @@ class _AddCategoryState extends State<AddCategory> {
                           return ListTile(
                             title: Text(
                               subCategory.name,
-                              style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+                              style: const TextStyle(
+                                  color: Color.fromARGB(
+                                      255, 0, 0, 0)), // Black text
                             ),
                           );
                         }).toList(),
@@ -271,7 +298,7 @@ class _AddCategoryState extends State<AddCategory> {
               const SizedBox(height: 16),
             ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -285,7 +312,8 @@ class _AddCategoryState extends State<AddCategory> {
       child: TextFormField(
         controller: controller,
         decoration: _inputDecoration(label),
-        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+        style:
+            const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
       ),
     );
   }
@@ -293,14 +321,17 @@ class _AddCategoryState extends State<AddCategory> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      labelStyle:
+          const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+        borderSide:
+            const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+        borderSide:
+            const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
       ),
     );
   }

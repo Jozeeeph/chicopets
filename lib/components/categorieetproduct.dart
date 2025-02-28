@@ -99,7 +99,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Expanded(
       child: Row(
         children: [
-          // Categories Column
+          // Colonne des catégories
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -121,18 +121,18 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   return GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 1,
-                      mainAxisSpacing: 8.0,
-                      crossAxisSpacing: 8.0,
+                      crossAxisCount: 3, 
+                      childAspectRatio:
+                          1.5, 
+                      mainAxisSpacing: 30.0,
+                      crossAxisSpacing: 30.0,
                     ),
                     padding: const EdgeInsets.all(8.0),
                     itemCount: snapshot.data!.length,
                     itemBuilder: (context, index) {
                       final category = snapshot.data![index];
-                      print(
-                          "Category Name: ${category.name}, Image Path: ${category.imagePath}");
-                      return buildCategoryButton(category.name, category.imagePath);
+                      return buildCategoryButton(
+                          category.name, category.imagePath);
                     },
                   );
                 },
@@ -143,7 +143,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
             color: lightGray,
             thickness: 1,
           ),
-          // Products Column
+          // Colonne des produits
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -163,14 +163,35 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   }
 
                   return GridView.count(
-                    crossAxisCount: 4,
+                    crossAxisCount: 6, 
+                    
+                    childAspectRatio:
+                        1.2, 
+                    mainAxisSpacing: 6.0,   
+                    crossAxisSpacing: 6.0, 
                     children: snapshot.data!.map((product) {
                       return InkWell(
                         onTap: () {
                           widget.onProductSelected(product);
                         },
-                        child: buildProductButton(
-                            "${product.designation} (${product.categoryName ?? 'Sans catégorie'})"),
+                        child: Container(
+                          margin: const EdgeInsets.all(2.0),
+                          decoration: BoxDecoration(
+                            color: skyBlue,
+                            borderRadius: BorderRadius.circular(17),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "${product.designation} (${product.categoryName ?? 'Sans catégorie'})",
+                              style: TextStyle(
+                                color: white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
                       );
                     }).toList(),
                   );
@@ -187,6 +208,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   Widget buildProductButton(String text) {
     return Container(
       margin: const EdgeInsets.all(2.0),
+      padding: const EdgeInsets.all(8.0), // Ajouter du padding
       decoration: BoxDecoration(
         color: skyBlue,
         borderRadius: BorderRadius.circular(8),
@@ -197,7 +219,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
           style: TextStyle(
             color: white,
             fontWeight: FontWeight.bold,
-            fontSize: 12,
+            fontSize: 14, // Augmenter la taille du texte
           ),
           textAlign: TextAlign.center,
         ),
@@ -207,53 +229,57 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   // Category button uses deep blue border with a light blue background.
   Widget buildCategoryButton(String? name, String? imagePath) {
-    final categoryName = name ?? 'Unknown Category';
-    final categoryImagePath = imagePath ?? 'assets/images/default.jpg';
+    final categoryName = name ?? 'Catégorie inconnue';
+    final defaultImage = 'assets/images/categorie.png';
+
+    final isLocalFile = imagePath != null &&
+        imagePath.isNotEmpty &&
+        !imagePath.startsWith('assets/');
+    final categoryImagePath = (isLocalFile && File(imagePath!).existsSync())
+        ? imagePath
+        : defaultImage;
 
     return GestureDetector(
       onTap: () {
         print("Category Selected: $categoryName");
       },
       child: Container(
-        margin: const EdgeInsets.all(6.0),
-        width: 80,
-        height: 80,
+        margin: const EdgeInsets.all(4.0),
+        width: 80, // Taille plus petite
+        height: 80, // Taille plus petite
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: skyBlue.withOpacity(0.1), // light sky blue background
-          border: Border.all(color: deepBlue, width: 2),
+          color: skyBlue.withOpacity(0.1),
+          border:
+              Border.all(color: deepBlue, width: 1.5), // Réduire l'épaisseur
+          borderRadius:
+              BorderRadius.circular(30), // Coins arrondis au lieu de cercle
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ClipOval(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(30),
               child: categoryImagePath.startsWith('assets/')
                   ? Image.asset(
                       categoryImagePath,
-                      width: 100,
+                      width: 100, // Réduire la taille de l'image
                       height: 100,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(Icons.error, size: 60, color: lightGray);
-                      },
                     )
-                  : (File(categoryImagePath).existsSync()
-                      ? Image.file(
-                          File(categoryImagePath),
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                        )
-                      : Icon(Icons.error, size: 60, color: lightGray)),
+                  : Image.file(
+                      File(categoryImagePath),
+                      width: 100, // Réduire la taille de l'image
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             SizedBox(
-              width: 60,
               child: Text(
                 categoryName,
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 12,
+                  fontSize: 15, // Réduire la taille du texte
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
