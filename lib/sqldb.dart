@@ -385,6 +385,24 @@ class SqlDb {
     );
   }
 
+  Future<Product?> getDesignationByCode(String code) async {
+    final dbClient = await db;
+    final List<Map<String, Object?>> result = await dbClient.query(
+      'products',
+      where: 'code = ?',
+      whereArgs: [code],
+      limit: 1, // Limit the result to 1 row
+    );
+
+    if (result.isNotEmpty) {
+      // Convert the first row to a Product object
+      return Product.fromMap(result.first);
+    } else {
+      // No product found with the given code
+      return null;
+    }
+  }
+
   Future<int> addCategory(String name, String imagePath) async {
     final dbClient = await db;
     return await dbClient.insert(
