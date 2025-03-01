@@ -217,7 +217,6 @@ class _AddCategoryState extends State<AddCategory> {
             const SizedBox(height: 16),
 
             // Category Dropdown
-            // Category Dropdown
             DropdownButtonFormField<int>(
               value: selectedCategoryId,
               hint: const Text(

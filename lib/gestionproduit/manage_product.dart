@@ -15,6 +15,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   final TextEditingController _searchController = TextEditingController();
+  List<Product> _selectedProducts = [];
 
   @override
   void initState() {
@@ -49,7 +50,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
     });
   }
 
-  Future<void> _confirmDeleteProduct(String productCode) async {
+  Future<void> _confirmDelete({Product? singleProduct}) async {
     TextEditingController _confirmController = TextEditingController();
     bool isConfirmed = false;
 
@@ -75,9 +76,11 @@ class _ManageProductPageState extends State<ManageProductPage> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Tapez "confirmer" pour supprimer ce produit :',
-                    style: TextStyle(fontSize: 16),
+                  Text(
+                    singleProduct != null
+                        ? 'Tapez "confirmer" pour supprimer ce produit :'
+                        : 'Tapez "confirmer" pour supprimer les produits sélectionnés :',
+                    style: const TextStyle(fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 15),
@@ -85,7 +88,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                     controller: _confirmController,
                     onChanged: (value) {
                       setState(() {
-                        isConfirmed = (value.toLowerCase().trim() == "confirmer");
+                        isConfirmed =
+                            (value.toLowerCase().trim() == "confirmer");
                       });
                     },
                     decoration: InputDecoration(
@@ -110,11 +114,16 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   onPressed: isConfirmed
                       ? () async {
                           Navigator.of(context).pop();
-                          await _deleteProduct(productCode);
+                          if (singleProduct != null) {
+                            await _deleteProducts([singleProduct]);
+                          } else {
+                            await _deleteProducts(_selectedProducts);
+                          }
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isConfirmed ? Colors.red : Colors.grey[400],
+                    backgroundColor:
+                        isConfirmed ? Colors.red : Colors.grey[400],
                   ),
                   child: const Text('Supprimer'),
                 ),
@@ -126,15 +135,38 @@ class _ManageProductPageState extends State<ManageProductPage> {
     );
   }
 
-  Future<void> _deleteProduct(String productCode) async {
-    await sqldb.deleteProduct(productCode);
+  Future<void> _deleteProducts(List<Product> products) async {
+    for (var product in products) {
+      await sqldb.deleteProduct(product.code);
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Produit $productCode supprimé avec succès"),
+        content: Text("${products.length} produits supprimés avec succès"),
         backgroundColor: Colors.green,
       ),
     );
+    _selectedProducts.clear();
     _loadProducts(); // Recharge directement la liste des produits
+  }
+
+  void _toggleProductSelection(Product product) {
+    setState(() {
+      if (_selectedProducts.contains(product)) {
+        _selectedProducts.remove(product);
+      } else {
+        _selectedProducts.add(product);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedProducts.length == _filteredProducts.length) {
+        _selectedProducts.clear(); // Désélectionner tout
+      } else {
+        _selectedProducts = List.from(_filteredProducts); // Sélectionner tout
+      }
+    });
   }
 
   @override
@@ -162,6 +194,22 @@ class _ManageProductPageState extends State<ManageProductPage> {
               );
             },
           ),
+          if (_filteredProducts.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                _selectedProducts.length == _filteredProducts.length
+                    ? Icons.deselect
+                    : Icons.select_all,
+                color: Colors.white,
+              ),
+              onPressed:
+                  _toggleSelectAll, // Sélectionner ou désélectionner tout
+            ),
+          if (_selectedProducts.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.white),
+              onPressed: _confirmDelete,
+            ),
         ],
       ),
       body: Column(
@@ -187,7 +235,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                 ? const Center(
                     child: Text(
                       'Aucun produit trouvé',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   )
                 : ListView.builder(
@@ -195,6 +244,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                     itemCount: _filteredProducts.length,
                     itemBuilder: (context, index) {
                       final product = _filteredProducts[index];
+                      final isSelected = _selectedProducts.contains(product);
                       return Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -203,16 +253,16 @@ class _ManageProductPageState extends State<ManageProductPage> {
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(15),
-                          leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF26A9E0),
-                            child: Text(
-                              product.designation[0].toUpperCase(),
-                              style: const TextStyle(color: Colors.white),
-                            ),
+                          leading: Checkbox(
+                            value: isSelected,
+                            onChanged: (value) {
+                              _toggleProductSelection(product);
+                            },
                           ),
                           title: Text(
                             product.designation,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             'Code: ${product.code} - Stock: ${product.stock}',
@@ -222,7 +272,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit, color: Color(0xFF009688)),
+                                icon: const Icon(Icons.edit,
+                                    color: Color(0xFF009688)),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -236,10 +287,10 @@ class _ManageProductPageState extends State<ManageProductPage> {
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
-                                onPressed: () {
-                                  _confirmDeleteProduct(product.code);
-                                },
+                                icon: const Icon(Icons.delete,
+                                    color: Color(0xFFE53935)),
+                                onPressed: () =>
+                                    _confirmDelete(singleProduct: product),
                               ),
                             ],
                           ),
