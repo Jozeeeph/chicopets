@@ -25,6 +25,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   final SqlDb sqldb = SqlDb();
   late Future<List<Category>> categories;
   late Future<List<Product>> products;
+  int? selectedCategoryId; // Track the selected category ID
 
   // Define the color palette
   final Color deepBlue = const Color(0xFF0056A6); // Primary deep blue
@@ -52,25 +53,17 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   Future<List<Category>> _fetchCategories() async {
     try {
       // Fetch categories from the database
-      final categoriesMap =
-          await sqldb.getCategories(); // Assuming it gets categories only
+      final categoriesMap = await sqldb.getCategories();
       List<Category> categoriesList = [];
 
-      // Iterate through each category (map is now a Category object)
       for (var category in categoriesMap) {
-        // Fetch subcategories for this category using the 'id_category' property of the Category object
-        var subCategoryMaps = await sqldb.getSubCategoriesByCategory(
-            category.id!); // Use category.id or category.id_category
-
-        // Map the subcategories from the map into SubCategory objects
+        var subCategoryMaps = await sqldb.getSubCategoriesByCategory(category.id!);
         List<SubCategory> subCategories = subCategoryMaps
             .map((subCategoryMap) => SubCategory.fromMap(subCategoryMap))
             .toList();
 
-        // Create a Category object with its subcategories
         Category categoryWithSubCategories = Category.fromMap(
-          category
-              .toMap(), // Convert the category object back to a map if needed
+          category.toMap(),
           subCategories: subCategories,
         );
         categoriesList.add(categoryWithSubCategories);
@@ -79,19 +72,25 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       return categoriesList;
     } catch (e) {
       print("Error fetching categories: $e");
-      return []; // Return empty list in case of error
+      return [];
     }
   }
 
   Future<List<Product>> _fetchProducts() async {
     try {
       final productsMap = await sqldb.getProducts();
-      print("Fetched products: $productsMap"); // Log the fetched products
+      print("Fetched products: $productsMap");
       return productsMap.toList();
     } catch (e) {
       print("Error fetching products: $e");
-      return []; // Return an empty list in case of error
+      return [];
     }
+  }
+
+  void _onCategorySelected(int categoryId) {
+    setState(() {
+      selectedCategoryId = categoryId;
+    });
   }
 
   @override
@@ -121,9 +120,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   return GridView.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3, 
-                      childAspectRatio:
-                          1.5, 
+                      crossAxisCount: 3,
+                      childAspectRatio: 1.5,
                       mainAxisSpacing: 30.0,
                       crossAxisSpacing: 30.0,
                     ),
@@ -132,7 +130,10 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     itemBuilder: (context, index) {
                       final category = snapshot.data![index];
                       return buildCategoryButton(
-                          category.name, category.imagePath);
+                        category.name,
+                        category.imagePath,
+                        category.id!,
+                      );
                     },
                   );
                 },
@@ -162,14 +163,19 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         child: Text('Aucun produit disponible'));
                   }
 
+                  // Filter products based on the selected category
+                  final filteredProducts = selectedCategoryId == null
+                      ? snapshot.data!
+                      : snapshot.data!
+                          .where((product) => product.categoryId == selectedCategoryId)
+                          .toList();
+
                   return GridView.count(
-                    crossAxisCount: 6, 
-                    
-                    childAspectRatio:
-                        1.2, 
-                    mainAxisSpacing: 6.0,   
-                    crossAxisSpacing: 6.0, 
-                    children: snapshot.data!.map((product) {
+                    crossAxisCount: 6,
+                    childAspectRatio: 1.2,
+                    mainAxisSpacing: 6.0,
+                    crossAxisSpacing: 6.0,
+                    children: filteredProducts.map((product) {
                       return InkWell(
                         onTap: () {
                           widget.onProductSelected(product);
@@ -204,31 +210,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     );
   }
 
-  // Product button uses sky blue background and white text.
-  Widget buildProductButton(String text) {
-    return Container(
-      margin: const EdgeInsets.all(2.0),
-      padding: const EdgeInsets.all(8.0), // Ajouter du padding
-      decoration: BoxDecoration(
-        color: skyBlue,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          text,
-          style: TextStyle(
-            color: white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14, // Augmenter la taille du texte
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  // Category button uses deep blue border with a light blue background.
-  Widget buildCategoryButton(String? name, String? imagePath) {
+  Widget buildCategoryButton(String? name, String? imagePath, int categoryId) {
     final categoryName = name ?? 'Catégorie inconnue';
     final defaultImage = 'assets/images/categorie.png';
 
@@ -241,18 +223,16 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
     return GestureDetector(
       onTap: () {
-        print("Category Selected: $categoryName");
+        _onCategorySelected(categoryId);
       },
       child: Container(
         margin: const EdgeInsets.all(4.0),
-        width: 80, // Taille plus petite
-        height: 80, // Taille plus petite
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           color: skyBlue.withOpacity(0.1),
-          border:
-              Border.all(color: deepBlue, width: 1.5), // Réduire l'épaisseur
-          borderRadius:
-              BorderRadius.circular(30), // Coins arrondis au lieu de cercle
+          border: Border.all(color: deepBlue, width: 1.5),
+          borderRadius: BorderRadius.circular(30),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -262,13 +242,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               child: categoryImagePath.startsWith('assets/')
                   ? Image.asset(
                       categoryImagePath,
-                      width: 100, // Réduire la taille de l'image
+                      width: 100,
                       height: 100,
                       fit: BoxFit.cover,
                     )
                   : Image.file(
                       File(categoryImagePath),
-                      width: 100, // Réduire la taille de l'image
+                      width: 100,
                       height: 100,
                       fit: BoxFit.cover,
                     ),
@@ -279,7 +259,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                 categoryName,
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 15, // Réduire la taille du texte
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
