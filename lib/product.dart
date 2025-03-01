@@ -11,6 +11,7 @@ class Product {
   int subCategoryId;
   String? subCategoryName;
   int isDeleted; // Nouvelle colonne
+  double marge; // Nouveau champ pour la marge %
 
   Product({
     required this.code,
@@ -25,7 +26,13 @@ class Product {
     required this.subCategoryId,
     this.subCategoryName,
     this.isDeleted = 0, // Valeur par défaut 0 (non supprimé)
+    required this.marge, // Nouveau champ
   });
+
+  // Méthode pour calculer la marge %
+  double calculateMargePercentage() {
+    return ((prixTTC - prixHT) / prixHT) * 100;
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -40,7 +47,8 @@ class Product {
       'sub_category_id': subCategoryId,
       'category_name': categoryName,
       'sub_category_name': subCategoryName,
-      'is_deleted': isDeleted, // Nouvelle colonne
+      'is_deleted': isDeleted,
+      'marge': marge, // Nouveau champ
     };
   }
 
@@ -57,12 +65,13 @@ class Product {
       categoryName: map['category_name'],
       subCategoryId: map['sub_category_id'] ?? 0,
       subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
-      isDeleted: map['is_deleted'] ?? 0, // Valeur par défaut
+      isDeleted: map['is_deleted'] ?? 0,
+      marge: map['marge'] ?? 0.0, // Nouveau champ
     );
   }
 
   @override
   String toString() {
-    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryId: $subCategoryId, subCategoryName: ${subCategoryName ?? "N/A"}, isDeleted: $isDeleted)';
+    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryId: $subCategoryId, subCategoryName: ${subCategoryName ?? "N/A"}, isDeleted: $isDeleted, marge: $marge%)';
   }
 }

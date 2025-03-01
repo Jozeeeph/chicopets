@@ -37,16 +37,22 @@ class _ImportProductPageState extends State<ImportProductPage> {
             String code = row[0]?.value.toString() ?? '';
             String designation = row[1]?.value.toString() ?? '';
             int stock = int.tryParse(row[2]?.value.toString() ?? '0') ?? 0;
-            double prixHT = double.tryParse(row[3]?.value.toString() ?? '0.0') ?? 0.0;
-            double taxe = double.tryParse(row[4]?.value.toString() ?? '0.0') ?? 0.0;
-            double prixTTC = double.tryParse(row[5]?.value.toString() ?? '0.0') ?? 0.0;
+            double prixHT =
+                double.tryParse(row[3]?.value.toString() ?? '0.0') ?? 0.0;
+            double taxe =
+                double.tryParse(row[4]?.value.toString() ?? '0.0') ?? 0.0;
+            double prixTTC =
+                double.tryParse(row[5]?.value.toString() ?? '0.0') ?? 0.0;
             String dateExpiration = row[6]?.value.toString() ?? '';
             String categoryName = row[7]?.value.toString() ?? '';
             String subCategoryName = row[8]?.value.toString() ?? '';
-            String categoryImagePath = row[9]?.value.toString() ?? 'assets/images/default.jpg';
+            String categoryImagePath =
+                row[9]?.value.toString() ?? 'assets/images/default.jpg';
 
-            int categoryId = await _getOrCreateCategoryIdByName(categoryName, categoryImagePath);
-            int subCategoryId = await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
+            int categoryId = await _getOrCreateCategoryIdByName(
+                categoryName, categoryImagePath);
+            int subCategoryId = await _getOrCreateSubCategoryIdByName(
+                subCategoryName, categoryId);
 
             await _sqlDb.addProduct(
               code,
@@ -58,6 +64,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               dateExpiration,
               categoryId,
               subCategoryId,
+              prixTTC - prixHT, // Add marge as the 10th argument
             );
           }
         }
@@ -65,7 +72,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Importation réussie!')),
         );
-            }
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors de l\'importation: $e')),
@@ -73,7 +80,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
-  Future<int> _getOrCreateCategoryIdByName(String categoryName, String categoryImagePath) async {
+  Future<int> _getOrCreateCategoryIdByName(
+      String categoryName, String categoryImagePath) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'categories',
@@ -93,7 +101,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
-  Future<int> _getOrCreateSubCategoryIdByName(String subCategoryName, int categoryId) async {
+  Future<int> _getOrCreateSubCategoryIdByName(
+      String subCategoryName, int categoryId) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'sub_categories',
@@ -122,7 +131,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Importer des produits', style: TextStyle(color: Colors.white)),
+        title: const Text('Importer des produits',
+            style: TextStyle(color: Colors.white)),
       ),
       body: Container(
         decoration: const BoxDecoration(
