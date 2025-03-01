@@ -21,7 +21,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-   await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -47,7 +47,8 @@ class SqlDb {
       sub_category_id INTEGER,
       category_name TEXT,
       sub_category_name TEXT,
-      is_deleted INTEGER DEFAULT 0
+      is_deleted INTEGER DEFAULT 0,
+      marge REAL
     );
 ''');
         print("Products table created");
@@ -182,7 +183,7 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
-    int subCategoryId,
+    int subCategoryId, double d,
   ) async {
     final dbClient = await db;
     await dbClient.insert(

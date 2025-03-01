@@ -13,6 +13,7 @@ class Addprod {
     final TextEditingController priceTTCController = TextEditingController();
     final TextEditingController taxController = TextEditingController();
     final TextEditingController dateController = TextEditingController();
+    final TextEditingController margeController = TextEditingController();
     final SqlDb sqldb = SqlDb();
 
     int? selectedCategoryId;
@@ -27,8 +28,13 @@ class Addprod {
         double taxe = double.tryParse(taxController.text) ?? 0.0;
         double prixTTC = prixHT + (prixHT * taxe / 100);
         priceTTCController.text = prixTTC.toStringAsFixed(2);
+
+        // Calculate marge automatically
+        double marge = prixTTC - prixHT;
+        margeController.text = marge.toStringAsFixed(2);
       } else {
         priceTTCController.clear();
+        margeController.clear();
       }
     }
 
@@ -80,8 +86,9 @@ class Addprod {
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return const CircularProgressIndicator(
-                                color: Color(0xFF0056A6), // Deep Blue for loader
-                            );
+                                color:
+                                    Color(0xFF0056A6), // Deep Blue for loader
+                              );
                             }
 
                             categories = snapshot.data!;
@@ -90,11 +97,13 @@ class Addprod {
                               value: selectedCategoryId,
                               items: categories.map((category) {
                                 return DropdownMenuItem<int>(
-                                  value: category.id,
-                                  child: Text(
-                                    category.name,
-                                    style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
-                                ));
+                                    value: category.id,
+                                    child: Text(
+                                      category.name,
+                                      style: const TextStyle(
+                                          color: Color(
+                                              0xFF0056A6)), // Deep Blue text
+                                    ));
                               }).toList(),
                               onChanged: (val) {
                                 setState(() {
@@ -107,7 +116,9 @@ class Addprod {
                                             value: subCat.id,
                                             child: Text(
                                               subCat.name,
-                                              style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                                              style: const TextStyle(
+                                                  color: Color(
+                                                      0xFF0056A6)), // Deep Blue text
                                             ),
                                           ))
                                       .toList();
@@ -140,13 +151,16 @@ class Addprod {
                           children: [
                             const Text(
                               "Ajouter une catégorie:",
-                              style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                              style: TextStyle(
+                                  color: Color(0xFF0056A6)), // Deep Blue text
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add, color: Color(0xFF26A9E0)), // Sky Blue icon
+                              icon: const Icon(Icons.add,
+                                  color: Color(0xFF26A9E0)), // Sky Blue icon
                               onPressed: () {
                                 setState(() {
-                                  isCategoryFormVisible = !isCategoryFormVisible;
+                                  isCategoryFormVisible =
+                                      !isCategoryFormVisible;
                                 });
                               },
                             ),
@@ -160,14 +174,17 @@ class Addprod {
               ),
               actions: [
                 ElevatedButton(
-                  style: _buttonStyle(const Color(0xFF009688)), // Teal Green for success
+                  style: _buttonStyle(
+                      const Color(0xFF009688)), // Teal Green for success
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
                       if (selectedSubCategoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text("Veuillez sélectionner une sous-catégorie"),
-                            backgroundColor: Color(0xFFE53935), // Warm Red for error
+                            content: Text(
+                                "Veuillez sélectionner une sous-catégorie"),
+                            backgroundColor:
+                                Color(0xFFE53935), // Warm Red for error
                           ),
                         );
                         return;
@@ -183,25 +200,28 @@ class Addprod {
                         dateController.text,
                         selectedCategoryId!,
                         selectedSubCategoryId!,
+                        double.tryParse(margeController.text) ?? 0.0,
                       );
-
                       refreshData();
                       Navigator.of(context).pop();
                     }
                   },
                   child: const Text(
                     'Ajouter',
-                    style: TextStyle(color: Colors.white), // White text for contrast
+                    style: TextStyle(
+                        color: Colors.white), // White text for contrast
                   ),
                 ),
                 ElevatedButton(
-                  style: _buttonStyle(const Color(0xFFE53935)), // Warm Red for cancel
+                  style: _buttonStyle(
+                      const Color(0xFFE53935)), // Warm Red for cancel
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
                   child: const Text(
                     'Annuler',
-                    style: TextStyle(color: Colors.white), // White text for contrast
+                    style: TextStyle(
+                        color: Colors.white), // White text for contrast
                   ),
                 ),
               ],
@@ -215,14 +235,17 @@ class Addprod {
   static InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      labelStyle:
+          const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+        borderSide:
+            const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+        borderSide:
+            const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
       ),
     );
   }

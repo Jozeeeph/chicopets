@@ -57,7 +57,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       List<Category> categoriesList = [];
 
       for (var category in categoriesMap) {
-        var subCategoryMaps = await sqldb.getSubCategoriesByCategory(category.id!);
+        var subCategoryMaps =
+            await sqldb.getSubCategoriesByCategory(category.id!);
         List<SubCategory> subCategories = subCategoryMaps
             .map((subCategoryMap) => SubCategory.fromMap(subCategoryMap))
             .toList();
@@ -167,7 +168,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   final filteredProducts = selectedCategoryId == null
                       ? snapshot.data!
                       : snapshot.data!
-                          .where((product) => product.categoryId == selectedCategoryId)
+                          .where((product) =>
+                              product.categoryId == selectedCategoryId)
                           .toList();
 
                   return GridView.count(

@@ -28,7 +28,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController priceTTCController = TextEditingController();
   final TextEditingController taxController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
+  final TextEditingController margeController =
+      TextEditingController(); // Marge controller
   final SqlDb sqldb = SqlDb();
+  double? selectedTax;
 
   int? selectedCategoryId;
   int? selectedSubCategoryId;
@@ -50,20 +53,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
       dateController.text = widget.product!.dateExpiration;
       selectedCategoryId = widget.product!.categoryId;
       selectedSubCategoryId = widget.product!.subCategoryId;
+
+      // Calculate and set the marge
+      double marge = widget.product!.prixTTC - widget.product!.prixHT;
+      margeController.text = marge.toStringAsFixed(2);
     }
 
     taxController.addListener(calculatePriceTTC);
     priceHTController.addListener(calculatePriceTTC);
   }
 
+  // Calculate Prix TTC and Marge automatically
   void calculatePriceTTC() {
     if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
       double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
       double taxe = double.tryParse(taxController.text) ?? 0.0;
       double prixTTC = prixHT + (prixHT * taxe / 100);
       priceTTCController.text = prixTTC.toStringAsFixed(2);
+
+      // Calculate marge automatically
+      double marge = prixTTC - prixHT;
+      margeController.text = marge.toStringAsFixed(2);
     } else {
       priceTTCController.clear();
+      margeController.clear();
     }
   }
 
@@ -74,13 +87,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
         title: widget.product == null
             ? const Text(
                 'Ajouter un Produit',
-                style: TextStyle(color: Colors.white), // White text for contrast
+                style: TextStyle(color: Colors.white),
               )
             : const Text(
                 'Modifier le Produit',
-                style: TextStyle(color: Colors.white), // White text for contrast
+                style: TextStyle(color: Colors.white),
               ),
-        backgroundColor: const Color(0xFF0056A6), // Deep Blue for app bar
+        backgroundColor: const Color(0xFF0056A6),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -135,11 +148,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                       _buildTextFormField(
                         controller: priceHTController,
-                        label: 'Prix dachat',
+                        label: 'Prix d\'achat',
                         keyboardType: TextInputType.number,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Le champ "Prix dachat" ne doit pas être vide.';
+                            return 'Le champ "Prix d\'achat" ne doit pas être vide.';
                           }
                           if (double.tryParse(value) == null ||
                               double.parse(value) <= 0) {
@@ -148,25 +161,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
-                      _buildTextFormField(
-                        controller: taxController,
-                        label: 'Taxe (%)',
-                        keyboardType: TextInputType.number,
+                      DropdownButtonFormField<double>(
+                        decoration: _inputDecoration('Taxe (%)'),
+                        value: selectedTax,
+                        items: const [
+                          DropdownMenuItem(value: 0.0, child: Text('0%')),
+                          DropdownMenuItem(value: 7.0, child: Text('7%')),
+                          DropdownMenuItem(value: 12.0, child: Text('12%')),
+                          DropdownMenuItem(value: 19.0, child: Text('19%')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            selectedTax = value;
+                            taxController.text = value.toString();
+                          });
+                          calculatePriceTTC();
+                        },
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Taxe (%)" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'La taxe doit être un nombre positif.';
+                          if (value == null) {
+                            return 'Veuillez sélectionner une taxe.';
                           }
                           return null;
                         },
                       ),
+                      const SizedBox(height: 16),
                       _buildTextFormField(
                         controller: priceTTCController,
                         label: 'Prix TTC',
                         enabled: false,
+                      ),
+                      _buildTextFormField(
+                        controller: margeController,
+                        label: 'Marge',
+                        enabled: false, // Marge is read-only
                       ),
                       _buildTextFormField(
                         controller: dateController,
@@ -189,7 +216,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           for (String format in possibleFormats) {
                             try {
                               date = DateFormat(format).parseStrict(value);
-                              break; // Dès qu'un format fonctionne, on arrête la boucle
+                              break;
                             } catch (e) {
                               continue;
                             }
@@ -217,14 +244,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) {
                                   return const CircularProgressIndicator(
-                                    color: Color(0xFF0056A6), // Deep Blue for loader
+                                    color: Color(0xFF0056A6),
                                   );
                                 }
                                 categories = snapshot.data!;
                                 if (categories.isEmpty) {
                                   return const Text(
                                     "Aucune catégorie disponible",
-                                    style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
+                                    style: TextStyle(color: Color(0xFF0056A6)),
                                   );
                                 }
                                 return DropdownButtonFormField<int>(
@@ -232,11 +259,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   value: selectedCategoryId,
                                   items: categories.map((cat) {
                                     return DropdownMenuItem<int>(
-                                      value: cat.id,
-                                      child: Text(
-                                        cat.name,
-                                        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
-                                    ));
+                                        value: cat.id,
+                                        child: Text(
+                                          cat.name,
+                                          style: const TextStyle(
+                                              color: Colors.black),
+                                        ));
                                   }).toList(),
                                   onChanged: (val) {
                                     setState(() {
@@ -245,13 +273,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                       subCategoryItems = categories
                                           .firstWhere((cat) => cat.id == val)
                                           .subCategories
-                                          .map((subCat) => DropdownMenuItem<int>(
-                                                value: subCat.id,
-                                                child: Text(
-                                                  subCat.name,
-                                                  style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
-                                                ),
-                                              ))
+                                          .map(
+                                              (subCat) => DropdownMenuItem<int>(
+                                                    value: subCat.id,
+                                                    child: Text(
+                                                      subCat.name,
+                                                      style: const TextStyle(
+                                                          color: Colors.black),
+                                                    ),
+                                                  ))
                                           .toList();
                                     });
                                   },
@@ -268,7 +298,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           const SizedBox(width: 10),
                           // Add category button
                           IconButton(
-                            icon: const Icon(Icons.add, color: Color(0xFF26A9E0)), // Sky Blue icon
+                            icon:
+                                const Icon(Icons.add, color: Color(0xFF26A9E0)),
                             onPressed: () {
                               setState(() {
                                 isCategoryFormVisible = !isCategoryFormVisible;
@@ -303,7 +334,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               ),
 
-              const VerticalDivider(width: 20, thickness: 2, color: Color(0xFFE0E0E0)), // Light Gray divider
+              const VerticalDivider(
+                  width: 20, thickness: 2, color: Color(0xFFE0E0E0)),
 
               // Right Side: Category Form (Visible on "+" Click)
               Expanded(
@@ -330,9 +362,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 SnackBar(
                   content: const Text(
                     'Veuillez sélectionner une catégorie et une sous-catégorie.',
-                    style: TextStyle(color: Colors.white), // White text for contrast
+                    style: TextStyle(color: Colors.white),
                   ),
-                  backgroundColor: const Color(0xFFE53935), // Warm Red for error
+                  backgroundColor: const Color(0xFFE53935),
                 ),
               );
               return;
@@ -348,6 +380,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               dateExpiration: dateController.text,
               categoryId: selectedCategoryId!,
               subCategoryId: selectedSubCategoryId!,
+              marge:
+                  double.tryParse(margeController.text) ?? 0.0, // Include marge
             );
 
             if (widget.product == null) {
@@ -362,6 +396,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 dateController.text,
                 selectedCategoryId!,
                 selectedSubCategoryId!,
+                double.tryParse(margeController.text) ?? 0.0, // Include marge
               );
             } else {
               // Editing the existing product
@@ -373,8 +408,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
             Navigator.of(context).pop();
           }
         },
-        backgroundColor: const Color(0xFF009688), // Teal Green for FAB
-        child: const Icon(Icons.save, color: Colors.white), // White icon for contrast
+        backgroundColor: const Color(0xFF009688),
+        child: const Icon(Icons.save, color: Colors.white),
       ),
     );
   }
@@ -394,7 +429,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         keyboardType: keyboardType,
         enabled: enabled,
         validator: validator,
-        style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Deep Blue text
+        style: const TextStyle(color: Colors.black),
       ),
     );
   }
@@ -402,14 +437,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      labelStyle: const TextStyle(color: Color(0xFF0056A6)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
+        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+        borderSide: const BorderSide(color: Color(0xFF26A9E0)),
       ),
     );
   }
