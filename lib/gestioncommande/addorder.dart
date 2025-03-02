@@ -33,6 +33,25 @@ class Addorder {
       return;
     }
 
+    String cleanInput(String input) {
+      // Remplace tout ce qui n'est pas un chiffre ou un point décimal
+      input = input.replaceAll(RegExp(r'[^0-9.]'), '');
+
+      // Empêcher plusieurs points décimaux
+      List<String> parts = input.split('.');
+      if (parts.length > 2) {
+        input = parts[0] + '.' + parts.sublist(1).join('');
+      }
+
+      // Vérifier si le nombre est positif
+      double? value = double.tryParse(input);
+      if (value != null && value < 0) {
+        return 'NEGATIVE'; // Code spécial pour signaler un nombre négatif
+      }
+
+      return input;
+    }
+
     double amountGiven = 0.0;
     double changeReturned = 0.0;
     TextEditingController amountGivenController = TextEditingController();
@@ -91,8 +110,7 @@ class Addorder {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                fontFamily:
-                                    'Courier', // Monospace for receipt style
+                                // Monospace for receipt style
                               ),
                             ),
                           ),
@@ -111,9 +129,9 @@ class Addorder {
                                   child: Text(
                                     "Qt",
                                     style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 Expanded(
@@ -121,9 +139,9 @@ class Addorder {
                                   child: Text(
                                     "Article",
                                     style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 Expanded(
@@ -131,9 +149,9 @@ class Addorder {
                                   child: Text(
                                     "Prix U",
                                     style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -142,9 +160,9 @@ class Addorder {
                                   child: Text(
                                     "Montant",
                                     style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Courier'),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                     textAlign: TextAlign.end,
                                   ),
                                 ),
@@ -171,8 +189,8 @@ class Addorder {
                                       child: Text(
                                         "${quantityProducts[index]}X",
                                         style: TextStyle(
-                                            fontSize: 16,
-                                            fontFamily: 'Courier'),
+                                          fontSize: 16,
+                                        ),
                                       ),
                                     ),
                                     Expanded(
@@ -180,8 +198,8 @@ class Addorder {
                                       child: Text(
                                         product.designation,
                                         style: TextStyle(
-                                            fontSize: 16,
-                                            fontFamily: 'Courier'),
+                                          fontSize: 16,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -190,8 +208,8 @@ class Addorder {
                                       child: Text(
                                         "${product.prixTTC.toStringAsFixed(2)} DT",
                                         style: TextStyle(
-                                            fontSize: 16,
-                                            fontFamily: 'Courier'),
+                                          fontSize: 16,
+                                        ),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -200,9 +218,9 @@ class Addorder {
                                       child: Text(
                                         "${(product.prixTTC * quantityProducts[index]).toStringAsFixed(2)} DT",
                                         style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            fontFamily: 'Courier'),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                         textAlign: TextAlign.end,
                                       ),
                                     ),
@@ -224,16 +242,16 @@ class Addorder {
                               Text(
                                 "Total:",
                                 style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Courier'),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               Text(
                                 "${total.toStringAsFixed(2)} DT", // Display total from order
                                 style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'Courier'),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -302,7 +320,33 @@ class Addorder {
                           ),
                           onChanged: (value) {
                             setState(() {
-                              amountGiven = double.tryParse(value) ?? 0.0;
+                              String cleanedValue = cleanInput(value);
+
+                              // Vérifier si le nombre est négatif
+                              if (cleanedValue == 'NEGATIVE') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Veuillez entrer un nombre positif.",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                amountGivenController.text = '';
+                                return;
+                              }
+
+                              // Appliquer la valeur nettoyée
+                              amountGivenController.text = cleanedValue;
+                              amountGivenController.selection =
+                                  TextSelection.fromPosition(
+                                TextPosition(offset: cleanedValue.length),
+                              );
+
+                              // Calcul du rendu de monnaie
+                              amountGiven =
+                                  double.tryParse(cleanedValue) ?? 0.0;
                               changeReturned = amountGiven - total;
                               changeReturnedController.text =
                                   changeReturned.toStringAsFixed(2);

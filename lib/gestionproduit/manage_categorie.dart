@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
-import 'dart:io';
 
 class ManageCategoriePage extends StatefulWidget {
   const ManageCategoriePage({super.key});
@@ -16,6 +15,8 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   List<Category> _categories = [];
   List<Category> _filteredCategories = [];
   final TextEditingController _searchController = TextEditingController();
+  List<Category> _selectedCategories =
+      []; // Pour stocker les catégories sélectionnées
 
   @override
   void initState() {
@@ -69,7 +70,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       context,
       MaterialPageRoute(builder: (context) => const AddCategory()),
     );
-    fetchCategories(); // Refresh the list after adding a category
+    fetchCategories(); // Rafraîchir la liste après l'ajout d'une catégorie
   }
 
   void _editCategory(Category category) async {
@@ -80,95 +81,128 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         settings: RouteSettings(arguments: category),
       ),
     );
-    fetchCategories(); // Refresh the list after editing a category
+    fetchCategories(); // Rafraîchir la liste après la modification d'une catégorie
   }
 
-  void _deleteCategory(int id) async {
-  final TextEditingController confirmController = TextEditingController();
-  bool isConfirmed = false;
+  Future<void> _confirmDelete({Category? singleCategory}) async {
+    final TextEditingController confirmController = TextEditingController();
+    bool isConfirmed = false;
 
-  await showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            title: Row(
-              children: [
-                const Icon(Icons.warning, color: Colors.red),
-                const SizedBox(width: 10),
-                const Text(
-                  'Confirmation',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Tapez "confirmer" pour supprimer cette catégorie :',
-                  style: TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  controller: confirmController,
-                  onChanged: (value) {
-                    setState(() {
-                      isConfirmed = (value.trim().toLowerCase() == "confirmer");
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'confirmer',
-                    filled: true,
-                    fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.warning, color: Colors.red),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Confirmation',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  textAlign: TextAlign.center,
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    singleCategory != null
+                        ? 'Tapez "confirmer" pour supprimer cette catégorie :'
+                        : 'Tapez "confirmer" pour supprimer les catégories sélectionnées :',
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: confirmController,
+                    onChanged: (value) {
+                      setState(() {
+                        isConfirmed =
+                            (value.trim().toLowerCase() == "confirmer");
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'confirmer',
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: isConfirmed
+                      ? () async {
+                          Navigator.of(context).pop();
+                          if (singleCategory != null) {
+                            await _deleteCategories([singleCategory]);
+                          } else {
+                            await _deleteCategories(_selectedCategories);
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isConfirmed ? Colors.red : Colors.grey[400],
+                  ),
+                  child: const Text('Supprimer'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Annuler'),
-              ),
-              ElevatedButton(
-                onPressed: isConfirmed
-                    ? () async {
-                        Navigator.of(context).pop();
-                        try {
-                          int result = await sqldb.deleteCategory(id);
-                          if (result > 0) {
-                            _showMessage("Catégorie supprimée avec succès !");
-                            fetchCategories();
-                          } else {
-                            _showMessage("Échec de la suppression de la catégorie !");
-                          }
-                        } catch (e) {
-                          _showMessage("Erreur lors de la suppression de la catégorie !");
-                        }
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isConfirmed ? Colors.red : Colors.grey[400],
-                ),
-                child: const Text('Supprimer'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteCategories(List<Category> categories) async {
+    try {
+      for (var category in categories) {
+        await sqldb.deleteCategory(category.id!);
+      }
+      _showMessage("${categories.length} catégories supprimées avec succès !");
+      _selectedCategories
+          .clear(); // Vider la liste des catégories sélectionnées
+      fetchCategories(); // Rafraîchir la liste
+    } catch (e) {
+      _showMessage("Erreur lors de la suppression des catégories !");
+    }
+  }
+
+  void _toggleCategorySelection(Category category) {
+    setState(() {
+      if (_selectedCategories.contains(category)) {
+        _selectedCategories.remove(category);
+      } else {
+        _selectedCategories.add(category);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedCategories.length == _filteredCategories.length) {
+        _selectedCategories.clear(); // Désélectionner tout
+      } else {
+        _selectedCategories =
+            List.from(_filteredCategories); // Sélectionner tout
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +220,22 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             icon: const Icon(Icons.add, color: Colors.white),
             onPressed: _navigateToAddCategory,
           ),
+          if (_filteredCategories.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                _selectedCategories.length == _filteredCategories.length
+                    ? Icons.deselect
+                    : Icons.select_all,
+                color: Colors.white,
+              ),
+              onPressed:
+                  _toggleSelectAll, // Sélectionner ou désélectionner tout
+            ),
+          if (_selectedCategories.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.white),
+              onPressed: () => _confirmDelete(),
+            ),
         ],
       ),
       body: Column(
@@ -211,7 +261,8 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                 ? const Center(
                     child: Text(
                       'Aucune catégorie trouvée',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   )
                 : ListView.builder(
@@ -219,6 +270,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                     itemCount: _filteredCategories.length,
                     itemBuilder: (context, index) {
                       final category = _filteredCategories[index];
+                      final isSelected = _selectedCategories.contains(category);
                       return Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -227,16 +279,16 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                         margin: const EdgeInsets.symmetric(vertical: 8),
                         child: ListTile(
                           contentPadding: const EdgeInsets.all(15),
-                          leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF26A9E0),
-                            child: Text(
-                              category.name[0].toUpperCase(),
-                              style: const TextStyle(color: Colors.white),
-                            ),
+                          leading: Checkbox(
+                            value: isSelected,
+                            onChanged: (value) {
+                              _toggleCategorySelection(category);
+                            },
                           ),
                           title: Text(
                             category.name,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             '${category.subCategories.length} sous-catégories',
@@ -246,16 +298,17 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.edit, color: Color(0xFF009688)),
+                                icon: const Icon(Icons.edit,
+                                    color: Color(0xFF009688)),
                                 onPressed: () {
                                   _editCategory(category);
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
-                                onPressed: () {
-                                  _deleteCategory(category.id!);
-                                },
+                                icon: const Icon(Icons.delete,
+                                    color: Color(0xFFE53935)),
+                                onPressed: () =>
+                                    _confirmDelete(singleCategory: category),
                               ),
                             ],
                           ),
