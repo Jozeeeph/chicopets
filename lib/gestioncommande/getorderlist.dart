@@ -6,6 +6,9 @@ import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+
 
 class Getorderlist {
   static Future<void> cancelOrder(
@@ -244,7 +247,8 @@ class Getorderlist {
                                             // Check if the order has any remaining order lines
                                             final dbClient = await sqldb
                                                 .db; // Access the database instance
-                                            final List<Map<String, dynamic>>remainingOrderLines =
+                                            final List<Map<String, dynamic>>
+                                                remainingOrderLines =
                                                 await dbClient.query(
                                               'order_items',
                                               where: 'id_order = ?',
@@ -568,33 +572,40 @@ class Getorderlist {
 
     pdf.addPage(
       pw.Page(
+        pageFormat: PdfPageFormat(80 * PdfPageFormat.mm, double.infinity),
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(
               child: pw.Text("Ticket de Commande",
                   style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
+                      fontWeight: pw.FontWeight.bold, fontSize: 12)),
             ),
             pw.Divider(),
 
             // Numéro de commande et date
-            pw.Text("Commande #${order.idOrder}"),
-            pw.Text("Date: ${formatDate(order.date)}"),
+            pw.Text(" Commande #${order.idOrder}",
+                style: pw.TextStyle(fontSize: 10)),
+            pw.Text(" Date: ${formatDate(order.date)}",
+                style: pw.TextStyle(fontSize: 10)),
             pw.Divider(),
 
-            // Header de la liste des articles
+            // Liste des articles avec un format compact
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Qt",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(" Qt",
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
                 pw.Text("Article",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Prix U",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Montant",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                pw.Text("PU",
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                pw.Text("Total   ",
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
               ],
             ),
             pw.Divider(),
@@ -604,11 +615,18 @@ class Getorderlist {
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text("x${orderLine.quantite}"),
-                  pw.Text(orderLine.idProduct),
-                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)} DT"),
+                  pw.Text(" x${orderLine.quantite}                ",
+                      style: pw.TextStyle(fontSize: 10)),
+                  pw.Expanded(
+                    child: pw.Text(orderLine.idProduct,
+                        style: pw.TextStyle(fontSize: 10),
+                        overflow: pw.TextOverflow.clip),
+                  ),
+                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)}  DT  ",
+                      style: pw.TextStyle(fontSize: 10)),
                   pw.Text(
-                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)}  DT ",
+                      style: pw.TextStyle(fontSize: 10)),
                 ],
               );
             }).toList(),
@@ -619,14 +637,25 @@ class Getorderlist {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Total:",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("${order.total.toStringAsFixed(2)} DT",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(" Total:",
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                pw.Text("${order.total.toStringAsFixed(2)} DT ",
+                    style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
               ],
             ),
+            pw.SizedBox(height: 5),
+            pw.Text(" Paiement: ${order.modePaiement}",
+                style: pw.TextStyle(fontSize: 10)),
             pw.SizedBox(height: 10),
-            pw.Text("Mode de Paiement: ${order.modePaiement}"),
+
+            // Message de remerciement
+            pw.Center(
+              child: pw.Text("Merci de votre visite !",
+                  style: pw.TextStyle(
+                      fontSize: 10, fontStyle: pw.FontStyle.italic)),
+            ),
           ],
         ),
       ),
