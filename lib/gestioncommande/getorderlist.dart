@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/order.dart';
+import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -125,6 +126,48 @@ class Getorderlist {
     }
   }
 
+  static Future<void> cancelOrderLine(
+      BuildContext context, Order order, OrderLine orderLine) async {
+    final SqlDb sqldb = SqlDb();
+
+    // Annuler la ligne de commande
+    await sqldb.cancelOrderLine(order.idOrder!, orderLine.idProduct);
+
+    // Restocker le produit
+    await sqldb.updateProductStock(orderLine.idProduct, orderLine.quantite);
+
+    // Recalculer le total de la commande
+    final dbClient = await sqldb.db;
+    final List<Map<String, dynamic>> remainingOrderLines = await dbClient.query(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
+
+    double newTotal = 0.0;
+    for (var line in remainingOrderLines) {
+      double prixUnitaire = line['prix_unitaire'] as double;
+      int quantite = line['quantity'] as int;
+      newTotal += prixUnitaire * quantite;
+    }
+
+    // Mettre à jour le total de la commande dans la base de données
+    await dbClient.update(
+      'orders',
+      {'total': newTotal},
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
+
+    // Mettre à jour l'objet Order localement
+    order.total = newTotal;
+    order.orderLines.removeWhere((line) => line.idProduct == orderLine.idProduct);
+
+    // Rafraîchir la liste des commandes
+    Navigator.pop(context); // Fermer la boîte de dialogue
+    showListOrdersPopUp(context); // Rouvrir la boîte de dialogue avec les données mises à jour
+  }
+
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
     List<Order> orders =
@@ -231,38 +274,8 @@ class Getorderlist {
 
                                           // If user confirms, delete the order line
                                           if (confirmDelete == true) {
-                                            // Annuler la ligne de commande
-                                            await sqldb.cancelOrderLine(
-                                                order.idOrder!,
-                                                orderLine.idProduct);
-
-                                            // Restocker le produit
-                                            await sqldb.updateProductStock(
-                                                orderLine.idProduct,
-                                                orderLine.quantite);
-
-                                            // Check if the order has any remaining order lines
-                                            final dbClient = await sqldb
-                                                .db; // Access the database instance
-                                            final List<Map<String, dynamic>>remainingOrderLines =
-                                                await dbClient.query(
-                                              'order_items',
-                                              where: 'id_order = ?',
-                                              whereArgs: [order.idOrder],
-                                            );
-                                            // If no order lines remain, delete the order
-                                            if (remainingOrderLines.isEmpty) {
-                                              await sqldb
-                                                  .deleteOrder(order.idOrder!);
-                                            }
-
-                                            // Rafraîchir la liste des commandes
-                                            orders = await sqldb
-                                                .getOrdersWithOrderLines();
-                                            Navigator.pop(
-                                                context); // Fermer la boîte de dialogue
-                                            showListOrdersPopUp(
-                                                context); // Rouvrir la boîte de dialogue avec les données mises à jour
+                                            await cancelOrderLine(
+                                                context, order, orderLine);
                                           }
                                         },
                                       ),
