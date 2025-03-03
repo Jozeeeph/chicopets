@@ -28,8 +28,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController priceTTCController = TextEditingController();
   final TextEditingController taxController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
-  final TextEditingController margeController =
-      TextEditingController(); // Marge controller
+  final TextEditingController margeController = TextEditingController();
+  final TextEditingController profitController = TextEditingController();
   final SqlDb sqldb = SqlDb();
   double? selectedTax;
 
@@ -42,7 +42,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   void initState() {
     super.initState();
-    // If a product is passed, populate the fields with the product data
     if (widget.product != null) {
       codeController.text = widget.product!.code;
       designationController.text = widget.product!.designation;
@@ -54,29 +53,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
       selectedCategoryId = widget.product!.categoryId;
       selectedSubCategoryId = widget.product!.subCategoryId;
 
-      // Calculate and set the marge
-      double marge = widget.product!.prixTTC - widget.product!.prixHT;
+      double marge = ((widget.product!.prixTTC - widget.product!.prixHT) / widget.product!.prixHT) * 100;
       margeController.text = marge.toStringAsFixed(2);
+
+      double profit = widget.product!.prixTTC - widget.product!.prixHT;
+      profitController.text = profit.toStringAsFixed(2);
     }
 
-    taxController.addListener(calculatePriceTTC);
-    priceHTController.addListener(calculatePriceTTC);
+    priceHTController.addListener(calculateValues);
+    taxController.addListener(calculateValues);
+    margeController.addListener(calculateValues);
+    profitController.addListener(calculateValues);
   }
 
-  // Calculate Prix TTC and Marge automatically
-  void calculatePriceTTC() {
-    if (priceHTController.text.isNotEmpty && taxController.text.isNotEmpty) {
-      double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-      double taxe = double.tryParse(taxController.text) ?? 0.0;
-      double prixTTC = prixHT + (prixHT * taxe / 100);
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
+  void calculateValues() {
+    double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
+    double taxe = double.tryParse(taxController.text) ?? 0.0;
+    double marge = double.tryParse(margeController.text) ?? 0.0;
+    double profit = double.tryParse(profitController.text) ?? 0.0;
 
-      // Calculate marge automatically
-      double marge = prixTTC - prixHT;
-      margeController.text = marge.toStringAsFixed(2);
-    } else {
-      priceTTCController.clear();
-      margeController.clear();
+    if (priceHTController.text.isNotEmpty && margeController.text.isNotEmpty) {
+      double prixTTC = prixHT * (1 + marge / 100);
+      priceTTCController.text = prixTTC.toStringAsFixed(2);
+      profitController.text = (prixTTC - prixHT).toStringAsFixed(2);
+    } else if (priceHTController.text.isNotEmpty && profitController.text.isNotEmpty) {
+      double prixTTC = prixHT + profit;
+      priceTTCController.text = prixTTC.toStringAsFixed(2);
+      margeController.text = ((profit / prixHT) * 100).toStringAsFixed(2);
+    }
+
+    if (taxController.text.isNotEmpty) {
+      double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
+      double prixTTCWithTax = prixTTC * (1 + taxe / 100);
+      priceTTCController.text = prixTTCWithTax.toStringAsFixed(2);
     }
   }
 
@@ -101,7 +110,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
           key: _formKey,
           child: Row(
             children: [
-              // Left Side: Product Form
               Expanded(
                 flex: 1,
                 child: SingleChildScrollView(
@@ -161,6 +169,36 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
+                      _buildTextFormField(
+                        controller: margeController,
+                        label: 'Marge (%)',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Marge (%)" ne doit pas être vide.';
+                          }
+                          if (double.tryParse(value) == null ||
+                              double.parse(value) <= 0) {
+                            return 'La marge doit être un nombre positif.';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextFormField(
+                        controller: profitController,
+                        label: 'Profit',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Profit" ne doit pas être vide.';
+                          }
+                          if (double.tryParse(value) == null ||
+                              double.parse(value) <= 0) {
+                            return 'Le profit doit être un nombre positif.';
+                          }
+                          return null;
+                        },
+                      ),
                       DropdownButtonFormField<double>(
                         decoration: _inputDecoration('Taxe (%)'),
                         value: selectedTax,
@@ -175,7 +213,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             selectedTax = value;
                             taxController.text = value.toString();
                           });
-                          calculatePriceTTC();
+                          calculateValues();
                         },
                         validator: (value) {
                           if (value == null) {
@@ -188,12 +226,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       _buildTextFormField(
                         controller: priceTTCController,
                         label: 'Prix TTC',
-                        enabled: false,
-                      ),
-                      _buildTextFormField(
-                        controller: margeController,
-                        label: 'Marge',
-                        enabled: false, // Marge is read-only
                       ),
                       _buildTextFormField(
                         controller: dateController,
@@ -234,8 +266,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-
-                      // Category Selection with Add Button
                       Row(
                         children: [
                           Expanded(
@@ -296,7 +326,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          // Add category button
                           IconButton(
                             icon:
                                 const Icon(Icons.add, color: Color(0xFF26A9E0)),
@@ -309,7 +338,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Subcategory Dropdown (Visible when a category is selected)
                       Visibility(
                         visible: selectedCategoryId != null,
                         child: DropdownButtonFormField<int>(
@@ -333,11 +361,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ),
                 ),
               ),
-
               const VerticalDivider(
                   width: 20, thickness: 2, color: Color(0xFFE0E0E0)),
-
-              // Right Side: Category Form (Visible on "+" Click)
               Expanded(
                 flex: 1,
                 child: isCategoryFormVisible
@@ -380,12 +405,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               dateExpiration: dateController.text,
               categoryId: selectedCategoryId!,
               subCategoryId: selectedSubCategoryId!,
-              marge:
-                  double.tryParse(margeController.text) ?? 0.0, // Include marge
+              marge: double.tryParse(margeController.text) ?? 0.0,
             );
 
             if (widget.product == null) {
-              // Adding a new product
               await sqldb.addProduct(
                 codeController.text,
                 designationController.text,
@@ -396,15 +419,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 dateController.text,
                 selectedCategoryId!,
                 selectedSubCategoryId!,
-                double.tryParse(margeController.text) ?? 0.0, // Include marge
+                double.tryParse(margeController.text) ?? 0.0,
               );
             } else {
-              // Editing the existing product
               await sqldb.updateProduct(updatedProduct);
               print("update product done");
             }
 
-            widget.refreshData(); // Refresh the product list after saving
+            widget.refreshData();
             Navigator.of(context).pop();
           }
         },
