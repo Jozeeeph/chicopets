@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/order.dart';
@@ -6,9 +7,6 @@ import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:printing/printing.dart';
-
 
 class Getorderlist {
   static Future<void> cancelOrder(
@@ -128,6 +126,48 @@ class Getorderlist {
     }
   }
 
+  static Future<void> cancelOrderLine(
+      BuildContext context, Order order, OrderLine orderLine) async {
+    final SqlDb sqldb = SqlDb();
+
+    // Annuler la ligne de commande
+    await sqldb.cancelOrderLine(order.idOrder!, orderLine.idProduct);
+
+    // Restocker le produit
+    await sqldb.updateProductStock(orderLine.idProduct, orderLine.quantite);
+
+    // Recalculer le total de la commande
+    final dbClient = await sqldb.db;
+    final List<Map<String, dynamic>> remainingOrderLines = await dbClient.query(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
+
+    double newTotal = 0.0;
+    for (var line in remainingOrderLines) {
+      double prixUnitaire = line['prix_unitaire'] as double;
+      int quantite = line['quantity'] as int;
+      newTotal += prixUnitaire * quantite;
+    }
+
+    // Mettre à jour le total de la commande dans la base de données
+    await dbClient.update(
+      'orders',
+      {'total': newTotal},
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
+
+    // Mettre à jour l'objet Order localement
+    order.total = newTotal;
+    order.orderLines.removeWhere((line) => line.idProduct == orderLine.idProduct);
+
+    // Rafraîchir la liste des commandes
+    Navigator.pop(context); // Fermer la boîte de dialogue
+    showListOrdersPopUp(context); // Rouvrir la boîte de dialogue avec les données mises à jour
+  }
+
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
     List<Order> orders =
@@ -234,39 +274,8 @@ class Getorderlist {
 
                                           // If user confirms, delete the order line
                                           if (confirmDelete == true) {
-                                            // Annuler la ligne de commande
-                                            await sqldb.cancelOrderLine(
-                                                order.idOrder!,
-                                                orderLine.idProduct);
-
-                                            // Restocker le produit
-                                            await sqldb.updateProductStock(
-                                                orderLine.idProduct,
-                                                orderLine.quantite);
-
-                                            // Check if the order has any remaining order lines
-                                            final dbClient = await sqldb
-                                                .db; // Access the database instance
-                                            final List<Map<String, dynamic>>
-                                                remainingOrderLines =
-                                                await dbClient.query(
-                                              'order_items',
-                                              where: 'id_order = ?',
-                                              whereArgs: [order.idOrder],
-                                            );
-                                            // If no order lines remain, delete the order
-                                            if (remainingOrderLines.isEmpty) {
-                                              await sqldb
-                                                  .deleteOrder(order.idOrder!);
-                                            }
-
-                                            // Rafraîchir la liste des commandes
-                                            orders = await sqldb
-                                                .getOrdersWithOrderLines();
-                                            Navigator.pop(
-                                                context); // Fermer la boîte de dialogue
-                                            showListOrdersPopUp(
-                                                context); // Rouvrir la boîte de dialogue avec les données mises à jour
+                                            await cancelOrderLine(
+                                                context, order, orderLine);
                                           }
                                         },
                                       ),
@@ -572,40 +581,33 @@ class Getorderlist {
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat(80 * PdfPageFormat.mm, double.infinity),
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(
               child: pw.Text("Ticket de Commande",
                   style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
             ),
             pw.Divider(),
 
             // Numéro de commande et date
-            pw.Text(" Commande #${order.idOrder}",
-                style: pw.TextStyle(fontSize: 10)),
-            pw.Text(" Date: ${formatDate(order.date)}",
-                style: pw.TextStyle(fontSize: 10)),
+            pw.Text("Commande #${order.idOrder}"),
+            pw.Text("Date: ${formatDate(order.date)}"),
             pw.Divider(),
 
-            // Liste des articles avec un format compact
+            // Header de la liste des articles
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(" Qt",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                pw.Text("Qt",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                 pw.Text("Article",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                pw.Text("PU",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                pw.Text("Total   ",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("Prix U",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("Montant",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               ],
             ),
             pw.Divider(),
@@ -615,18 +617,11 @@ class Getorderlist {
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(" x${orderLine.quantite}                ",
-                      style: pw.TextStyle(fontSize: 10)),
-                  pw.Expanded(
-                    child: pw.Text(orderLine.idProduct,
-                        style: pw.TextStyle(fontSize: 10),
-                        overflow: pw.TextOverflow.clip),
-                  ),
-                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)}  DT  ",
-                      style: pw.TextStyle(fontSize: 10)),
+                  pw.Text("x${orderLine.quantite}"),
+                  pw.Text(orderLine.idProduct),
+                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)} DT"),
                   pw.Text(
-                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)}  DT ",
-                      style: pw.TextStyle(fontSize: 10)),
+                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
                 ],
               );
             }).toList(),
@@ -637,25 +632,14 @@ class Getorderlist {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(" Total:",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                pw.Text("${order.total.toStringAsFixed(2)} DT ",
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                pw.Text("Total:",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text("${order.total.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               ],
             ),
-            pw.SizedBox(height: 5),
-            pw.Text(" Paiement: ${order.modePaiement}",
-                style: pw.TextStyle(fontSize: 10)),
             pw.SizedBox(height: 10),
-
-            // Message de remerciement
-            pw.Center(
-              child: pw.Text("Merci de votre visite !",
-                  style: pw.TextStyle(
-                      fontSize: 10, fontStyle: pw.FontStyle.italic)),
-            ),
+            pw.Text("Mode de Paiement: ${order.modePaiement}"),
           ],
         ),
       ),
