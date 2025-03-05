@@ -384,8 +384,8 @@ class Addorder {
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop(); // Close popup
-                    _confirmPlaceOrder(
-                        context, selectedProducts, quantityProducts);
+                    _confirmPlaceOrder(context, selectedProducts,
+                        quantityProducts, amountGiven);
                   },
                   child: Text(
                     "Confirmer",
@@ -401,8 +401,11 @@ class Addorder {
     );
   }
 
-  static void _confirmPlaceOrder(BuildContext context,
-      List<Product> selectedProducts, List<int> quantityProducts) async {
+  static void _confirmPlaceOrder(
+      BuildContext context,
+      List<Product> selectedProducts,
+      List<int> quantityProducts,
+      double amountGiven) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Aucun produit sélectionné.")),
@@ -413,6 +416,14 @@ class Addorder {
     double total = calculateTotal(selectedProducts, quantityProducts);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces"; // You can change this if needed
+
+    // Determine the status based on the amount given
+    String status = (amountGiven >= total) ? "payée" : "non payée";
+
+    // Calculate the remaining amount
+    double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
+    print("Remaining amount when saving order: $remainingAmount");
+
 
     // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
@@ -433,11 +444,12 @@ class Addorder {
       orderLines: orderLines,
       total: total,
       modePaiement: modePaiement,
+      status: status,
+      remainingAmount: remainingAmount,
     );
 
     // Save order to database
     int orderId = await SqlDb().addOrder(order);
-
     if (orderId > 0) {
       bool isValidOrder = true; // To check order validity
 

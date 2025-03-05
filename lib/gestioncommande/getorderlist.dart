@@ -161,11 +161,13 @@ class Getorderlist {
 
     // Mettre à jour l'objet Order localement
     order.total = newTotal;
-    order.orderLines.removeWhere((line) => line.idProduct == orderLine.idProduct);
+    order.orderLines
+        .removeWhere((line) => line.idProduct == orderLine.idProduct);
 
     // Rafraîchir la liste des commandes
     Navigator.pop(context); // Fermer la boîte de dialogue
-    showListOrdersPopUp(context); // Rouvrir la boîte de dialogue avec les données mises à jour
+    showListOrdersPopUp(
+        context); // Rouvrir la boîte de dialogue avec les données mises à jour
   }
 
   static void showListOrdersPopUp(BuildContext context) async {
@@ -197,140 +199,191 @@ class Getorderlist {
                     itemCount: orders.length,
                     itemBuilder: (context, index) {
                       Order order = orders[index];
-                      return ExpansionTile(
-                        title: Text(
-                          "Commande #${order.idOrder} - ${formatDate(order.date)}",
-                          style: const TextStyle(
+                      bool isCancelled = order.status == 'annulée';
+                      bool isSemiPaid = order.remainingAmount >
+                          0; // Check if the order is semi-paid
+
+                      return Card(
+                        margin: const EdgeInsets.all(8.0),
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        color: isCancelled
+                            ? Colors.red.shade100
+                            : isSemiPaid
+                                ? Colors.orange
+                                    .shade100 // Orange background for semi-paid orders
+                                : order.status == "payée"
+                                    ? Colors.green
+                                        .shade100 // Green background for fully paid orders
+                                    : Colors.white,
+                        child: ExpansionTile(
+                          title: Text(
+                            'Commande #${order.idOrder} - ${formatDate(order.date)}',
+                            style: TextStyle(
+                              color: isCancelled
+                                  ? Colors.red
+                                  : isSemiPaid
+                                      ? Colors
+                                          .orange // Orange text for semi-paid orders
+                                      : order.status == "payée"
+                                          ? Colors
+                                              .green // Green text for fully paid orders
+                                          : const Color(0xFF0056A6),
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
-                        ),
-                        children: [
-                          ...order.orderLines.map((orderLine) {
-                            return FutureBuilder<Product?>(
-                              future:
-                                  sqldb.getProductByCode(orderLine.idProduct),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                      child: CircularProgressIndicator());
-                                }
-
-                                if (snapshot.hasError ||
-                                    !snapshot.hasData ||
-                                    snapshot.data == null) {
-                                  return ListTile(
-                                    title: Text(
-                                        "Produit supprimé (${orderLine.idProduct})",
-                                        style: TextStyle(color: Colors.red)),
-                                    subtitle:
-                                        Text("Quantité: ${orderLine.quantite}"),
-                                    trailing: Text(
-                                        "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
-                                  );
-                                }
-
-                                Product product = snapshot.data!;
-                                return ListTile(
-                                  title: Text(product.designation),
-                                  subtitle:
-                                      Text("Quantité: ${orderLine.quantite}"),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                          "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
-                                      IconButton(
-                                        icon: Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () async {
-                                          // Show confirmation dialog
-                                          bool? confirmDelete =
-                                              await showDialog<bool>(
-                                            context: context,
-                                            builder: (BuildContext context) {
-                                              return AlertDialog(
-                                                title: const Text(
-                                                    "Confirmer la suppression"),
-                                                content: const Text(
-                                                    "Êtes-vous sûr de vouloir supprimer ce produit de la commande ? La quantité de ce produit sera restockée"),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.of(context)
-                                                            .pop(false),
-                                                    child: const Text("Non"),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.of(context)
-                                                            .pop(true),
-                                                    child: const Text("Oui"),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          );
-
-                                          // If user confirms, delete the order line
-                                          if (confirmDelete == true) {
-                                            await cancelOrderLine(
-                                                context, order, orderLine);
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-
-                          // 🔹 Boutons alignés horizontalement
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment
-                                  .spaceEvenly, // Align buttons evenly
-                              children: [
-                                // Bouton "Imprimer Ticket"
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    _showOrderTicketPopup(context, order);
-                                  },
-                                  icon: Icon(Icons.print, color: Colors.white),
-                                  label: Text("Imprimer Ticket",
-                                      style: TextStyle(color: Colors.white)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Color(0xFF26A9E0), // Deep Blue
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-
-                                // Bouton "Annuler Commande"
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    // Annuler la commande
-                                    await cancelOrder(context, order, () {
-                                      // Fermer la boîte de dialogue et mettre à jour la liste
-                                      Navigator.pop(context);
-                                      showListOrdersPopUp(context);
-                                    });
-                                  },
-                                  icon: Icon(Icons.cancel, color: Colors.white),
-                                  label: Text("Annuler Commande",
-                                      style: TextStyle(color: Colors.white)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors
-                                        .red, // Red color for cancellation
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                        ],
+                          subtitle: Text(
+                            isCancelled
+                                ? 'Commande annulée'
+                                : isSemiPaid
+                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Display remaining amount
+                                    : order.status == "payée"
+                                        ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
+                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
+                            style: TextStyle(
+                                color: isCancelled
+                                    ? Colors.red
+                                    : isSemiPaid
+                                        ? Colors
+                                            .orange // Orange text for semi-paid orders
+                                        : order.status == "payée"
+                                            ? Colors
+                                                .green // Green text for fully paid orders
+                                            : const Color(0xFF009688),
+                                fontSize: 14),
+                          ),
+                          children: [
+                            ...order.orderLines.map((orderLine) {
+                              return FutureBuilder<Product?>(
+                                future:
+                                    sqldb.getProductByCode(orderLine.idProduct),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                        child: CircularProgressIndicator());
+                                  }
+
+                                  if (snapshot.hasError ||
+                                      !snapshot.hasData ||
+                                      snapshot.data == null) {
+                                    return ListTile(
+                                      title: Text(
+                                          "Produit supprimé (${orderLine.idProduct})",
+                                          style: TextStyle(color: Colors.red)),
+                                      subtitle: Text(
+                                          "Quantité: ${orderLine.quantite}"),
+                                      trailing: Text(
+                                          "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                    );
+                                  }
+
+                                  Product product = snapshot.data!;
+                                  return ListTile(
+                                    title: Text(product.designation),
+                                    subtitle:
+                                        Text("Quantité: ${orderLine.quantite}"),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                            "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                        IconButton(
+                                          icon: Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () async {
+                                            // Show confirmation dialog
+                                            bool? confirmDelete =
+                                                await showDialog<bool>(
+                                              context: context,
+                                              builder: (BuildContext context) {
+                                                return AlertDialog(
+                                                  title: const Text(
+                                                      "Confirmer la suppression"),
+                                                  content: const Text(
+                                                      "Êtes-vous sûr de vouloir supprimer ce produit de la commande ? La quantité de ce produit sera restockée"),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.of(context)
+                                                              .pop(false),
+                                                      child: const Text("Non"),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.of(context)
+                                                              .pop(true),
+                                                      child: const Text("Oui"),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            );
+
+                                            // If user confirms, delete the order line
+                                            if (confirmDelete == true) {
+                                              await cancelOrderLine(
+                                                  context, order, orderLine);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            }).toList(),
+
+                            // 🔹 Boutons alignés horizontalement
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment
+                                    .spaceEvenly, // Align buttons evenly
+                                children: [
+                                  // Bouton "Imprimer Ticket"
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      _showOrderTicketPopup(context, order);
+                                    },
+                                    icon:
+                                        Icon(Icons.print, color: Colors.white),
+                                    label: Text("Imprimer Ticket",
+                                        style: TextStyle(color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          Color(0xFF26A9E0), // Deep Blue
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+
+                                  // Bouton "Annuler Commande"
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      // Annuler la commande
+                                      await cancelOrder(context, order, () {
+                                        // Fermer la boîte de dialogue et mettre à jour la liste
+                                        Navigator.pop(context);
+                                        showListOrdersPopUp(context);
+                                      });
+                                    },
+                                    icon:
+                                        Icon(Icons.cancel, color: Colors.white),
+                                    label: Text("Annuler Commande",
+                                        style: TextStyle(color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors
+                                          .red, // Red color for cancellation
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),
