@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
@@ -95,6 +96,19 @@ class SqlDb {
           )
         ''');
         print("Sub-categories table created");
+
+        await db.execute('''
+  CREATE TABLE IF NOT EXISTS variants (
+    code TEXT PRIMARY KEY,
+    product_code TEXT,
+    combination_name TEXT,
+    price REAL,
+    stock INTEGER,
+    attributes TEXT,
+    FOREIGN KEY(product_code) REFERENCES products(code) ON DELETE CASCADE
+  );
+''');
+        print("Variants table created");
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -183,7 +197,8 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
-    int subCategoryId, double d,
+    int subCategoryId,
+    double d,
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -591,4 +606,50 @@ class SqlDb {
       return [];
     }
   }
+
+  Future<int> addVariant(Variant variant) async {
+    final dbClient = await db;
+    return await dbClient.insert(
+      'variants',
+      variant.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Variant>> getVariantsByProductCode(String productCode) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps = await dbClient.query(
+      'variants',
+      where: 'product_code = ?',
+      whereArgs: [productCode],
+    );
+    return maps.map((map) => Variant.fromMap(map)).toList();
+  }
+
+  Future<int> updateVariant(Variant variant) async {
+    final dbClient = await db;
+    return await dbClient.update(
+      'variants',
+      variant.toMap(),
+      where: 'code = ?',
+      whereArgs: [variant.code],
+    );
+  }
+
+  Future<int> deleteVariant(String variantCode) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'variants',
+      where: 'code = ?',
+      whereArgs: [variantCode],
+    );
+  }
+  Future<int> deleteVariantsByProductCode(String productCode) async {
+  final dbClient = await db;
+  return await dbClient.delete(
+    'variants',
+    where: 'product_code = ?',
+    whereArgs: [productCode],
+  );
+}
 }
