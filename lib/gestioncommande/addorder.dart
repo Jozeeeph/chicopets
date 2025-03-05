@@ -422,7 +422,7 @@ class Addorder {
 
     // Calculate the remaining amount
     double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
-    print("Remaining amount when saving order: $remainingAmount");
+    print("Calculated remainingAmount: $remainingAmount");
 
 
     // Prepare order lines with correct quantities
@@ -447,7 +447,7 @@ class Addorder {
       status: status,
       remainingAmount: remainingAmount,
     );
-
+    print(order.remainingAmount);
     // Save order to database
     int orderId = await SqlDb().addOrder(order);
     if (orderId > 0) {

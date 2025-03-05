@@ -178,10 +178,22 @@ class _ManageCommandState extends State<ManageCommand> {
               itemCount: snapshot.data!.length,
               itemBuilder: (context, index) {
                 Order order = snapshot.data![index];
-               print("Remaining amount when retrieving order: ${order.remainingAmount}");
+
+                print(
+                    "Remaining amount when retrieving order: ${order.remainingAmount}");
+
                 bool isCancelled = order.status == 'annulée';
                 bool isSemiPaid = order.status == 'non payée';
                 bool isPaid = order.status == 'payée';
+
+                // Set the background color based on the status
+                Color backgroundColor = isCancelled
+                    ? Colors.red.shade100
+                    : isSemiPaid
+                        ? Colors.orange.shade100
+                        : isPaid
+                            ? Colors.green.shade100
+                            : Colors.grey.shade100;
 
                 return Card(
                   margin: const EdgeInsets.all(8.0),
@@ -189,107 +201,129 @@ class _ManageCommandState extends State<ManageCommand> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: ExpansionTile(
-                    tilePadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Commande #${order.idOrder} - ${formatDate(order.date)}',
-                          style: const TextStyle(
-                            color: Color(0xFF0056A6),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isCancelled
-                              ? 'Commande annulée'
-                              : isSemiPaid
-                                  ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
-                                  : isPaid
-                                      ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
-                                      : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
-                          style: TextStyle(
-                            color: isCancelled
-                                ? Colors.red
-                                : isSemiPaid
-                                    ? const Color.fromARGB(255, 188, 113, 0)
-                                    : isPaid
-                                        ? Colors.green
-                                        : const Color(0xFF009688),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    children: [
-                      const Divider(thickness: 1, color: Colors.grey),
-                      ...order.orderLines.map((orderLine) {
-                        return FutureBuilder<Product?>(
-                          future:
-                              sqlDb.getDesignationByCode(orderLine.idProduct),
-                          builder: (context, productSnapshot) {
-                            if (productSnapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const ListTile(
-                                title: Text(
-                                  'Chargement...',
-                                  style: TextStyle(fontStyle: FontStyle.italic),
-                                ),
-                              );
-                            } else if (productSnapshot.hasError) {
-                              return ListTile(
-                                title: Text(
-                                  'Erreur: ${productSnapshot.error}',
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              );
-                            } else if (!productSnapshot.hasData ||
-                                productSnapshot.data == null) {
-                              return const ListTile(
-                                title: Text(
-                                  'Produit introuvable',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              );
-                            } else {
-                              Product product = productSnapshot.data!;
-                              return ListTile(
-                                title: Text(
-                                  'Produit: ${product.designation}',
+                  child: Container(
+                    color: backgroundColor, // Apply background color
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      title: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Commande #${order.idOrder} - ${formatDate(order.date)}',
                                   style: const TextStyle(
                                     color: Colors.black,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 16,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  'Quantité: ${orderLine.quantite} - Prix: ${(orderLine.quantite * orderLine.prixUnitaire).toStringAsFixed(2)} DT',
-                                  style: const TextStyle(color: Colors.black87),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(
+                              height: 4), // Adds spacing between rows
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  isCancelled
+                                      ? 'Commande annulée'
+                                      : isSemiPaid
+                                          ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
+                                          : isPaid
+                                              ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
+                                              : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
+                                  style: TextStyle(
+                                    color: isCancelled
+                                        ? Colors.red
+                                        : isSemiPaid
+                                            ? const Color.fromARGB(
+                                                255, 188, 113, 0)
+                                            : isPaid
+                                                ? Colors.green
+                                                : const Color(0xFF009688),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight
+                                        .bold, // Now both texts are bold
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                        );
-                      }).toList(),
-                      if (!isCancelled)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: TextButton.icon(
-                            onPressed: () => cancelOrder(context, order),
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            label: const Text(
-                              'Annuler la commande',
-                              style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      children: [
+                        const Divider(thickness: 1, color: Colors.grey),
+                        ...order.orderLines.map((orderLine) {
+                          return FutureBuilder<Product?>(
+                            future:
+                                sqlDb.getDesignationByCode(orderLine.idProduct),
+                            builder: (context, productSnapshot) {
+                              if (productSnapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const ListTile(
+                                  title: Text(
+                                    'Chargement...',
+                                    style:
+                                        TextStyle(fontStyle: FontStyle.italic),
+                                  ),
+                                );
+                              } else if (productSnapshot.hasError) {
+                                return ListTile(
+                                  title: Text(
+                                    'Erreur: ${productSnapshot.error}',
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              } else if (!productSnapshot.hasData ||
+                                  productSnapshot.data == null) {
+                                return const ListTile(
+                                  title: Text(
+                                    'Produit introuvable',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                );
+                              } else {
+                                Product product = productSnapshot.data!;
+                                return ListTile(
+                                  title: Text(
+                                    'Produit: ${product.designation}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'Quantité: ${orderLine.quantite} - Prix: ${(orderLine.quantite * orderLine.prixUnitaire).toStringAsFixed(2)} DT',
+                                    style:
+                                        const TextStyle(color: Colors.black87),
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        }).toList(),
+                        if (!isCancelled)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: TextButton.icon(
+                              onPressed: () => cancelOrder(context, order),
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              label: const Text(
+                                'Annuler la commande',
+                                style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
