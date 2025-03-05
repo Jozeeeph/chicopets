@@ -21,14 +21,14 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
       Directory(appSupportDir.path).createSync(recursive: true);
     }
 
-    // Open the database
+    // Open the databases
     return openDatabase(
       dbPath,
       version: 1,
@@ -60,6 +60,7 @@ class SqlDb {
           total REAL,
           mode_paiement TEXT,
           status TEXT,
+          remaining_amount REAL,
           id_client INTEGER
         )
       ''');
@@ -183,7 +184,8 @@ class SqlDb {
     double prixTTC,
     String date,
     int categoryId,
-    int subCategoryId, double d,
+    int subCategoryId,
+    double d,
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -205,30 +207,29 @@ class SqlDb {
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
-    int orderId = await dbClient.transaction((txn) async {
-      // Insert the order into the orders table
-      int orderId = await txn.insert(
-        'orders',
-        order.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+    int orderId = await dbClient.insert(
+      'orders',
+      {
+        'date': order.date,
+        'total': order.total,
+        'mode_paiement': order.modePaiement,
+        'status': order.status,
+        'remaining_amount': order.remainingAmount,
+      },
+    );
+
+    // Insert order lines
+    for (var orderLine in order.orderLines) {
+      await dbClient.insert(
+        'order_items',
+        {
+          'id_order': orderId,
+          'product_code': orderLine.idProduct,
+          'quantity': orderLine.quantite,
+          'prix_unitaire': orderLine.prixUnitaire,
+        },
       );
-
-      // Insert each product in the order into the order_items table
-      for (var product in order.orderLines) {
-        await txn.insert(
-          'order_items',
-          {
-            'id_order': orderId,
-            'product_code': product.idProduct,
-            'quantity': product.quantite,
-            'prix_unitaire': product.prixUnitaire,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-
-      return orderId;
-    });
+    }
 
     return orderId;
   }
@@ -243,6 +244,13 @@ class SqlDb {
 
     for (var orderMap in ordersData) {
       int orderId = orderMap['id_order'];
+      double total = (orderMap['total'] ?? 0.0) as double;
+      double montantPaye =
+          (orderMap['montant_paye'] ?? 0.0) as double; // Add this field
+
+      double remainingAmount =
+          total - montantPaye; // Calculate remaining amount
+
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
         where: "id_order = ?",
@@ -261,10 +269,11 @@ class SqlDb {
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        total: (orderMap['total'] ?? 0.0) as double,
+        total: total,
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
         status: orderMap['status'],
         orderLines: orderLines,
+        remainingAmount: remainingAmount, // Add this to the Order object
       ));
     }
 
