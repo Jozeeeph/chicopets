@@ -1,5 +1,6 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -30,6 +31,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController dateController = TextEditingController();
   final TextEditingController margeController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
+  final TextEditingController sizeController = TextEditingController();
+  final TextEditingController colorController = TextEditingController();
+  final TextEditingController weightController = TextEditingController();
+
   final SqlDb sqldb = SqlDb();
   double? selectedTax;
 
@@ -38,6 +43,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool isCategoryFormVisible = false;
   List<Category> categories = [];
   List<DropdownMenuItem<int>> subCategoryItems = [];
+
+  // Variables pour la gestion des variantes
+  bool hasVariants = false;
+  List<Variant> variants = [];
+  List<String> selectedSizes = [];
+  List<String> selectedColors = [];
+  List<String> selectedWeights = [];
 
   @override
   void initState() {
@@ -53,17 +65,53 @@ class _AddProductScreenState extends State<AddProductScreen> {
       selectedCategoryId = widget.product!.categoryId;
       selectedSubCategoryId = widget.product!.subCategoryId;
 
+      // Charger les sous-catégories de la catégorie sélectionnée
+      _loadSubCategories(selectedCategoryId!);
+
       double marge = ((widget.product!.prixTTC - widget.product!.prixHT) / widget.product!.prixHT) * 100;
       margeController.text = marge.toStringAsFixed(2);
 
       double profit = widget.product!.prixTTC - widget.product!.prixHT;
       profitController.text = profit.toStringAsFixed(2);
+
+      // Récupérer les variantes du produit
+      _loadVariants();
     }
 
     priceHTController.addListener(calculateValues);
     taxController.addListener(calculateValues);
     margeController.addListener(calculateValues);
     profitController.addListener(calculateValues);
+  }
+
+  // Méthode pour charger les sous-catégories
+ void _loadSubCategories(int categoryId) async {
+  final dbClient = await sqldb.db;
+  final subCategories = await dbClient.query(
+    'sub_categories',
+    where: 'category_id = ?',
+    whereArgs: [categoryId],
+  );
+
+  setState(() {
+    subCategoryItems = subCategories.map((subCat) {
+      return DropdownMenuItem<int>(
+        value: subCat['id_sub_category'] as int, // Cast to int
+        child: Text(subCat['sub_category_name'] as String), // Cast to String
+      );
+    }).toList();
+  });
+}
+
+  // Méthode pour charger les variantes
+  void _loadVariants() async {
+    if (widget.product != null) {
+      final variantsFromDb = await sqldb.getVariantsByProductCode(widget.product!.code);
+      setState(() {
+        variants = variantsFromDb;
+        hasVariants = variants.isNotEmpty;
+      });
+    }
   }
 
   void calculateValues() {
@@ -87,6 +135,50 @@ class _AddProductScreenState extends State<AddProductScreen> {
       double prixTTCWithTax = prixTTC * (1 + taxe / 100);
       priceTTCController.text = prixTTCWithTax.toStringAsFixed(2);
     }
+  }
+
+  void generateVariants() {
+    variants.clear();
+    if (selectedSizes.isNotEmpty && selectedColors.isNotEmpty) {
+      // Générer des variantes avec taille et couleur
+      for (var size in selectedSizes) {
+        for (var color in selectedColors) {
+          variants.add(Variant(
+            code: '', // L'utilisateur saisira le code à barres
+            productCode: codeController.text,
+            combinationName: '$size-$color',
+            price: 0.0, // L'utilisateur saisira le prix
+            stock: 0, // L'utilisateur saisira le stock
+            attributes: {'size': size, 'color': color},
+          ));
+        }
+      }
+    } else if (selectedSizes.isNotEmpty) {
+      // Générer des variantes avec uniquement la taille
+      for (var size in selectedSizes) {
+        variants.add(Variant(
+          code: '', // L'utilisateur saisira le code à barres
+          productCode: codeController.text,
+          combinationName: size,
+          price: 0.0, // L'utilisateur saisira le prix
+          stock: 0, // L'utilisateur saisira le stock
+          attributes: {'size': size},
+        ));
+      }
+    } else if (selectedColors.isNotEmpty) {
+      // Générer des variantes avec uniquement la couleur
+      for (var color in selectedColors) {
+        variants.add(Variant(
+          code: '', // L'utilisateur saisira le code à barres
+          productCode: codeController.text,
+          combinationName: color,
+          price: 0.0, // L'utilisateur saisira le prix
+          stock: 0, // L'utilisateur saisira le stock
+          attributes: {'color': color},
+        ));
+      }
+    }
+    setState(() {});
   }
 
   @override
@@ -116,19 +208,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildTextFormField(
-                        controller: codeController,
-                        label: 'Code à Barre',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Code à Barre" ne doit pas être vide.';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Le "Code à Barre" doit être un nombre.';
-                          }
-                          return null;
+                      // Checkbox pour les variantes
+                      CheckboxListTile(
+                        title: const Text('Ce produit a-t-il des variantes ?'),
+                        value: hasVariants,
+                        onChanged: (value) {
+                          setState(() {
+                            hasVariants = value ?? false;
+                          });
                         },
                       ),
+                      if (!hasVariants) ...[
+                        _buildTextFormField(
+                          controller: codeController,
+                          label: 'Code à Barre',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Code à Barre" ne doit pas être vide.';
+                            }
+                            if (int.tryParse(value) == null) {
+                              return 'Le "Code à Barre" doit être un nombre.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       _buildTextFormField(
                         controller: designationController,
                         label: 'Désignation',
@@ -139,94 +243,92 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
-                      _buildTextFormField(
-                        controller: stockController,
-                        label: 'Stock',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Stock" ne doit pas être vide.';
-                          }
-                          if (int.tryParse(value) == null ||
-                              int.parse(value) <= 0) {
-                            return 'Le stock doit être un nombre entier positif.';
-                          }
-                          return null;
-                        },
-                      ),
-                      _buildTextFormField(
-                        controller: priceHTController,
-                        label: 'Prix d\'achat',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Prix d\'achat" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'Le prix doit être un nombre positif.';
-                          }
-                          return null;
-                        },
-                      ),
-                      _buildTextFormField(
-                        controller: margeController,
-                        label: 'Marge (%)',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Marge (%)" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'La marge doit être un nombre positif.';
-                          }
-                          return null;
-                        },
-                      ),
-                      _buildTextFormField(
-                        controller: profitController,
-                        label: 'Profit',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Profit" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'Le profit doit être un nombre positif.';
-                          }
-                          return null;
-                        },
-                      ),
-                      DropdownButtonFormField<double>(
-                        decoration: _inputDecoration('Taxe (%)'),
-                        value: selectedTax,
-                        items: const [
-                          DropdownMenuItem(value: 0.0, child: Text('0%')),
-                          DropdownMenuItem(value: 7.0, child: Text('7%')),
-                          DropdownMenuItem(value: 12.0, child: Text('12%')),
-                          DropdownMenuItem(value: 19.0, child: Text('19%')),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            selectedTax = value;
-                            taxController.text = value.toString();
-                          });
-                          calculateValues();
-                        },
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Veuillez sélectionner une taxe.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextFormField(
-                        controller: priceTTCController,
-                        label: 'Prix TTC',
-                      ),
+                      if (!hasVariants) ...[
+                        _buildTextFormField(
+                          controller: stockController,
+                          label: 'Stock',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Stock" ne doit pas être vide.';
+                            }
+                            if (int.tryParse(value) == null || int.parse(value) <= 0) {
+                              return 'Le stock doit être un nombre entier positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: priceHTController,
+                          label: 'Prix d\'achat',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Prix d\'achat" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                              return 'Le prix doit être un nombre positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: margeController,
+                          label: 'Marge (%)',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Marge (%)" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                              return 'La marge doit être un nombre positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: profitController,
+                          label: 'Profit',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Profit" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null || double.parse(value) <= 0) {
+                              return 'Le profit doit être un nombre positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        DropdownButtonFormField<double>(
+                          decoration: _inputDecoration('Taxe (%)'),
+                          value: selectedTax,
+                          items: const [
+                            DropdownMenuItem(value: 0.0, child: Text('0%')),
+                            DropdownMenuItem(value: 7.0, child: Text('7%')),
+                            DropdownMenuItem(value: 12.0, child: Text('12%')),
+                            DropdownMenuItem(value: 19.0, child: Text('19%')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              selectedTax = value;
+                              taxController.text = value.toString();
+                            });
+                            calculateValues();
+                          },
+                          validator: (value) {
+                            if (value == null) {
+                              return 'Veuillez sélectionner une taxe.';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextFormField(
+                          controller: priceTTCController,
+                          label: 'Prix TTC',
+                        ),
+                      ],
                       _buildTextFormField(
                         controller: dateController,
                         label: 'Date Expiration',
@@ -234,7 +336,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Le champ "Date Expiration" ne doit pas être vide.';
                           }
-
                           List<String> possibleFormats = [
                             "dd-MM-yyyy",
                             "MM-dd-yyyy",
@@ -242,9 +343,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             "dd/MM/yyyy",
                             "MM/dd/yyyy"
                           ];
-
                           DateTime? date;
-
                           for (String format in possibleFormats) {
                             try {
                               date = DateFormat(format).parseStrict(value);
@@ -253,15 +352,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               continue;
                             }
                           }
-
                           if (date == null) {
                             return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
                           }
-
                           if (!date.isAfter(DateTime.now())) {
                             return 'La date doit être dans le futur.';
                           }
-
                           return null;
                         },
                       ),
@@ -292,27 +388,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                         value: cat.id,
                                         child: Text(
                                           cat.name,
-                                          style: const TextStyle(
-                                              color: Colors.black),
+                                          style: const TextStyle(color: Colors.black),
                                         ));
                                   }).toList(),
                                   onChanged: (val) {
                                     setState(() {
                                       selectedCategoryId = val;
                                       selectedSubCategoryId = null;
-                                      subCategoryItems = categories
-                                          .firstWhere((cat) => cat.id == val)
-                                          .subCategories
-                                          .map(
-                                              (subCat) => DropdownMenuItem<int>(
-                                                    value: subCat.id,
-                                                    child: Text(
-                                                      subCat.name,
-                                                      style: const TextStyle(
-                                                          color: Colors.black),
-                                                    ),
-                                                  ))
-                                          .toList();
+                                      _loadSubCategories(val!);
                                     });
                                   },
                                   validator: (value) {
@@ -327,8 +410,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                           const SizedBox(width: 10),
                           IconButton(
-                            icon:
-                                const Icon(Icons.add, color: Color(0xFF26A9E0)),
+                            icon: const Icon(Icons.add, color: Color(0xFF26A9E0)),
                             onPressed: () {
                               setState(() {
                                 isCategoryFormVisible = !isCategoryFormVisible;
@@ -357,12 +439,131 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                       ),
+                      if (hasVariants) ...[
+                        const SizedBox(height: 16),
+                        _buildTextFormField(
+                          controller: sizeController,
+                          label: 'Ajouter une taille',
+                          onFieldSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              setState(() {
+                                selectedSizes.add(value);
+                                sizeController.clear();
+                              });
+                            }
+                          },
+                        ),
+                        Wrap(
+                          spacing: 8.0,
+                          children: selectedSizes.map((size) {
+                            return Chip(
+                              label: Text(size),
+                              onDeleted: () {
+                                setState(() {
+                                  selectedSizes.remove(size);
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextFormField(
+                          controller: colorController,
+                          label: 'Ajouter une couleur',
+                          onFieldSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              setState(() {
+                                selectedColors.add(value);
+                                colorController.clear();
+                              });
+                            }
+                          },
+                        ),
+                        Wrap(
+                          spacing: 8.0,
+                          children: selectedColors.map((color) {
+                            return Chip(
+                              label: Text(color),
+                              onDeleted: () {
+                                setState(() {
+                                  selectedColors.remove(color);
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextFormField(
+                          controller: weightController,
+                          label: 'Ajouter un poids',
+                          onFieldSubmitted: (value) {
+                            if (value.isNotEmpty) {
+                              setState(() {
+                                selectedWeights.add(value);
+                                weightController.clear();
+                              });
+                            }
+                          },
+                        ),
+                        Wrap(
+                          spacing: 8.0,
+                          children: selectedWeights.map((weight) {
+                            return Chip(
+                              label: Text(weight),
+                              onDeleted: () {
+                                setState(() {
+                                  selectedSizes.remove(weight);
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: generateVariants,
+                          child: const Text('Générer les variantes'),
+                        ),
+                        if (variants.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Text('Variantes générées :'),
+                          DataTable(
+                            columns: const [
+                              DataColumn(label: Text('Combinaison')),
+                              DataColumn(label: Text('Prix')),
+                              DataColumn(label: Text('Stock')),
+                              DataColumn(label: Text('Code à barre')),
+                            ],
+                            rows: variants.map((variant) {
+                              return DataRow(cells: [
+                                DataCell(Text(variant.combinationName)),
+                                DataCell(TextFormField(
+                                  initialValue: variant.price.toString(),
+                                  onChanged: (value) {
+                                    variant.price = double.tryParse(value) ?? 0.0;
+                                  },
+                                )),
+                                DataCell(TextFormField(
+                                  initialValue: variant.stock.toString(),
+                                  onChanged: (value) {
+                                    variant.stock = int.tryParse(value) ?? 0;
+                                  },
+                                )),
+                                DataCell(TextFormField(
+                                  initialValue: variant.code,
+                                  onChanged: (value) {
+                                    variant.code = value;
+                                  },
+                                )),
+                              ]);
+                            }).toList(),
+                          ),
+                        ],
+                      ],
                     ],
                   ),
                 ),
               ),
-              const VerticalDivider(
-                  width: 20, thickness: 2, color: Color(0xFFE0E0E0)),
+              const VerticalDivider(width: 20, thickness: 2, color: Color(0xFFE0E0E0)),
               Expanded(
                 flex: 1,
                 child: isCategoryFormVisible
@@ -426,6 +627,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
               print("update product done");
             }
 
+            if (hasVariants) {
+              // Supprimer les anciennes variantes
+              await sqldb.deleteVariantsByProductCode(updatedProduct.code);
+
+              // Ajouter les nouvelles variantes
+              for (var variant in variants) {
+                await sqldb.addVariant(variant);
+              }
+            }
+
             widget.refreshData();
             Navigator.of(context).pop();
           }
@@ -442,6 +653,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
     String? Function(String?)? validator,
+    void Function(String)? onFieldSubmitted,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -452,6 +664,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         enabled: enabled,
         validator: validator,
         style: const TextStyle(color: Colors.black),
+        onFieldSubmitted: onFieldSubmitted,
       ),
     );
   }
