@@ -259,11 +259,7 @@ class SqlDb {
     for (var orderMap in ordersData) {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
-      double montantPaye =
-          (orderMap['montant_paye'] ?? 0.0) as double; // Add this field
-
-      double remainingAmount =
-          total - montantPaye; // Calculate remaining amount
+      double remaining=(orderMap['remaining_amount']) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -287,7 +283,7 @@ class SqlDb {
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
         status: orderMap['status'],
         orderLines: orderLines,
-        remainingAmount: remainingAmount, // Add this to the Order object
+        remainingAmount: remaining, // Add this to the Order object
       ));
     }
 
