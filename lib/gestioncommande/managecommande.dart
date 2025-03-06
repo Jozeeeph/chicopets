@@ -213,6 +213,8 @@ class _ManageCommandState extends State<ManageCommand> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
+                                flex:
+                                    2, // Adjust the flex value to control the space allocation
                                 child: Text(
                                   'Commande #${order.idOrder} - ${formatDate(order.date)}',
                                   style: const TextStyle(
@@ -222,14 +224,9 @@ class _ManageCommandState extends State<ManageCommand> {
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(
-                              height: 4), // Adds spacing between rows
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
                               Expanded(
+                                flex:
+                                    3, // Adjust the flex value to control the space allocation
                                 child: Text(
                                   isCancelled
                                       ? 'Commande annulée'
@@ -248,13 +245,16 @@ class _ManageCommandState extends State<ManageCommand> {
                                                 ? Colors.green
                                                 : const Color(0xFF009688),
                                     fontSize: 14,
-                                    fontWeight: FontWeight
-                                        .bold, // Now both texts are bold
+                                    fontWeight: FontWeight.bold,
                                   ),
+                                  textAlign: TextAlign
+                                      .end, // Align the text to the end (right)
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(
+                              height: 4), // Adds spacing between rows
                         ],
                       ),
                       children: [
