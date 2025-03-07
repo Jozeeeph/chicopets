@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
+import 'package:uuid/uuid.dart';
+
 
 class Addprod {
   static void showAddProductPopup(BuildContext context, Function refreshData) {
@@ -15,7 +17,6 @@ class Addprod {
     final TextEditingController dateController = TextEditingController();
     final TextEditingController margeController = TextEditingController();
     final SqlDb sqldb = SqlDb();
-    
 
     int? selectedCategoryId;
     int? selectedSubCategoryId;
@@ -190,19 +191,27 @@ class Addprod {
                         );
                         return;
                       }
+                      String generateProductReferenceId() {
+                        var uuid = Uuid();
+                        return uuid
+                            .v4(); // Génère un UUID de version 4 (aléatoire)
+                      }
+
+// Dans la méthode de sauvegarde du produit
+                      final productReferenceId = generateProductReferenceId();
 
                       await sqldb.addProduct(
-                        codeController.text,
-                        designationController.text,
-                        int.tryParse(stockController.text) ?? 0,
-                        double.tryParse(priceHTController.text) ?? 0.0,
-                        double.tryParse(taxController.text) ?? 0.0,
-                        double.tryParse(priceTTCController.text) ?? 0.0,
-                        dateController.text,
-                        selectedCategoryId!,
-                        selectedSubCategoryId!,
-                        double.tryParse(margeController.text) ?? 0.0,
-                      );
+                          codeController.text,
+                          designationController.text,
+                          int.tryParse(stockController.text) ?? 0,
+                          double.tryParse(priceHTController.text) ?? 0.0,
+                          double.tryParse(taxController.text) ?? 0.0,
+                          double.tryParse(priceTTCController.text) ?? 0.0,
+                          dateController.text,
+                          selectedCategoryId!,
+                          selectedSubCategoryId!,
+                          double.tryParse(margeController.text) ?? 0.0,
+                          productReferenceId);
                       refreshData();
                       Navigator.of(context).pop();
                     }

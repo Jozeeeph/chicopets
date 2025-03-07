@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
@@ -107,8 +108,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // Méthode pour charger les variantes
   void _loadVariants() async {
     if (widget.product != null) {
-      final variantsFromDb =
-          await sqldb.getVariantsByProductCode(widget.product!.code);
+      final variantsFromDb = await sqldb
+          .getVariantsByProductReferenceId(widget.product!.productReferenceId);
       setState(() {
         variants = variantsFromDb;
         hasVariants = variants.isNotEmpty;
@@ -184,26 +185,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-void generateVariants() {
-  variants.clear();
-  List<Map<String, String>> combinations = _generateCombinations(attributes);
-
-  // Récupérer la valeur du prixTTC
-  double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
-
-  for (var combination in combinations) {
-    variants.add(Variant(
-      code: '', // L'utilisateur saisira le code à barres
-      productCode: codeController.text,
-      combinationName: combination.values.join('-'),
-      price: prixTTC, // Utiliser la valeur du prixTTC
-      priceImpact: 0.0, // L'utilisateur saisira le prix d'impact
-      stock: 0, // L'utilisateur saisira le stock
-      attributes: combination,
-    ));
-  }
-  setState(() {});
+  String generateProductReferenceId() {
+  var uuid = Uuid();
+  return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
 }
+
+  void generateVariants() {
+    variants.clear();
+    List<Map<String, String>> combinations = _generateCombinations(attributes);
+
+    // Récupérer la valeur du prixTTC
+    double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
+
+    for (var combination in combinations) {
+      variants.add(Variant(
+        code: '', // L'utilisateur saisira le code à barres
+        combinationName: combination.values.join('-'),
+        price: prixTTC, // Utiliser la valeur du prixTTC
+        priceImpact: 0.0, // L'utilisateur saisira le prix d'impact
+        stock: 0, // L'utilisateur saisira le stock
+        attributes: combination,
+        productReferenceId: '', // Sera mis à jour lors de la sauvegarde
+      ));
+    }
+    setState(() {});
+  }
 
   List<Map<String, String>> _generateCombinations(
       Map<String, List<String>> attributes) {
@@ -745,40 +751,51 @@ void generateVariants() {
                 ? variants.map((v) => v.price).reduce((a, b) => a < b ? a : b)
                 : double.tryParse(priceHTController.text) ?? 0.0;
 
+            final productReferenceId = generateProductReferenceId();
             final updatedProduct = Product(
               code: codeController.text,
               designation: designationController.text,
-              stock: totalStock, // Stock mis à jour
-              prixHT: minPrixHT, // Prix HT mis à jour
-              taxe: selectedTax ?? 0.0, // Assure que la taxe est sauvegardée
+              stock: totalStock,
+              prixHT: minPrixHT,
+              taxe: selectedTax ?? 0.0,
               prixTTC: double.tryParse(priceTTCController.text) ?? 0.0,
               dateExpiration: dateController.text,
               categoryId: selectedCategoryId!,
               subCategoryId: selectedSubCategoryId!,
               marge: double.tryParse(margeController.text) ?? 0.0,
+              productReferenceId: productReferenceId, // Nouvel attribut
+              variants: variants, // Liste des variantes
             );
 
+// Sauvegarder le produit
             if (widget.product == null) {
               await sqldb.addProduct(
                 codeController.text,
                 designationController.text,
-                totalStock, // Stock mis à jour
-                minPrixHT, // Prix HT mis à jour
+                totalStock,
+                minPrixHT,
                 selectedTax ?? 0.0,
                 double.tryParse(priceTTCController.text) ?? 0.0,
                 dateController.text,
                 selectedCategoryId!,
                 selectedSubCategoryId!,
                 double.tryParse(margeController.text) ?? 0.0,
+                productReferenceId, // Nouvel attribut
               );
             } else {
               await sqldb.updateProduct(updatedProduct);
-              print("Mise à jour du produit terminée");
+            }
+
+// Sauvegarder les variantes avec le productReferenceId
+            for (var variant in variants) {
+              variant.productReferenceId = productReferenceId;
+              await sqldb.addVariant(variant);
             }
 
             if (hasVariants) {
               // Supprimer les anciennes variantes
-              await sqldb.deleteVariantsByProductCode(updatedProduct.code);
+              await sqldb.deleteVariantsByProductReferenceId(
+                  updatedProduct.productReferenceId);
 
               // Ajouter les nouvelles variantes
               for (var variant in variants) {

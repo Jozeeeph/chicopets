@@ -4,6 +4,7 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:uuid/uuid.dart';
 
 class ImportProductPage extends StatefulWidget {
   const ImportProductPage({super.key});
@@ -54,18 +55,26 @@ class _ImportProductPageState extends State<ImportProductPage> {
             int subCategoryId = await _getOrCreateSubCategoryIdByName(
                 subCategoryName, categoryId);
 
+            String generateProductReferenceId() {
+              var uuid = Uuid();
+              return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
+            }
+
+// Dans la méthode de sauvegarde du produit
+            final productReferenceId = generateProductReferenceId();
+
             await _sqlDb.addProduct(
-              code,
-              designation,
-              stock,
-              prixHT,
-              taxe,
-              prixTTC,
-              dateExpiration,
-              categoryId,
-              subCategoryId,
-              prixTTC - prixHT, // Add marge as the 10th argument
-            );
+                code,
+                designation,
+                stock,
+                prixHT,
+                taxe,
+                prixTTC,
+                dateExpiration,
+                categoryId,
+                subCategoryId,
+                prixTTC - prixHT,
+                productReferenceId);
           }
         }
 
