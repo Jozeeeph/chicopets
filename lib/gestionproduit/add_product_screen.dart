@@ -186,9 +186,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   String generateProductReferenceId() {
-  var uuid = Uuid();
-  return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
-}
+    var uuid = Uuid();
+    return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
+  }
 
   void generateVariants() {
     variants.clear();
@@ -752,6 +752,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 : double.tryParse(priceHTController.text) ?? 0.0;
 
             final productReferenceId = generateProductReferenceId();
+            print(generateProductReferenceId());
             final updatedProduct = Product(
               code: codeController.text,
               designation: designationController.text,
@@ -767,8 +768,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
               variants: variants, // Liste des variantes
             );
 
-// Sauvegarder le produit
+            // Sauvegarder le produit
             if (widget.product == null) {
+              // Ajout d'un nouveau produit
               await sqldb.addProduct(
                 codeController.text,
                 designationController.text,
@@ -782,27 +784,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 double.tryParse(margeController.text) ?? 0.0,
                 productReferenceId, // Nouvel attribut
               );
-            } else {
-              await sqldb.updateProduct(updatedProduct);
-            }
 
-// Sauvegarder les variantes avec le productReferenceId
-            for (var variant in variants) {
-              variant.productReferenceId = productReferenceId;
-              await sqldb.addVariant(variant);
-            }
-
-            if (hasVariants) {
-              // Supprimer les anciennes variantes
-              await sqldb.deleteVariantsByProductReferenceId(
-                  updatedProduct.productReferenceId);
-
-              // Ajouter les nouvelles variantes
+              // Ajouter les variantes du nouveau produit
               for (var variant in variants) {
+                variant.productReferenceId = productReferenceId;
                 await sqldb.addVariant(variant);
+              }
+            } else {
+              // Mise à jour d'un produit existant
+              await sqldb.updateProduct(updatedProduct);
+
+              if (hasVariants) {
+                // Supprimer uniquement les anciennes variantes du produit existant
+                await sqldb.deleteVariantsByProductReferenceId(
+                    updatedProduct.productReferenceId);
+
+                // Ajouter les nouvelles variantes
+                for (var variant in variants) {
+                  variant.productReferenceId =
+                      updatedProduct.productReferenceId;
+                  await sqldb.addVariant(variant);
+                }
               }
             }
 
+            // Rafraîchir les données et fermer l'écran
             widget.refreshData();
             Navigator.of(context).pop();
           }

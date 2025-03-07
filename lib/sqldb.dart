@@ -655,14 +655,7 @@ class SqlDb {
     );
   }
 
-  Future<int> deleteVariantsByProductCode(String productCode) async {
-    final dbClient = await db;
-    return await dbClient.delete(
-      'variants',
-      where: 'product_code = ?',
-      whereArgs: [productCode],
-    );
-  }
+ 
 
   Future<List<Variant>> getVariantsByProductReferenceId(String productReferenceId) async {
   final dbClient = await db;
