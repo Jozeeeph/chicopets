@@ -1,4 +1,5 @@
 import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../product.dart';
@@ -12,14 +13,8 @@ class Searchprod {
     final TextEditingController searchController = TextEditingController();
     ValueNotifier<List<Product>> filteredProducts = ValueNotifier(products);
 
-    // Listener to filter the products when the search text changes
     searchController.addListener(() {
       String query = searchController.text.toLowerCase();
-
-      // Check what query is being entered
-      print("Searching for: $query");
-
-      // Filter the products based on the query
       List<Product> newFilteredProducts = products.where((product) {
         String code = product.code.toLowerCase();
         String designation = product.designation.toLowerCase();
@@ -29,13 +24,6 @@ class Searchprod {
             designation.contains(query) ||
             category.contains(query);
       }).toList();
-
-      // If no products match, print a message for debugging
-      if (newFilteredProducts.isEmpty) {
-        print("No products found for query: $query");
-      } else {
-        print("Found ${newFilteredProducts.length} products for query: $query");
-      }
 
       filteredProducts.value = newFilteredProducts;
     });
@@ -52,8 +40,7 @@ class Searchprod {
             style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
-                color: Color(0xFF0056A6) // Deep Blue
-            ),
+                color: Color(0xFF0056A6)),
           ),
           content: SizedBox(
             width: 800,
@@ -64,20 +51,20 @@ class Searchprod {
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: TextField(
                       controller: searchController,
-                      autofocus: true, // Ensures the field is focused
+                      autofocus: true,
                       decoration: InputDecoration(
                         labelText: 'Recherche Produit (code ou designation)',
                         prefixIcon: const Icon(Icons.search,
-                            color: Color(0xFF0056A6)), // Deep Blue
+                            color: Color(0xFF0056A6)),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFF26A9E0)), // Sky Blue
+                              color: Color(0xFF26A9E0)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(
-                              color: Color(0xFF26A9E0), width: 2), // Sky Blue
+                              color: Color(0xFF26A9E0), width: 2),
                         ),
                       ),
                     ),
@@ -94,7 +81,7 @@ class Searchprod {
                                   'Code',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                               Expanded(
@@ -102,7 +89,7 @@ class Searchprod {
                                   'Désignation',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                               Expanded(
@@ -110,7 +97,7 @@ class Searchprod {
                                   'Catégorie',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                               Expanded(
@@ -118,7 +105,7 @@ class Searchprod {
                                   'Stock',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                               Expanded(
@@ -126,7 +113,7 @@ class Searchprod {
                                   'Prix HT',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                               Expanded(
@@ -134,7 +121,7 @@ class Searchprod {
                                   'Date Expiration',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)), // Deep Blue
+                                      color: Color(0xFF0056A6)),
                                 ),
                               ),
                             ],
@@ -145,7 +132,6 @@ class Searchprod {
                             itemBuilder: (context, index) {
                               final product = currentProducts[index];
 
-                              // If subcategoryId is null, return default subcategory name
                               Future<String> subCategoryNameFuture = product.subCategoryId != null
                                   ? sqldb
                                       .getSubCategoryById(product.subCategoryId, product.categoryId)
@@ -154,7 +140,7 @@ class Searchprod {
                                             ? subCategoryResult.first['sub_category_name'] ?? 'Sans sous-catégorie'
                                             : 'Sans sous-catégorie';
                                       })
-                                  : Future.value('Sans sous-catégorie'); // Default value if no subcategory ID
+                                  : Future.value('Sans sous-catégorie');
 
                               return FutureBuilder(
                                 future: subCategoryNameFuture,
@@ -190,23 +176,49 @@ class Searchprod {
                                       }
                                     }
 
-                                    return InkWell(
-                                      child: Container(
-                                        color: index.isEven
-                                            ? const Color(0xFFE0E0E0)
-                                            : Colors.white, // Light Gray and White alternation
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                        child: Row(
-                                          children: [
-                                            Expanded(child: Text(product.code)),
-                                            Expanded(child: Text(product.designation)),
-                                            Expanded(child: Text('${product.categoryName} / $subCategoryName')),
-                                            Expanded(child: Text('${product.stock}')),
-                                            Expanded(child: Text('${product.prixHT} DT')),
-                                            Expanded(child: Text(formattedDate)),
-                                          ],
-                                        ),
+                                    return ExpansionTile(
+                                      title: Row(
+                                        children: [
+                                          Expanded(child: Text(product.code)),
+                                          Expanded(child: Text(product.designation)),
+                                          Expanded(child: Text('${product.categoryName} / $subCategoryName')),
+                                          Expanded(child: Text('${product.stock}')),
+                                          Expanded(child: Text('${product.prixHT} DT')),
+                                          Expanded(child: Text(formattedDate)),
+                                        ],
                                       ),
+                                      children: [
+                                        FutureBuilder<List<Variant>>(
+                                          future: sqldb.getVariantsByProductCode(product.code),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.connectionState == ConnectionState.waiting) {
+                                              return const Center(child: CircularProgressIndicator());
+                                            } else if (snapshot.hasError) {
+                                              return Center(child: Text('Erreur: ${snapshot.error}'));
+                                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                              return const Center(child: Text('Aucune variante disponible'));
+                                            } else {
+                                              final variants = snapshot.data!;
+                                              return DataTable(
+                                                columns: const [
+                                                  DataColumn(label: Text('Combinaison')),
+                                                  DataColumn(label: Text('Prix')),
+                                                  DataColumn(label: Text('Stock')),
+                                                  DataColumn(label: Text('Code à barre')),
+                                                ],
+                                                rows: variants.map((variant) {
+                                                  return DataRow(cells: [
+                                                    DataCell(Text(variant.combinationName)),
+                                                    DataCell(Text(variant.price.toString())),
+                                                    DataCell(Text(variant.stock.toString())),
+                                                    DataCell(Text(variant.code)),
+                                                  ]);
+                                                }).toList(),
+                                              );
+                                            }
+                                          },
+                                        ),
+                                      ],
                                     );
                                   }
                                 },
@@ -227,7 +239,7 @@ class Searchprod {
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935), // Warm Red for cancel
+                backgroundColor: const Color(0xFFE53935),
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
