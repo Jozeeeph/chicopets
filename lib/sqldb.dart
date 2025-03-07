@@ -100,14 +100,16 @@ class SqlDb {
 
         await db.execute('''
   CREATE TABLE IF NOT EXISTS variants (
-    code TEXT PRIMARY KEY,
-    product_code TEXT,
-    combination_name TEXT,
-    price REAL,
-    stock INTEGER,
-    attributes TEXT,
-    FOREIGN KEY(product_code) REFERENCES products(code) ON DELETE CASCADE
-  );
+  code TEXT PRIMARY KEY,
+  product_code TEXT,
+  combination_name TEXT,
+  price REAL,
+  price_impact REAL, -- Prix d'impact (positif ou négatif)
+  final_price REAL, -- Prix total après application du prix d'impact
+  stock INTEGER,
+  attributes TEXT,
+  FOREIGN KEY(product_code) REFERENCES products(code) ON DELETE CASCADE
+);
 ''');
         print("Variants table created");
       },

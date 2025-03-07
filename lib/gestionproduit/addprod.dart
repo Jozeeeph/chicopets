@@ -15,6 +15,7 @@ class Addprod {
     final TextEditingController dateController = TextEditingController();
     final TextEditingController margeController = TextEditingController();
     final SqlDb sqldb = SqlDb();
+    
 
     int? selectedCategoryId;
     int? selectedSubCategoryId;

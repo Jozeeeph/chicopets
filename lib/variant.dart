@@ -2,7 +2,9 @@ class Variant {
   String code;
   String productCode; // Code du produit principal
   String combinationName; // Nom de la combinaison (ex: "Small-Red")
-  double price;
+  double price; // Prix de base
+  double priceImpact; // Prix d'impact (positif ou négatif)
+  double finalPrice; // Prix total après application du prix d'impact
   int stock;
   Map<String, String> attributes; // Attributs de la variante (ex: {"size": "small", "color": "red"})
 
@@ -11,9 +13,10 @@ class Variant {
     required this.productCode,
     required this.combinationName,
     required this.price,
+    required this.priceImpact,
     required this.stock,
     required this.attributes,
-  });
+  }) : finalPrice = price + priceImpact; // Calcul du prix total
 
   Map<String, dynamic> toMap() {
     return {
@@ -21,6 +24,8 @@ class Variant {
       'product_code': productCode,
       'combination_name': combinationName,
       'price': price,
+      'price_impact': priceImpact,
+      'final_price': finalPrice, // Nouveau champ
       'stock': stock,
       'attributes': attributes.toString(), // Convertir Map en String pour la base de données
     };
@@ -32,6 +37,7 @@ class Variant {
       productCode: map['product_code'],
       combinationName: map['combination_name'],
       price: map['price'],
+      priceImpact: map['price_impact'] ?? 0.0,
       stock: map['stock'],
       attributes: _parseAttributes(map['attributes']), // Convertir String en Map
     );
