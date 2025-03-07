@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -36,21 +36,22 @@ class SqlDb {
       onCreate: (Database db, int version) async {
         print("Creating tables...");
         await db.execute('''
-    CREATE TABLE products (
-      code TEXT PRIMARY KEY,
-      designation TEXT,
-      stock INTEGER,
-      prix_ht REAL,
-      taxe REAL,
-      prix_ttc REAL,
-      date_expiration TEXT,
-      category_id INTEGER,
-      sub_category_id INTEGER,
-      category_name TEXT,
-      sub_category_name TEXT,
-      is_deleted INTEGER DEFAULT 0,
-      marge REAL
-    );
+  CREATE TABLE products (
+    code TEXT PRIMARY KEY,
+    designation TEXT,
+    stock INTEGER,
+    prix_ht REAL,
+    taxe REAL,
+    prix_ttc REAL,
+    date_expiration TEXT,
+    category_id INTEGER,
+    sub_category_id INTEGER,
+    category_name TEXT,
+    sub_category_name TEXT,
+    is_deleted INTEGER DEFAULT 0,
+    marge REAL,
+    product_reference_id TEXT UNIQUE -- Nouvelle colonne
+  );
 ''');
         print("Products table created");
 
@@ -100,16 +101,16 @@ class SqlDb {
 
         await db.execute('''
   CREATE TABLE IF NOT EXISTS variants (
-  code TEXT PRIMARY KEY,
-  product_code TEXT,
-  combination_name TEXT,
-  price REAL,
-  price_impact REAL, -- Prix d'impact (positif ou négatif)
-  final_price REAL, -- Prix total après application du prix d'impact
-  stock INTEGER,
-  attributes TEXT,
-  FOREIGN KEY(product_code) REFERENCES products(code) ON DELETE CASCADE
-);
+    code TEXT PRIMARY KEY,
+    combination_name TEXT,
+    price REAL,
+    price_impact REAL,
+    final_price REAL,
+    stock INTEGER,
+    attributes TEXT,
+    product_reference_id TEXT, -- Nouvelle colonne
+    FOREIGN KEY(product_reference_id) REFERENCES products(product_reference_id) ON DELETE CASCADE
+  );
 ''');
         print("Variants table created");
       },
@@ -192,34 +193,37 @@ class SqlDb {
   }
 
   Future<void> addProduct(
-    String code,
-    String designation,
-    int stock,
-    double prixHT,
-    double taxe,
-    double prixTTC,
-    String date,
-    int categoryId,
-    int subCategoryId,
-    double d,
-  ) async {
-    final dbClient = await db;
-    await dbClient.insert(
-      'products',
-      {
-        'code': code,
-        'designation': designation,
-        'stock': stock,
-        'prix_ht': prixHT,
-        'taxe': taxe,
-        'prix_ttc': prixTTC,
-        'date_expiration': date,
-        'category_id': categoryId,
-        'sub_category_id': subCategoryId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
+  String code,
+  String designation,
+  int stock,
+  double prixHT,
+  double taxe,
+  double prixTTC,
+  String date,
+  int categoryId,
+  int subCategoryId,
+  double marge,
+  String productReferenceId, // Nouveau paramètre
+) async {
+  final dbClient = await db;
+  await dbClient.insert(
+    'products',
+    {
+      'code': code,
+      'designation': designation,
+      'stock': stock,
+      'prix_ht': prixHT,
+      'taxe': taxe,
+      'prix_ttc': prixTTC,
+      'date_expiration': date,
+      'category_id': categoryId,
+      'sub_category_id': subCategoryId,
+      'marge': marge,
+      'product_reference_id': productReferenceId, // Nouvelle colonne
+    },
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
@@ -261,7 +265,7 @@ class SqlDb {
     for (var orderMap in ordersData) {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
-      double remaining=(orderMap['remaining_amount']) as double;
+      double remaining = (orderMap['remaining_amount']) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -650,12 +654,32 @@ class SqlDb {
       whereArgs: [variantCode],
     );
   }
+
   Future<int> deleteVariantsByProductCode(String productCode) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'variants',
+      where: 'product_code = ?',
+      whereArgs: [productCode],
+    );
+  }
+
+  Future<List<Variant>> getVariantsByProductReferenceId(String productReferenceId) async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> maps = await dbClient.query(
+    'variants',
+    where: 'product_reference_id = ?',
+    whereArgs: [productReferenceId],
+  );
+  return maps.map((map) => Variant.fromMap(map)).toList();
+}
+
+Future<int> deleteVariantsByProductReferenceId(String productReferenceId) async {
   final dbClient = await db;
   return await dbClient.delete(
     'variants',
-    where: 'product_code = ?',
-    whereArgs: [productCode],
+    where: 'product_reference_id = ?',
+    whereArgs: [productReferenceId],
   );
 }
 }
