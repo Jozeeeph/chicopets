@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -50,8 +50,8 @@ class SqlDb {
     sub_category_name TEXT,
     is_deleted INTEGER DEFAULT 0,
     marge REAL,
-    product_reference_id TEXT UNIQUE -- Nouvelle colonne
-  );
+    product_reference_id TEXT -- Now it's not UNIQUE
+);
 ''');
         print("Products table created");
 
@@ -109,9 +109,9 @@ class SqlDb {
     final_price REAL,
     stock INTEGER,
     attributes TEXT,
-    product_reference_id TEXT, -- Nouvelle colonne
+    product_reference_id TEXT,
     FOREIGN KEY(product_reference_id) REFERENCES products(product_reference_id) ON DELETE CASCADE
-  );
+);
 ''');
         print("Variants table created");
       },
@@ -626,7 +626,7 @@ class SqlDb {
     return await dbClient.insert(
       'variants',
       variant.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm: ConflictAlgorithm.abort,
     );
   }
 
