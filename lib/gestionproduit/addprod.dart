@@ -4,7 +4,6 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:uuid/uuid.dart';
 
-
 class Addprod {
   static void showAddProductPopup(BuildContext context, Function refreshData) {
     final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -193,8 +192,7 @@ class Addprod {
                       }
                       String generateProductReferenceId() {
                         var uuid = Uuid();
-                        return uuid
-                            .v4(); // Génère un UUID de version 4 (aléatoire)
+                        return uuid.v4(); // Generates a unique ID
                       }
 
 // Dans la méthode de sauvegarde du produit
