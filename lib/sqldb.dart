@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -74,6 +74,7 @@ class SqlDb {
           product_code TEXT,
           quantity INTEGER,
           prix_unitaire REAL DEFAULT 0,
+          discount REAL,
           FOREIGN KEY(id_order) REFERENCES orders(id_order),
           FOREIGN KEY(product_code) REFERENCES products(code)
         )
@@ -193,37 +194,37 @@ class SqlDb {
   }
 
   Future<void> addProduct(
-  String code,
-  String designation,
-  int stock,
-  double prixHT,
-  double taxe,
-  double prixTTC,
-  String date,
-  int categoryId,
-  int subCategoryId,
-  double marge,
-  String productReferenceId, // Nouveau paramètre
-) async {
-  final dbClient = await db;
-  await dbClient.insert(
-    'products',
-    {
-      'code': code,
-      'designation': designation,
-      'stock': stock,
-      'prix_ht': prixHT,
-      'taxe': taxe,
-      'prix_ttc': prixTTC,
-      'date_expiration': date,
-      'category_id': categoryId,
-      'sub_category_id': subCategoryId,
-      'marge': marge,
-      'product_reference_id': productReferenceId, // Nouvelle colonne
-    },
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
-}
+    String code,
+    String designation,
+    int stock,
+    double prixHT,
+    double taxe,
+    double prixTTC,
+    String date,
+    int categoryId,
+    int subCategoryId,
+    double marge,
+    String productReferenceId, // Nouveau paramètre
+  ) async {
+    final dbClient = await db;
+    await dbClient.insert(
+      'products',
+      {
+        'code': code,
+        'designation': designation,
+        'stock': stock,
+        'prix_ht': prixHT,
+        'taxe': taxe,
+        'prix_ttc': prixTTC,
+        'date_expiration': date,
+        'category_id': categoryId,
+        'sub_category_id': subCategoryId,
+        'marge': marge,
+        'product_reference_id': productReferenceId, // Nouvelle colonne
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
@@ -247,6 +248,7 @@ class SqlDb {
           'product_code': orderLine.idProduct,
           'quantity': orderLine.quantite,
           'prix_unitaire': orderLine.prixUnitaire,
+          'discount': orderLine.discount
         },
       );
     }
@@ -279,6 +281,7 @@ class SqlDb {
           idProduct: line['product_code'].toString(),
           quantite: (line['quantity'] ?? 1) as int,
           prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
+          discount: (line['discount'] ?? 0.0) as double,
         );
       }).toList();
 
@@ -362,6 +365,7 @@ class SqlDb {
             quantite: itemMap['quantity'],
             prixUnitaire: product
                 .prixTTC, // Assuming the unit price is the product's TTC price
+            discount: itemMap['discount'],
           ));
         }
       }
@@ -655,24 +659,24 @@ class SqlDb {
     );
   }
 
- 
+  Future<List<Variant>> getVariantsByProductReferenceId(
+      String productReferenceId) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps = await dbClient.query(
+      'variants',
+      where: 'product_reference_id = ?',
+      whereArgs: [productReferenceId],
+    );
+    return maps.map((map) => Variant.fromMap(map)).toList();
+  }
 
-  Future<List<Variant>> getVariantsByProductReferenceId(String productReferenceId) async {
-  final dbClient = await db;
-  final List<Map<String, dynamic>> maps = await dbClient.query(
-    'variants',
-    where: 'product_reference_id = ?',
-    whereArgs: [productReferenceId],
-  );
-  return maps.map((map) => Variant.fromMap(map)).toList();
-}
-
-Future<int> deleteVariantsByProductReferenceId(String productReferenceId) async {
-  final dbClient = await db;
-  return await dbClient.delete(
-    'variants',
-    where: 'product_reference_id = ?',
-    whereArgs: [productReferenceId],
-  );
-}
+  Future<int> deleteVariantsByProductReferenceId(
+      String productReferenceId) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'variants',
+      where: 'product_reference_id = ?',
+      whereArgs: [productReferenceId],
+    );
+  }
 }

@@ -229,7 +229,7 @@ class _ManageCommandState extends State<ManageCommand> {
                                     3, // Adjust the flex value to control the space allocation
                                 child: Text(
                                   isCancelled
-                                      ? 'Commande annulée'
+                                      ? 'Commande annulée - Total: ${order.total.toStringAsFixed(2)} DT'
                                       : isSemiPaid
                                           ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
                                           : isPaid
@@ -299,7 +299,7 @@ class _ManageCommandState extends State<ManageCommand> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    'Quantité: ${orderLine.quantite} - Prix: ${(orderLine.quantite * orderLine.prixUnitaire).toStringAsFixed(2)} DT',
+                                    'Quantité: ${orderLine.quantite} - Prix: ${(orderLine.quantite * orderLine.prixUnitaire * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT',
                                     style:
                                         const TextStyle(color: Colors.black87),
                                   ),
