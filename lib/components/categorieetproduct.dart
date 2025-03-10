@@ -8,13 +8,16 @@ import 'package:caissechicopets/sqldb.dart';
 class Categorieetproduct extends StatefulWidget {
   final List<Product> selectedProducts;
   final List<int> quantityProducts;
+  final List<double> discounts;
   final Function(Product) onProductSelected;
 
   const Categorieetproduct({
     Key? key,
     required this.selectedProducts,
     required this.quantityProducts,
+    required this.discounts,
     required this.onProductSelected,
+    
   }) : super(key: key);
 
   @override

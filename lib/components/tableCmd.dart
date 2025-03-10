@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
@@ -11,12 +12,14 @@ class TableCmd extends StatefulWidget {
   final double total;
   final List<Product> selectedProducts;
   final List<int> quantityProducts;
+  final List<double> discounts;
+  final Function(int) onApplyDiscount;
   final Function(int) onDeleteProduct;
   final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
-  // final VoidCallback onAddCategory;
+
   final Function(int) onQuantityChange;
-  final double Function(List<Product>, List<int>) calculateTotal;
+  final double Function(List<Product>, List<int>, List<double>) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -25,6 +28,8 @@ class TableCmd extends StatefulWidget {
     required this.total,
     required this.selectedProducts,
     required this.quantityProducts,
+    required this.discounts,
+    required this.onApplyDiscount,
     required this.onDeleteProduct,
     required this.onAddProduct,
     required this.onSearchProduct,
@@ -32,7 +37,6 @@ class TableCmd extends StatefulWidget {
     required this.calculateTotal,
     required this.onFetchOrders,
     required this.onPlaceOrder,
-    // required this.onAddCategory,
   });
 
   @override
@@ -43,14 +47,13 @@ class _TableCmdState extends State<TableCmd> {
   final SqlDb sqldb = SqlDb();
   int? selectedProductIndex;
   TextEditingController barcodeController = TextEditingController();
-  FocusNode barcodeFocusNode = FocusNode(); // To keep focus on the input field
-  String scannedBarcode = ""; // Store scanned barcode temporarily
+  FocusNode barcodeFocusNode = FocusNode();
+  String scannedBarcode = "";
 
   @override
   void initState() {
     super.initState();
-    barcodeFocusNode.requestFocus(); // Keep focus on input field
-    // Listen for barcode scanner input
+    barcodeFocusNode.requestFocus();
     RawKeyboard.instance.addListener(_handleKeyEvent);
   }
 
@@ -65,11 +68,9 @@ class _TableCmdState extends State<TableCmd> {
   void _handleKeyEvent(RawKeyEvent event) {
     if (event is RawKeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.enter) {
-        // If Enter key is detected, process the barcode
         handleBarcodeScan(scannedBarcode);
-        scannedBarcode = ""; // Reset the barcode buffer
+        scannedBarcode = "";
       } else {
-        // Append characters to scannedBarcode
         scannedBarcode += event.character ?? "";
       }
     }
@@ -91,6 +92,7 @@ class _TableCmdState extends State<TableCmd> {
         } else {
           widget.selectedProducts.add(scannedProduct);
           widget.quantityProducts.add(1);
+          widget.discounts.add(0.0); // Add a discount value for the new product
         }
       });
     } else {
@@ -104,11 +106,11 @@ class _TableCmdState extends State<TableCmd> {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start, // Align items to the top
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Table on the left
         Expanded(
-          flex: 2, // Adjust the size of the table
+          flex: 2,
           child: Column(
             children: [
               // Scanner (invisible)
@@ -132,7 +134,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${calculateTotal().toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -146,14 +148,14 @@ class _TableCmdState extends State<TableCmd> {
                         const Text(
                           'Caissier: foulen ben foulen',
                           style: TextStyle(
-                              fontSize:18 ,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white),
                         ),
                         Text(
                           'Time: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
                           style: const TextStyle(
-                              fontSize:18,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white),
                         ),
@@ -175,8 +177,6 @@ class _TableCmdState extends State<TableCmd> {
 
               const SizedBox(height: 10),
 
-              // Total
-
               // Product table
               Container(
                 height: 270,
@@ -186,14 +186,15 @@ class _TableCmdState extends State<TableCmd> {
                 ),
                 child: Column(
                   children: [
+                    // Table Header
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: const Color(0xFF26A9E0),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           Expanded(
                               child: Text('Code',
                                   style: TextStyle(color: Colors.white))),
@@ -204,6 +205,9 @@ class _TableCmdState extends State<TableCmd> {
                               child: Text('Quantité',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
+                              child: Text('Remise%',
+                                  style: TextStyle(color: Colors.white))),
+                          Expanded(
                               child: Text('Prix U',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
@@ -212,54 +216,69 @@ class _TableCmdState extends State<TableCmd> {
                         ],
                       ),
                     ),
+
+                    // Table Body
                     Expanded(
                       child: RawScrollbar(
-                        thumbColor: const Color.fromARGB(
-                            255, 132, 132, 132)!, // Gris sombre
-                        radius: const Radius.circular(10), // Coins arrondis
-                        thickness: 7, // Épaisseur de la barre
-                        thumbVisibility: true, // Toujours visible
-                        scrollbarOrientation:
-                            ScrollbarOrientation.right, // À droite
-                        child: ListView.builder(
-                          itemCount: widget.selectedProducts.length,
-                          itemBuilder: (context, index) {
-                            final product = widget.selectedProducts[index];
-                            bool isSelected = selectedProductIndex == index;
+                        thumbColor: const Color.fromARGB(255, 132, 132, 132),
+                        radius: const Radius.circular(10),
+                        thickness: 7,
+                        thumbVisibility: true,
+                        scrollbarOrientation: ScrollbarOrientation.right,
+                        child: widget.selectedProducts.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Aucun produit sélectionné',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.grey),
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: widget.selectedProducts.length,
+                                itemBuilder: (context, index) {
+                                  final product =
+                                      widget.selectedProducts[index];
+                                  bool isSelected =
+                                      selectedProductIndex == index;
 
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  selectedProductIndex = index;
-                                });
-                              },
-                              child: Container(
-                                color: isSelected
-                                    ? const Color(0xFF26A9E0).withOpacity(0.2)
-                                    : Colors.transparent,
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 12),
-                                child: Row(
-                                  children: [
-                                    Expanded(child: Text(product.code)),
-                                    Expanded(child: Text(product.designation)),
-                                    Expanded(
-                                        child: Text(
-                                            '${widget.quantityProducts[index]}')),
-                                    Expanded(
-                                        child: Text(
-                                            '${product.prixTTC.toStringAsFixed(2)} DT')),
-                                    Expanded(
-                                      child: Text(
-                                        "${(product.prixTTC * widget.quantityProducts[index]).toStringAsFixed(2)} DT",
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        selectedProductIndex = index;
+                                      });
+                                    },
+                                    child: Container(
+                                      color: isSelected
+                                          ? const Color(0xFF26A9E0)
+                                              .withOpacity(0.2)
+                                          : Colors.transparent,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8, horizontal: 12),
+                                      child: Row(
+                                        children: [
+                                          Expanded(child: Text(product.code)),
+                                          Expanded(
+                                              child: Text(product.designation)),
+                                          Expanded(
+                                              child: Text(
+                                                  '${widget.quantityProducts[index]}')),
+                                          Expanded(
+                                              child: Text(
+                                                  '${widget.discounts[index]}')),
+                                          Expanded(
+                                              child: Text(
+                                                  '${product.prixTTC.toStringAsFixed(2)} DT')),
+                                          Expanded(
+                                            child: Text(
+                                              "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT",
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
                       ),
                     ),
                   ],
@@ -273,12 +292,11 @@ class _TableCmdState extends State<TableCmd> {
 
         // Buttons on the right
         Expanded(
-          flex: 1, // Colonne plus petite pour les boutons
+          flex: 1,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start, // Alignement en haut
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              const SizedBox(height: 170), // Espacement en haut
-
+              const SizedBox(height: 170),
               GestureDetector(
                 onTap: selectedProductIndex != null
                     ? () {
@@ -290,21 +308,17 @@ class _TableCmdState extends State<TableCmd> {
                     : null,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 10), // Réduction du padding
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     color: selectedProductIndex != null
                         ? const Color(0xFFE53935)
                         : Colors.grey,
-                    borderRadius:
-                        BorderRadius.circular(8), // Légèrement plus arrondi
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.delete,
-                          color: Colors.white,
-                          size: 18), // Taille icône réduite
+                      Icon(Icons.delete, color: Colors.white, size: 18),
                       SizedBox(width: 8),
                       Text('SUPPRIMER LIGNE',
                           style: TextStyle(
@@ -315,7 +329,42 @@ class _TableCmdState extends State<TableCmd> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8), // Réduction de l'espacement
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: selectedProductIndex != null
+                    ? () {
+                        Applydiscount.showDiscountInput(
+                          context,
+                          selectedProductIndex!,
+                          widget.discounts,
+                          () => setState(() {}),
+                        );
+                      }
+                    : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selectedProductIndex != null
+                        ? const Color(0xFF0056A6)
+                        : Colors.grey,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('REMISE',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               GestureDetector(
                 onTap: selectedProductIndex != null
                     ? () => widget.onQuantityChange(selectedProductIndex!)
@@ -334,7 +383,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.edit, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('CHANGER QUANTITÉ',
+                      Text('CHANGER QUANTITE',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -344,7 +393,6 @@ class _TableCmdState extends State<TableCmd> {
                 ),
               ),
               const SizedBox(height: 8),
-
               GestureDetector(
                 onTap: widget.onSearchProduct,
                 child: Container(
@@ -369,9 +417,6 @@ class _TableCmdState extends State<TableCmd> {
                 ),
               ),
               const SizedBox(height: 8),
-
-              
-
               GestureDetector(
                 onTap: widget.onFetchOrders,
                 child: Container(
@@ -396,7 +441,6 @@ class _TableCmdState extends State<TableCmd> {
                 ),
               ),
               const SizedBox(height: 8),
-
               GestureDetector(
                 onTap: widget.onPlaceOrder,
                 child: Container(
@@ -425,13 +469,5 @@ class _TableCmdState extends State<TableCmd> {
         ),
       ],
     );
-  }
-
-  double calculateTotal() {
-    double total = 0.0;
-    for (int i = 0; i < widget.selectedProducts.length; i++) {
-      total += widget.selectedProducts[i].prixTTC * widget.quantityProducts[i];
-    }
-    return total;
   }
 }

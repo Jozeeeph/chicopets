@@ -3,12 +3,14 @@ class OrderLine {
   String idProduct;  // Product code
   int quantite;      // Quantity of the product
   double prixUnitaire; // Unit price
+  double discount; 
 
   OrderLine({
     required this.idOrder,
     required this.idProduct,
     required this.quantite,
     required this.prixUnitaire,
+    required this.discount,
   });
 
   // Convert OrderLine to a map (for database storage)
@@ -18,6 +20,7 @@ class OrderLine {
       'idProduct': idProduct,
       'quantite': quantite,
       'prixUnitaire': prixUnitaire,
+      'discount': discount,
     };
   }
 
@@ -28,6 +31,7 @@ class OrderLine {
       idProduct: map['idProduct'],
       quantite: map['quantite'],
       prixUnitaire: map['prixUnitaire'],
+      discount: map['discount'],
     );
   }
 }
