@@ -5,8 +5,13 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 
 class Addorder {
-  static void showPlaceOrderPopup(BuildContext context, Order order,
-      List<Product> selectedProducts, List<int> quantityProducts) async {
+  static void showPlaceOrderPopup(
+    BuildContext context,
+    Order order,
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+  ) async {
     print("seee ${selectedProducts.length}");
 
     if (selectedProducts.isEmpty) {
@@ -57,7 +62,7 @@ class Addorder {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController changeReturnedController = TextEditingController();
 
-    double total = calculateTotal(selectedProducts, quantityProducts);
+    double total = calculateTotal(selectedProducts, quantityProducts, discounts);
     String selectedPaymentMethod = "Espèce"; // Default payment method
 
     showDialog(
@@ -177,6 +182,8 @@ class Addorder {
                           if (selectedProducts.isNotEmpty)
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
+                              double discountedPrice = product.prixTTC *
+                                  (1 - discounts[index] / 100); // Apply discount
                               return Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -206,7 +213,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${product.prixTTC.toStringAsFixed(2)} DT",
+                                        "${discountedPrice.toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                         ),
@@ -216,7 +223,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${(product.prixTTC * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                        "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -385,7 +392,7 @@ class Addorder {
                   onPressed: () {
                     Navigator.of(context).pop(); // Close popup
                     _confirmPlaceOrder(context, selectedProducts,
-                        quantityProducts, amountGiven);
+                        quantityProducts, amountGiven, discounts);
                   },
                   child: Text(
                     "Confirmer",
@@ -402,10 +409,12 @@ class Addorder {
   }
 
   static void _confirmPlaceOrder(
-      BuildContext context,
-      List<Product> selectedProducts,
-      List<int> quantityProducts,
-      double amountGiven) async {
+    BuildContext context,
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    double amountGiven,
+    List<double> discounts,
+  ) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Aucun produit sélectionné.")),
@@ -413,7 +422,9 @@ class Addorder {
       return;
     }
 
-    double total = calculateTotal(selectedProducts, quantityProducts);
+    print("saving ....");
+
+    double total = calculateTotal(selectedProducts, quantityProducts, discounts);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces"; // You can change this if needed
 
@@ -423,7 +434,6 @@ class Addorder {
     // Calculate the remaining amount
     double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
     print("Calculated remainingAmount: $remainingAmount");
-
 
     // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
@@ -435,6 +445,7 @@ class Addorder {
         idProduct: product.code,
         quantite: quantityProducts[productIndex], // Correct quantity
         prixUnitaire: product.prixTTC,
+        discount: discounts[productIndex], // Correct quantity
       );
     }).toList();
 
@@ -496,6 +507,7 @@ class Addorder {
 
       selectedProducts.clear();
       quantityProducts.clear();
+      discounts.clear();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -507,10 +519,15 @@ class Addorder {
   }
 
   static double calculateTotal(
-      List<Product> selectedProducts, List<int> quantityProducts) {
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+  ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      total += selectedProducts[i].prixTTC * quantityProducts[i];
+      double discountedPrice =
+          selectedProducts[i].prixTTC * (1 - discounts[i] / 100); // Apply discount
+      total += discountedPrice * quantityProducts[i];
     }
     return total;
   }

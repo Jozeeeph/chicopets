@@ -7,6 +7,7 @@ class Deleteline {
       BuildContext context,
       List<Product> selectedProducts,
       List<int> quantityProducts,
+      List<double> discounts,
       VoidCallback onUpdate) { // Add callback parameter
     
     if (index < 0 || index >= selectedProducts.length) {
@@ -28,6 +29,7 @@ class Deleteline {
                 if (index >= 0 && index < selectedProducts.length) {
                   selectedProducts.removeAt(index);
                   quantityProducts.removeAt(index);
+                  discounts.removeAt(index);
                   onUpdate(); // Update UI after deletion
                 }
                 Navigator.of(context).pop(); // Close popup

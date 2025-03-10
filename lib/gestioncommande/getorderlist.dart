@@ -288,7 +288,7 @@ class Getorderlist {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                            "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                            "${(orderLine.prixUnitaire * (1 - orderLine.discount / 100) * orderLine.quantite).toStringAsFixed(2)} DT"),
                                         IconButton(
                                           icon: Icon(Icons.delete,
                                               color: Colors.red),
@@ -514,6 +514,8 @@ class Getorderlist {
                       }
 
                       Product product = snapshot.data!;
+                      double discountedPrice = orderLine.prixUnitaire *
+                          (1 - orderLine.discount / 100);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
@@ -541,7 +543,7 @@ class Getorderlist {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                "${discountedPrice.toStringAsFixed(2)} DT",
                                 style: TextStyle(
                                     fontSize: 16,
                                     color: Color(0xFF000000)), // Deep Blue
@@ -551,7 +553,7 @@ class Getorderlist {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
+                                "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -667,14 +669,16 @@ class Getorderlist {
 
             // Liste des produits
             ...order.orderLines.map((orderLine) {
+              double discountedPrice =
+                  orderLine.prixUnitaire * (1 - orderLine.discount / 100);
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text("x${orderLine.quantite}"),
                   pw.Text(orderLine.idProduct),
-                  pw.Text("${orderLine.prixUnitaire.toStringAsFixed(2)} DT"),
+                  pw.Text("${discountedPrice.toStringAsFixed(2)} DT"),
                   pw.Text(
-                      "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                      "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT"),
                 ],
               );
             }).toList(),

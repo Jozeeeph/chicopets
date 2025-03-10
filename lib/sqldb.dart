@@ -73,6 +73,7 @@ class SqlDb {
           product_code TEXT,
           quantity INTEGER,
           prix_unitaire REAL DEFAULT 0,
+          discount REAL,
           FOREIGN KEY(id_order) REFERENCES orders(id_order),
           FOREIGN KEY(product_code) REFERENCES products(code)
         )
@@ -241,6 +242,7 @@ class SqlDb {
           'product_code': orderLine.idProduct,
           'quantity': orderLine.quantite,
           'prix_unitaire': orderLine.prixUnitaire,
+          'discount': orderLine.discount
         },
       );
     }
@@ -259,7 +261,7 @@ class SqlDb {
     for (var orderMap in ordersData) {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
-      double remaining=(orderMap['remaining_amount']) as double;
+      double remaining = (orderMap['remaining_amount']) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -273,6 +275,7 @@ class SqlDb {
           idProduct: line['product_code'].toString(),
           quantite: (line['quantity'] ?? 1) as int,
           prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
+          discount: (line['discount'] ?? 0.0) as double,
         );
       }).toList();
 
@@ -356,6 +359,7 @@ class SqlDb {
             quantite: itemMap['quantity'],
             prixUnitaire: product
                 .prixTTC, // Assuming the unit price is the product's TTC price
+            discount: itemMap['discount'],
           ));
         }
       }
@@ -648,12 +652,13 @@ class SqlDb {
       whereArgs: [variantCode],
     );
   }
+
   Future<int> deleteVariantsByProductCode(String productCode) async {
-  final dbClient = await db;
-  return await dbClient.delete(
-    'variants',
-    where: 'product_code = ?',
-    whereArgs: [productCode],
-  );
-}
+    final dbClient = await db;
+    return await dbClient.delete(
+      'variants',
+      where: 'product_code = ?',
+      whereArgs: [productCode],
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/components/categorieetproduct.dart';
 import 'package:caissechicopets/gestioncommande/addorder.dart';
@@ -24,6 +25,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   Future<List<Product>>? products;
   List<Product> selectedProducts = [];
   List<int> quantityProducts = [];
+  List<double> discounts = []; // Track discounts for each product
   int? selectedProductIndex;
   String enteredQuantity = "";
 
@@ -38,15 +40,35 @@ class _CashDeskPageState extends State<CashDeskPage> {
     }
   }
 
+  void handleApplyDiscount(int index) {
+    if (index >= 0 && index < selectedProducts.length) {
+      Applydiscount.showDiscountInput(
+        context,
+        index,
+        discounts,
+        () {
+          setState(() {}); // Refresh UI after discount update
+        },
+      );
+    } else {
+      print("Invalid product index: $index");
+    }
+  }
+
   void handlePlaceOrder() {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(selectedProducts, quantityProducts),
+      total: calculateTotal(selectedProducts, quantityProducts, discounts),
       modePaiement: "Espèces", // Default payment method
     );
     Addorder.showPlaceOrderPopup(
-        context, order, selectedProducts, quantityProducts);
+      context,
+      order,
+      selectedProducts,
+      quantityProducts,
+      discounts,
+    );
   }
 
   void handleSearchProduct() {
@@ -59,9 +81,15 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   void handleDeleteProduct(int index) {
     Deleteline.showDeleteConfirmation(
-        index, context, selectedProducts, quantityProducts, () {
-      setState(() {}); // Refresh UI after deletion
-    });
+      index,
+      context,
+      selectedProducts,
+      quantityProducts,
+      discounts, // Pass the discounts list directly
+      () {
+        setState(() {}); // Refresh UI after deletion
+      },
+    );
   }
 
   void handleFetchOrders() {
@@ -74,6 +102,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
     products = sqldb
         .getProductsWithCategory()
         .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
+    products?.then((productList) {
+      print("Fetched products: $productList");
+    });
   }
 
   @override
@@ -85,18 +116,21 @@ class _CashDeskPageState extends State<CashDeskPage> {
         child: Column(
           children: [
             // Table Command Section
-            TableCmd(
-              total: calculateTotal(selectedProducts, quantityProducts),
-              selectedProducts: selectedProducts,
-              quantityProducts: quantityProducts,
-              calculateTotal: calculateTotal,
-              onAddProduct: (refreshData) => handleAddProduct(refreshData),
-              onDeleteProduct: handleDeleteProduct,
-              onSearchProduct: handleSearchProduct, // Ensure this is passed
-              onQuantityChange: handleQuantityChange,
-              onFetchOrders: handleFetchOrders,
-              onPlaceOrder: handlePlaceOrder, 
-            ),
+              TableCmd(
+                total: calculateTotal(selectedProducts, quantityProducts, discounts),
+                selectedProducts: selectedProducts,
+                quantityProducts: quantityProducts,
+                discounts: discounts,
+                onApplyDiscount: handleApplyDiscount,
+                calculateTotal: calculateTotal,
+                onAddProduct: (refreshData) => handleAddProduct(refreshData),
+                onDeleteProduct: handleDeleteProduct,
+                onSearchProduct: handleSearchProduct,
+                onQuantityChange: handleQuantityChange,
+                onFetchOrders: handleFetchOrders,
+                onPlaceOrder: handlePlaceOrder,
+              ),
+           
 
             const SizedBox(height: 10), // Add some spacing
 
@@ -104,17 +138,35 @@ class _CashDeskPageState extends State<CashDeskPage> {
             Categorieetproduct(
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
+              discounts: discounts,
               onProductSelected: (Product product) {
                 setState(() {
-                  int index = selectedProducts
-                      .indexWhere((p) => p.code == product.code);
+                  // Debugging: Print the product code being passed in and the codes in selectedProducts
+                  print("List length: ${selectedProducts.length}");
+                  print("List content: $selectedProducts");
+                  print("Selected Product Code: '${product.code}'");
+                  selectedProducts.forEach((p) {
+                    print("Existing Product Code: '${p.code}'");
+                  });
+
+                  // Ensuring no spaces or formatting issues
+                  int index = selectedProducts.indexWhere(
+                    (p) =>
+                        p.code.trim().toLowerCase() ==
+                        product.code.trim().toLowerCase(),
+                  );
+                  print("Index found: $index");
+
                   if (index == -1) {
-                    // Produit non encore sélectionné, on l'ajoute avec une quantité initiale de 1
+                    // Product not selected yet, we add it with an initial quantity of 1
                     selectedProducts.add(product);
                     quantityProducts.add(1);
+                    discounts.add(0.0); // Add a discount value for the new product
+                    selectedProductIndex = selectedProducts.length - 1;
                   } else {
-                    // Produit déjà sélectionné, on incrémente la quantité
+                    // Product already selected, we increment the quantity
                     quantityProducts[index]++;
+                    selectedProductIndex = index;
                   }
                 });
               },
@@ -125,11 +177,18 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
+  // Calculate the total price including discounts
   double calculateTotal(
-      List<Product> selectedProducts, List<int> quantityProducts) {
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+  ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      total += selectedProducts[i].prixTTC * quantityProducts[i];
+      final double price = selectedProducts[i].prixTTC;
+      final int quantity = quantityProducts[i];
+      final double discount = discounts[i];
+      total += price * quantity * (1 - discount / 100);
     }
     return total;
   }

@@ -1,3 +1,4 @@
+
 import 'package:caissechicopets/orderline.dart';
 
 class Order {
@@ -10,6 +11,7 @@ class Order {
   double remainingAmount;
   int? idClient;
 
+
   Order({
     this.idOrder,
     required this.date,
@@ -19,6 +21,7 @@ class Order {
     this.status = "non payée",
     this.remainingAmount = 0.0, 
     this.idClient,
+
   });
 
   // Convert Order object to a Map
@@ -31,6 +34,7 @@ class Order {
       'status': status,
       'remaining_amount': remainingAmount,
       'id_client': idClient,
+
     };
   }
 
@@ -45,11 +49,12 @@ class Order {
       status: map['status'] ?? "non payée",
       remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0, 
       idClient: map['id_client'],
+
     );
   }
 
   @override
   String toString() {
-    return 'reste: $remainingAmount';
+    return 'Order ID: $idOrder, Status: $status';
   }
 }
