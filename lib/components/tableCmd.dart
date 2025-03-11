@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -13,14 +12,14 @@ class TableCmd extends StatefulWidget {
   final List<Product> selectedProducts;
   final List<int> quantityProducts;
   final List<double> discounts;
-  final double globalDiscount;
+  final List<bool> typeDiscounts;
   final Function(int) onApplyDiscount;
   final Function(int) onDeleteProduct;
   final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
 
   final Function(int) onQuantityChange;
-  final double Function(List<Product>, List<int>, List<double>,double globalDiscount) calculateTotal;
+  final double Function(List<Product>, List<int>, List<double>) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -30,7 +29,7 @@ class TableCmd extends StatefulWidget {
     required this.selectedProducts,
     required this.quantityProducts,
     required this.discounts,
-    required this.globalDiscount,
+    required this.typeDiscounts,
     required this.onApplyDiscount,
     required this.onDeleteProduct,
     required this.onAddProduct,
@@ -136,7 +135,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.globalDiscount).toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -207,7 +206,7 @@ class _TableCmdState extends State<TableCmd> {
                               child: Text('Quantité',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
-                              child: Text('Remise%',
+                              child: Text('Remise',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
                               child: Text('Prix U',
@@ -266,13 +265,16 @@ class _TableCmdState extends State<TableCmd> {
                                                   '${widget.quantityProducts[index]}')),
                                           Expanded(
                                               child: Text(
-                                                  '${widget.discounts[index]}')),
+                                                  '${widget.discounts[index]} ${widget.typeDiscounts[index] ? '%' : 'DT'}')),
                                           Expanded(
                                               child: Text(
                                                   '${product.prixTTC.toStringAsFixed(2)} DT')),
                                           Expanded(
                                             child: Text(
-                                              "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT",
+                                              widget.typeDiscounts[
+                                                      index] // Check if the discount is a percentage
+                                                  ? "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                                  : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT", // Fixed value discount
                                             ),
                                           ),
                                         ],
@@ -339,6 +341,7 @@ class _TableCmdState extends State<TableCmd> {
                           context,
                           selectedProductIndex!,
                           widget.discounts,
+                          widget.typeDiscounts,
                           () => setState(() {}),
                         );
                       }
@@ -355,9 +358,9 @@ class _TableCmdState extends State<TableCmd> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.discount, color: Colors.white, size: 18),
+                      Icon(Icons.edit, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('REMISE PAR LIGNE',
+                      Text('REMISE',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
