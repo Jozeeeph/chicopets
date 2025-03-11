@@ -297,6 +297,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                         _buildTextFormField(
+                        controller: designationController,
+                        label: 'Désignation',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Désignation" ne doit pas être vide.';
+                          }
+                          return null;
+                        },
+                      ),
+                        _buildTextFormField(
                           controller: stockController,
                           label: 'Stock',
                           keyboardType: TextInputType.number,
@@ -312,16 +322,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                       ],
-                      _buildTextFormField(
-                        controller: designationController,
-                        label: 'Désignation',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Désignation" ne doit pas être vide.';
-                          }
-                          return null;
-                        },
-                      ),
+                      
                       _buildTextFormField(
                         controller: priceHTController,
                         label: 'Prix d\'achat',
@@ -516,6 +517,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                       ),
+                      const SizedBox(height: 16),
                       if (hasVariants) ...[
                         _buildTextFormField(
                           controller: attributeNameController,

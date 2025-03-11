@@ -292,7 +292,7 @@ class _AddCategoryState extends State<AddCategory> {
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor:
-            const Color.fromARGB(255, 71, 233, 46), // Green for success
+            const Color.fromARGB(255, 92, 216, 73), // Green for success
       ),
     );
   }

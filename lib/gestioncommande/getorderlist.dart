@@ -3,6 +3,7 @@ import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/order.dart';
+import 'package:pdf/pdf.dart'; // Import the PdfPageFormat class
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -514,7 +515,8 @@ class Getorderlist {
                       }
 
                       Product product = snapshot.data!;
-                      double discountedPrice = orderLine.prixUnitaire *(1 - orderLine.discount / 100);
+                      double discountedPrice = orderLine.prixUnitaire *
+                          (1 - orderLine.discount / 100);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
@@ -568,6 +570,28 @@ class Getorderlist {
                 }).toList(),
 
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+
+                // Global Discount
+                if (order.globalDiscount > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Remise Globale:",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)), // Deep Blue
+                      ),
+                      Text(
+                        "${order.globalDiscount.toStringAsFixed(2)} %",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red), // Red for discount
+                      ),
+                    ],
+                  ),
 
                 // Total et Mode de paiement
                 Row(
@@ -633,83 +657,198 @@ class Getorderlist {
       BuildContext context, Order order) async {
     final pdf = pw.Document();
 
+    // Define the page format for a standard receipt (80mm width, auto height)
+    const double pageWidth = 70 * PdfPageFormat.mm; // 80mm width
+    const double pageHeight = double.infinity; // Auto height
+
     pdf.addPage(
       pw.Page(
+        pageFormat: PdfPageFormat(pageWidth, pageHeight,
+            marginAll: 4 * PdfPageFormat.mm),
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            // Header with welcome message
             pw.Center(
-              child: pw.Text("Ticket de Commande",
-                  style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
+              child: pw.Column(
+                children: [
+                  pw.Text(
+                    "Bienvenue chez Chicopets!",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Text(
+                    "Merci pour votre visite!",
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
             ),
             pw.Divider(),
 
-            // Numéro de commande et date
-            pw.Text("Commande #${order.idOrder}"),
-            pw.Text("Date: ${formatDate(order.date)}"),
+            // Order number and date
+            pw.Text(
+              "Commande #${order.idOrder}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
+            pw.Text(
+              "Date: ${formatDate(order.date)}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
             pw.Divider(),
 
-            // Header de la liste des articles
+            // Header row for items
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Qt",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Article",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Prix U",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Montant",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  "Qt",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Article",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Prix U",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Montant",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
               ],
             ),
             pw.Divider(),
 
-            // Liste des produits
+            // List of products
             ...order.orderLines.map((orderLine) {
               double discountedPrice =
                   orderLine.prixUnitaire * (1 - orderLine.discount / 100);
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text("x${orderLine.quantite}"),
-                  pw.Text(orderLine.idProduct),
-                  pw.Text("${discountedPrice.toStringAsFixed(2)} DT"),
                   pw.Text(
-                      "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT"),
+                    "x${orderLine.quantite}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    orderLine.idProduct,
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    "${discountedPrice.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
                 ],
               );
             }).toList(),
 
             pw.Divider(),
 
-            // Total et mode de paiement
+            // Global Discount
+            if (order.globalDiscount > 0)
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Remise Globale:",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "${order.globalDiscount.toStringAsFixed(2)} %",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
+
+            // Total and payment method
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Total:",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("${order.total.toStringAsFixed(2)} DT",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  "Total:",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "${order.total.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
               ],
             ),
-            pw.SizedBox(height: 10),
-            pw.Text("Mode de Paiement: ${order.modePaiement}"),
+            pw.SizedBox(height: 5),
+            pw.Text(
+              "Mode de Paiement: ${order.modePaiement}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
+
+            // Footer with thank you message
+            pw.Center(
+              child: pw.Column(
+                children: [
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    "Merci pour votre confiance!",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "À bientôt chez Chicopets!",
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
 
-    // Obtenir le répertoire de téléchargement
+    // Save the PDF to the downloads directory
     final directory = await getDownloadsDirectory();
     final filePath = "${directory!.path}/ticket_commande_${order.idOrder}.pdf";
 
-    // Sauvegarde du fichier
     final file = File(filePath);
     await file.writeAsBytes(await pdf.save());
 
-    // Afficher une notification de succès
+    // Show a success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("PDF enregistré dans: $filePath"),

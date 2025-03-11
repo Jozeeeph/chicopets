@@ -15,8 +15,17 @@ class ImportProductPage extends StatefulWidget {
 
 class _ImportProductPageState extends State<ImportProductPage> {
   final SqlDb _sqlDb = SqlDb();
+  String _importStatus = 'Prêt ?'; // État initial
+  int _importedProductsCount = 0; // Nombre de produits importés
+  String _errorMessage = ''; // Message d'erreur
 
   Future<void> importProducts() async {
+    setState(() {
+      _importStatus = 'Importation en cours...';
+      _importedProductsCount = 0;
+      _errorMessage = '';
+    });
+
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -60,7 +69,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
               return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
             }
 
-// Dans la méthode de sauvegarde du produit
             final productReferenceId = generateProductReferenceId();
 
             await _sqlDb.addProduct(
@@ -75,14 +83,27 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 subCategoryId,
                 prixTTC - prixHT,
                 productReferenceId);
+
+            setState(() {
+              _importedProductsCount++;
+            });
           }
         }
+
+        setState(() {
+          _importStatus = 'Importation réussie!';
+        });
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Importation réussie!')),
         );
       }
     } catch (e) {
+      setState(() {
+        _importStatus = 'Erreur lors de l\'importation';
+        _errorMessage = e.toString();
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors de l\'importation: $e')),
       );
@@ -101,7 +122,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
     if (result.isNotEmpty) {
       return result.first['id_category'];
     } else {
-      // Si la catégorie n'existe pas, on la crée
       int newCategoryId = await dbClient.insert(
         'categories',
         {'category_name': categoryName, 'image_path': categoryImagePath},
@@ -122,7 +142,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
     if (result.isNotEmpty) {
       return result.first['id_sub_category'];
     } else {
-      // Si la sous-catégorie n'existe pas, on la crée
       int newSubCategoryId = await dbClient.insert(
         'sub_categories',
         {'sub_category_name': subCategoryName, 'category_id': categoryId},
@@ -152,25 +171,54 @@ class _ImportProductPageState extends State<ImportProductPage> {
           ),
         ),
         child: Center(
-          child: ElevatedButton.icon(
-            onPressed: importProducts,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              backgroundColor: const Color(0xFFFF9800),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: importProducts,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  backgroundColor: const Color(0xFFFF9800),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 5,
+                ),
+                icon: const Icon(Icons.upload_file, color: Colors.white),
+                label: Text(
+                  'Importer un fichier Excel',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              elevation: 5,
-            ),
-            icon: const Icon(Icons.upload_file, color: Colors.white),
-            label: Text(
-              'Importer un fichier Excel',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 20),
+              Text(
+                _importStatus,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
               ),
-            ),
+              if (_importedProductsCount > 0)
+                Text(
+                  'Produits importés: $_importedProductsCount',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              if (_errorMessage.isNotEmpty)
+                Text(
+                  'Erreur: $_errorMessage',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.red,
+                  ),
+                ),
+            ],
           ),
         ),
       ),
