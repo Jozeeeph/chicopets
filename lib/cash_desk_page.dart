@@ -26,6 +26,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   List<Product> selectedProducts = [];
   List<int> quantityProducts = [];
   List<double> discounts = []; // Track discounts for each product
+  double globalDiscount = 0.0; // Remise globale
   int? selectedProductIndex;
   String enteredQuantity = "";
 
@@ -59,8 +60,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(selectedProducts, quantityProducts, discounts),
+      total: calculateTotal(selectedProducts, quantityProducts, discounts,
+          globalDiscount), // Ajout de la remise globale
       modePaiement: "Espèces", // Default payment method
+      globalDiscount: globalDiscount, // Ajout de la remise globale
     );
     Addorder.showPlaceOrderPopup(
       context,
@@ -116,21 +119,22 @@ class _CashDeskPageState extends State<CashDeskPage> {
         child: Column(
           children: [
             // Table Command Section
-              TableCmd(
-                total: calculateTotal(selectedProducts, quantityProducts, discounts),
-                selectedProducts: selectedProducts,
-                quantityProducts: quantityProducts,
-                discounts: discounts,
-                onApplyDiscount: handleApplyDiscount,
-                calculateTotal: calculateTotal,
-                onAddProduct: (refreshData) => handleAddProduct(refreshData),
-                onDeleteProduct: handleDeleteProduct,
-                onSearchProduct: handleSearchProduct,
-                onQuantityChange: handleQuantityChange,
-                onFetchOrders: handleFetchOrders,
-                onPlaceOrder: handlePlaceOrder,
-              ),
-           
+            TableCmd(
+              total:
+                  calculateTotal(selectedProducts, quantityProducts, discounts,globalDiscount),
+              selectedProducts: selectedProducts,
+              quantityProducts: quantityProducts,
+              discounts: discounts,
+              globalDiscount: globalDiscount,
+              onApplyDiscount: handleApplyDiscount,
+              calculateTotal: calculateTotal,
+              onAddProduct: (refreshData) => handleAddProduct(refreshData),
+              onDeleteProduct: handleDeleteProduct,
+              onSearchProduct: handleSearchProduct,
+              onQuantityChange: handleQuantityChange,
+              onFetchOrders: handleFetchOrders,
+              onPlaceOrder: handlePlaceOrder,
+            ),
 
             const SizedBox(height: 10), // Add some spacing
 
@@ -161,7 +165,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     // Product not selected yet, we add it with an initial quantity of 1
                     selectedProducts.add(product);
                     quantityProducts.add(1);
-                    discounts.add(0.0); // Add a discount value for the new product
+                    discounts
+                        .add(0.0); // Add a discount value for the new product
                     selectedProductIndex = selectedProducts.length - 1;
                   } else {
                     // Product already selected, we increment the quantity
@@ -182,14 +187,16 @@ class _CashDeskPageState extends State<CashDeskPage> {
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
+    double globalDiscount, // Ajout de la remise globale
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      final double price = selectedProducts[i].prixTTC;
-      final int quantity = quantityProducts[i];
-      final double discount = discounts[i];
-      total += price * quantity * (1 - discount / 100);
+      double discountedPrice = selectedProducts[i].prixTTC *
+          (1 - discounts[i] / 100); // Remise par produit
+      total += discountedPrice * quantityProducts[i];
     }
+    // Appliquer la remise globale
+    total *= (1 - globalDiscount / 100);
     return total;
   }
 }

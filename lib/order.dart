@@ -9,6 +9,7 @@ class Order {
   String status;
   double remainingAmount;
   int? idClient;
+  double globalDiscount;
 
   Order({
     this.idOrder,
@@ -17,8 +18,9 @@ class Order {
     required this.total,
     required this.modePaiement,
     this.status = "non payée",
-    this.remainingAmount = 0.0, 
+    this.remainingAmount = 0.0,
     this.idClient,
+    required this.globalDiscount,
   });
 
   // Convert Order object to a Map
@@ -31,6 +33,7 @@ class Order {
       'status': status,
       'remaining_amount': remainingAmount,
       'id_client': idClient,
+      'global_discount': globalDiscount,
     };
   }
 
@@ -43,8 +46,9 @@ class Order {
       total: map['total'].toDouble(),
       modePaiement: map['mode_paiement'],
       status: map['status'] ?? "non payée",
-      remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0, 
+      remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0,
       idClient: map['id_client'],
+      globalDiscount: map['global_discount'],
     );
   }
 

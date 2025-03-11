@@ -17,7 +17,6 @@ class Categorieetproduct extends StatefulWidget {
     required this.quantityProducts,
     required this.discounts,
     required this.onProductSelected,
-    
   }) : super(key: key);
 
   @override
@@ -84,7 +83,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     try {
       final productsMap = await sqldb.getProducts();
       print("Fetched products: $productsMap");
-      return productsMap.toList();
+      // Filter out products with stock = 0
+      return productsMap.where((product) => product.stock > 0).toList();
     } catch (e) {
       print("Error fetching products: $e");
       return [];
