@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -13,6 +12,7 @@ class TableCmd extends StatefulWidget {
   final List<Product> selectedProducts;
   final List<int> quantityProducts;
   final List<double> discounts;
+  final List<bool> typeDiscounts;
   final Function(int) onApplyDiscount;
   final Function(int) onDeleteProduct;
   final RefreshCallback onAddProduct;
@@ -29,6 +29,7 @@ class TableCmd extends StatefulWidget {
     required this.selectedProducts,
     required this.quantityProducts,
     required this.discounts,
+    required this.typeDiscounts,
     required this.onApplyDiscount,
     required this.onDeleteProduct,
     required this.onAddProduct,
@@ -205,7 +206,7 @@ class _TableCmdState extends State<TableCmd> {
                               child: Text('Quantité',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
-                              child: Text('Remise%',
+                              child: Text('Remise',
                                   style: TextStyle(color: Colors.white))),
                           Expanded(
                               child: Text('Prix U',
@@ -264,13 +265,16 @@ class _TableCmdState extends State<TableCmd> {
                                                   '${widget.quantityProducts[index]}')),
                                           Expanded(
                                               child: Text(
-                                                  '${widget.discounts[index]}')),
+                                                  '${widget.discounts[index]} ${widget.typeDiscounts[index] ? '%' : 'DT'}')),
                                           Expanded(
                                               child: Text(
                                                   '${product.prixTTC.toStringAsFixed(2)} DT')),
                                           Expanded(
                                             child: Text(
-                                              "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT",
+                                              widget.typeDiscounts[
+                                                      index] // Check if the discount is a percentage
+                                                  ? "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                                  : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT", // Fixed value discount
                                             ),
                                           ),
                                         ],
@@ -337,6 +341,7 @@ class _TableCmdState extends State<TableCmd> {
                           context,
                           selectedProductIndex!,
                           widget.discounts,
+                          widget.typeDiscounts,
                           () => setState(() {}),
                         );
                       }

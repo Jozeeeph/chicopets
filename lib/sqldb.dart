@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -75,6 +75,7 @@ class SqlDb {
           quantity INTEGER,
           prix_unitaire REAL DEFAULT 0,
           discount REAL,
+          isPercentage 
           FOREIGN KEY(id_order) REFERENCES orders(id_order),
           FOREIGN KEY(product_code) REFERENCES products(code)
         )
@@ -145,7 +146,7 @@ class SqlDb {
 
   Future<void> updateOrderStatus(int idOrder, String status) async {
     final dbClient = await db;
-    await dbClient!.update(
+    await dbClient.update(
       'orders',
       {'status': status},
       where: 'id_order = ?',
@@ -267,7 +268,7 @@ class SqlDb {
     for (var orderMap in ordersData) {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
-      double remaining = (orderMap['remaining_amount']) as double;
+      double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -282,6 +283,7 @@ class SqlDb {
           quantite: (line['quantity'] ?? 1) as int,
           prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
           discount: (line['discount'] ?? 0.0) as double,
+          isPercentage: (line['isPercentage'] ?? 1) == 1, // Convert int to bool
         );
       }).toList();
 
@@ -345,7 +347,7 @@ class SqlDb {
         whereArgs: [orderId],
       );
 
-      List<OrderLine> orderLines = []; // Corrected variable
+      List<OrderLine> orderLines = [];
 
       for (var itemMap in itemMaps) {
         // Fetch the product details
@@ -358,14 +360,15 @@ class SqlDb {
         if (productMaps.isNotEmpty) {
           Product product = Product.fromMap(productMaps.first);
 
-          // Create an OrderLine for each item, pass the correct idProduct
+          // Create an OrderLine for each item, including isPercentage
           orderLines.add(OrderLine(
             idOrder: orderId,
-            idProduct: itemMap['product_code'], // Pass the product code
-            quantite: itemMap['quantity'],
-            prixUnitaire: product
-                .prixTTC, // Assuming the unit price is the product's TTC price
-            discount: itemMap['discount'],
+            idProduct: itemMap['product_code'],
+            quantite: itemMap['quantity'] ?? 1, // Default to 1 if null
+            prixUnitaire: product.prixTTC, // TTC price from product
+            discount: (itemMap['discount'] ?? 0.0).toDouble(), // Ensure double
+            isPercentage:
+                (itemMap['isPercentage'] ?? 1) == 1, // Convert 0/1 to bool
           ));
         }
       }
@@ -374,10 +377,10 @@ class SqlDb {
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        orderLines: orderLines, //Assign correct list
-        total: orderMap['total'].toDouble(),
-        modePaiement: orderMap['mode_paiement'],
-        status: orderMap['status'],
+        orderLines: orderLines,
+        total: (orderMap['total'] ?? 0.0).toDouble(), // Ensure double
+        modePaiement: orderMap['mode_paiement'] ?? "N/A",
+        status: orderMap['status'] ?? "Pending",
         idClient: orderMap['id_client'],
       ));
     }

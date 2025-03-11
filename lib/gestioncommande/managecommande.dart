@@ -28,7 +28,7 @@ class _ManageCommandState extends State<ManageCommand> {
   }
 
   Future<void> cancelOrder(BuildContext context, Order order) async {
-    TextEditingController _confirmController = TextEditingController();
+    TextEditingController confirmController = TextEditingController();
     bool isConfirmed = false;
 
     bool? confirmCancel = await showDialog<bool>(
@@ -60,7 +60,7 @@ class _ManageCommandState extends State<ManageCommand> {
                   ),
                   const SizedBox(height: 15),
                   TextField(
-                    controller: _confirmController,
+                    controller: confirmController,
                     onChanged: (value) {
                       setState(() {
                         isConfirmed = (value.toLowerCase().trim() == "annuler");
@@ -307,7 +307,7 @@ class _ManageCommandState extends State<ManageCommand> {
                               }
                             },
                           );
-                        }).toList(),
+                        }),
                         if (!isCancelled)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),

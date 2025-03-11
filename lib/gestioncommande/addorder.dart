@@ -11,6 +11,7 @@ class Addorder {
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
+    List<bool> typeDiscounts,
   ) async {
     print("seee ${selectedProducts.length}");
 
@@ -45,7 +46,7 @@ class Addorder {
       // Empêcher plusieurs points décimaux
       List<String> parts = input.split('.');
       if (parts.length > 2) {
-        input = parts[0] + '.' + parts.sublist(1).join('');
+        input = '${parts[0]}.${parts.sublist(1).join('')}';
       }
 
       // Vérifier si le nombre est positif
@@ -62,7 +63,8 @@ class Addorder {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController changeReturnedController = TextEditingController();
 
-    double total = calculateTotal(selectedProducts, quantityProducts, discounts);
+    double total = calculateTotal(
+        selectedProducts, quantityProducts, discounts, typeDiscounts);
     String selectedPaymentMethod = "Espèce"; // Default payment method
 
     showDialog(
@@ -182,8 +184,6 @@ class Addorder {
                           if (selectedProducts.isNotEmpty)
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
-                              double discountedPrice = product.prixTTC *
-                                  (1 - discounts[index] / 100); // Apply discount
                               return Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -213,7 +213,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${discountedPrice.toStringAsFixed(2)} DT",
+                                        "${product.prixTTC.toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                         ),
@@ -223,7 +223,9 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                        typeDiscounts[index]
+                                            ? "${(product.prixTTC * quantityProducts[index] * (1 - discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                            : "${(product.prixTTC * quantityProducts[index] - discounts[index]).toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -234,7 +236,7 @@ class Addorder {
                                   ],
                                 ),
                               );
-                            }).toList()
+                            })
                           else
                             Center(child: Text("Aucun produit sélectionné.")),
 
@@ -391,8 +393,13 @@ class Addorder {
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop(); // Close popup
-                    _confirmPlaceOrder(context, selectedProducts,
-                        quantityProducts, amountGiven, discounts);
+                    _confirmPlaceOrder(
+                        context,
+                        selectedProducts,
+                        quantityProducts,
+                        amountGiven,
+                        discounts,
+                        typeDiscounts);
                   },
                   child: Text(
                     "Confirmer",
@@ -414,6 +421,7 @@ class Addorder {
     List<int> quantityProducts,
     double amountGiven,
     List<double> discounts,
+    List<bool> typeDiscounts,
   ) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +432,8 @@ class Addorder {
 
     print("saving ....");
 
-    double total = calculateTotal(selectedProducts, quantityProducts, discounts);
+    double total = calculateTotal(
+        selectedProducts, quantityProducts, discounts, typeDiscounts);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces"; // You can change this if needed
 
@@ -445,7 +454,8 @@ class Addorder {
         idProduct: product.code,
         quantite: quantityProducts[productIndex], // Correct quantity
         prixUnitaire: product.prixTTC,
-        discount: discounts[productIndex], // Correct quantity
+        discount: discounts[productIndex], // Correct discount
+        isPercentage: typeDiscounts[productIndex], // Correct discount type
       );
     }).toList();
 
@@ -459,6 +469,7 @@ class Addorder {
       remainingAmount: remainingAmount,
     );
     print(order.remainingAmount);
+
     // Save order to database
     int orderId = await SqlDb().addOrder(order);
     if (orderId > 0) {
@@ -508,6 +519,7 @@ class Addorder {
       selectedProducts.clear();
       quantityProducts.clear();
       discounts.clear();
+      typeDiscounts.clear();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -522,12 +534,23 @@ class Addorder {
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
+    List<bool> typeDiscounts,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      double discountedPrice =
-          selectedProducts[i].prixTTC * (1 - discounts[i] / 100); // Apply discount
+      double discountedPrice;
+
+      if (typeDiscounts[i]) {
+        // If the discount is a percentage
+        discountedPrice =
+            selectedProducts[i].prixTTC * (1 - discounts[i] / 100);
+      } else {
+        // If the discount is a fixed value (DT)
+        discountedPrice = selectedProducts[i].prixTTC - discounts[i];
+      }
+
       total += discountedPrice * quantityProducts[i];
+      print(total);
     }
     return total;
   }

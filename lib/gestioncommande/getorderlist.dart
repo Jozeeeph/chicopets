@@ -11,7 +11,7 @@ import 'package:path_provider/path_provider.dart';
 class Getorderlist {
   static Future<void> cancelOrder(
       BuildContext context, Order order, Function() onOrderCanceled) async {
-    TextEditingController _confirmController = TextEditingController();
+    TextEditingController confirmController = TextEditingController();
     bool isConfirmed = false;
     final SqlDb sqlDb = SqlDb();
 
@@ -44,7 +44,7 @@ class Getorderlist {
                   ),
                   const SizedBox(height: 15),
                   TextField(
-                    controller: _confirmController,
+                    controller: confirmController,
                     onChanged: (value) {
                       setState(() {
                         isConfirmed = (value.toLowerCase().trim() == "annuler");
@@ -288,7 +288,11 @@ class Getorderlist {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                            "${(orderLine.prixUnitaire * (1 - orderLine.discount / 100) * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                          orderLine
+                                                  .isPercentage // Check if the discount is a percentage
+                                              ? "${(orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                              : "${(orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT", // Fixed value discount
+                                        ),
                                         IconButton(
                                           icon: Icon(Icons.delete,
                                               color: Colors.red),
@@ -333,7 +337,7 @@ class Getorderlist {
                                   );
                                 },
                               );
-                            }).toList(),
+                            }),
 
                             // 🔹 Boutons alignés horizontalement
                             Padding(
@@ -514,7 +518,8 @@ class Getorderlist {
                       }
 
                       Product product = snapshot.data!;
-                      double discountedPrice = orderLine.prixUnitaire *(1 - orderLine.discount / 100);
+                      double discountedPrice = orderLine.prixUnitaire *
+                          (1 - orderLine.discount / 100);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
@@ -552,7 +557,10 @@ class Getorderlist {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                                orderLine
+                                        .isPercentage // Check if the discount is a percentage
+                                    ? "${(orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                    : "${(orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT", // Fixed value discount
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -565,7 +573,7 @@ class Getorderlist {
                       );
                     },
                   );
-                }).toList(),
+                }),
 
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
 
@@ -628,7 +636,6 @@ class Getorderlist {
     return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
   }
 
-  //Convert to PDF
   static Future<void> generateAndSavePDF(
       BuildContext context, Order order) async {
     final pdf = pw.Document();
@@ -668,8 +675,16 @@ class Getorderlist {
 
             // Liste des produits
             ...order.orderLines.map((orderLine) {
-              double discountedPrice =
-                  orderLine.prixUnitaire * (1 - orderLine.discount / 100);
+              double discountedPrice;
+
+              if (orderLine.isPercentage) {
+                // If the discount is a percentage
+                discountedPrice =orderLine.prixUnitaire * (1 - orderLine.discount / 100);
+              } else {
+                // If the discount is a fixed value
+                discountedPrice = orderLine.prixUnitaire - orderLine.discount;
+              }
+
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -680,7 +695,7 @@ class Getorderlist {
                       "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT"),
                 ],
               );
-            }).toList(),
+            }),
 
             pw.Divider(),
 

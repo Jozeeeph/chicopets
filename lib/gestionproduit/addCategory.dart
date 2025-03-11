@@ -38,10 +38,8 @@ class _AddCategoryState extends State<AddCategory> {
       categoryToEdit = args;
       nameController.text = categoryToEdit!.name;
       selectedCategoryId = categoryToEdit!.id;
-      if (categoryToEdit!.imagePath != null) {
-        selectedImage = File(categoryToEdit!.imagePath!);
-      }
-    }
+      selectedImage = File(categoryToEdit!.imagePath!);
+        }
   }
 
   Future<void> fetchCategories() async {

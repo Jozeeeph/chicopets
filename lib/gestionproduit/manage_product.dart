@@ -51,7 +51,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
   }
 
   Future<void> _confirmDelete({Product? singleProduct}) async {
-    TextEditingController _confirmController = TextEditingController();
+    TextEditingController confirmController = TextEditingController();
     bool isConfirmed = false;
 
     await showDialog(
@@ -85,7 +85,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   ),
                   const SizedBox(height: 15),
                   TextField(
-                    controller: _confirmController,
+                    controller: confirmController,
                     onChanged: (value) {
                       setState(() {
                         isConfirmed =
