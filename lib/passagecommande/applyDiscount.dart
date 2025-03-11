@@ -5,6 +5,7 @@ class Applydiscount {
     BuildContext context,
     int productIndex,
     List<double> discounts,
+    List<bool> typeDiscounts,
     VoidCallback onUpdate,
   ) {
     if (productIndex < 0 || productIndex >= discounts.length) {
@@ -12,20 +13,38 @@ class Applydiscount {
       return;
     }
 
-    String enteredDiscount = ""; // Start empty
+    String enteredDiscount = "";
+    bool isPercentage = true;
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Choisir le pourcentage de remise'),
+          title: const Text('Choisir la remise'),
           content: StatefulBuilder(
             builder: (context, setDialogState) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("%"),
+                      Switch(
+                        value: isPercentage,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            isPercentage = value;
+                          });
+                        },
+                      ),
+                      const Text("DT"),
+                    ],
+                  ),
                   Text(
-                    enteredDiscount.isEmpty ? "0%" : "$enteredDiscount%",
+                    enteredDiscount.isEmpty
+                        ? "0${isPercentage ? '%' : ' DT'}"
+                        : "$enteredDiscount${isPercentage ? '%' : ' DT'}",
                     style: const TextStyle(
                         fontSize: 24, fontWeight: FontWeight.bold),
                   ),
@@ -44,29 +63,36 @@ class Applydiscount {
                             onTap: () {
                               setDialogState(() {
                                 if (number == "C") {
-                                  enteredDiscount = ""; // Clear input
+                                  enteredDiscount = "";
                                 } else if (number == "OK") {
                                   if (enteredDiscount.isNotEmpty) {
                                     final discount =
                                         double.tryParse(enteredDiscount);
-                                    if (discount != null &&
-                                        discount >= 0 &&
-                                        discount <= 100) {
+                                    if (discount != null && discount >= 0) {
                                       discounts[productIndex] = discount;
-                                      onUpdate(); // Callback to update UI
+                                      typeDiscounts[productIndex] =isPercentage; // Ensure this is set correctly
+                                      print(isPercentage);
+                                      onUpdate();
+                                      Navigator.of(context).pop();
                                     } else {
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                              'Veuillez entrer un pourcentage valide (0-100).'),
+                                              'Veuillez entrer une valeur valide.'),
                                         ),
                                       );
                                     }
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Veuillez entrer une valeur avant de valider.'),
+                                      ),
+                                    );
                                   }
-                                  Navigator.of(context).pop(); // Close dialog
                                 } else {
-                                  enteredDiscount += number; // Append number
+                                  enteredDiscount += number;
                                 }
                               });
                             },

@@ -25,8 +25,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
   Future<List<Product>>? products;
   List<Product> selectedProducts = [];
   List<int> quantityProducts = [];
+  List<bool> typeDiscounts = [];
   List<double> discounts = []; // Track discounts for each product
-  double globalDiscount = 0.0; // Remise globale
   int? selectedProductIndex;
   String enteredQuantity = "";
 
@@ -47,6 +47,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
         context,
         index,
         discounts,
+        typeDiscounts,
         () {
           setState(() {}); // Refresh UI after discount update
         },
@@ -60,10 +61,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(selectedProducts, quantityProducts, discounts,
-          globalDiscount), // Ajout de la remise globale
+      total: calculateTotal(selectedProducts, quantityProducts, discounts),
       modePaiement: "Espèces", // Default payment method
-      globalDiscount: globalDiscount, // Ajout de la remise globale
     );
     Addorder.showPlaceOrderPopup(
       context,
@@ -71,6 +70,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
       selectedProducts,
       quantityProducts,
       discounts,
+      typeDiscounts,
     );
   }
 
@@ -88,9 +88,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
       context,
       selectedProducts,
       quantityProducts,
-      discounts, // Pass the discounts list directly
+      discounts, // 5th argument
+      typeDiscounts, // 6th argument
       () {
-        setState(() {}); // Refresh UI after deletion
+        setState(() {}); // 7th argument (callback)
       },
     );
   }
@@ -121,11 +122,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
             // Table Command Section
             TableCmd(
               total:
-                  calculateTotal(selectedProducts, quantityProducts, discounts,globalDiscount),
+                  calculateTotal(selectedProducts, quantityProducts, discounts),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
-              globalDiscount: globalDiscount,
+              typeDiscounts: typeDiscounts,
               onApplyDiscount: handleApplyDiscount,
               calculateTotal: calculateTotal,
               onAddProduct: (refreshData) => handleAddProduct(refreshData),
@@ -149,9 +150,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   print("List length: ${selectedProducts.length}");
                   print("List content: $selectedProducts");
                   print("Selected Product Code: '${product.code}'");
-                  selectedProducts.forEach((p) {
+                  for (var p in selectedProducts) {
                     print("Existing Product Code: '${p.code}'");
-                  });
+                  }
 
                   // Ensuring no spaces or formatting issues
                   int index = selectedProducts.indexWhere(
@@ -165,8 +166,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     // Product not selected yet, we add it with an initial quantity of 1
                     selectedProducts.add(product);
                     quantityProducts.add(1);
-                    discounts
-                        .add(0.0); // Add a discount value for the new product
+                    discounts.add(0.0); // Add a discount value for the new product
+                    typeDiscounts.add(true);
                     selectedProductIndex = selectedProducts.length - 1;
                   } else {
                     // Product already selected, we increment the quantity
@@ -187,16 +188,14 @@ class _CashDeskPageState extends State<CashDeskPage> {
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
-    double globalDiscount, // Ajout de la remise globale
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      double discountedPrice = selectedProducts[i].prixTTC *
-          (1 - discounts[i] / 100); // Remise par produit
-      total += discountedPrice * quantityProducts[i];
+      final double price = selectedProducts[i].prixTTC;
+      final int quantity = quantityProducts[i];
+      final double discount = discounts[i];
+      total += price * quantity * (1 - discount / 100);
     }
-    // Appliquer la remise globale
-    total *= (1 - globalDiscount / 100);
     return total;
   }
 }
