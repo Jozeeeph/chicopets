@@ -23,6 +23,8 @@ class _AddCategoryState extends State<AddCategory> {
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
   Category? categoryToEdit;
+  final TextEditingController _editSubCategoryController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -40,6 +42,11 @@ class _AddCategoryState extends State<AddCategory> {
       selectedCategoryId = categoryToEdit!.id;
       if (categoryToEdit!.imagePath != null) {
         selectedImage = File(categoryToEdit!.imagePath!);
+      }
+
+      // Charger les sous-catégories associées à la catégorie en cours de modification
+      if (selectedCategoryId != null) {
+        fetchSubCategories(selectedCategoryId!);
       }
     }
   }
@@ -63,6 +70,7 @@ class _AddCategoryState extends State<AddCategory> {
       setState(() {
         subCategories = fetchedSubCategories.map((map) {
           return SubCategory(
+            id: map['id_sub_category'],
             name: map['sub_category_name'] ?? 'Unknown',
             categoryId: map['category_id'] ?? 0,
           );
@@ -90,14 +98,26 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    int result =
+    // Ajouter la catégorie
+    int categoryId =
         await sqldb.addCategory(nameController.text, selectedImage!.path);
-    if (result > 0) {
-      _showMessage("Catégorie ajoutée avec succès !");
+    if (categoryId > 0) {
+      // Ajouter les sous-catégories
+      for (var subCategory in subCategories) {
+        await sqldb.addSubCategory(
+          SubCategory(
+            name: subCategory.name,
+            categoryId: categoryId,
+          ),
+        );
+      }
+
+      _showMessageSuccess(
+          "Catégorie et sous-catégories ajoutées avec succès !");
       setState(() {
-        isVisible = false;
         nameController.clear();
         selectedImage = null;
+        subCategories.clear();
         fetchCategories();
       });
     } else {
@@ -111,6 +131,7 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
+    // Mettre à jour la catégorie
     int result = await sqldb.updateCategory(
       categoryToEdit!.id!,
       nameController.text,
@@ -118,7 +139,32 @@ class _AddCategoryState extends State<AddCategory> {
     );
 
     if (result > 0) {
-      _showMessage("Catégorie mise à jour avec succès !");
+      // Mettre à jour les sous-catégories
+      for (var subCategory in subCategories) {
+        if (subCategory.id == null) {
+          // Ajouter une nouvelle sous-catégorie
+          await sqldb.addSubCategory(
+            SubCategory(
+              name: subCategory.name,
+              categoryId: categoryToEdit!.id!,
+            ),
+          );
+        } else {
+          // Mettre à jour une sous-catégorie existante
+          print("Mise à jour de la sous-catégorie : ${subCategory.name}");
+          print(
+              "Données de la sous-catégorie à mettre à jour : ${subCategory.toMap()}");
+          final updateResult = await sqldb.updateSubCategory(subCategory);
+          print("Résultat de la mise à jour : $updateResult");
+          if (updateResult <= 0) {
+            _showMessage(
+                "Échec de la mise à jour de la sous-catégorie : ${subCategory.name}");
+          }
+        }
+      }
+
+      _showMessageSuccess(
+          "Catégorie et sous-catégories mises à jour avec succès !");
       Navigator.pop(context);
     } else {
       _showMessage("Échec de la mise à jour de la catégorie !");
@@ -126,27 +172,110 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   void addSubCategory() async {
-    if (subCategoryNameController.text.isEmpty || selectedCategoryId == null) {
-      _showMessage("Veuillez remplir tous les champs !");
+    if (subCategoryNameController.text.isEmpty) {
+      _showMessage("Veuillez entrez un nom de sous-catégorie !");
       return;
     }
+    setState(() {
+      subCategories.add(
+        SubCategory(
+          name: subCategoryNameController.text,
+          categoryId: selectedCategoryId ?? categoryToEdit?.id ?? 0,
+        ),
+      );
+      subCategoryNameController.clear();
+    });
+  }
 
-    int result = await sqldb.addSubCategory(
-      SubCategory(
-        name: subCategoryNameController.text,
-        categoryId: selectedCategoryId!,
-      ),
+  void _confirmDeleteSubCategory(int subCategoryId) async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Confirmer la suppression"),
+          content: const Text(
+              "Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Annuler"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Supprimer"),
+            ),
+          ],
+        );
+      },
     );
 
-    if (result > 0) {
-      _showMessage("Sous-catégorie ajoutée avec succès !");
-      setState(() {
-        subCategoryNameController.clear();
-        fetchSubCategories(selectedCategoryId!);
-      });
-    } else {
-      _showMessage("Échec de l'ajout de la sous-catégorie !");
+    if (confirm == true) {
+      await deleteSubCategory(subCategoryId);
     }
+  }
+
+  Future<void> deleteSubCategory(int subCategoryId) async {
+    try {
+      final result = await sqldb.deleteSubCategory(subCategoryId);
+      if (result > 0) {
+        _showMessageSuccess("Sous-catégorie supprimée avec succès !");
+        setState(() {
+          subCategories.removeWhere((subCat) => subCat.id == subCategoryId);
+        });
+      } else {
+        _showMessage("Échec de la suppression de la sous-catégorie !");
+      }
+    } catch (e) {
+      _showMessage("Erreur lors de la suppression de la sous-catégorie : $e");
+    }
+  }
+
+  void _editSubCategory(SubCategory subCategory) async {
+    _editSubCategoryController.text = subCategory.name;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Modifier la sous-catégorie"),
+          content: TextFormField(
+            controller: _editSubCategoryController,
+            decoration:
+                const InputDecoration(labelText: 'Nom de la sous-catégorie'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Annuler"),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (_editSubCategoryController.text.isEmpty) {
+                  _showMessage("Veuillez entrer un nom valide !");
+                  return;
+                }
+
+                setState(() {
+                  subCategories = subCategories.map((subCat) {
+                    if (subCat.id == subCategory.id) {
+                      return SubCategory(
+                        id: subCat.id,
+                        name: _editSubCategoryController.text,
+                        categoryId: subCat.categoryId,
+                      );
+                    }
+                    return subCat;
+                  }).toList();
+                });
+
+                Navigator.pop(context);
+              },
+              child: const Text("Enregistrer"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showMessage(String message) {
@@ -154,6 +283,16 @@ class _AddCategoryState extends State<AddCategory> {
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFFE53935), // Warm Red for error
+      ),
+    );
+  }
+
+  void _showMessageSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor:
+            const Color.fromARGB(255, 71, 233, 46), // Green for success
       ),
     );
   }
@@ -216,36 +355,36 @@ class _AddCategoryState extends State<AddCategory> {
             ),
             const SizedBox(height: 16),
 
-            // Category Dropdown
-            // Category Dropdown
-            DropdownButtonFormField<int>(
-              value: selectedCategoryId,
-              hint: const Text(
-                "Sélectionner une catégorie",
-                style: TextStyle(color: Color(0xFF0056A6)), // Deep Blue
-              ),
-              items: categories.map((category) {
-                return DropdownMenuItem<int>(
-                  value: category.id,
-                  child: Text(
-                    category.name,
-                    style: const TextStyle(
-                        color: Color.fromARGB(255, 0, 0, 0)), // Black text
+            // Ajout des sous-catégories
+            const Text(
+              "Ajouter des sous-catégories :",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0056A6)), // Deep Blue
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextFormField(
+                    controller: subCategoryNameController,
+                    label: 'Nom de la sous-catégorie',
                   ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedCategoryId = value;
-                  fetchSubCategories(value!);
-                });
-              },
-              decoration: _inputDecoration('Catégorie'),
+                ),
+                const SizedBox(width: 10),
+                IconButton(
+                  icon: const Icon(
+                    Icons.add,
+                    color: Color(0xFF26A9E0), // Sky Blue icon
+                  ),
+                  onPressed: addSubCategory,
+                ),
+              ],
             ),
             const SizedBox(height: 16),
 
-            // Subcategories List
-            if (selectedCategoryId != null) ...[
+            // Affichage des sous-catégories
+            if (subCategories.isNotEmpty) ...[
               const Text(
                 "Sous-catégories :",
                 style: TextStyle(
@@ -253,47 +392,36 @@ class _AddCategoryState extends State<AddCategory> {
                     color: Color(0xFF0056A6)), // Deep Blue
               ),
               const SizedBox(height: 8),
-              subCategories.isEmpty
-                  ? Text(
-                      "Aucune sous-catégorie trouvée",
-                      style: TextStyle(color: Colors.grey[600]),
-                    )
-                  : SingleChildScrollView(
-                      child: Column(
-                        children: subCategories.map((subCategory) {
-                          return ListTile(
-                            title: Text(
-                              subCategory.name,
-                              style: const TextStyle(
-                                  color: Color.fromARGB(
-                                      255, 0, 0, 0)), // Black text
-                            ),
-                          );
-                        }).toList(),
-                      ),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: subCategories.length,
+                itemBuilder: (context, index) {
+                  final subCategory = subCategories[index];
+                  return ListTile(
+                    title: Text(
+                      subCategory.name,
+                      style: const TextStyle(
+                          color: Color.fromARGB(255, 0, 0, 0)), // Black text
                     ),
-              const SizedBox(height: 16),
-            ],
-
-            // Add Subcategory
-            if (selectedCategoryId != null) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextFormField(
-                      controller: subCategoryNameController,
-                      label: 'Nom de la sous-catégorie',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit,
+                              color: Color(0xFF009688)), // Teal Green
+                          onPressed: () => _editSubCategory(subCategory),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete,
+                              color: Color(0xFFE53935)), // Warm Red
+                          onPressed: () =>
+                              _confirmDeleteSubCategory(subCategory.id!),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.add,
-                      color: Color(0xFF26A9E0), // Sky Blue icon
-                    ),
-                    onPressed: addSubCategory,
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
             ],

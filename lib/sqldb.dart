@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -56,16 +56,17 @@ class SqlDb {
         print("Products table created");
 
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
-          id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT,
-          total REAL,
-          mode_paiement TEXT,
-          status TEXT,
-          remaining_amount REAL,
-          id_client INTEGER
-        )
-      ''');
+    CREATE TABLE orders (
+      id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      total REAL NOT NULL,
+      mode_paiement TEXT NOT NULL,
+      status TEXT NOT NULL,
+      remaining_amount REAL NOT NULL,
+      id_client INTEGER,
+      globalDiscount REAL DEFAULT 0.0
+    )
+  ''');
         print("Orders table created");
 
         await db.execute('''
@@ -114,19 +115,6 @@ class SqlDb {
 );
 ''');
         print("Variants table created");
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('''
-          CREATE TABLE IF NOT EXISTS orders(
-            id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            total REAL,
-            mode_paiement TEXT,
-            id_client INTEGER
-          )
-        ''');
-        }
       },
     );
   }
@@ -228,32 +216,42 @@ class SqlDb {
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
-    int orderId = await dbClient.insert(
-      'orders',
-      {
-        'date': order.date,
-        'total': order.total,
-        'mode_paiement': order.modePaiement,
-        'status': order.status,
-        'remaining_amount': order.remainingAmount,
-      },
-    );
-
-    // Insert order lines
-    for (var orderLine in order.orderLines) {
-      await dbClient.insert(
-        'order_items',
+    try {
+      int orderId = await dbClient.insert(
+        'orders',
         {
-          'id_order': orderId,
-          'product_code': orderLine.idProduct,
-          'quantity': orderLine.quantite,
-          'prix_unitaire': orderLine.prixUnitaire,
-          'discount': orderLine.discount
+          'date': order.date,
+          'total': order.total,
+          'mode_paiement': order.modePaiement,
+          'status': order.status,
+          'remaining_amount': order.remainingAmount,
+          'id_client': order.idClient,
+          'global_discount': order.globalDiscount,
         },
       );
-    }
 
-    return orderId;
+      print("Order inserted with ID: $orderId");
+
+      // Insert order lines
+      for (var orderLine in order.orderLines) {
+        await dbClient.insert(
+          'order_items',
+          {
+            'id_order': orderId,
+            'product_code': orderLine.idProduct,
+            'quantity': orderLine.quantite,
+            'prix_unitaire': orderLine.prixUnitaire,
+            'discount': orderLine.discount
+          },
+        );
+        print("Order line inserted for product: ${orderLine.idProduct}");
+      }
+
+      return orderId;
+    } catch (e) {
+      print("Error inserting order: $e");
+      return -1;
+    }
   }
 
   Future<List<Order>> getOrdersWithOrderLines() async {
@@ -268,6 +266,7 @@ class SqlDb {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
       double remaining = (orderMap['remaining_amount']) as double;
+      double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -292,7 +291,9 @@ class SqlDb {
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
         status: orderMap['status'],
         orderLines: orderLines,
-        remainingAmount: remaining, // Add this to the Order object
+        remainingAmount: remaining,
+        globalDiscount: globalDiscount,
+        idClient: orderMap['id_client'],
       ));
     }
 
@@ -345,7 +346,7 @@ class SqlDb {
         whereArgs: [orderId],
       );
 
-      List<OrderLine> orderLines = []; // Corrected variable
+      List<OrderLine> orderLines = [];
 
       for (var itemMap in itemMaps) {
         // Fetch the product details
@@ -361,10 +362,9 @@ class SqlDb {
           // Create an OrderLine for each item, pass the correct idProduct
           orderLines.add(OrderLine(
             idOrder: orderId,
-            idProduct: itemMap['product_code'], // Pass the product code
+            idProduct: itemMap['product_code'],
             quantite: itemMap['quantity'],
-            prixUnitaire: product
-                .prixTTC, // Assuming the unit price is the product's TTC price
+            prixUnitaire: product.prixTTC,
             discount: itemMap['discount'],
           ));
         }
@@ -374,11 +374,12 @@ class SqlDb {
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        orderLines: orderLines, //Assign correct list
+        orderLines: orderLines,
         total: orderMap['total'].toDouble(),
         modePaiement: orderMap['mode_paiement'],
         status: orderMap['status'],
         idClient: orderMap['id_client'],
+        globalDiscount: orderMap['global_discount'].toDouble(),
       ));
     }
 
@@ -519,13 +520,20 @@ class SqlDb {
 
   /// **Mettre à jour une sous-catégorie**
   Future<int> updateSubCategory(SubCategory subCategory) async {
-    final dbClient = await db;
-    return await dbClient.update(
-      'sub_categories',
-      subCategory.toMap(),
-      where: 'id_sub_category = ?',
-      whereArgs: [subCategory.id],
-    );
+    try {
+      final dbClient = await db;
+      final result = await dbClient.update(
+        'sub_categories',
+        subCategory.toMap(),
+        where: 'id_sub_category = ?',
+        whereArgs: [subCategory.id],
+      );
+      print("Sous-catégorie mise à jour : $result");
+      return result;
+    } catch (e) {
+      print("Erreur lors de la mise à jour de la sous-catégorie : $e");
+      return -1;
+    }
   }
 
   /// **Supprimer une sous-catégorie**

@@ -63,8 +63,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
       dateController.text = widget.product!.dateExpiration;
       selectedCategoryId = widget.product!.categoryId;
       selectedSubCategoryId = widget.product!.subCategoryId;
-      selectedTax = widget.product!.taxe;
-
+      selectedTax = widget.product?.taxe ?? 0.0; // Valeur par défaut : 0.0
+      if (![0.0, 7.0, 12.0, 19.0].contains(selectedTax)) {
+        selectedTax =
+            0.0; // Forcer une valeur valide si la taxe n'est pas valide
+      }
       // Charger les sous-catégories de la catégorie sélectionnée
       _loadSubCategories(selectedCategoryId!);
 
@@ -302,7 +305,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               return 'Le champ "Stock" ne doit pas être vide.';
                             }
                             if (int.tryParse(value) == null ||
-                                int.parse(value) <= 0) {
+                                int.parse(value) < 0) {
                               return 'Le stock doit être un nombre entier positif.';
                             }
                             return null;
@@ -374,11 +377,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           DropdownMenuItem(value: 19.0, child: Text('19%')),
                         ],
                         onChanged: (value) {
-                          setState(() {
-                            selectedTax = value;
-                            taxController.text = value.toString();
-                          });
-                          calculateValues();
+                          if (value != null &&
+                              [0.0, 7.0, 12.0, 19.0].contains(value)) {
+                            setState(() {
+                              selectedTax = value;
+                              taxController.text = value.toString();
+                            });
+                            calculateValues();
+                          } else {
+                            // Gérer le cas où la valeur n'est pas valide
+                            setState(() {
+                              selectedTax = 0.0; // Valeur par défaut
+                              taxController.text = '0.0';
+                            });
+                          }
                         },
                         validator: (value) {
                           if (value == null) {
