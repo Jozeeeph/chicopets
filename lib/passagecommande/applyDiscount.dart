@@ -69,9 +69,11 @@ class Applydiscount {
                                     final discount =
                                         double.tryParse(enteredDiscount);
                                     if (discount != null && discount >= 0) {
+                                      // ✅ Correction ici : s'assurer que c'est bien un booléen
                                       discounts[productIndex] = discount;
-                                      typeDiscounts[productIndex] =isPercentage; // Ensure this is set correctly
-                                      print(isPercentage);
+                                      typeDiscounts[productIndex] =
+                                          isPercentage ? true : false;
+                                      print("isPercentage: $isPercentage");
                                       onUpdate();
                                       Navigator.of(context).pop();
                                     } else {
@@ -92,7 +94,10 @@ class Applydiscount {
                                     );
                                   }
                                 } else {
-                                  enteredDiscount += number;
+                                  // ✅ Vérification pour éviter les entrées invalides
+                                  if (!(number == "0" && enteredDiscount == "0")) {
+                                    enteredDiscount += number;
+                                  }
                                 }
                               });
                             },
