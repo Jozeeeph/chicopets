@@ -270,21 +270,16 @@ class Getorderlist {
                                       snapshot.data == null) {
                                     return ListTile(
                                       title: Text(
-                                          "Produit supprimé (${orderLine.idProduct})",
-                                          style: TextStyle(color: Colors.red)),
+                                        "Produit supprimé (${orderLine.idProduct})",
+                                        style: TextStyle(color: Colors.red),
+                                      ),
                                       subtitle: Text(
                                           "Quantité: ${orderLine.quantite}"),
                                       trailing: Text(
-                                          "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                        "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
+                                      ),
                                     );
                                   }
-                                  print(
-                                      "Discount Type: ${orderLine.isPercentage ? 'Percentage' : 'Fixed Value'}");
-                                  print("Discount: ${orderLine.discount}");
-                                  print(
-                                      "Total Price Before Discount: ${orderLine.prixUnitaire * orderLine.quantite}");
-                                  print(
-                                      "Calculated Price: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)) : (orderLine.prixUnitaire * orderLine.quantite - orderLine.discount)}");
                                   Product product = snapshot.data!;
                                   return ListTile(
                                     title: Text(product.designation),
@@ -388,6 +383,17 @@ class Getorderlist {
                                       foregroundColor: Colors.white,
                                     ),
                                   ),
+
+                                  // Bouton "Mettre à jour" pour les commandes semi-payées
+                                  if (isSemiPaid)
+                                    IconButton(
+                                      icon: Icon(Icons.update,
+                                          color: Colors.blue),
+                                      onPressed: () {
+                                        // Trigger an update action for semi-paid orders
+                                        _updateSemiPaidOrder(context, order);
+                                      },
+                                    ),
                                 ],
                               ),
                             ),
@@ -409,6 +415,93 @@ class Getorderlist {
         );
       },
     );
+  }
+
+  static void _updateSemiPaidOrder(BuildContext context, Order order) {
+    // Calculate the remaining amount
+    double remainingAmount = order.remainingAmount;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        TextEditingController amountController = TextEditingController();
+
+        return AlertDialog(
+          title: const Text('Ajouter un montant à la commande'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Montant restant: ${remainingAmount.toStringAsFixed(2)} DT',
+                style: TextStyle(color: Colors.black),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Montant à ajouter',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Close the dialog
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () {
+                double amountToAdd =
+                    double.tryParse(amountController.text) ?? 0;
+
+                if (amountToAdd > 0) {
+                  // Call your method to update the order with the added amount
+                  _addAmountToOrder(context, order, amountToAdd);
+                  Navigator.pop(context); // Close the dialog after action
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez entrer un montant valide'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Valider'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  static void _addAmountToOrder(
+      BuildContext context, Order order, double amount) async {
+    // Update the order with the additional amount
+    final SqlDb sqldb = SqlDb();
+    order.remainingAmount -= amount;
+
+    // Check if the remaining amount is zero or less to mark the order as paid
+    if (order.remainingAmount <= 0) {
+      order.status = 'payée'; // Mark order as fully paid
+    }
+
+    // Update the order in the database
+    await sqldb.updateOrderInDatabase(order);
+
+    // Show a success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Commande #${order.idOrder} mise à jour avec ${amount.toStringAsFixed(2)} DT',
+        ),
+      ),
+    );
+
+    // Auto-reload orders after updating
+    Navigator.pop(context); // Close the dialog
+    showListOrdersPopUp(context); // Reload the orders
   }
 
   static void _showOrderTicketPopup(BuildContext context, Order order) {

@@ -76,7 +76,7 @@ class SqlDb {
     quantity INTEGER NOT NULL,
     prix_unitaire REAL DEFAULT 0 NOT NULL,
     discount REAL NOT NULL,
-    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)), -- ✅ Booléen sécurisé
+    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)), -- Booléen sécurisé
     FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
     FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE
   )
@@ -457,6 +457,26 @@ class SqlDb {
       where: 'id_category = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> updateOrderInDatabase(Order order) async {
+   final dbClient = await db;
+    try {
+      // Update the order in the database with the new remaining amount and status
+      await dbClient.update(
+        'orders', // Table name
+        {
+          'remaining_amount': order.remainingAmount,
+          'status': order.status,
+        },
+        where: 'id_order = ?',
+        whereArgs: [order.idOrder], // The ID of the order to update
+      );
+    } catch (e) {
+      // Handle any errors during the update
+      print('Error updating order: $e');
+      throw Exception('Error updating order');
+    }
   }
 
   Future<int> deleteCategory(int id) async {
