@@ -447,6 +447,9 @@ class Addorder {
     List<OrderLine> orderLines = selectedProducts.map((product) {
       int productIndex = selectedProducts.indexOf(product); // Find correct index
 
+      print(typeDiscounts);
+      
+
       return OrderLine(
         idOrder: 0, // Temporary ID
         idProduct: product.code,
@@ -466,7 +469,6 @@ class Addorder {
       status: status,
       remainingAmount: remainingAmount,
     );
-    print(order.remainingAmount);
 
     // Save order to database
     int orderId = await SqlDb().addOrder(order);

@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -69,17 +69,19 @@ class SqlDb {
         print("Orders table created");
 
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS order_items(
-          id_order INTEGER,
-          product_code TEXT,
-          quantity INTEGER,
-          prix_unitaire REAL DEFAULT 0,
-          discount REAL,
-          isPercentage 
-          FOREIGN KEY(id_order) REFERENCES orders(id_order),
-          FOREIGN KEY(product_code) REFERENCES products(code)
-        )
-      ''');
+  CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clé primaire auto-incrémentée
+    id_order INTEGER NOT NULL,
+    product_code TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    prix_unitaire REAL DEFAULT 0 NOT NULL,
+    discount REAL NOT NULL,
+    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)), -- ✅ Booléen sécurisé
+    FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
+    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE
+  )
+''');
+
         print("Order items table created");
 
         await db.execute('''
@@ -229,6 +231,8 @@ class SqlDb {
 
   Future<int> addOrder(Order order) async {
     final dbClient = await db;
+
+    // Insert the order details into the 'orders' table
     int orderId = await dbClient.insert(
       'orders',
       {
@@ -240,7 +244,7 @@ class SqlDb {
       },
     );
 
-    // Insert order lines
+    // Insert each order line into the 'order_items' table
     for (var orderLine in order.orderLines) {
       await dbClient.insert(
         'order_items',
@@ -249,7 +253,9 @@ class SqlDb {
           'product_code': orderLine.idProduct,
           'quantity': orderLine.quantite,
           'prix_unitaire': orderLine.prixUnitaire,
-          'discount': orderLine.discount
+          'discount': orderLine.discount,
+          'isPercentage':
+              orderLine.isPercentage ? 1 : 0, // Convert bool to int (1 or 0)
         },
       );
     }

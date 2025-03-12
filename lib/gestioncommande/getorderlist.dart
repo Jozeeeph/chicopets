@@ -278,7 +278,13 @@ class Getorderlist {
                                           "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT"),
                                     );
                                   }
-
+                                  print(
+                                      "Discount Type: ${orderLine.isPercentage ? 'Percentage' : 'Fixed Value'}");
+                                  print("Discount: ${orderLine.discount}");
+                                  print(
+                                      "Total Price Before Discount: ${orderLine.prixUnitaire * orderLine.quantite}");
+                                  print(
+                                      "Calculated Price: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)) : (orderLine.prixUnitaire * orderLine.quantite - orderLine.discount)}");
                                   Product product = snapshot.data!;
                                   return ListTile(
                                     title: Text(product.designation),
@@ -288,7 +294,10 @@ class Getorderlist {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                            "${(orderLine.prixUnitaire * (1 - orderLine.discount / 100) * orderLine.quantite).toStringAsFixed(2)} DT"),
+                                          orderLine.isPercentage
+                                              ? "${(orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                              : "${(orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT", // Fixed value discount
+                                        ),
                                         IconButton(
                                           icon: Icon(Icons.delete,
                                               color: Colors.red),
@@ -514,7 +523,8 @@ class Getorderlist {
                       }
 
                       Product product = snapshot.data!;
-                      double discountedPrice = orderLine.prixUnitaire *(1 - orderLine.discount / 100);
+                      double discountedPrice = orderLine.prixUnitaire *
+                          (1 - orderLine.discount / 100);
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(

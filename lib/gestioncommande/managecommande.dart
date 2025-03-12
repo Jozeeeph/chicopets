@@ -299,7 +299,7 @@ class _ManageCommandState extends State<ManageCommand> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    'Quantité: ${orderLine.quantite} - Prix: ${(orderLine.quantite * orderLine.prixUnitaire * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT',
+                                    'Quantité: ${orderLine.quantite} - Prix: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2) : (orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT',
                                     style:
                                         const TextStyle(color: Colors.black87),
                                   ),
