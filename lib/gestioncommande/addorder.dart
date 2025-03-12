@@ -19,16 +19,16 @@ class Addorder {
         SnackBar(
           content: Text(
             "Aucun produit sélectionné.",
-            style: TextStyle(color: Colors.white), // White text for contrast
+            style: TextStyle(color: Colors.white),
           ),
-          backgroundColor: Color(0xFFE53935), // Warm Red for error
-          behavior: SnackBarBehavior.floating, // Floating style
+          backgroundColor: Color(0xFFE53935),
+          behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10), // Rounded corners
+            borderRadius: BorderRadius.circular(10),
           ),
           action: SnackBarAction(
             label: "OK",
-            textColor: Colors.white, // White text for contrast
+            textColor: Colors.white,
             onPressed: () {
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
             },
@@ -39,21 +39,15 @@ class Addorder {
     }
 
     String cleanInput(String input) {
-      // Remplace tout ce qui n'est pas un chiffre ou un point décimal
       input = input.replaceAll(RegExp(r'[^0-9.]'), '');
-
-      // Empêcher plusieurs points décimaux
       List<String> parts = input.split('.');
       if (parts.length > 2) {
         input = parts[0] + '.' + parts.sublist(1).join('');
       }
-
-      // Vérifier si le nombre est positif
       double? value = double.tryParse(input);
       if (value != null && value < 0) {
-        return 'NEGATIVE'; // Code spécial pour signaler un nombre négatif
+        return 'NEGATIVE';
       }
-
       return input;
     }
 
@@ -62,19 +56,44 @@ class Addorder {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController changeReturnedController = TextEditingController();
 
-    double globalDiscount =
-        order.globalDiscount; // Récupération de la remise globale
+    double globalDiscount = order.globalDiscount;
+    double globalDiscountValue =
+        0.0; // Nouvelle variable pour la remise en valeur
+    bool isPercentageDiscount =
+        true; // Par défaut, la remise est en pourcentage
     double total = calculateTotal(
-        selectedProducts, quantityProducts, discounts, globalDiscount);
-    String selectedPaymentMethod = "Espèce"; // Default payment method
+        selectedProducts,
+        quantityProducts,
+        discounts,
+        isPercentageDiscount ? globalDiscount : globalDiscountValue,
+        isPercentageDiscount);
+    String selectedPaymentMethod = "Espèce";
 
     TextEditingController globalDiscountController =
         TextEditingController(text: globalDiscount.toString());
+    TextEditingController globalDiscountValueController =
+        TextEditingController(); // Contrôleur pour la remise en valeur
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            // Function to update total and change
+            void updateTotalAndChange() {
+              setState(() {
+                total = calculateTotal(
+                    selectedProducts,
+                    quantityProducts,
+                    discounts,
+                    isPercentageDiscount ? globalDiscount : globalDiscountValue,
+                    isPercentageDiscount);
+                changeReturned = amountGiven - total;
+                changeReturnedController.text =
+                    changeReturned.toStringAsFixed(2);
+              });
+            }
+
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -83,25 +102,21 @@ class Addorder {
                 "Confirmer la commande",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056A6), // Deep Blue for title
+                  color: Color(0xFF0056A6),
                 ),
               ),
               content: SingleChildScrollView(
-                // Wrap the content in SingleChildScrollView
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Static list of products and quantities
-                    // Styled product list (receipt look)
                     Container(
-                      width: double.infinity, // Ensure full width
+                      width: double.infinity,
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: Colors.black,
-                            width: 1), // Border for ticket feel
+                        border: Border.all(color: Colors.black, width: 1),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black26,
@@ -113,7 +128,6 @@ class Addorder {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Title
                           Center(
                             child: Text(
                               "🧾 Ticket de Commande",
@@ -126,9 +140,7 @@ class Addorder {
                           Divider(
                             thickness: 1,
                             color: Colors.black,
-                          ), // Separator line
-
-                          // Header Row
+                          ),
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
@@ -182,15 +194,12 @@ class Addorder {
                           Divider(
                             thickness: 1,
                             color: Colors.black,
-                          ), // Separator line
-
-                          // Product List from OrderLine
+                          ),
                           if (selectedProducts.isNotEmpty)
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
                               double discountedPrice = product.prixTTC *
-                                  (1 -
-                                      discounts[index] / 100); // Apply discount
+                                  (1 - discounts[index] / 100);
                               return Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -244,13 +253,10 @@ class Addorder {
                             }).toList()
                           else
                             Center(child: Text("Aucun produit sélectionné.")),
-
                           Divider(
                             thickness: 1,
                             color: Colors.black,
-                          ), // Bottom separator
-
-                          // Total
+                          ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -261,8 +267,7 @@ class Addorder {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (globalDiscount >
-                                  0) // Si une remise globale est appliquée
+                              if (isPercentageDiscount && globalDiscount > 0)
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
@@ -271,15 +276,12 @@ class Addorder {
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .red, // Couleur pour mettre en évidence la remise
+                                        color: Colors.red,
                                       ),
                                     ),
-                                    SizedBox(
-                                        height:
-                                            4), // Espace entre les deux lignes
+                                    SizedBox(height: 4),
                                     Text(
-                                      "Total après remise: ${order.total.toStringAsFixed(2)} DT",
+                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -287,9 +289,32 @@ class Addorder {
                                     ),
                                   ],
                                 )
-                              else // Si aucune remise globale n'est appliquée
+                              else if (!isPercentageDiscount &&
+                                  globalDiscountValue > 0)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      "Remise: ${globalDiscountValue.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
                                 Text(
-                                  "${order.total.toStringAsFixed(2)} DT",
+                                  "${total.toStringAsFixed(2)} DT",
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -299,6 +324,79 @@ class Addorder {
                           ),
                         ],
                       ),
+                    ),
+
+                    SizedBox(height: 16),
+
+                    // Remise Globale
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Type de Remise:",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Row(
+                          children: [
+                            Radio(
+                              value: true,
+                              groupValue: isPercentageDiscount,
+                              onChanged: (value) {
+                                setState(() {
+                                  isPercentageDiscount = value as bool;
+                                  globalDiscountController.text = '';
+                                  globalDiscountValueController.text = '';
+                                  updateTotalAndChange();
+                                });
+                              },
+                            ),
+                            Text("Pourcentage"),
+                            Radio(
+                              value: false,
+                              groupValue: isPercentageDiscount,
+                              onChanged: (value) {
+                                setState(() {
+                                  isPercentageDiscount = value as bool;
+                                  globalDiscountController.text = '';
+                                  globalDiscountValueController.text = '';
+                                  updateTotalAndChange();
+                                });
+                              },
+                            ),
+                            Text("Valeur (DT)"),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+                        if (isPercentageDiscount)
+                          TextField(
+                            controller: globalDiscountController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Remise Globale (%)",
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                globalDiscount = double.tryParse(value) ?? 0.0;
+                                updateTotalAndChange();
+                              });
+                            },
+                          ),
+                        if (!isPercentageDiscount)
+                          TextField(
+                            controller: globalDiscountValueController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Remise Globale (DT)",
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                globalDiscountValue =
+                                    double.tryParse(value) ?? 0.0;
+                                updateTotalAndChange();
+                              });
+                            },
+                          ),
+                      ],
                     ),
 
                     SizedBox(height: 16),
@@ -352,7 +450,6 @@ class Addorder {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Input for "Donnée" (Amount Given)
                         TextField(
                           controller: amountGivenController,
                           keyboardType: TextInputType.number,
@@ -363,8 +460,6 @@ class Addorder {
                           onChanged: (value) {
                             setState(() {
                               String cleanedValue = cleanInput(value);
-
-                              // Vérifier si le nombre est négatif
                               if (cleanedValue == 'NEGATIVE') {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -378,15 +473,11 @@ class Addorder {
                                 amountGivenController.text = '';
                                 return;
                               }
-
-                              // Appliquer la valeur nettoyée
                               amountGivenController.text = cleanedValue;
                               amountGivenController.selection =
                                   TextSelection.fromPosition(
                                 TextPosition(offset: cleanedValue.length),
                               );
-
-                              // Calcul du rendu de monnaie
                               amountGiven =
                                   double.tryParse(cleanedValue) ?? 0.0;
                               changeReturned = amountGiven - total;
@@ -395,10 +486,7 @@ class Addorder {
                             });
                           },
                         ),
-
                         SizedBox(height: 10),
-
-                        // "Rendu" (Change Returned) - Readonly
                         TextField(
                           controller: changeReturnedController,
                           readOnly: true,
@@ -406,23 +494,6 @@ class Addorder {
                             labelText: "Rendu (DT)",
                             border: OutlineInputBorder(),
                           ),
-                        ),
-                        SizedBox(height: 10),
-                        TextField(
-                          controller: globalDiscountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: "Remise Globale (%)",
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              globalDiscount = double.tryParse(value) ?? 0.0;
-                              order.globalDiscount = globalDiscount;
-                              order.total = calculateTotal(selectedProducts,
-                                  quantityProducts, discounts, globalDiscount);
-                            });
-                          },
                         ),
                       ],
                     ),
@@ -436,25 +507,25 @@ class Addorder {
                   },
                   child: Text(
                     "Annuler",
-                    style: TextStyle(
-                        color: Color(0xFFE53935)), // Warm Red for cancel
+                    style: TextStyle(color: Color(0xFFE53935)),
                   ),
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop(); // Close popup
+                    Navigator.of(context).pop();
                     _confirmPlaceOrder(
                         context,
                         selectedProducts,
                         quantityProducts,
                         amountGiven,
                         discounts,
-                        globalDiscount);
+                        isPercentageDiscount
+                            ? globalDiscount
+                            : globalDiscountValue);
                   },
                   child: Text(
                     "Confirmer",
-                    style: TextStyle(
-                        color: Color(0xFF009688)), // Teal Green for confirm
+                    style: TextStyle(color: Color(0xFF009688)),
                   ),
                 ),
               ],
@@ -483,32 +554,25 @@ class Addorder {
     print("saving ....");
 
     double total = calculateTotal(
-        selectedProducts, quantityProducts, discounts, globalDiscount);
+        selectedProducts, quantityProducts, discounts, globalDiscount, true);
     String date = DateTime.now().toIso8601String();
-    String modePaiement = "Espèces"; // Vous pouvez changer cela si nécessaire
+    String modePaiement = "Espèces";
 
-    // Déterminer le statut en fonction du montant donné
     String status = (amountGiven >= total) ? "payée" : "non payée";
-
-    // Calculer le montant restant
     double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
     print("Calculated remainingAmount: $remainingAmount");
 
-    // Préparer les lignes de commande avec les quantités correctes
     List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex =
-          selectedProducts.indexOf(product); // Trouver l'index correct
-
+      int productIndex = selectedProducts.indexOf(product);
       return OrderLine(
-        idOrder: 0, // ID temporaire
+        idOrder: 0,
         idProduct: product.code,
-        quantite: quantityProducts[productIndex], // Quantité correcte
+        quantite: quantityProducts[productIndex],
         prixUnitaire: product.prixTTC,
-        discount: discounts[productIndex], // Quantité correcte
+        discount: discounts[productIndex],
       );
     }).toList();
 
-    // Créer un objet Order
     Order order = Order(
       date: date,
       orderLines: orderLines,
@@ -520,12 +584,11 @@ class Addorder {
     );
     print("Order to be saved: ${order.toMap()}");
 
-    // Sauvegarder la commande dans la base de données
     try {
       int orderId = await SqlDb().addOrder(order);
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
-        bool isValidOrder = true; // Pour vérifier la validité de la commande
+        bool isValidOrder = true;
 
         for (int i = 0; i < selectedProducts.length; i++) {
           if (selectedProducts[i].stock == 0) {
@@ -550,12 +613,11 @@ class Addorder {
         }
 
         if (!isValidOrder) {
-          return; // Arrêter le traitement de la commande si un produit a un stock insuffisant
+          return;
         }
 
-        // Procéder à la commande si les conditions de stock sont remplies
         for (int i = 0; i < selectedProducts.length; i++) {
-          selectedProducts[i].stock -= quantityProducts[i]; // Diminuer le stock
+          selectedProducts[i].stock -= quantityProducts[i];
           await SqlDb().updateProductStock(
               selectedProducts[i].code, selectedProducts[i].stock);
         }
@@ -594,16 +656,23 @@ class Addorder {
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
-    double globalDiscount, // Ajout de la remise globale
+    double globalDiscount,
+    bool isPercentageDiscount,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      double discountedPrice = selectedProducts[i].prixTTC *
-          (1 - discounts[i] / 100); // Apply discount
+      double discountedPrice =
+          selectedProducts[i].prixTTC * (1 - discounts[i] / 100);
       total += discountedPrice * quantityProducts[i];
     }
-    double totalAfterGlobalDiscount = total * (1 - globalDiscount / 100);
 
-    return totalAfterGlobalDiscount;
+    // Appliquer la remise globale
+    if (isPercentageDiscount) {
+      total = total * (1 - globalDiscount / 100); // Remise en pourcentage
+    } else {
+      total = total - globalDiscount; // Remise en valeur
+    }
+
+    return total;
   }
 }

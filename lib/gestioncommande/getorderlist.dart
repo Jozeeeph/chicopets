@@ -405,11 +405,14 @@ class Getorderlist {
 
   static void _showOrderTicketPopup(BuildContext context, Order order) {
     final SqlDb sqldb = SqlDb();
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.white, // White background for clarity
+          backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Center(
@@ -418,14 +421,14 @@ class Getorderlist {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: Color(0xFF000000)), // Deep Blue
+                  color: Color(0xFF000000)),
             ),
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Numéro de commande et date
                 Text(
@@ -434,10 +437,10 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)), // Deep Blue
+                      color: Color(0xFF000000)),
                 ),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Header Row
                 Padding(
@@ -452,7 +455,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                         ),
                       ),
                       Expanded(
@@ -462,7 +465,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                         ),
                       ),
                       Expanded(
@@ -472,7 +475,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -483,7 +486,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                           textAlign: TextAlign.end,
                         ),
                       ),
@@ -491,7 +494,7 @@ class Getorderlist {
                   ),
                 ),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Liste des produits
                 ...order.orderLines.map((orderLine) {
@@ -501,7 +504,7 @@ class Getorderlist {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                             child: CircularProgressIndicator(
-                          color: Color(0xFF26A9E0), // Sky Blue
+                          color: Color(0xFF26A9E0),
                         ));
                       }
 
@@ -510,8 +513,7 @@ class Getorderlist {
                           snapshot.data == null) {
                         return const ListTile(
                             title: Text("Produit introuvable",
-                                style: TextStyle(
-                                    color: Color(0xFFE53935)))); // Warm Red
+                                style: TextStyle(color: Color(0xFFE53935))));
                       }
 
                       Product product = snapshot.data!;
@@ -527,8 +529,7 @@ class Getorderlist {
                               child: Text(
                                 "x${orderLine.quantite}",
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                               ),
                             ),
                             Expanded(
@@ -536,8 +537,7 @@ class Getorderlist {
                               child: Text(
                                 product.designation,
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -546,8 +546,7 @@ class Getorderlist {
                               child: Text(
                                 "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -558,7 +557,7 @@ class Getorderlist {
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    color: Color(0xFF000000)),
                                 textAlign: TextAlign.end,
                               ),
                             ),
@@ -569,10 +568,10 @@ class Getorderlist {
                   );
                 }).toList(),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Global Discount
-                if (order.globalDiscount > 0)
+                if (isPercentageDiscount && order.globalDiscount > 0)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -581,14 +580,34 @@ class Getorderlist {
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF000000)), // Deep Blue
+                            color: Color(0xFF000000)),
                       ),
                       Text(
                         "${order.globalDiscount.toStringAsFixed(2)} %",
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red), // Red for discount
+                            color: Colors.red),
+                      ),
+                    ],
+                  )
+                else if (!isPercentageDiscount && order.globalDiscount > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Remise Globale:",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)),
+                      ),
+                      Text(
+                        "${order.globalDiscount.toStringAsFixed(2)} DT",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red),
                       ),
                     ],
                   ),
@@ -602,14 +621,14 @@ class Getorderlist {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)), // Deep Blue
+                          color: Color(0xFF000000)),
                     ),
                     Text(
                       "${order.total.toStringAsFixed(2)} DT",
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)), // Deep Blue
+                          color: Color(0xFF000000)),
                     ),
                   ],
                 ),
@@ -621,7 +640,7 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)), // Deep Blue
+                      color: Color(0xFF000000)),
                 ),
               ],
             ),
@@ -631,15 +650,14 @@ class Getorderlist {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Fermer",
-                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: Text("Fermer", style: TextStyle(color: Color(0xFF000000))),
             ),
             TextButton(
               onPressed: () {
                 generateAndSavePDF(context, order);
               },
-              child: Text("Imprimer",
-                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child:
+                  Text("Imprimer", style: TextStyle(color: Color(0xFF000000))),
             ),
           ],
         );
@@ -656,10 +674,12 @@ class Getorderlist {
   static Future<void> generateAndSavePDF(
       BuildContext context, Order order) async {
     final pdf = pw.Document();
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
 
     // Define the page format for a standard receipt (80mm width, auto height)
-    const double pageWidth = 70 * PdfPageFormat.mm; // 80mm width
-    const double pageHeight = double.infinity; // Auto height
+    const double pageWidth = 70 * PdfPageFormat.mm;
+    const double pageHeight = double.infinity;
 
     pdf.addPage(
       pw.Page(
@@ -768,7 +788,7 @@ class Getorderlist {
             pw.Divider(),
 
             // Global Discount
-            if (order.globalDiscount > 0)
+            if (isPercentageDiscount && order.globalDiscount > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -781,6 +801,26 @@ class Getorderlist {
                   ),
                   pw.Text(
                     "${order.globalDiscount.toStringAsFixed(2)} %",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              )
+            else if (!isPercentageDiscount)
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Remise Globale:",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "${order.globalDiscount.toStringAsFixed(2)} DT",
                     style: pw.TextStyle(
                       fontWeight: pw.FontWeight.bold,
                       fontSize: 8,
@@ -852,7 +892,7 @@ class Getorderlist {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("PDF enregistré dans: $filePath"),
-        backgroundColor: Color(0xFF009688), // Teal Green
+        backgroundColor: Color(0xFF009688),
       ),
     );
   }
