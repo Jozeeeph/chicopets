@@ -185,7 +185,7 @@ class _TableCmdState extends State<TableCmd> {
               Container(
                 height: 270,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFF26A9E0)),
+                  border: Border.all(color: const Color.fromARGB(255, 1, 42, 79)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -194,7 +194,7 @@ class _TableCmdState extends State<TableCmd> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF26A9E0),
+                        color: const Color.fromARGB(255, 1, 42, 79),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Row(
