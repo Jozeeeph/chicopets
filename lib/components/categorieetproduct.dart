@@ -31,7 +31,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   // Define the color palette
   final Color deepBlue = const Color(0xFF0056A6); // Primary deep blue
-  final Color skyBlue = const Color(0xFF26A9E0); // Accent sky blue
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79); // Accent sky blue
   final Color white = Colors.white; // White
   final Color lightGray = const Color(0xFFE0E0E0); // Light gray
   final Color tealGreen = const Color(0xFF009688); // Accent teal green
@@ -188,7 +188,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         child: Container(
                           margin: const EdgeInsets.all(2.0),
                           decoration: BoxDecoration(
-                            color: skyBlue,
+                            color: darkBlue,
                             borderRadius: BorderRadius.circular(17),
                           ),
                           child: Center(
@@ -235,7 +235,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: skyBlue.withOpacity(0.1),
+          color: darkBlue.withOpacity(0.1),
           border: Border.all(color: deepBlue, width: 1.5),
           borderRadius: BorderRadius.circular(30),
         ),
