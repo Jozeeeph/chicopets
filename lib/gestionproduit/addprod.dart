@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 
 class Addprod {
   static void showAddProductPopup(BuildContext context, Function refreshData) {
-    final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     final TextEditingController codeController = TextEditingController();
     final TextEditingController designationController = TextEditingController();
     final TextEditingController stockController = TextEditingController();
@@ -64,7 +64,7 @@ class Addprod {
                 width: 800,
                 height: 500,
                 child: Form(
-                  key: _formKey,
+                  key: formKey,
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
@@ -178,7 +178,7 @@ class Addprod {
                   style: _buttonStyle(
                       const Color(0xFF009688)), // Teal Green for success
                   onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
+                    if (formKey.currentState!.validate()) {
                       if (selectedSubCategoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(

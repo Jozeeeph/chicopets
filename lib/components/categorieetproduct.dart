@@ -12,12 +12,12 @@ class Categorieetproduct extends StatefulWidget {
   final Function(Product) onProductSelected;
 
   const Categorieetproduct({
-    Key? key,
+    super.key,
     required this.selectedProducts,
     required this.quantityProducts,
     required this.discounts,
     required this.onProductSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<Categorieetproduct> createState() => _CategorieetproductState();
@@ -222,7 +222,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     final isLocalFile = imagePath != null &&
         imagePath.isNotEmpty &&
         !imagePath.startsWith('assets/');
-    final categoryImagePath = (isLocalFile && File(imagePath!).existsSync())
+    final categoryImagePath = (isLocalFile && File(imagePath).existsSync())
         ? imagePath
         : defaultImage;
 

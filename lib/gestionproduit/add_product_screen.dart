@@ -12,10 +12,10 @@ class AddProductScreen extends StatefulWidget {
   final Function refreshData;
 
   const AddProductScreen({
-    Key? key,
+    super.key,
     this.product,
     required this.refreshData,
-  }) : super(key: key);
+  });
 
   @override
   _AddProductScreenState createState() => _AddProductScreenState();
@@ -581,7 +581,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               ),
                             ],
                           );
-                        }).toList(),
+                        }),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: generateVariants,

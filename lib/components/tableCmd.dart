@@ -19,7 +19,7 @@ class TableCmd extends StatefulWidget {
   final VoidCallback onSearchProduct;
 
   final Function(int) onQuantityChange;
-  final double Function(List<Product>, List<int>, List<double>) calculateTotal;
+  final double Function(List<Product>, List<int>, List<double>,List<bool>) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -135,7 +135,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts).toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,

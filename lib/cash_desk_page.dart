@@ -61,7 +61,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(selectedProducts, quantityProducts, discounts),
+      total: calculateTotal(
+          selectedProducts, quantityProducts, discounts, typeDiscounts),
       modePaiement: "Espèces", // Default payment method
     );
     Addorder.showPlaceOrderPopup(
@@ -122,7 +123,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
             // Table Command Section
             TableCmd(
               total:
-                  calculateTotal(selectedProducts, quantityProducts, discounts),
+                  calculateTotal(selectedProducts, quantityProducts, discounts,typeDiscounts),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
@@ -166,7 +167,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
                     // Product not selected yet, we add it with an initial quantity of 1
                     selectedProducts.add(product);
                     quantityProducts.add(1);
-                    discounts.add(0.0); // Add a discount value for the new product
+                    discounts
+                        .add(0.0); // Add a discount value for the new product
                     typeDiscounts.add(true);
                     selectedProductIndex = selectedProducts.length - 1;
                   } else {
@@ -184,17 +186,35 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   // Calculate the total price including discounts
-  double calculateTotal(
+  static double calculateTotal(
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
+    List<bool> typeDiscounts,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      final double price = selectedProducts[i].prixTTC;
-      final int quantity = quantityProducts[i];
-      final double discount = discounts[i];
-      total += price * quantity * (1 - discount / 100);
+      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+
+      if (typeDiscounts[i]) {
+        // Percentage discount (applied to the total price)
+        productTotal *= (1 - discounts[i] / 100);
+      } else {
+        // Fixed discount (subtract the discount from the total price)
+        productTotal -= discounts[i];
+      }
+
+      // Ensure the product total is not negative
+      if (productTotal < 0) {
+        productTotal = 0.0; // Prevent negative prices
+      }
+
+      total += productTotal;
+
+      // Debugging output
+      print(
+          'Product: ${selectedProducts[i].designation}, Quantity: ${quantityProducts[i]}, Discount: ${discounts[i]}, TypeDiscount: ${typeDiscounts[i]}');
+      print('Product Total: $productTotal, Total so far: $total');
     }
     return total;
   }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/home_page.dart';
-import 'package:caissechicopets/cash_desk_page.dart';
-import 'package:caissechicopets/dashboard_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Import sqflite_ffi
