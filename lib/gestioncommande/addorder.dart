@@ -223,9 +223,9 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                       typeDiscounts[index]
-                                                  ? "${(product.prixTTC * quantityProducts[index] * (1 - discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
-                                                  : "${(product.prixTTC * quantityProducts[index] - discounts[index]).toStringAsFixed(2)} DT",
+                                        typeDiscounts[index]
+                                            ? "${(product.prixTTC * quantityProducts[index] * (1 - discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
+                                            : "${(product.prixTTC * quantityProducts[index] - discounts[index]).toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -432,7 +432,8 @@ class Addorder {
 
     print("saving ....");
 
-    double total = calculateTotal(selectedProducts, quantityProducts, discounts, typeDiscounts);
+    double total = calculateTotal(
+        selectedProducts, quantityProducts, discounts, typeDiscounts);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces"; // You can change this if needed
 
@@ -445,10 +446,10 @@ class Addorder {
 
     // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex = selectedProducts.indexOf(product); // Find correct index
+      int productIndex =
+          selectedProducts.indexOf(product); // Find correct index
 
       print(typeDiscounts);
-      
 
       return OrderLine(
         idOrder: 0, // Temporary ID
@@ -538,19 +539,27 @@ class Addorder {
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      double discountedPrice;
+      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
 
       if (typeDiscounts[i]) {
-        // If the discount is a percentage
-        discountedPrice =
-            selectedProducts[i].prixTTC * (1 - discounts[i] / 100);
+        // Percentage discount (applied to the total price)
+        productTotal *= (1 - discounts[i] / 100);
       } else {
-        // If the discount is a fixed value (DT)
-        discountedPrice = selectedProducts[i].prixTTC - discounts[i];
+        // Fixed discount (subtract the discount from the total price)
+        productTotal -= discounts[i];
       }
 
-      total += discountedPrice * quantityProducts[i];
-      print(total);
+      // Ensure the product total is not negative
+      if (productTotal < 0) {
+        productTotal = 0.0; // Prevent negative prices
+      }
+
+      total += productTotal;
+
+      // Debugging output
+      print(
+          'Product: ${selectedProducts[i].designation}, Quantity: ${quantityProducts[i]}, Discount: ${discounts[i]}, TypeDiscount: ${typeDiscounts[i]}');
+      print('Product Total: $productTotal, Total so far: $total');
     }
     return total;
   }

@@ -11,7 +11,7 @@ import 'package:path_provider/path_provider.dart';
 class Getorderlist {
   static Future<void> cancelOrder(
       BuildContext context, Order order, Function() onOrderCanceled) async {
-    TextEditingController _confirmController = TextEditingController();
+    TextEditingController confirmController = TextEditingController();
     bool isConfirmed = false;
     final SqlDb sqlDb = SqlDb();
 
@@ -44,7 +44,7 @@ class Getorderlist {
                   ),
                   const SizedBox(height: 15),
                   TextField(
-                    controller: _confirmController,
+                    controller: confirmController,
                     onChanged: (value) {
                       setState(() {
                         isConfirmed = (value.toLowerCase().trim() == "annuler");
@@ -223,35 +223,40 @@ class Getorderlist {
                             style: TextStyle(
                               color: isCancelled
                                   ? Colors.red
-                                  : isSemiPaid
+                                  : order.remainingAmount ==
+                                          0 // Check if remaining amount is 0
                                       ? Colors
-                                          .orange // Orange text for semi-paid orders
-                                      : order.status == "payée"
+                                          .green // Green text for fully paid orders
+                                      : isSemiPaid
                                           ? Colors
-                                              .green // Green text for fully paid orders
-                                          : const Color(0xFF0056A6),
+                                              .orange // Orange text for semi-paid orders
+                                          : const Color(
+                                              0xFF0056A6), // Default color
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           subtitle: Text(
                             isCancelled
                                 ? 'Commande annulée'
-                                : isSemiPaid
-                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Display remaining amount
-                                    : order.status == "payée"
-                                        ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
-                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
-                            style: TextStyle(
-                                color: isCancelled
-                                    ? Colors.red
+                                : order.remainingAmount ==
+                                        0 // Check if remaining amount is 0
+                                    ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT' // Fully paid
                                     : isSemiPaid
-                                        ? Colors
-                                            .orange // Orange text for semi-paid orders
-                                        : order.status == "payée"
-                                            ? Colors
-                                                .green // Green text for fully paid orders
-                                            : const Color(0xFF009688),
-                                fontSize: 14),
+                                        ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Semi-paid
+                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT', // Not paid
+                            style: TextStyle(
+                              color: isCancelled
+                                  ? Colors.red
+                                  : order.remainingAmount ==
+                                          0 // Check if remaining amount is 0
+                                      ? Colors
+                                          .green // Green text for fully paid orders
+                                      : isSemiPaid
+                                          ? Colors
+                                              .orange // Orange text for semi-paid orders
+                                          : const Color(0xFF009688), // Default color
+                              fontSize: 14,
+                            ),
                           ),
                           children: [
                             ...order.orderLines.map((orderLine) {
@@ -337,7 +342,7 @@ class Getorderlist {
                                   );
                                 },
                               );
-                            }).toList(),
+                            }),
 
                             // 🔹 Boutons alignés horizontalement
                             Padding(
@@ -668,7 +673,7 @@ class Getorderlist {
                       );
                     },
                   );
-                }).toList(),
+                }),
 
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
 
@@ -783,7 +788,7 @@ class Getorderlist {
                       "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT"),
                 ],
               );
-            }).toList(),
+            }),
 
             pw.Divider(),
 

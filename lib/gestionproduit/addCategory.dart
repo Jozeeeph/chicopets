@@ -40,10 +40,8 @@ class _AddCategoryState extends State<AddCategory> {
       categoryToEdit = args;
       nameController.text = categoryToEdit!.name;
       selectedCategoryId = categoryToEdit!.id;
-      if (categoryToEdit!.imagePath != null) {
-        selectedImage = File(categoryToEdit!.imagePath!);
-      }
-
+      selectedImage = File(categoryToEdit!.imagePath!);
+    
       // Charger les sous-catégories associées à la catégorie en cours de modification
       if (selectedCategoryId != null) {
         fetchSubCategories(selectedCategoryId!);
