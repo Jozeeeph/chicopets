@@ -17,9 +17,11 @@ class TableCmd extends StatefulWidget {
   final Function(int) onDeleteProduct;
   final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
+  final double globalDiscount;
 
   final Function(int) onQuantityChange;
-  final double Function(List<Product>, List<int>, List<double>,List<bool>) calculateTotal;
+  final double Function(List<Product>, List<int>, List<double>, List<bool>, double globalDiscount)
+      calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -29,6 +31,7 @@ class TableCmd extends StatefulWidget {
     required this.selectedProducts,
     required this.quantityProducts,
     required this.discounts,
+    required this.globalDiscount,
     required this.typeDiscounts,
     required this.onApplyDiscount,
     required this.onDeleteProduct,
@@ -135,7 +138,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts).toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts,widget.globalDiscount).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -358,9 +361,9 @@ class _TableCmdState extends State<TableCmd> {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.edit, color: Colors.white, size: 18),
+                      Icon(Icons.discount, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('REMISE',
+                      Text('REMISE PAR LIGNE',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

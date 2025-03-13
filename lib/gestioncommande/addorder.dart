@@ -20,16 +20,16 @@ class Addorder {
         SnackBar(
           content: Text(
             "Aucun produit sélectionné.",
-            style: TextStyle(color: Colors.white), // White text for contrast
+            style: TextStyle(color: Colors.white),
           ),
-          backgroundColor: Color(0xFFE53935), // Warm Red for error
-          behavior: SnackBarBehavior.floating, // Floating style
+          backgroundColor: Color(0xFFE53935),
+          behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10), // Rounded corners
+            borderRadius: BorderRadius.circular(10),
           ),
           action: SnackBarAction(
             label: "OK",
-            textColor: Colors.white, // White text for contrast
+            textColor: Colors.white,
             onPressed: () {
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
             },
@@ -40,21 +40,15 @@ class Addorder {
     }
 
     String cleanInput(String input) {
-      // Remplace tout ce qui n'est pas un chiffre ou un point décimal
       input = input.replaceAll(RegExp(r'[^0-9.]'), '');
-
-      // Empêcher plusieurs points décimaux
       List<String> parts = input.split('.');
       if (parts.length > 2) {
-        input = '${parts[0]}.${parts.sublist(1).join('')}';
+        input = parts[0] + '.' + parts.sublist(1).join('');
       }
-
-      // Vérifier si le nombre est positif
       double? value = double.tryParse(input);
       if (value != null && value < 0) {
-        return 'NEGATIVE'; // Code spécial pour signaler un nombre négatif
+        return 'NEGATIVE';
       }
-
       return input;
     }
 
@@ -63,15 +57,43 @@ class Addorder {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController changeReturnedController = TextEditingController();
 
+    double globalDiscount = order.globalDiscount;
+    double globalDiscountValue = 0.0;
+    bool isPercentageDiscount = true;
     double total = calculateTotal(
-        selectedProducts, quantityProducts, discounts, typeDiscounts);
-    String selectedPaymentMethod = "Espèce"; // Default payment method
+        selectedProducts,
+        quantityProducts,
+        discounts,
+        typeDiscounts,
+        isPercentageDiscount ? globalDiscount : globalDiscountValue,
+        isPercentageDiscount);
+    String selectedPaymentMethod = "Espèce";
+
+    TextEditingController globalDiscountController =
+        TextEditingController(text: globalDiscount.toString());
+    TextEditingController globalDiscountValueController =
+        TextEditingController();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            void updateTotalAndChange() {
+              setState(() {
+                total = calculateTotal(
+                    selectedProducts,
+                    quantityProducts,
+                    discounts,
+                    typeDiscounts,
+                    isPercentageDiscount ? globalDiscount : globalDiscountValue,
+                    isPercentageDiscount);
+                changeReturned = amountGiven - total;
+                changeReturnedController.text =
+                    changeReturned.toStringAsFixed(2);
+              });
+            }
+
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -80,25 +102,20 @@ class Addorder {
                 "Confirmer la commande",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056A6), // Deep Blue for title
+                  color: Color(0xFF0056A6),
                 ),
               ),
               content: SingleChildScrollView(
-                // Wrap the content in SingleChildScrollView
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Static list of products and quantities
-                    // Styled product list (receipt look)
                     Container(
-                      width: double.infinity, // Ensure full width
+                      width: double.infinity,
                       padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: Colors.black,
-                            width: 1), // Border for ticket feel
+                        border: Border.all(color: Colors.black, width: 1),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black26,
@@ -110,22 +127,19 @@ class Addorder {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Title
                           Center(
                             child: Text(
                               "🧾 Ticket de Commande",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                // Monospace for receipt style
                               ),
                             ),
                           ),
                           Divider(
-                              thickness: 1,
-                              color: Colors.black), // Separator line
-
-                          // Header Row
+                            thickness: 1,
+                            color: Colors.black,
+                          ),
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
@@ -177,13 +191,15 @@ class Addorder {
                             ),
                           ),
                           Divider(
-                              thickness: 1,
-                              color: Colors.black), // Separator line
-
-                          // Product List from OrderLine
+                            thickness: 1,
+                            color: Colors.black,
+                          ),
                           if (selectedProducts.isNotEmpty)
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
+                              double discountedPrice = typeDiscounts[index]
+                                  ? product.prixTTC * (1 - discounts[index] / 100)
+                                  : product.prixTTC - discounts[index];
                               return Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -213,7 +229,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${product.prixTTC.toStringAsFixed(2)} DT",
+                                        "${discountedPrice.toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                         ),
@@ -223,9 +239,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        typeDiscounts[index]
-                                            ? "${(product.prixTTC * quantityProducts[index] * (1 - discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
-                                            : "${(product.prixTTC * quantityProducts[index] - discounts[index]).toStringAsFixed(2)} DT",
+                                        "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -236,15 +250,13 @@ class Addorder {
                                   ],
                                 ),
                               );
-                            })
+                            }).toList()
                           else
                             Center(child: Text("Aucun produit sélectionné.")),
-
                           Divider(
-                              thickness: 1,
-                              color: Colors.black), // Bottom separator
-
-                          // Total
+                            thickness: 1,
+                            color: Colors.black,
+                          ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -255,17 +267,136 @@ class Addorder {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                "${total.toStringAsFixed(2)} DT", // Display total from order
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              if (isPercentageDiscount && globalDiscount > 0)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      "Remise: ${globalDiscount.toStringAsFixed(2)} %",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else if (!isPercentageDiscount &&
+                                  globalDiscountValue > 0)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      "Remise: ${globalDiscountValue.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Text(
+                                  "${total.toStringAsFixed(2)} DT",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ],
                       ),
+                    ),
+
+                    SizedBox(height: 16),
+
+                    // Remise Globale
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Type de Remise:",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Row(
+                          children: [
+                            Radio(
+                              value: true,
+                              groupValue: isPercentageDiscount,
+                              onChanged: (value) {
+                                setState(() {
+                                  isPercentageDiscount = value as bool;
+                                  globalDiscountController.text = '';
+                                  globalDiscountValueController.text = '';
+                                  updateTotalAndChange();
+                                });
+                              },
+                            ),
+                            Text("Pourcentage"),
+                            Radio(
+                              value: false,
+                              groupValue: isPercentageDiscount,
+                              onChanged: (value) {
+                                setState(() {
+                                  isPercentageDiscount = value as bool;
+                                  globalDiscountController.text = '';
+                                  globalDiscountValueController.text = '';
+                                  updateTotalAndChange();
+                                });
+                              },
+                            ),
+                            Text("Valeur (DT)"),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+                        if (isPercentageDiscount)
+                          TextField(
+                            controller: globalDiscountController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Remise Globale (%)",
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                globalDiscount = double.tryParse(value) ?? 0.0;
+                                updateTotalAndChange();
+                              });
+                            },
+                          ),
+                        if (!isPercentageDiscount)
+                          TextField(
+                            controller: globalDiscountValueController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Remise Globale (DT)",
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                globalDiscountValue =
+                                    double.tryParse(value) ?? 0.0;
+                                updateTotalAndChange();
+                              });
+                            },
+                          ),
+                      ],
                     ),
 
                     SizedBox(height: 16),
@@ -319,7 +450,6 @@ class Addorder {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Input for "Donnée" (Amount Given)
                         TextField(
                           controller: amountGivenController,
                           keyboardType: TextInputType.number,
@@ -330,8 +460,6 @@ class Addorder {
                           onChanged: (value) {
                             setState(() {
                               String cleanedValue = cleanInput(value);
-
-                              // Vérifier si le nombre est négatif
                               if (cleanedValue == 'NEGATIVE') {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -345,15 +473,11 @@ class Addorder {
                                 amountGivenController.text = '';
                                 return;
                               }
-
-                              // Appliquer la valeur nettoyée
                               amountGivenController.text = cleanedValue;
                               amountGivenController.selection =
                                   TextSelection.fromPosition(
                                 TextPosition(offset: cleanedValue.length),
                               );
-
-                              // Calcul du rendu de monnaie
                               amountGiven =
                                   double.tryParse(cleanedValue) ?? 0.0;
                               changeReturned = amountGiven - total;
@@ -362,10 +486,7 @@ class Addorder {
                             });
                           },
                         ),
-
                         SizedBox(height: 10),
-
-                        // "Rendu" (Change Returned) - Readonly
                         TextField(
                           controller: changeReturnedController,
                           readOnly: true,
@@ -386,25 +507,26 @@ class Addorder {
                   },
                   child: Text(
                     "Annuler",
-                    style: TextStyle(
-                        color: Color(0xFFE53935)), // Warm Red for cancel
+                    style: TextStyle(color: Color(0xFFE53935)),
                   ),
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop(); // Close popup
+                    Navigator.of(context).pop();
                     _confirmPlaceOrder(
                         context,
                         selectedProducts,
                         quantityProducts,
                         amountGiven,
                         discounts,
-                        typeDiscounts);
+                        typeDiscounts,
+                        isPercentageDiscount
+                            ? globalDiscount
+                            : globalDiscountValue);
                   },
                   child: Text(
                     "Confirmer",
-                    style: TextStyle(
-                        color: Color(0xFF009688)), // Teal Green for confirm
+                    style: TextStyle(color: Color(0xFF009688)),
                   ),
                 ),
               ],
@@ -422,6 +544,7 @@ class Addorder {
     double amountGiven,
     List<double> discounts,
     List<bool> typeDiscounts,
+    double globalDiscount,
   ) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -433,35 +556,26 @@ class Addorder {
     print("saving ....");
 
     double total = calculateTotal(
-        selectedProducts, quantityProducts, discounts, typeDiscounts);
+        selectedProducts, quantityProducts, discounts, typeDiscounts, globalDiscount, true);
     String date = DateTime.now().toIso8601String();
-    String modePaiement = "Espèces"; // You can change this if needed
+    String modePaiement = "Espèces";
 
-    // Determine the status based on the amount given
     String status = (amountGiven >= total) ? "payée" : "non payée";
-
-    // Calculate the remaining amount
     double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
     print("Calculated remainingAmount: $remainingAmount");
 
-    // Prepare order lines with correct quantities
     List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex =
-          selectedProducts.indexOf(product); // Find correct index
-
-      print(typeDiscounts);
-
+      int productIndex = selectedProducts.indexOf(product);
       return OrderLine(
-        idOrder: 0, // Temporary ID
+        idOrder: 0,
         idProduct: product.code,
-        quantite: quantityProducts[productIndex], // Correct quantity
+        quantite: quantityProducts[productIndex],
         prixUnitaire: product.prixTTC,
-        discount: discounts[productIndex], // Correct discount
-        isPercentage: typeDiscounts[productIndex], // Correct discount type
+        discount: discounts[productIndex],
+        isPercentage: typeDiscounts[productIndex],
       );
     }).toList();
 
-    // Create an Order object
     Order order = Order(
       date: date,
       orderLines: orderLines,
@@ -469,62 +583,73 @@ class Addorder {
       modePaiement: modePaiement,
       status: status,
       remainingAmount: remainingAmount,
+      globalDiscount: globalDiscount,
     );
+    print("Order to be saved: ${order.toMap()}");
 
-    // Save order to database
-    int orderId = await SqlDb().addOrder(order);
-    if (orderId > 0) {
-      bool isValidOrder = true; // To check order validity
+    try {
+      int orderId = await SqlDb().addOrder(order);
+      if (orderId > 0) {
+        print("Order saved successfully with ID: $orderId");
+        bool isValidOrder = true;
 
-      for (int i = 0; i < selectedProducts.length; i++) {
-        if (selectedProducts[i].stock == 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  "${selectedProducts[i].designation} est en rupture de stock !"),
-              backgroundColor: Colors.red,
-            ),
-          );
-          isValidOrder = false;
-        } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                " Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}.",
+        for (int i = 0; i < selectedProducts.length; i++) {
+          if (selectedProducts[i].stock == 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    "${selectedProducts[i].designation} est en rupture de stock !"),
+                backgroundColor: Colors.red,
               ),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          isValidOrder = false;
+            );
+            isValidOrder = false;
+          } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    "Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}."),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            isValidOrder = false;
+          }
         }
-      }
 
-      if (!isValidOrder) {
-        return; // Stop order processing if any product has insufficient stock
-      }
+        if (!isValidOrder) {
+          return;
+        }
 
-      // Proceed with order if stock conditions are met
-      for (int i = 0; i < selectedProducts.length; i++) {
-        selectedProducts[i].stock -= quantityProducts[i]; // Decrease stock
-        await SqlDb().updateProductStock(
-            selectedProducts[i].code, selectedProducts[i].stock);
-      }
+        for (int i = 0; i < selectedProducts.length; i++) {
+          selectedProducts[i].stock -= quantityProducts[i];
+          await SqlDb().updateProductStock(
+              selectedProducts[i].code, selectedProducts[i].stock);
+        }
 
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Commande passée avec succès !"),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        selectedProducts.clear();
+        quantityProducts.clear();
+        discounts.clear();
+        typeDiscounts.clear();
+      } else {
+        print("Failed to save order.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur lors de l'enregistrement de la commande."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error saving order: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Commande passée avec succès !"),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      selectedProducts.clear();
-      quantityProducts.clear();
-      discounts.clear();
-      typeDiscounts.clear();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Erreur lors de l'enregistrement de la commande."),
+          content: Text("Erreur lors de l'enregistrement de la commande: $e"),
           backgroundColor: Colors.red,
         ),
       );
@@ -536,31 +661,32 @@ class Addorder {
     List<int> quantityProducts,
     List<double> discounts,
     List<bool> typeDiscounts,
+    double globalDiscount,
+    bool isPercentageDiscount,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
       double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
 
       if (typeDiscounts[i]) {
-        // Percentage discount (applied to the total price)
         productTotal *= (1 - discounts[i] / 100);
       } else {
-        // Fixed discount (subtract the discount from the total price)
         productTotal -= discounts[i];
       }
 
-      // Ensure the product total is not negative
       if (productTotal < 0) {
-        productTotal = 0.0; // Prevent negative prices
+        productTotal = 0.0;
       }
 
       total += productTotal;
-
-      // Debugging output
-      print(
-          'Product: ${selectedProducts[i].designation}, Quantity: ${quantityProducts[i]}, Discount: ${discounts[i]}, TypeDiscount: ${typeDiscounts[i]}');
-      print('Product Total: $productTotal, Total so far: $total');
     }
+
+    if (isPercentageDiscount) {
+      total = total * (1 - globalDiscount / 100);
+    } else {
+      total = total - globalDiscount;
+    }
+
     return total;
   }
 }

@@ -3,6 +3,7 @@ import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/order.dart';
+import 'package:pdf/pdf.dart'; // Import the PdfPageFormat class
 import 'package:caissechicopets/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -223,40 +224,35 @@ class Getorderlist {
                             style: TextStyle(
                               color: isCancelled
                                   ? Colors.red
-                                  : order.remainingAmount ==
-                                          0 // Check if remaining amount is 0
+                                  : isSemiPaid
                                       ? Colors
-                                          .green // Green text for fully paid orders
-                                      : isSemiPaid
+                                          .orange // Orange text for semi-paid orders
+                                      : order.status == "payée"
                                           ? Colors
-                                              .orange // Orange text for semi-paid orders
-                                          : const Color(
-                                              0xFF0056A6), // Default color
+                                              .green // Green text for fully paid orders
+                                          : const Color(0xFF0056A6),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           subtitle: Text(
                             isCancelled
                                 ? 'Commande annulée'
-                                : order.remainingAmount ==
-                                        0 // Check if remaining amount is 0
-                                    ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT' // Fully paid
-                                    : isSemiPaid
-                                        ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Semi-paid
-                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT', // Not paid
+                                : isSemiPaid
+                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Display remaining amount
+                                    : order.status == "payée"
+                                        ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
+                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
                             style: TextStyle(
-                              color: isCancelled
-                                  ? Colors.red
-                                  : order.remainingAmount ==
-                                          0 // Check if remaining amount is 0
-                                      ? Colors
-                                          .green // Green text for fully paid orders
-                                      : isSemiPaid
-                                          ? Colors
-                                              .orange // Orange text for semi-paid orders
-                                          : const Color(0xFF009688), // Default color
-                              fontSize: 14,
-                            ),
+                                color: isCancelled
+                                    ? Colors.red
+                                    : isSemiPaid
+                                        ? Colors
+                                            .orange // Orange text for semi-paid orders
+                                        : order.status == "payée"
+                                            ? Colors
+                                                .green // Green text for fully paid orders
+                                            : const Color(0xFF009688),
+                                fontSize: 14),
                           ),
                           children: [
                             ...order.orderLines.map((orderLine) {
@@ -273,76 +269,63 @@ class Getorderlist {
                                   if (snapshot.hasError ||
                                       !snapshot.hasData ||
                                       snapshot.data == null) {
-                                    return ListTile(
-                                      title: Text(
-                                        "Produit supprimé (${orderLine.idProduct})",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                      subtitle: Text(
-                                          "Quantité: ${orderLine.quantite}"),
-                                      trailing: Text(
-                                        "${(orderLine.prixUnitaire * orderLine.quantite).toStringAsFixed(2)} DT",
-                                      ),
-                                    );
+                                    return const ListTile(
+                                        title: Text("Produit supprimé",
+                                            style: TextStyle(
+                                                color: Color(0xFFE53935))));
                                   }
-                                  Product product = snapshot.data!;
-                                  return ListTile(
-                                    title: Text(product.designation),
-                                    subtitle:
-                                        Text("Quantité: ${orderLine.quantite}"),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          orderLine.isPercentage
-                                              ? "${(orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2)} DT" // Percentage discount
-                                              : "${(orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT", // Fixed value discount
-                                        ),
-                                        IconButton(
-                                          icon: Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () async {
-                                            // Show confirmation dialog
-                                            bool? confirmDelete =
-                                                await showDialog<bool>(
-                                              context: context,
-                                              builder: (BuildContext context) {
-                                                return AlertDialog(
-                                                  title: const Text(
-                                                      "Confirmer la suppression"),
-                                                  content: const Text(
-                                                      "Êtes-vous sûr de vouloir supprimer ce produit de la commande ? La quantité de ce produit sera restockée"),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.of(context)
-                                                              .pop(false),
-                                                      child: const Text("Non"),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.of(context)
-                                                              .pop(true),
-                                                      child: const Text("Oui"),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            );
 
-                                            // If user confirms, delete the order line
-                                            if (confirmDelete == true) {
-                                              await cancelOrderLine(
-                                                  context, order, orderLine);
-                                            }
-                                          },
+                                  Product product = snapshot.data!;
+                                  double discountedPrice = orderLine.prixUnitaire *
+                                      (1 - orderLine.discount / 100);
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "x${orderLine.quantite}",
+                                            style: TextStyle(
+                                                fontSize: 16, color: Color(0xFF000000)),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            product.designation,
+                                            style: TextStyle(
+                                                fontSize: 16, color: Color(0xFF000000)),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                            style: TextStyle(
+                                                fontSize: 16, color: Color(0xFF000000)),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                                            style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF000000)),
+                                            textAlign: TextAlign.end,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   );
                                 },
                               );
-                            }),
+                            }).toList(),
 
                             // 🔹 Boutons alignés horizontalement
                             Padding(
@@ -388,7 +371,6 @@ class Getorderlist {
                                       foregroundColor: Colors.white,
                                     ),
                                   ),
-
                                   // Bouton "Mettre à jour" pour les commandes semi-payées
                                   if (isSemiPaid)
                                     IconButton(
@@ -422,7 +404,7 @@ class Getorderlist {
     );
   }
 
-  static void _updateSemiPaidOrder(BuildContext context, Order order) {
+   static void _updateSemiPaidOrder(BuildContext context, Order order) {
     // Calculate the remaining amount
     double remainingAmount = order.remainingAmount;
 
@@ -511,11 +493,14 @@ class Getorderlist {
 
   static void _showOrderTicketPopup(BuildContext context, Order order) {
     final SqlDb sqldb = SqlDb();
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.white, // White background for clarity
+          backgroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Center(
@@ -524,14 +509,14 @@ class Getorderlist {
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: Color(0xFF000000)), // Deep Blue
+                  color: Color(0xFF000000)),
             ),
           ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Numéro de commande et date
                 Text(
@@ -540,10 +525,10 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)), // Deep Blue
+                      color: Color(0xFF000000)),
                 ),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Header Row
                 Padding(
@@ -558,7 +543,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                         ),
                       ),
                       Expanded(
@@ -568,7 +553,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                         ),
                       ),
                       Expanded(
@@ -578,7 +563,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -589,7 +574,7 @@ class Getorderlist {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)), // Deep Blue
+                              color: Color(0xFF000000)),
                           textAlign: TextAlign.end,
                         ),
                       ),
@@ -597,7 +582,7 @@ class Getorderlist {
                   ),
                 ),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Liste des produits
                 ...order.orderLines.map((orderLine) {
@@ -607,7 +592,7 @@ class Getorderlist {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                             child: CircularProgressIndicator(
-                          color: Color(0xFF26A9E0), // Sky Blue
+                          color: Color(0xFF26A9E0),
                         ));
                       }
 
@@ -616,8 +601,7 @@ class Getorderlist {
                           snapshot.data == null) {
                         return const ListTile(
                             title: Text("Produit introuvable",
-                                style: TextStyle(
-                                    color: Color(0xFFE53935)))); // Warm Red
+                                style: TextStyle(color: Color(0xFFE53935))));
                       }
 
                       Product product = snapshot.data!;
@@ -633,8 +617,7 @@ class Getorderlist {
                               child: Text(
                                 "x${orderLine.quantite}",
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                               ),
                             ),
                             Expanded(
@@ -642,8 +625,7 @@ class Getorderlist {
                               child: Text(
                                 product.designation,
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -652,8 +634,7 @@ class Getorderlist {
                               child: Text(
                                 "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    fontSize: 16, color: Color(0xFF000000)),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -664,7 +645,7 @@ class Getorderlist {
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF000000)), // Deep Blue
+                                    color: Color(0xFF000000)),
                                 textAlign: TextAlign.end,
                               ),
                             ),
@@ -673,9 +654,51 @@ class Getorderlist {
                       );
                     },
                   );
-                }),
+                }).toList(),
 
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)), // Light Gray
+                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+
+                // Global Discount
+                if (isPercentageDiscount && order.globalDiscount > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Remise Globale:",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)),
+                      ),
+                      Text(
+                        "${order.globalDiscount.toStringAsFixed(2)} %",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red),
+                      ),
+                    ],
+                  )
+                else if (!isPercentageDiscount && order.globalDiscount > 0)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Remise Globale:",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)),
+                      ),
+                      Text(
+                        "${order.globalDiscount.toStringAsFixed(2)} DT",
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red),
+                      ),
+                    ],
+                  ),
 
                 // Total et Mode de paiement
                 Row(
@@ -686,14 +709,14 @@ class Getorderlist {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)), // Deep Blue
+                          color: Color(0xFF000000)),
                     ),
                     Text(
                       "${order.total.toStringAsFixed(2)} DT",
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)), // Deep Blue
+                          color: Color(0xFF000000)),
                     ),
                   ],
                 ),
@@ -705,7 +728,7 @@ class Getorderlist {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)), // Deep Blue
+                      color: Color(0xFF000000)),
                 ),
               ],
             ),
@@ -715,15 +738,14 @@ class Getorderlist {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Fermer",
-                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child: Text("Fermer", style: TextStyle(color: Color(0xFF000000))),
             ),
             TextButton(
               onPressed: () {
                 generateAndSavePDF(context, order);
               },
-              child: Text("Imprimer",
-                  style: TextStyle(color: Color(0xFF000000))), // Deep Blue
+              child:
+                  Text("Imprimer", style: TextStyle(color: Color(0xFF000000))),
             ),
           ],
         );
@@ -740,88 +762,225 @@ class Getorderlist {
   static Future<void> generateAndSavePDF(
       BuildContext context, Order order) async {
     final pdf = pw.Document();
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
+
+    // Define the page format for a standard receipt (80mm width, auto height)
+    const double pageWidth = 70 * PdfPageFormat.mm;
+    const double pageHeight = double.infinity;
 
     pdf.addPage(
       pw.Page(
+        pageFormat: PdfPageFormat(pageWidth, pageHeight,
+            marginAll: 4 * PdfPageFormat.mm),
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            // Header with welcome message
             pw.Center(
-              child: pw.Text("Ticket de Commande",
-                  style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
+              child: pw.Column(
+                children: [
+                  pw.Text(
+                    "Bienvenue chez Chicopets!",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Text(
+                    "Merci pour votre visite!",
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
             ),
             pw.Divider(),
 
-            // Numéro de commande et date
-            pw.Text("Commande #${order.idOrder}"),
-            pw.Text("Date: ${formatDate(order.date)}"),
+            // Order number and date
+            pw.Text(
+              "Commande #${order.idOrder}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
+            pw.Text(
+              "Date: ${formatDate(order.date)}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
             pw.Divider(),
 
-            // Header de la liste des articles
+            // Header row for items
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Qt",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Article",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Prix U",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("Montant",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  "Qt",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Article",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Prix U",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "Montant",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
               ],
             ),
             pw.Divider(),
 
-            // Liste des produits
+            // List of products
             ...order.orderLines.map((orderLine) {
               double discountedPrice =
                   orderLine.prixUnitaire * (1 - orderLine.discount / 100);
               return pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text("x${orderLine.quantite}"),
-                  pw.Text(orderLine.idProduct),
-                  pw.Text("${discountedPrice.toStringAsFixed(2)} DT"),
                   pw.Text(
-                      "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT"),
+                    "x${orderLine.quantite}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    orderLine.idProduct,
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    "${discountedPrice.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                  pw.Text(
+                    "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
                 ],
               );
-            }),
+            }).toList(),
 
             pw.Divider(),
 
-            // Total et mode de paiement
+            // Global Discount
+            if (isPercentageDiscount && order.globalDiscount > 0)
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Remise Globale:",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "${order.globalDiscount.toStringAsFixed(2)} %",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              )
+            else if (!isPercentageDiscount && order.globalDiscount > 0)
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Remise Globale:",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "${order.globalDiscount.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
+
+            // Total and payment method
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Total:",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text("${order.total.toStringAsFixed(2)} DT",
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(
+                  "Total:",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "${order.total.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
               ],
             ),
-            pw.SizedBox(height: 10),
-            pw.Text("Mode de Paiement: ${order.modePaiement}"),
+            pw.SizedBox(height: 5),
+            pw.Text(
+              "Mode de Paiement: ${order.modePaiement}",
+              style: pw.TextStyle(fontSize: 8),
+            ),
+
+            // Footer with thank you message
+            pw.Center(
+              child: pw.Column(
+                children: [
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    "Merci pour votre confiance!",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
+                  ),
+                  pw.Text(
+                    "À bientôt chez Chicopets!",
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
 
-    // Obtenir le répertoire de téléchargement
+    // Save the PDF to the downloads directory
     final directory = await getDownloadsDirectory();
     final filePath = "${directory!.path}/ticket_commande_${order.idOrder}.pdf";
 
-    // Sauvegarde du fichier
     final file = File(filePath);
     await file.writeAsBytes(await pdf.save());
 
-    // Afficher une notification de succès
+    // Show a success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("PDF enregistré dans: $filePath"),
-        backgroundColor: Color(0xFF009688), // Teal Green
+        backgroundColor: Color(0xFF009688),
       ),
     );
   }

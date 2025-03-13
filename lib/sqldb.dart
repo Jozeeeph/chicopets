@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -63,7 +63,8 @@ class SqlDb {
           mode_paiement TEXT,
           status TEXT,
           remaining_amount REAL,
-          id_client INTEGER
+          id_client INTEGER,
+          global_discount REAL DEFAULT 0.0
         )
       ''');
         print("Orders table created");
@@ -241,6 +242,8 @@ class SqlDb {
         'mode_paiement': order.modePaiement,
         'status': order.status,
         'remaining_amount': order.remainingAmount,
+        'id_client': order.idClient,
+        'global_discount': order.globalDiscount,
       },
     );
 
@@ -275,6 +278,7 @@ class SqlDb {
       int orderId = orderMap['id_order'];
       double total = (orderMap['total'] ?? 0.0) as double;
       double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
+      double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -300,7 +304,9 @@ class SqlDb {
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
         status: orderMap['status'],
         orderLines: orderLines,
-        remainingAmount: remaining, // Add this to the Order object
+        remainingAmount: remaining,
+        globalDiscount: globalDiscount,
+        idClient: orderMap['id_client'], // Add this to the Order object
       ));
     }
 
@@ -388,6 +394,7 @@ class SqlDb {
         modePaiement: orderMap['mode_paiement'] ?? "N/A",
         status: orderMap['status'] ?? "Pending",
         idClient: orderMap['id_client'],
+        globalDiscount: orderMap['global_discount'].toDouble(),
       ));
     }
 
@@ -460,7 +467,7 @@ class SqlDb {
   }
 
   Future<void> updateOrderInDatabase(Order order) async {
-   final dbClient = await db;
+    final dbClient = await db;
     try {
       // Update the order in the database with the new remaining amount and status
       await dbClient.update(

@@ -27,6 +27,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   List<int> quantityProducts = [];
   List<bool> typeDiscounts = [];
   List<double> discounts = []; // Track discounts for each product
+  double globalDiscount = 0.0; // Added global discount
   int? selectedProductIndex;
   String enteredQuantity = "";
 
@@ -61,9 +62,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(
-          selectedProducts, quantityProducts, discounts, typeDiscounts),
+      total: calculateTotal(selectedProducts, quantityProducts, discounts,
+          typeDiscounts, globalDiscount),
       modePaiement: "Espèces", // Default payment method
+      globalDiscount: globalDiscount, // Added global discount
     );
     Addorder.showPlaceOrderPopup(
       context,
@@ -122,11 +124,12 @@ class _CashDeskPageState extends State<CashDeskPage> {
           children: [
             // Table Command Section
             TableCmd(
-              total:
-                  calculateTotal(selectedProducts, quantityProducts, discounts,typeDiscounts),
+              total: calculateTotal(selectedProducts, quantityProducts,
+                  discounts, typeDiscounts, globalDiscount),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
+              globalDiscount: globalDiscount,
               typeDiscounts: typeDiscounts,
               onApplyDiscount: handleApplyDiscount,
               calculateTotal: calculateTotal,
@@ -191,6 +194,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     List<int> quantityProducts,
     List<double> discounts,
     List<bool> typeDiscounts,
+    double globalDiscount, // Added global discount
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -216,6 +220,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
           'Product: ${selectedProducts[i].designation}, Quantity: ${quantityProducts[i]}, Discount: ${discounts[i]}, TypeDiscount: ${typeDiscounts[i]}');
       print('Product Total: $productTotal, Total so far: $total');
     }
+
+    // Apply global discount
+    total *= (1 - globalDiscount / 100);
+
     return total;
   }
 }
