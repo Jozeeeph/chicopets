@@ -60,13 +60,16 @@ class Addorder {
     double globalDiscount = order.globalDiscount;
     double globalDiscountValue = 0.0;
     bool isPercentageDiscount = true;
+    bool isValueDiscount = false;
+
     double total = calculateTotal(
         selectedProducts,
         quantityProducts,
         discounts,
         typeDiscounts,
         isPercentageDiscount ? globalDiscount : globalDiscountValue,
-        isPercentageDiscount);
+        isPercentageDiscount,
+        isValueDiscount);
     String selectedPaymentMethod = "Espèce";
 
     TextEditingController globalDiscountController =
@@ -87,7 +90,8 @@ class Addorder {
                     discounts,
                     typeDiscounts,
                     isPercentageDiscount ? globalDiscount : globalDiscountValue,
-                    isPercentageDiscount);
+                    isPercentageDiscount,
+                    isValueDiscount);
                 changeReturned = amountGiven - total;
                 changeReturnedController.text =
                     changeReturned.toStringAsFixed(2);
@@ -198,7 +202,8 @@ class Addorder {
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
                               double discountedPrice = typeDiscounts[index]
-                                  ? product.prixTTC * (1 - discounts[index] / 100)
+                                  ? product.prixTTC *
+                                      (1 - discounts[index] / 100)
                                   : product.prixTTC - discounts[index];
                               return Padding(
                                 padding:
@@ -342,6 +347,7 @@ class Addorder {
                               onChanged: (value) {
                                 setState(() {
                                   isPercentageDiscount = value as bool;
+                                  isValueDiscount = false;
                                   globalDiscountController.text = '';
                                   globalDiscountValueController.text = '';
                                   updateTotalAndChange();
@@ -355,6 +361,7 @@ class Addorder {
                               onChanged: (value) {
                                 setState(() {
                                   isPercentageDiscount = value as bool;
+                                  isValueDiscount = true;
                                   globalDiscountController.text = '';
                                   globalDiscountValueController.text = '';
                                   updateTotalAndChange();
@@ -380,7 +387,7 @@ class Addorder {
                               });
                             },
                           ),
-                        if (!isPercentageDiscount)
+                        if (isValueDiscount)
                           TextField(
                             controller: globalDiscountValueController,
                             keyboardType: TextInputType.number,
@@ -522,7 +529,8 @@ class Addorder {
                         typeDiscounts,
                         isPercentageDiscount
                             ? globalDiscount
-                            : globalDiscountValue);
+                            : globalDiscountValue,
+                        isValueDiscount);
                   },
                   child: Text(
                     "Confirmer",
@@ -545,6 +553,7 @@ class Addorder {
     List<double> discounts,
     List<bool> typeDiscounts,
     double globalDiscount,
+    bool isValueDiscount, // Ajout de isValueDiscount
   ) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -555,8 +564,8 @@ class Addorder {
 
     print("saving ....");
 
-    double total = calculateTotal(
-        selectedProducts, quantityProducts, discounts, typeDiscounts, globalDiscount, true);
+    double total = calculateTotal(selectedProducts, quantityProducts, discounts,
+        typeDiscounts, globalDiscount, true, isValueDiscount);
     String date = DateTime.now().toIso8601String();
     String modePaiement = "Espèces";
 
@@ -663,6 +672,7 @@ class Addorder {
     List<bool> typeDiscounts,
     double globalDiscount,
     bool isPercentageDiscount,
+    bool isValueDiscount,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -683,7 +693,7 @@ class Addorder {
 
     if (isPercentageDiscount) {
       total = total * (1 - globalDiscount / 100);
-    } else {
+    } else if (isValueDiscount) {
       total = total - globalDiscount;
     }
 
