@@ -253,8 +253,7 @@ class _TableCmdState extends State<TableCmd> {
                                     },
                                     child: Container(
                                       color: isSelected
-                                          ? const Color(0xFF26A9E0)
-                                              .withOpacity(0.2)
+                                          ? const Color.fromARGB(255, 166, 196, 222)
                                           : Colors.transparent,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 8, horizontal: 12),
@@ -303,7 +302,7 @@ class _TableCmdState extends State<TableCmd> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              const SizedBox(height: 170),
+              const SizedBox(height: 150),
               GestureDetector(
                 onTap: selectedProductIndex != null
                     ? () {
