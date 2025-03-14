@@ -46,12 +46,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
     if (index >= 0 && index < selectedProducts.length) {
       Applydiscount.showDiscountInput(
         context,
-        index,
+        selectedProductIndex!,
         discounts,
         typeDiscounts,
-        () {
-          setState(() {}); // Refresh UI after discount update
-        },
+        selectedProducts,
+        () => setState(() {}),
       );
     } else {
       print("Invalid product index: $index");
