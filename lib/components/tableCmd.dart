@@ -20,8 +20,8 @@ class TableCmd extends StatefulWidget {
   final double globalDiscount;
 
   final Function(int) onQuantityChange;
-  final double Function(List<Product>, List<int>, List<double>, List<bool>, double globalDiscount)
-      calculateTotal;
+  final double Function(List<Product>, List<int>, List<double>, List<bool>,
+      double globalDiscount) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -138,7 +138,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts,widget.globalDiscount).toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts, widget.globalDiscount).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -185,7 +185,8 @@ class _TableCmdState extends State<TableCmd> {
               Container(
                 height: 270,
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color.fromARGB(255, 1, 42, 79)),
+                  border:
+                      Border.all(color: const Color.fromARGB(255, 1, 42, 79)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -253,7 +254,8 @@ class _TableCmdState extends State<TableCmd> {
                                     },
                                     child: Container(
                                       color: isSelected
-                                          ? const Color.fromARGB(255, 166, 196, 222)
+                                          ? const Color.fromARGB(
+                                              255, 166, 196, 222)
                                           : Colors.transparent,
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 8, horizontal: 12),
@@ -344,6 +346,7 @@ class _TableCmdState extends State<TableCmd> {
                           selectedProductIndex!,
                           widget.discounts,
                           widget.typeDiscounts,
+                          widget.selectedProducts,
                           () => setState(() {}),
                         );
                       }
