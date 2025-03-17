@@ -25,6 +25,8 @@ class _AddCategoryState extends State<AddCategory> {
   Category? categoryToEdit;
   final TextEditingController _editSubCategoryController =
       TextEditingController();
+  int? selectedParentSubCategoryId;
+  int _nextSubCategoryId = 1; // For generating unique IDs
 
   @override
   void initState() {
@@ -41,8 +43,8 @@ class _AddCategoryState extends State<AddCategory> {
       nameController.text = categoryToEdit!.name;
       selectedCategoryId = categoryToEdit!.id;
       selectedImage = File(categoryToEdit!.imagePath!);
-    
-      // Charger les sous-catégories associées à la catégorie en cours de modification
+
+      // Load subcategories for the category being edited
       if (selectedCategoryId != null) {
         fetchSubCategories(selectedCategoryId!);
       }
@@ -61,24 +63,28 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   Future<void> fetchSubCategories(int categoryId) async {
-    try {
-      List<Map<String, dynamic>> fetchedSubCategories =
-          await sqldb.getSubCategoriesByCategory(categoryId);
+  try {
+    List<Map<String, dynamic>> fetchedSubCategories =
+        await sqldb.getSubCategoriesByCategory(categoryId);
 
-      setState(() {
-        subCategories = fetchedSubCategories.map((map) {
-          return SubCategory(
-            id: map['id_sub_category'],
-            name: map['sub_category_name'] ?? 'Unknown',
-            categoryId: map['category_id'] ?? 0,
-          );
-        }).toList();
-      });
-    } catch (e) {
-      print("Error fetching subcategories: $e");
-      _showMessage("Erreur lors du chargement des sous-catégories !");
-    }
+    // Debugging: Print fetched subcategories
+    print("Fetched subcategories: $fetchedSubCategories");
+
+    setState(() {
+      subCategories = fetchedSubCategories.map((map) {
+        return SubCategory(
+          id: map['id_sub_category'],
+          name: map['sub_category_name'] ?? 'Unknown',
+          parentId: map['parent_id'],
+          categoryId: map['category_id'] ?? 0,
+        );
+      }).toList();
+    });
+  } catch (e) {
+    print("Error fetching subcategories: $e");
+    _showMessage("Erreur lors du chargement des sous-catégories !");
   }
+}
 
   Future<void> pickImage() async {
     final pickedFile =
@@ -96,15 +102,16 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Ajouter la catégorie
+    // Add the category
     int categoryId =
         await sqldb.addCategory(nameController.text, selectedImage!.path);
     if (categoryId > 0) {
-      // Ajouter les sous-catégories
+      // Add subcategories
       for (var subCategory in subCategories) {
         await sqldb.addSubCategory(
           SubCategory(
             name: subCategory.name,
+            parentId: subCategory.parentId,
             categoryId: categoryId,
           ),
         );
@@ -129,7 +136,7 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Mettre à jour la catégorie
+    // Update the category
     int result = await sqldb.updateCategory(
       categoryToEdit!.id!,
       nameController.text,
@@ -137,29 +144,40 @@ class _AddCategoryState extends State<AddCategory> {
     );
 
     if (result > 0) {
-      // Mettre à jour les sous-catégories
+      // Debugging: Print the subcategories before updating
+      print("Subcategories before update: $subCategories");
+
+      // Update subcategories
       for (var subCategory in subCategories) {
         if (subCategory.id == null) {
-          // Ajouter une nouvelle sous-catégorie
-          await sqldb.addSubCategory(
+          // Add a new subcategory
+          int newSubCategoryId = await sqldb.addSubCategory(
             SubCategory(
               name: subCategory.name,
+              parentId: subCategory.parentId,
               categoryId: categoryToEdit!.id!,
             ),
           );
-        } else {
-          // Mettre à jour une sous-catégorie existante
-          print("Mise à jour de la sous-catégorie : ${subCategory.name}");
           print(
-              "Données de la sous-catégorie à mettre à jour : ${subCategory.toMap()}");
+              "Added new subcategory: ${subCategory.name}, ID: $newSubCategoryId");
+        } else {
+          // Update an existing subcategory
           final updateResult = await sqldb.updateSubCategory(subCategory);
-          print("Résultat de la mise à jour : $updateResult");
           if (updateResult <= 0) {
             _showMessage(
                 "Échec de la mise à jour de la sous-catégorie : ${subCategory.name}");
+          } else {
+            print(
+                "Updated subcategory: ${subCategory.name}, ID: ${subCategory.id}");
           }
         }
       }
+
+      // Fetch the updated subcategories after updating the category
+      await fetchSubCategories(categoryToEdit!.id!);
+
+      // Debugging: Print the subcategories after updating
+      print("Subcategories after update: $subCategories");
 
       _showMessageSuccess(
           "Catégorie et sous-catégories mises à jour avec succès !");
@@ -174,15 +192,37 @@ class _AddCategoryState extends State<AddCategory> {
       _showMessage("Veuillez entrez un nom de sous-catégorie !");
       return;
     }
-    setState(() {
-      subCategories.add(
-        SubCategory(
-          name: subCategoryNameController.text,
-          categoryId: selectedCategoryId ?? categoryToEdit?.id ?? 0,
-        ),
-      );
-      subCategoryNameController.clear();
-    });
+
+    // Save the subcategory to the database
+    int subCategoryId = await sqldb.addSubCategory(
+      SubCategory(
+        name: subCategoryNameController.text,
+        parentId: selectedParentSubCategoryId,
+        categoryId: selectedCategoryId ?? categoryToEdit?.id ?? 0,
+      ),
+    );
+
+    if (subCategoryId > 0) {
+      setState(() {
+        subCategories.add(
+          SubCategory(
+            id: subCategoryId,
+            name: subCategoryNameController.text,
+            parentId: selectedParentSubCategoryId,
+            categoryId: selectedCategoryId ?? categoryToEdit?.id ?? 0,
+          ),
+        );
+        subCategoryNameController.clear();
+        selectedParentSubCategoryId = null; // Reset the selected parent ID
+      });
+
+      // Debugging
+      print("Added SubCategory: ${subCategories.last.name}");
+      print("Parent ID: ${subCategories.last.parentId}");
+      print("SubCategories: $subCategories");
+    } else {
+      _showMessage("Échec de l'ajout de la sous-catégorie !");
+    }
   }
 
   void _confirmDeleteSubCategory(int subCategoryId) async {
@@ -259,6 +299,7 @@ class _AddCategoryState extends State<AddCategory> {
                       return SubCategory(
                         id: subCat.id,
                         name: _editSubCategoryController.text,
+                        parentId: subCat.parentId,
                         categoryId: subCat.categoryId,
                       );
                     }
@@ -370,6 +411,30 @@ class _AddCategoryState extends State<AddCategory> {
                   ),
                 ),
                 const SizedBox(width: 10),
+                DropdownButton<int>(
+                  value: selectedParentSubCategoryId,
+                  hint: const Text('Select Parent'),
+                  items: [
+                    // Add a "No Parent" option
+                    const DropdownMenuItem<int>(
+                      value: null,
+                      child: Text('No Parent'),
+                    ),
+                    // Add all subcategories as options
+                    ...subCategories.map((subCategory) {
+                      return DropdownMenuItem<int>(
+                        value: subCategory.id,
+                        child: Text(subCategory.name),
+                      );
+                    }).toList(),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      selectedParentSubCategoryId = value;
+                    });
+                  },
+                ),
+                const SizedBox(width: 10),
                 IconButton(
                   icon: const Icon(
                     Icons.add,
@@ -390,38 +455,12 @@ class _AddCategoryState extends State<AddCategory> {
                     color: Color(0xFF0056A6)), // Deep Blue
               ),
               const SizedBox(height: 8),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: subCategories.length,
-                itemBuilder: (context, index) {
-                  final subCategory = subCategories[index];
-                  return ListTile(
-                    title: Text(
-                      subCategory.name,
-                      style: const TextStyle(
-                          color: Color.fromARGB(255, 0, 0, 0)), // Black text
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit,
-                              color: Color(0xFF009688)), // Teal Green
-                          onPressed: () => _editSubCategory(subCategory),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete,
-                              color: Color(0xFFE53935)), // Warm Red
-                          onPressed: () =>
-                              _confirmDeleteSubCategory(subCategory.id!),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+              SubCategoryTree(
+                subCategories: subCategories,
+                parentId: null, // Start with top-level subcategories
+                onEdit: _editSubCategory, // Pass the edit method
+                onDelete: _confirmDeleteSubCategory, // Pass the delete method
               ),
-              const SizedBox(height: 16),
             ],
           ],
         ),
@@ -438,8 +477,7 @@ class _AddCategoryState extends State<AddCategory> {
       child: TextFormField(
         controller: controller,
         decoration: _inputDecoration(label),
-        style:
-            const TextStyle(color: Color.fromARGB(255, 0, 0, 0)), // Black text
+        style: const TextStyle(color: Colors.black),
       ),
     );
   }
@@ -459,6 +497,73 @@ class _AddCategoryState extends State<AddCategory> {
         borderSide:
             const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
       ),
+    );
+  }
+}
+
+// Recursive widget to display subcategory hierarchy
+class SubCategoryTree extends StatelessWidget {
+  final List<SubCategory> subCategories;
+  final int? parentId;
+  final Function(SubCategory) onEdit;
+  final Function(int) onDelete;
+
+  const SubCategoryTree({
+    required this.subCategories,
+    this.parentId,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Filter subcategories by parentId
+    final children =
+        subCategories.where((subCat) => subCat.parentId == parentId).toList();
+
+    // Debugging: Print the filtered children
+    print("Filtered subcategories for parentId $parentId: $children");
+
+    // If no children, return an empty widget
+    if (children.isEmpty) return const SizedBox.shrink();
+
+    return ListView.builder(
+      shrinkWrap: true, // Avoid infinite height issues
+      physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+      itemCount: children.length,
+      itemBuilder: (context, index) {
+        final subCat = children[index];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              title: Text(subCat.name),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Color(0xFF009688)),
+                    onPressed: () => onEdit(subCat),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
+                    onPressed: () => onDelete(subCat.id!),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0),
+              child: SubCategoryTree(
+                subCategories: subCategories,
+                parentId: subCat.id,
+                onEdit: onEdit,
+                onDelete: onDelete,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

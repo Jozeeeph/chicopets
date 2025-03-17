@@ -60,16 +60,13 @@ class Addorder {
     double globalDiscount = order.globalDiscount;
     double globalDiscountValue = 0.0;
     bool isPercentageDiscount = true;
-    bool isValueDiscount = false;
-
     double total = calculateTotal(
         selectedProducts,
         quantityProducts,
         discounts,
         typeDiscounts,
         isPercentageDiscount ? globalDiscount : globalDiscountValue,
-        isPercentageDiscount,
-        isValueDiscount);
+        isPercentageDiscount);
     String selectedPaymentMethod = "Espèce";
 
     TextEditingController globalDiscountController =
@@ -90,8 +87,7 @@ class Addorder {
                     discounts,
                     typeDiscounts,
                     isPercentageDiscount ? globalDiscount : globalDiscountValue,
-                    isPercentageDiscount,
-                    isValueDiscount);
+                    isPercentageDiscount);
                 changeReturned = amountGiven - total;
                 changeReturnedController.text =
                     changeReturned.toStringAsFixed(2);
@@ -202,8 +198,7 @@ class Addorder {
                             ...selectedProducts.map((product) {
                               int index = selectedProducts.indexOf(product);
                               double discountedPrice = typeDiscounts[index]
-                                  ? product.prixTTC *
-                                      (1 - discounts[index] / 100)
+                                  ? product.prixTTC * (1 - discounts[index] / 100)
                                   : product.prixTTC - discounts[index];
                               return Padding(
                                 padding:
@@ -347,7 +342,6 @@ class Addorder {
                               onChanged: (value) {
                                 setState(() {
                                   isPercentageDiscount = value as bool;
-                                  isValueDiscount = false;
                                   globalDiscountController.text = '';
                                   globalDiscountValueController.text = '';
                                   updateTotalAndChange();
@@ -361,7 +355,6 @@ class Addorder {
                               onChanged: (value) {
                                 setState(() {
                                   isPercentageDiscount = value as bool;
-                                  isValueDiscount = true;
                                   globalDiscountController.text = '';
                                   globalDiscountValueController.text = '';
                                   updateTotalAndChange();
@@ -387,7 +380,7 @@ class Addorder {
                               });
                             },
                           ),
-                        if (isValueDiscount)
+                        if (!isPercentageDiscount)
                           TextField(
                             controller: globalDiscountValueController,
                             keyboardType: TextInputType.number,
@@ -529,8 +522,7 @@ class Addorder {
                         typeDiscounts,
                         isPercentageDiscount
                             ? globalDiscount
-                            : globalDiscountValue,
-                        isValueDiscount);
+                            : globalDiscountValue);
                   },
                   child: Text(
                     "Confirmer",
@@ -545,125 +537,141 @@ class Addorder {
     );
   }
 
-  static void _confirmPlaceOrder(
-    BuildContext context,
-    List<Product> selectedProducts,
-    List<int> quantityProducts,
-    double amountGiven,
-    List<double> discounts,
-    List<bool> typeDiscounts,
-    double globalDiscount,
-    bool isValueDiscount, // Ajout de isValueDiscount
-  ) async {
-    if (selectedProducts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Aucun produit sélectionné.")),
-      );
-      return;
-    }
-
-    print("saving ....");
-
-    double total = calculateTotal(selectedProducts, quantityProducts, discounts,
-        typeDiscounts, globalDiscount, true, isValueDiscount);
-    String date = DateTime.now().toIso8601String();
-    String modePaiement = "Espèces";
-
-    String status = (amountGiven >= total) ? "payée" : "non payée";
-    double remainingAmount = (amountGiven < total) ? total - amountGiven : 0.0;
-    print("Calculated remainingAmount: $remainingAmount");
-
-    List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex = selectedProducts.indexOf(product);
-      return OrderLine(
-        idOrder: 0,
-        idProduct: product.code,
-        quantite: quantityProducts[productIndex],
-        prixUnitaire: product.prixTTC,
-        discount: discounts[productIndex],
-        isPercentage: typeDiscounts[productIndex],
-      );
-    }).toList();
-
-    Order order = Order(
-      date: date,
-      orderLines: orderLines,
-      total: total,
-      modePaiement: modePaiement,
-      status: status,
-      remainingAmount: remainingAmount,
-      globalDiscount: globalDiscount,
+static void _confirmPlaceOrder(
+  BuildContext context,
+  List<Product> selectedProducts,
+  List<int> quantityProducts,
+  double amountGiven,
+  List<double> discounts,
+  List<bool> typeDiscounts,
+  double globalDiscount,
+) async {
+  if (selectedProducts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Aucun produit sélectionné.")),
     );
-    print("Order to be saved: ${order.toMap()}");
+    return;
+  }
 
-    try {
-      int orderId = await SqlDb().addOrder(order);
-      if (orderId > 0) {
-        print("Order saved successfully with ID: $orderId");
-        bool isValidOrder = true;
+  print("saving ....");
 
-        for (int i = 0; i < selectedProducts.length; i++) {
-          if (selectedProducts[i].stock == 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    "${selectedProducts[i].designation} est en rupture de stock !"),
-                backgroundColor: Colors.red,
-              ),
-            );
-            isValidOrder = false;
-          } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    "Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}."),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            isValidOrder = false;
-          }
+  // Calcul du total de la commande
+  double total = calculateTotal(
+      selectedProducts, quantityProducts, discounts, typeDiscounts, globalDiscount, true);
+
+  // Déterminer le statut de la commande et le montant restant
+  String status;
+  double remainingAmount;
+
+  if (amountGiven >= total) {
+    status = "payée";
+    remainingAmount = 0.0; // La commande est entièrement payée
+  } else {
+    status = "semi-payée";
+    remainingAmount = total - amountGiven; // Calcul du montant restant
+  }
+
+  print("Calculated remainingAmount: $remainingAmount");
+
+  // Création des lignes de commande
+  List<OrderLine> orderLines = selectedProducts.map((product) {
+    int productIndex = selectedProducts.indexOf(product);
+    return OrderLine(
+      idOrder: 0,
+      idProduct: product.code,
+      quantite: quantityProducts[productIndex],
+      prixUnitaire: product.prixTTC,
+      discount: discounts[productIndex],
+      isPercentage: typeDiscounts[productIndex],
+    );
+  }).toList();
+
+  // Création de l'objet Order
+  Order order = Order(
+    date: DateTime.now().toIso8601String(), // Date actuelle
+    orderLines: orderLines,
+    total: total,
+    modePaiement: "Espèces", // Mode de paiement par défaut
+    status: status, // Statut de la commande (payée ou semi-payée)
+    remainingAmount: remainingAmount, // Montant restant à payer
+    globalDiscount: globalDiscount, // Remise globale
+  );
+
+  print("Order to be saved: ${order.toMap()}");
+
+  try {
+    // Enregistrement de la commande dans la base de données
+    int orderId = await SqlDb().addOrder(order);
+    if (orderId > 0) {
+      print("Order saved successfully with ID: $orderId");
+
+      // Vérification du stock des produits
+      bool isValidOrder = true;
+      for (int i = 0; i < selectedProducts.length; i++) {
+        if (selectedProducts[i].stock == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "${selectedProducts[i].designation} est en rupture de stock !"),
+              backgroundColor: Colors.red,
+            ),
+          );
+          isValidOrder = false;
+        } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}."),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          isValidOrder = false;
         }
-
-        if (!isValidOrder) {
-          return;
-        }
-
-        for (int i = 0; i < selectedProducts.length; i++) {
-          selectedProducts[i].stock -= quantityProducts[i];
-          await SqlDb().updateProductStock(
-              selectedProducts[i].code, selectedProducts[i].stock);
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Commande passée avec succès !"),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        selectedProducts.clear();
-        quantityProducts.clear();
-        discounts.clear();
-        typeDiscounts.clear();
-      } else {
-        print("Failed to save order.");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erreur lors de l'enregistrement de la commande."),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
-    } catch (e) {
-      print("Error saving order: $e");
+
+      if (!isValidOrder) {
+        return; // Annuler l'enregistrement si le stock est insuffisant
+      }
+
+      // Mise à jour du stock des produits
+      for (int i = 0; i < selectedProducts.length; i++) {
+        selectedProducts[i].stock -= quantityProducts[i];
+        await SqlDb().updateProductStock(
+            selectedProducts[i].code, selectedProducts[i].stock);
+      }
+
+      // Affichage d'un message de succès
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erreur lors de l'enregistrement de la commande: $e"),
+          content: Text("Commande passée avec succès !"),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Réinitialisation des listes
+      selectedProducts.clear();
+      quantityProducts.clear();
+      discounts.clear();
+      typeDiscounts.clear();
+    } else {
+      print("Failed to save order.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erreur lors de l'enregistrement de la commande."),
           backgroundColor: Colors.red,
         ),
       );
     }
+  } catch (e) {
+    print("Error saving order: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Erreur lors de l'enregistrement de la commande: $e"),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
+}
 
   static double calculateTotal(
     List<Product> selectedProducts,
@@ -672,7 +680,6 @@ class Addorder {
     List<bool> typeDiscounts,
     double globalDiscount,
     bool isPercentageDiscount,
-    bool isValueDiscount,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -693,7 +700,7 @@ class Addorder {
 
     if (isPercentageDiscount) {
       total = total * (1 - globalDiscount / 100);
-    } else if (isValueDiscount) {
+    } else {
       total = total - globalDiscount;
     }
 
