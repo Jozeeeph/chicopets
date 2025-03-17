@@ -506,6 +506,38 @@ class SqlDb {
     );
   }
 
+  Future<List<Product>> searchProducts({String? category, required String query}) async {
+    final dbClient = await db;
+    print("Exécution de la recherche: catégorie=$category, query=$query");
+
+    // Début de la requête SQL
+    String sqlQuery = '''
+    SELECT * FROM products 
+    WHERE 1 = 1 
+  ''';
+
+    List<dynamic> args = [];
+
+    // Filtrer par catégorie si elle est sélectionnée
+    if (category != null && category.isNotEmpty) {
+      sqlQuery += " AND category_id = ?";
+      args.add(category);
+    }
+
+    // Filtrer par code ou désignation (si une recherche est effectuée)
+    if (query.isNotEmpty) {
+      sqlQuery += " AND (code LIKE ? OR designation LIKE ?)";
+      args.add('%$query%');
+      args.add('%$query%');
+    }
+
+    final List<Map<String, dynamic>> results =
+        await dbClient.rawQuery(sqlQuery, args);
+    print("Résultats SQL: ${results.length}");
+
+    return results.map((map) => Product.fromMap(map)).toList();
+  }
+
   Future<List<Category>> getCategories() async {
     final dbClient = await db;
     // Fetch categories as maps from the 'categories' table
