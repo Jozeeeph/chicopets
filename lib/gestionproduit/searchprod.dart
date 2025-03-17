@@ -1,42 +1,49 @@
-import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:caissechicopets/sqldb.dart';
 import '../product.dart';
 
 class Searchprod {
   static void showProductSearchPopup(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
-    final products = await sqldb.getProducts();
-    print("Fetched Products: $products"); // Debugging print
-
+    final categories = await sqldb.getCategories();
     final TextEditingController searchController = TextEditingController();
-    ValueNotifier<List<Product>> filteredProducts = ValueNotifier(products);
+    ValueNotifier<List<Product>> filteredProducts = ValueNotifier([]);
+    String? selectedCategory;
+    bool isLoading = false;
 
-    searchController.addListener(() {
-      String query = searchController.text.toLowerCase();
-      List<Product> newFilteredProducts = products.where((product) {
-        String code = product.code.toLowerCase();
-        String designation = product.designation.toLowerCase();
-        String category = (product.categoryName ?? '').toLowerCase();
+    Future<void> searchProducts() async {
+      isLoading = true;
+      filteredProducts.notifyListeners(); // Met à jour l'état du chargement
 
-        return code.contains(query) ||
-            designation.contains(query) ||
-            category.contains(query);
-      }).toList();
+      List<Product> results = await sqldb.searchProducts(
+        category: selectedCategory,
+        query: searchController.text,
+      );
+      filteredProducts.value = results;
 
-      filteredProducts.value = newFilteredProducts;
-    });
+      isLoading = false;
+      filteredProducts.notifyListeners();
+    }
+
+    Future<void> scanBarcode() async {
+      String barcodeScanRes = await FlutterBarcodeScanner.scanBarcode(
+          "#ff6666", "Annuler", true, ScanMode.BARCODE);
+
+      if (barcodeScanRes != "-1") {
+        searchController.text = barcodeScanRes;
+        searchProducts();
+      }
+    }
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text(
-            'Liste des Produits',
+            'Recherche Avancée',
             style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
@@ -44,206 +51,153 @@ class Searchprod {
           ),
           content: SizedBox(
             width: 800,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: TextField(
-                      controller: searchController,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: 'Recherche Produit (code ou designation)',
-                        prefixIcon: const Icon(Icons.search,
-                            color: Color(0xFF0056A6)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF26A9E0)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Champ de recherche avec scanner
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Recherche Produit (code ou désignation)',
+                          prefixIcon: const Icon(Icons.search,
+                              color: Color(0xFF0056A6)),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF26A9E0), width: 2),
-                        ),
+                        onChanged: (value) => searchProducts(),
                       ),
                     ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner,
+                          color: Colors.blue, size: 32),
+                      onPressed: scanBarcode,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Sélecteur de catégorie
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                   ),
-                  ValueListenableBuilder<List<Product>>(
+                  hint: const Text("Sélectionner une catégorie"),
+                  value: selectedCategory,
+                  items: categories.map((category) {
+                    return DropdownMenuItem(
+                      value: category.id.toString(),
+                      child: Text(category.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    selectedCategory = value;
+                    searchProducts();
+                  },
+                ),
+                const SizedBox(height: 15),
+
+                // Indicateur de chargement
+                if (isLoading) const CircularProgressIndicator(),
+
+                // Affichage des résultats dans un tableau défilable
+                Expanded(
+                  child: ValueListenableBuilder<List<Product>>(
                     valueListenable: filteredProducts,
                     builder: (context, currentProducts, child) {
-                      return Column(
-                        children: [
-                          Row(
-                            children: const [
-                              Expanded(
-                                child: Text(
-                                  'Code',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
+                      return currentProducts.isEmpty
+                          ? const Text("Aucun produit trouvé",
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w500))
+                          : Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection:
+                                    Axis.horizontal, // Défilement horizontal
+                                child: SingleChildScrollView(
+                                  scrollDirection:
+                                      Axis.vertical, // Défilement vertical
+                                  child: DataTable(
+                                    columnSpacing: 20,
+                                    columns: const [
+                                      DataColumn(
+                                          label: Text('Désignation',
+                                              style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      DataColumn(
+                                          label: Text('Code',
+                                              style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      DataColumn(
+                                          label: Text('Stock',
+                                              style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      DataColumn(
+                                          label: Text('Prix TTC',
+                                              style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                      DataColumn(
+                                          label: Text('Date Expiration',
+                                              style: TextStyle(
+                                                  fontWeight:
+                                                      FontWeight.bold))),
+                                    ],
+                                    rows: currentProducts.map((product) {
+                                      return DataRow(cells: [
+                                        DataCell(Text(product.designation)),
+                                        DataCell(Text(product.code)),
+                                        DataCell(
+                                            Text(product.stock.toString())),
+                                        DataCell(Text(
+                                            "${product.prixTTC.toStringAsFixed(2)} TND")),
+                                        DataCell(Text(
+                                            product.dateExpiration ?? "N/A")),
+                                      ]);
+                                    }).toList(),
+                                  ),
                                 ),
                               ),
-                              Expanded(
-                                child: Text(
-                                  'Désignation',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  'Catégorie',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  'Stock',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  'Prix HT',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  'Date Expiration',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0056A6)),
-                                ),
-                              ),
-                            ],
-                          ),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: currentProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = currentProducts[index];
-
-                              Future<String> subCategoryNameFuture = product.subCategoryId != null
-                                  ? sqldb
-                                      .getSubCategoryById(product.subCategoryId, product.categoryId)
-                                      .then((subCategoryResult) {
-                                        return subCategoryResult.isNotEmpty
-                                            ? subCategoryResult.first['sub_category_name'] ?? 'Sans sous-catégorie'
-                                            : 'Sans sous-catégorie';
-                                      })
-                                  : Future.value('Sans sous-catégorie');
-
-                              return FutureBuilder(
-                                future: subCategoryNameFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Center(child: CircularProgressIndicator());
-                                  } else if (snapshot.hasError) {
-                                    return Center(child: Text('Erreur: ${snapshot.error}'));
-                                  } else {
-                                    String subCategoryName = snapshot.data as String;
-
-                                    List<String> formattedDatePatterns = [
-                                      'yyyy-MM-dd',
-                                      'yyyy-dd-MM',
-                                      'yyyy/dd/MM',
-                                      'dd/MM/yyyy',
-                                      'MM/dd/yyyy',
-                                      'yyyy/MM/dd',
-                                      'dd-MM-yyyy',
-                                      'MM-dd-yyyy'
-                                    ];
-
-                                    String formattedDate = 'Invalid Date';
-                                    if (product.dateExpiration.isNotEmpty) {
-                                      for (var pattern in formattedDatePatterns) {
-                                        try {
-                                          DateTime parsedDate = DateFormat(pattern).parseStrict(product.dateExpiration);
-                                          formattedDate = DateFormat('dd/MM/yyyy').format(parsedDate);
-                                          break;
-                                        } catch (e) {
-                                          continue;
-                                        }
-                                      }
-                                    }
-
-                                    return ExpansionTile(
-                                      title: Row(
-                                        children: [
-                                          Expanded(child: Text(product.code)),
-                                          Expanded(child: Text(product.designation)),
-                                          Expanded(child: Text('${product.categoryName} / $subCategoryName')),
-                                          Expanded(child: Text('${product.stock}')),
-                                          Expanded(child: Text('${product.prixHT} DT')),
-                                          Expanded(child: Text(formattedDate)),
-                                        ],
-                                      ),
-                                      children: [
-                                        FutureBuilder<List<Variant>>(
-                                          future: sqldb.getVariantsByProductCode(product.code),
-                                          builder: (context, snapshot) {
-                                            if (snapshot.connectionState == ConnectionState.waiting) {
-                                              return const Center(child: CircularProgressIndicator());
-                                            } else if (snapshot.hasError) {
-                                              return Center(child: Text('Erreur: ${snapshot.error}'));
-                                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                              return const Center(child: Text('Aucune variante disponible'));
-                                            } else {
-                                              final variants = snapshot.data!;
-                                              return DataTable(
-                                                columns: const [
-                                                  DataColumn(label: Text('Combinaison')),
-                                                  DataColumn(label: Text('Prix')),
-                                                  DataColumn(label: Text('Stock')),
-                                                  DataColumn(label: Text('Code à barre')),
-                                                ],
-                                                rows: variants.map((variant) {
-                                                  return DataRow(cells: [
-                                                    DataCell(Text(variant.combinationName)),
-                                                    DataCell(Text(variant.price.toString())),
-                                                    DataCell(Text(variant.stock.toString())),
-                                                    DataCell(Text(variant.code)),
-                                                  ]);
-                                                }).toList(),
-                                              );
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  }
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      );
+                            );
                     },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           actions: [
-            ElevatedButton(
+            // Bouton Réinitialiser (bleu)
+            TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                searchController.clear();
+                selectedCategory = null;
+                filteredProducts.value = [];
               },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.blue, // Couleur bleue
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              child:
+                  const Text('Réinitialiser', style: TextStyle(fontSize: 16)),
+            ),
+
+            // Bouton Fermer (rouge)
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                backgroundColor: Colors.red, // Couleur rouge
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               child: const Text(
                 'Fermer',
