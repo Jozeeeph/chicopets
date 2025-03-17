@@ -494,7 +494,7 @@ class Getorderlist {
   static void _showOrderTicketPopup(BuildContext context, Order order) {
     final SqlDb sqldb = SqlDb();
     bool isPercentageDiscount =
-        order.globalDiscount > 0; 
+        order.isPercentageDiscount; 
 
     showDialog(
       context: context,
@@ -763,7 +763,7 @@ class Getorderlist {
       BuildContext context, Order order) async {
     final pdf = pw.Document();
     bool isPercentageDiscount =
-        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
+        order.isPercentageDiscount; // Vérifie si la remise est en pourcentage
 
     // Define the page format for a standard receipt (80mm width, auto height)
     const double pageWidth = 70 * PdfPageFormat.mm;

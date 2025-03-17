@@ -10,6 +10,7 @@ class Order {
   double remainingAmount;
   int? idClient;
   double globalDiscount; // Added field
+  bool isPercentageDiscount; // Added field
 
   Order({
     this.idOrder,
@@ -21,6 +22,7 @@ class Order {
     this.remainingAmount = 0.0,
     this.idClient,
     required this.globalDiscount, // Added field
+    required this.isPercentageDiscount, // Added field
   });
 
   // Convert Order object to a Map
@@ -34,6 +36,7 @@ class Order {
       'remaining_amount': remainingAmount,
       'id_client': idClient,
       'global_discount': globalDiscount, // Added field
+      'is_percentage_discount': isPercentageDiscount ? 1 : 0, // Added field
     };
   }
 
@@ -49,6 +52,7 @@ class Order {
       remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0,
       idClient: map['id_client'],
       globalDiscount: map['global_discount'], // Added field
+      isPercentageDiscount: map['is_percentage_discount'] == 1, // Added field
     );
   }
 

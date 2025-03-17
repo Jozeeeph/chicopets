@@ -30,6 +30,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   double globalDiscount = 0.0; // Added global discount
   int? selectedProductIndex;
   String enteredQuantity = "";
+  bool isPercentageDiscount = true;
 
   void handleQuantityChange(int index) {
     if (index >= 0 && index < quantityProducts.length) {
@@ -61,10 +62,17 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [], // Empty list for orderLines
-      total: calculateTotal(selectedProducts, quantityProducts, discounts,
-          typeDiscounts, globalDiscount),
+      total: calculateTotal(
+          selectedProducts,
+          quantityProducts,
+          discounts,
+          typeDiscounts,
+          globalDiscount,
+          isPercentageDiscount), // Ajoutez isPercentageDiscount
       modePaiement: "Espèces", // Default payment method
-      globalDiscount: globalDiscount, // Added global discount
+      globalDiscount: globalDiscount,
+      isPercentageDiscount:
+          isPercentageDiscount, // Assurez-vous de passer cette valeur
     );
     Addorder.showPlaceOrderPopup(
       context,
@@ -124,7 +132,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
             // Table Command Section
             TableCmd(
               total: calculateTotal(selectedProducts, quantityProducts,
-                  discounts, typeDiscounts, globalDiscount),
+                  discounts, typeDiscounts, globalDiscount,isPercentageDiscount),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
@@ -138,6 +146,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onQuantityChange: handleQuantityChange,
               onFetchOrders: handleFetchOrders,
               onPlaceOrder: handlePlaceOrder,
+              isPercentageDiscount: isPercentageDiscount,
             ),
 
             const SizedBox(height: 10), // Add some spacing
@@ -189,40 +198,37 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   // Calculate the total price including discounts
   static double calculateTotal(
-    List<Product> selectedProducts,
-    List<int> quantityProducts,
-    List<double> discounts,
-    List<bool> typeDiscounts,
-    double globalDiscount, // Added global discount
-  ) {
-    double total = 0.0;
-    for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+  List<Product> selectedProducts,
+  List<int> quantityProducts,
+  List<double> discounts,
+  List<bool> typeDiscounts,
+  double globalDiscount,
+  bool isPercentageDiscount, // Ajoutez ce paramètre
+) {
+  double total = 0.0;
+  for (int i = 0; i < selectedProducts.length; i++) {
+    double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
 
-      if (typeDiscounts[i]) {
-        // Percentage discount (applied to the total price)
-        productTotal *= (1 - discounts[i] / 100);
-      } else {
-        // Fixed discount (subtract the discount from the total price)
-        productTotal -= discounts[i];
-      }
-
-      // Ensure the product total is not negative
-      if (productTotal < 0) {
-        productTotal = 0.0; // Prevent negative prices
-      }
-
-      total += productTotal;
-
-      // Debugging output
-      print(
-          'Product: ${selectedProducts[i].designation}, Quantity: ${quantityProducts[i]}, Discount: ${discounts[i]}, TypeDiscount: ${typeDiscounts[i]}');
-      print('Product Total: $productTotal, Total so far: $total');
+    if (typeDiscounts[i]) {
+      productTotal *= (1 - discounts[i] / 100);
+    } else {
+      productTotal -= discounts[i];
     }
 
-    // Apply global discount
-    total *= (1 - globalDiscount / 100);
+    if (productTotal < 0) {
+      productTotal = 0.0;
+    }
 
-    return total;
+    total += productTotal;
   }
+
+  // Appliquer la remise globale
+  if (isPercentageDiscount) {
+    total *= (1 - globalDiscount / 100);
+  } else {
+    total -= globalDiscount;
+  }
+
+  return total;
+}
 }

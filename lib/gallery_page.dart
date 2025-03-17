@@ -64,13 +64,13 @@ class _GalleryPageState extends State<GalleryPage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(false); // Retourne `false` pour annuler
+                Navigator.of(context).pop(false); // Retourne false pour annuler
               },
               child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(true); // Retourne `true` pour confirmer
+                Navigator.of(context).pop(true); // Retourne true pour confirmer
               },
               child: const Text("Supprimer"),
             ),
@@ -123,15 +123,8 @@ class _GalleryPageState extends State<GalleryPage> {
               ElevatedButton.icon(
                 onPressed: _pickImages,
                 icon: const Icon(Icons.photo_library),
-                label: const Text("Depuis la galerie"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: _pickFromCamera,
-                icon: const Icon(Icons.camera),
-                label: const Text("Prendre une photo"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                label: const Text("Importer depuis la galerie"),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 93, 212, 220)),
               ),
             ],
           ),
@@ -142,9 +135,10 @@ class _GalleryPageState extends State<GalleryPage> {
                 : GridView.builder(
                     padding: const EdgeInsets.all(10),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3, // Affichage en 3 colonnes
+                      crossAxisCount: 5, // Augmenter le nombre de colonnes pour des images plus petites
                       crossAxisSpacing: 5,
                       mainAxisSpacing: 5,
+                      childAspectRatio: 1, // Conserver un ratio carré pour les images
                     ),
                     itemCount: _images.length,
                     itemBuilder: (context, index) {
@@ -153,7 +147,7 @@ class _GalleryPageState extends State<GalleryPage> {
                           Positioned.fill(
                             child: Image.file(
                               _images[index],
-                              fit: BoxFit.cover,
+                              fit: BoxFit.cover, // Ajuster l'image pour couvrir l'espace disponible
                             ),
                           ),
                           Positioned(
