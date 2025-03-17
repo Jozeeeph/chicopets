@@ -1,15 +1,22 @@
 class SubCategory {
   final int? id;
   final String name;
-  final int categoryId;  // The ID of the parent category
+  final int? parentId; // Référence à la sous-catégorie parente
+  final int? categoryId; // Référence à la catégorie principale
 
-  SubCategory({this.id, required this.name, required this.categoryId});
+  SubCategory({
+    this.id,
+    required this.name,
+    this.parentId,
+    this.categoryId,
+  });
 
   Map<String, dynamic> toMap() {
     return {
       'id_sub_category': id,
       'sub_category_name': name,
-      'category_id': categoryId, // Store the parent category ID
+      'parent_id': parentId,
+      'category_id': categoryId,
     };
   }
 
@@ -17,7 +24,8 @@ class SubCategory {
     return SubCategory(
       id: map['id_sub_category'],
       name: map['sub_category_name'],
-      categoryId: map['category_id'], // Extract the parent category ID
+      parentId: map['parent_id'],
+      categoryId: map['category_id'],
     );
   }
 }

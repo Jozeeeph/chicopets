@@ -1,3 +1,4 @@
+import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
 import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
 import 'package:caissechicopets/import_product.dart'; // Importez le nouveau fichier
@@ -54,11 +55,10 @@ class DashboardPage extends StatelessWidget {
               _buildButton(
                 context,
                 label: 'Gestion de commandes',
-                icon: Icons.shopping_cart, // Icône mise à jour
+                icon: Icons.shopping_cart,
                 page: const ManageCommand(),
                 color: const Color.fromARGB(255, 86, 0, 207),
               ),
-
               const SizedBox(height: 20),
               _buildButton(
                 context,
@@ -67,14 +67,21 @@ class DashboardPage extends StatelessWidget {
                 page: const ImportProductPage(),
                 color: const Color(0xFFFF9800),
               ),
-              const SizedBox(height: 20), // Ajoutez cet espace
+              const SizedBox(height: 20),
               _buildButton(
                 context,
-                label: 'Gestion de catégorie', // Nouveau label
-                icon: Icons.category, // Icône pour le bouton de catégorie
-                page:
-                    const ManageCategoriePage(), // Page de gestion de catégorie
-                color: const Color(0xFF673AB7), // Couleur que vous souhaitez
+                label: 'Gestion de catégorie',
+                icon: Icons.category,
+                page: const ManageCategoriePage(),
+                color: const Color(0xFF673AB7),
+              ),
+              const SizedBox(height: 20),
+              _buildButton(
+                context,
+                label: 'Galerie de photos', // Nouveau bouton
+                icon: Icons.photo_library, // Icône pour la galerie
+                page: const GalleryPage(), // Assurez-vous que cette page existe
+                color: const Color(0xFFE91E63), // Une couleur attrayante
               ),
             ],
           ),

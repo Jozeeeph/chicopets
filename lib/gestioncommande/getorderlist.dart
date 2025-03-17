@@ -175,8 +175,6 @@ class Getorderlist {
     final SqlDb sqldb = SqlDb();
     List<Order> orders =
         await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
-     // Ajout de isValueDiscount
-    
 
     // Filtrer les commandes non annulées
     orders = orders.where((order) => order.status != 'annulée').toList();
@@ -205,7 +203,7 @@ class Getorderlist {
                       bool isCancelled = order.status == 'annulée';
                       bool isSemiPaid = order.remainingAmount >
                           0; // Check if the order is semi-paid
-                      bool isValueDiscount = order.globalDiscount >0;
+
                       return Card(
                         margin: const EdgeInsets.all(8.0),
                         elevation: 4,
@@ -338,10 +336,9 @@ class Getorderlist {
                                     .spaceEvenly, // Align buttons evenly
                                 children: [
                                   // Bouton "Imprimer Ticket"
-                                  
                                   ElevatedButton.icon(
                                     onPressed: () {
-                                      _showOrderTicketPopup(context, order,isValueDiscount);
+                                      _showOrderTicketPopup(context, order);
                                     },
                                     icon:
                                         Icon(Icons.print, color: Colors.white),
@@ -494,10 +491,10 @@ class Getorderlist {
     showListOrdersPopUp(context); // Reload the orders
   }
 
-  static void _showOrderTicketPopup(BuildContext context, Order order,bool isValueDiscount) {
+  static void _showOrderTicketPopup(BuildContext context, Order order) {
     final SqlDb sqldb = SqlDb();
-    bool isPercentageDiscount = !isValueDiscount; 
-
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; 
 
     showDialog(
       context: context,
@@ -662,7 +659,7 @@ class Getorderlist {
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Global Discount
-                if (isPercentageDiscount)
+                if (isPercentageDiscount && order.globalDiscount > 0)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -682,7 +679,7 @@ class Getorderlist {
                       ),
                     ],
                   )
-                else if (isValueDiscount)
+                else if (!isPercentageDiscount && order.globalDiscount > 0)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -745,7 +742,7 @@ class Getorderlist {
             ),
             TextButton(
               onPressed: () {
-                generateAndSavePDF(context, order, isValueDiscount);
+                generateAndSavePDF(context, order);
               },
               child:
                   Text("Imprimer", style: TextStyle(color: Color(0xFF000000))),
@@ -763,9 +760,10 @@ class Getorderlist {
 
   //Convert to PDF
   static Future<void> generateAndSavePDF(
-      BuildContext context, Order order, bool isValueDiscount) async {
+      BuildContext context, Order order) async {
     final pdf = pw.Document();
-    bool isPercentageDiscount =!isValueDiscount; // Vérifie si la remise est en pourcentage
+    bool isPercentageDiscount =
+        order.globalDiscount > 0; // Vérifie si la remise est en pourcentage
 
     // Define the page format for a standard receipt (80mm width, auto height)
     const double pageWidth = 70 * PdfPageFormat.mm;
@@ -898,7 +896,7 @@ class Getorderlist {
                   ),
                 ],
               )
-            else if (isValueDiscount && order.globalDiscount > 0)
+            else if (!isPercentageDiscount && order.globalDiscount > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [

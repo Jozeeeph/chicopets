@@ -98,7 +98,9 @@ class SqlDb {
           CREATE TABLE IF NOT EXISTS sub_categories (
             id_sub_category INTEGER PRIMARY KEY AUTOINCREMENT,
             sub_category_name TEXT NOT NULL,
+            parent_id INTEGER,
             category_id INTEGER NOT NULL,
+            FOREIGN KEY (parent_id) REFERENCES sub_categories (id_sub_category) ON DELETE CASCADE,
             FOREIGN KEY (category_id) REFERENCES categories (id_category) ON DELETE CASCADE
           )
         ''');
@@ -118,6 +120,15 @@ class SqlDb {
 );
 ''');
         print("Variants table created");
+
+        await db.execute('''
+  CREATE TABLE IF NOT EXISTS gallery_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_path TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+''');
+        print("Gallery images table created");
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -543,12 +554,13 @@ class SqlDb {
   }
 
   /// **Lire toutes les sous-catégories d'une catégorie spécifique**
-  Future<List<SubCategory>> getSubCategories(int categoryId) async {
+  Future<List<SubCategory>> getSubCategories(int categoryId,
+      {int? parentId}) async {
     final dbClient = await db;
     final List<Map<String, dynamic>> maps = await dbClient.query(
       'sub_categories',
-      where: 'category_id = ?',
-      whereArgs: [categoryId],
+      where: 'category_id = ? AND parent_id = ?',
+      whereArgs: [categoryId, parentId],
     );
     return List.generate(maps.length, (i) => SubCategory.fromMap(maps[i]));
   }
@@ -713,6 +725,32 @@ class SqlDb {
       'variants',
       where: 'product_reference_id = ?',
       whereArgs: [productReferenceId],
+    );
+  }
+
+  // Méthode pour insérer une image dans la base de données
+  Future<int> insertImage(String imagePath) async {
+    final dbClient = await db;
+    return await dbClient.insert(
+      'gallery_images',
+      {'image_path': imagePath},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+// Méthode pour récupérer toutes les images de la galerie
+  Future<List<Map<String, dynamic>>> getGalleryImages() async {
+    final dbClient = await db;
+    return await dbClient.query('gallery_images');
+  }
+
+// Méthode pour supprimer une image de la galerie
+  Future<int> deleteImage(int id) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'gallery_images',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }
