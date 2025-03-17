@@ -57,15 +57,16 @@ class SqlDb {
 
         await db.execute('''
         CREATE TABLE IF NOT EXISTS orders(
-          id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT,
-          total REAL,
-          mode_paiement TEXT,
-          status TEXT,
-          remaining_amount REAL,
-          id_client INTEGER,
-          global_discount REAL DEFAULT 0.0
-        )
+  id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT,
+  total REAL,
+  mode_paiement TEXT,
+  status TEXT,
+  remaining_amount REAL,
+  id_client INTEGER,
+  global_discount REAL DEFAULT 0.0,
+  is_percentage_discount INTEGER DEFAULT 1 -- 1 for true (percentage), 0 for false (fixed value)
+);
       ''');
         print("Orders table created");
 
@@ -255,6 +256,7 @@ class SqlDb {
         'remaining_amount': order.remainingAmount,
         'id_client': order.idClient,
         'global_discount': order.globalDiscount,
+        'is_percentage_discount': order.isPercentageDiscount ? 1 : 0, // Added field
       },
     );
 
@@ -278,51 +280,53 @@ class SqlDb {
   }
 
   Future<List<Order>> getOrdersWithOrderLines() async {
-    final db1 = await db;
+  final db1 = await db;
 
-    // Fetch all orders
-    List<Map<String, dynamic>> ordersData = await db1.query("orders");
+  // Fetch all orders
+  List<Map<String, dynamic>> ordersData = await db1.query("orders");
 
-    List<Order> orders = [];
+  List<Order> orders = [];
 
-    for (var orderMap in ordersData) {
-      int orderId = orderMap['id_order'];
-      double total = (orderMap['total'] ?? 0.0) as double;
-      double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
-      double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
+  for (var orderMap in ordersData) {
+    int orderId = orderMap['id_order'];
+    double total = (orderMap['total'] ?? 0.0) as double;
+    double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
+    double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
+    bool isPercentageDiscount = (orderMap['is_percentage_discount'] as int?) == 1; // Fix here
 
-      List<Map<String, dynamic>> orderLinesData = await db1.query(
-        "order_items",
-        where: "id_order = ?",
-        whereArgs: [orderId],
-      );
+    List<Map<String, dynamic>> orderLinesData = await db1.query(
+      "order_items",
+      where: "id_order = ?",
+      whereArgs: [orderId],
+    );
 
-      List<OrderLine> orderLines = orderLinesData.map((line) {
-        return OrderLine(
-          idOrder: orderId,
-          idProduct: line['product_code'].toString(),
-          quantite: (line['quantity'] ?? 1) as int,
-          prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
-          discount: (line['discount'] ?? 0.0) as double,
-          isPercentage: (line['isPercentage'] ?? 1) == 1, // Convert int to bool
-        );
-      }).toList();
-
-      orders.add(Order(
+    List<OrderLine> orderLines = orderLinesData.map((line) {
+      return OrderLine(
         idOrder: orderId,
-        date: orderMap['date'],
-        total: total,
-        modePaiement: orderMap['mode_paiement'] ?? "N/A",
-        status: orderMap['status'],
-        orderLines: orderLines,
-        remainingAmount: remaining,
-        globalDiscount: globalDiscount,
-        idClient: orderMap['id_client'], // Add this to the Order object
-      ));
-    }
+        idProduct: line['product_code'].toString(),
+        quantite: (line['quantity'] ?? 1) as int,
+        prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
+        discount: (line['discount'] ?? 0.0) as double,
+        isPercentage: (line['isPercentage'] as int?) == 1, // Fix here
+      );
+    }).toList();
 
-    return orders;
+    orders.add(Order(
+      idOrder: orderId,
+      date: orderMap['date'],
+      total: total,
+      modePaiement: orderMap['mode_paiement'] ?? "N/A",
+      status: orderMap['status'],
+      orderLines: orderLines,
+      remainingAmount: remaining,
+      globalDiscount: globalDiscount,
+      isPercentageDiscount: isPercentageDiscount, // Fix here
+      idClient: orderMap['id_client'],
+    ));
   }
+
+  return orders;
+}
 
   Future<int> updateProductStock(String productCode, int newStock) async {
     final db1 = await db;
@@ -406,6 +410,7 @@ class SqlDb {
         status: orderMap['status'] ?? "Pending",
         idClient: orderMap['id_client'],
         globalDiscount: orderMap['global_discount'].toDouble(),
+        isPercentageDiscount: orderMap['is_percentage_discount']
       ));
     }
 

@@ -18,10 +18,11 @@ class TableCmd extends StatefulWidget {
   final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
   final double globalDiscount;
+  final bool isPercentageDiscount; // Nouveau paramètre pour le type de remise globale
 
   final Function(int) onQuantityChange;
   final double Function(List<Product>, List<int>, List<double>, List<bool>,
-      double globalDiscount) calculateTotal;
+      double globalDiscount, bool isPercentageDiscount) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
 
@@ -41,6 +42,7 @@ class TableCmd extends StatefulWidget {
     required this.calculateTotal,
     required this.onFetchOrders,
     required this.onPlaceOrder,
+    required this.isPercentageDiscount, // Ajoutez ce paramètre
   });
 
   @override
@@ -96,7 +98,8 @@ class _TableCmdState extends State<TableCmd> {
         } else {
           widget.selectedProducts.add(scannedProduct);
           widget.quantityProducts.add(1);
-          widget.discounts.add(0.0); // Add a discount value for the new product
+          widget.discounts.add(0.0); // Ajouter une remise par défaut
+          widget.typeDiscounts.add(true); // Par défaut, la remise est en pourcentage
         }
       });
     } else {
@@ -112,12 +115,12 @@ class _TableCmdState extends State<TableCmd> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Table on the left
+        // Tableau des produits à gauche
         Expanded(
           flex: 2,
           child: Column(
             children: [
-              // Scanner (invisible)
+              // En-tête du tableau avec le total
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -138,7 +141,7 @@ class _TableCmdState extends State<TableCmd> {
                               color: Colors.white),
                         ),
                         Text(
-                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts, widget.globalDiscount).toStringAsFixed(2)} DT',
+                          '${widget.calculateTotal(widget.selectedProducts, widget.quantityProducts, widget.discounts, widget.typeDiscounts, widget.globalDiscount, widget.isPercentageDiscount).toStringAsFixed(2)} DT',
                           style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
@@ -170,6 +173,7 @@ class _TableCmdState extends State<TableCmd> {
               ),
               const SizedBox(height: 15),
 
+              // Champ de saisie pour le code-barres
               TextField(
                 controller: barcodeController,
                 focusNode: barcodeFocusNode,
@@ -181,7 +185,7 @@ class _TableCmdState extends State<TableCmd> {
 
               const SizedBox(height: 10),
 
-              // Product table
+              // Tableau des produits sélectionnés
               Container(
                 height: 270,
                 decoration: BoxDecoration(
@@ -191,7 +195,7 @@ class _TableCmdState extends State<TableCmd> {
                 ),
                 child: Column(
                   children: [
-                    // Table Header
+                    // En-tête du tableau
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -222,7 +226,7 @@ class _TableCmdState extends State<TableCmd> {
                       ),
                     ),
 
-                    // Table Body
+                    // Corps du tableau
                     Expanded(
                       child: RawScrollbar(
                         thumbColor: const Color.fromARGB(255, 132, 132, 132),
@@ -275,10 +279,9 @@ class _TableCmdState extends State<TableCmd> {
                                                   '${product.prixTTC.toStringAsFixed(2)} DT')),
                                           Expanded(
                                             child: Text(
-                                              widget.typeDiscounts[
-                                                      index] // Check if the discount is a percentage
-                                                  ? "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT" // Percentage discount
-                                                  : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT", // Fixed value discount
+                                              widget.typeDiscounts[index]
+                                                  ? "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT"
+                                                  : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT",
                                             ),
                                           ),
                                         ],
@@ -298,7 +301,7 @@ class _TableCmdState extends State<TableCmd> {
 
         const SizedBox(width: 15),
 
-        // Buttons on the right
+        // Boutons à droite
         Expanded(
           flex: 1,
           child: Column(
