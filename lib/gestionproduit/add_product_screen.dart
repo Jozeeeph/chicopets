@@ -31,7 +31,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController taxController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController margeController = TextEditingController();
+  final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
+  final TextEditingController remiseValeurMaxController =
+      TextEditingController();
   final TextEditingController attributeNameController = TextEditingController();
   final TextEditingController attributeValuesController =
       TextEditingController();
@@ -297,15 +300,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                         _buildTextFormField(
-                        controller: designationController,
-                        label: 'Désignation',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Désignation" ne doit pas être vide.';
-                          }
-                          return null;
-                        },
-                      ),
+                          controller: designationController,
+                          label: 'Désignation',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Désignation" ne doit pas être vide.';
+                            }
+                            return null;
+                          },
+                        ),
                         _buildTextFormField(
                           controller: stockController,
                           label: 'Stock',
@@ -322,7 +325,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                       ],
-                      
+
                       _buildTextFormField(
                         controller: priceHTController,
                         label: 'Prix d\'achat',
@@ -354,6 +357,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       _buildTextFormField(
+                        controller:
+                            remiseMaxController, // New controller for remise% max
+                        label: 'Remise % Max',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Remise % Max" ne doit pas être vide.';
+                          }
+                          if (double.tryParse(value) == null ||
+                              double.parse(value) < 0) {
+                            return 'La remise % max doit être un nombre positif ou nul.';
+                          }
+                          if (double.parse(value) > 100) {
+                            return 'La remise % max ne peut pas dépasser 100%.';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextFormField(
                         controller: profitController,
                         label: 'Profit',
                         keyboardType: TextInputType.number,
@@ -364,6 +386,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           if (double.tryParse(value) == null ||
                               double.parse(value) <= 0) {
                             return 'Le profit doit être un nombre positif.';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextFormField(
+                        controller:
+                            remiseValeurMaxController, // New controller for remise valeur max
+                        label: 'Remise Valeur Max',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Remise Valeur Max" ne doit pas être vide.';
+                          }
+                          if (double.tryParse(value) == null ||
+                              double.parse(value) < 0) {
+                            return 'La remise valeur max doit être un nombre positif ou nul.';
                           }
                           return null;
                         },
@@ -796,7 +834,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 selectedCategoryId!,
                 selectedSubCategoryId!,
                 double.tryParse(margeController.text) ?? 0.0,
-                productReferenceId, // Nouvel attribut
+                productReferenceId,
+                double.tryParse(remiseMaxController.text) ?? 0.0, // Include remiseMax
+                double.tryParse(remiseValeurMaxController.text) ?? 0.0, // Include remiseValeurMax
               );
 
               // Ajouter les variantes du nouveau produit

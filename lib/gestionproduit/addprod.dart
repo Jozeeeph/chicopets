@@ -15,6 +15,9 @@ class Addprod {
     final TextEditingController taxController = TextEditingController();
     final TextEditingController dateController = TextEditingController();
     final TextEditingController margeController = TextEditingController();
+    final TextEditingController remiseMaxController = TextEditingController();
+    final TextEditingController remiseValeurMaxController =TextEditingController();
+
     final SqlDb sqldb = SqlDb();
 
     int? selectedCategoryId;
@@ -209,7 +212,10 @@ class Addprod {
                           selectedCategoryId!,
                           selectedSubCategoryId!,
                           double.tryParse(margeController.text) ?? 0.0,
-                          productReferenceId);
+                          productReferenceId,
+                          0.0,
+                          0
+                          );
                       refreshData();
                       Navigator.of(context).pop();
                     }
