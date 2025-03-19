@@ -20,9 +20,24 @@ class Applydiscount {
     Product product = selectedProducts[productIndex];
     double costPrice = product.prixHT; // Prix de revient (prixHT)
     double sellingPrice = product.prixTTC; // Prix de vente (prixTTC)
-    double profit = sellingPrice - costPrice; // Calcul du profit
-    double maxPercentageDiscount = (profit / sellingPrice) * 100; // Remise maximale en %
-    double maxFixedDiscount = profit; // Remise maximale en DT
+    double profit = (product.marge / 100) * costPrice; // Calcul du profit à partir de la marge
+
+    // Vérification des limites de remise avec les valeurs définies par le produit
+    double maxPercentageDiscount = (profit / sellingPrice) * 100; // Remise max basée sur le profit
+    double maxFixedDiscount = profit; // Remise max en valeur
+
+    // Application des limites du produit
+    if (product.remiseMax != null) {
+      maxPercentageDiscount = maxPercentageDiscount < product.remiseMax
+          ? maxPercentageDiscount
+          : product.remiseMax;
+    }
+
+    if (product.remiseValeurMax != null) {
+      maxFixedDiscount = maxFixedDiscount < product.remiseValeurMax
+          ? maxFixedDiscount
+          : product.remiseValeurMax;
+    }
 
     showDialog(
       context: context,
@@ -39,7 +54,7 @@ class Applydiscount {
                 double discountedPrice = isPercentage
                     ? sellingPrice * (1 - discountValue / 100)
                     : sellingPrice - discountValue;
-                double newProfit = discountedPrice - costPrice;
+                double newProfit = (product.marge / 100) * costPrice - (sellingPrice - discountedPrice);
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -100,7 +115,6 @@ class Applydiscount {
                               onTap: () {
                                 setDialogState(() {
                                   if (number == "C") {
-                                    // Effacer tout le contenu
                                     enteredDiscount = "";
                                   } else if (number == "OK") {
                                     if (enteredDiscount.isNotEmpty) {
@@ -151,7 +165,6 @@ class Applydiscount {
                                       );
                                     }
                                   } else if (number == ".") {
-                                    // Permettre un seul point décimal
                                     if (!enteredDiscount.contains(".")) {
                                       enteredDiscount += number;
                                     }

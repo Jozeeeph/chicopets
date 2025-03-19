@@ -16,6 +16,8 @@ class Product {
   double marge; // Nouveau champ pour la marge %
   String productReferenceId; // Nouvel attribut
   List<Variant> variants; // Liste des variantes
+  double remiseMax; // Nouvel attribut pour la remise maximale en pourcentage
+  double remiseValeurMax; // Nouvel attribut pour la valeur maximale de la remise
 
   Product({
     required this.code,
@@ -33,6 +35,8 @@ class Product {
     required this.marge,
     required this.productReferenceId, // Nouvel attribut
     this.variants = const [], // Liste des variantes (vide par défaut)
+    this.remiseMax = 0.0, // Valeur par défaut 0.0
+    this.remiseValeurMax = 0.0, // Valeur par défaut 0.0
   });
 
   // Méthode pour calculer la marge %
@@ -56,6 +60,8 @@ class Product {
       'is_deleted': isDeleted,
       'marge': marge,
       'product_reference_id': productReferenceId, // Nouvel attribut
+      'remise_max': remiseMax, // Nouvel attribut
+      'remise_valeur_max': remiseValeurMax, // Nouvel attribut
     };
   }
 
@@ -75,11 +81,13 @@ class Product {
       isDeleted: map['is_deleted'] ?? 0,
       marge: map['marge'] ?? 0.0,
       productReferenceId: map['product_reference_id'], // Nouvel attribut
+      remiseMax: map['remise_max'] ?? 0.0, // Nouvel attribut
+      remiseValeurMax: map['remise_valeur_max'] ?? 0.0, // Nouvel attribut
     );
   }
 
   @override
   String toString() {
-    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryId: $subCategoryId, subCategoryName: ${subCategoryName ?? "N/A"}, isDeleted: $isDeleted, marge: $marge%, productReferenceId: $productReferenceId)';
+    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryId: $subCategoryId, subCategoryName: ${subCategoryName ?? "N/A"}, isDeleted: $isDeleted, marge: $marge%, productReferenceId: $productReferenceId, remiseMax: $remiseMax%, remiseValeurMax: $remiseValeurMax)';
   }
 }

@@ -97,6 +97,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
               subCategoryId,
               prixTTC - prixHT,
               productReferenceId,
+              0.0,
+              0
             );
 
             // Mise à jour de la progression

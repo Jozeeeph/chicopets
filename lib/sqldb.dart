@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -50,7 +50,9 @@ class SqlDb {
     sub_category_name TEXT,
     is_deleted INTEGER DEFAULT 0,
     marge REAL,
-    product_reference_id TEXT -- Now it's not UNIQUE
+    product_reference_id TEXT, -- Now it's not UNIQUE
+    remise_max REAL DEFAULT 0.0, -- Nouvel attribut pour la remise maximale en pourcentage
+    remise_valeur_max REAL DEFAULT 0.0 -- Nouvel attribut pour la valeur maximale de la remise
 );
 ''');
         print("Products table created");
@@ -220,7 +222,9 @@ class SqlDb {
     int categoryId,
     int subCategoryId,
     double marge,
-    String productReferenceId, // Nouveau paramètre
+    String productReferenceId,
+    double remiseMax, // Ajout de remiseMax
+    double remiseValeurMax, // Ajout de remiseValeurMax
   ) async {
     final dbClient = await db;
     await dbClient.insert(
@@ -236,7 +240,9 @@ class SqlDb {
         'category_id': categoryId,
         'sub_category_id': subCategoryId,
         'marge': marge,
-        'product_reference_id': productReferenceId, // Nouvelle colonne
+        'product_reference_id': productReferenceId,
+        'remise_max': remiseMax, // Ajout dans la base
+        'remise_valeur_max': remiseValeurMax, // Ajout dans la base
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -256,7 +262,8 @@ class SqlDb {
         'remaining_amount': order.remainingAmount,
         'id_client': order.idClient,
         'global_discount': order.globalDiscount,
-        'is_percentage_discount': order.isPercentageDiscount ? 1 : 0, // Added field
+        'is_percentage_discount':
+            order.isPercentageDiscount ? 1 : 0, // Added field
       },
     );
 
@@ -280,53 +287,54 @@ class SqlDb {
   }
 
   Future<List<Order>> getOrdersWithOrderLines() async {
-  final db1 = await db;
+    final db1 = await db;
 
-  // Fetch all orders
-  List<Map<String, dynamic>> ordersData = await db1.query("orders");
+    // Fetch all orders
+    List<Map<String, dynamic>> ordersData = await db1.query("orders");
 
-  List<Order> orders = [];
+    List<Order> orders = [];
 
-  for (var orderMap in ordersData) {
-    int orderId = orderMap['id_order'];
-    double total = (orderMap['total'] ?? 0.0) as double;
-    double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
-    double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
-    bool isPercentageDiscount = (orderMap['is_percentage_discount'] as int?) == 1; // Fix here
+    for (var orderMap in ordersData) {
+      int orderId = orderMap['id_order'];
+      double total = (orderMap['total'] ?? 0.0) as double;
+      double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
+      double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
+      bool isPercentageDiscount =
+          (orderMap['is_percentage_discount'] as int?) == 1; // Fix here
 
-    List<Map<String, dynamic>> orderLinesData = await db1.query(
-      "order_items",
-      where: "id_order = ?",
-      whereArgs: [orderId],
-    );
-
-    List<OrderLine> orderLines = orderLinesData.map((line) {
-      return OrderLine(
-        idOrder: orderId,
-        idProduct: line['product_code'].toString(),
-        quantite: (line['quantity'] ?? 1) as int,
-        prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
-        discount: (line['discount'] ?? 0.0) as double,
-        isPercentage: (line['isPercentage'] as int?) == 1, // Fix here
+      List<Map<String, dynamic>> orderLinesData = await db1.query(
+        "order_items",
+        where: "id_order = ?",
+        whereArgs: [orderId],
       );
-    }).toList();
 
-    orders.add(Order(
-      idOrder: orderId,
-      date: orderMap['date'],
-      total: total,
-      modePaiement: orderMap['mode_paiement'] ?? "N/A",
-      status: orderMap['status'],
-      orderLines: orderLines,
-      remainingAmount: remaining,
-      globalDiscount: globalDiscount,
-      isPercentageDiscount: isPercentageDiscount, // Fix here
-      idClient: orderMap['id_client'],
-    ));
+      List<OrderLine> orderLines = orderLinesData.map((line) {
+        return OrderLine(
+          idOrder: orderId,
+          idProduct: line['product_code'].toString(),
+          quantite: (line['quantity'] ?? 1) as int,
+          prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
+          discount: (line['discount'] ?? 0.0) as double,
+          isPercentage: (line['isPercentage'] as int?) == 1, // Fix here
+        );
+      }).toList();
+
+      orders.add(Order(
+        idOrder: orderId,
+        date: orderMap['date'],
+        total: total,
+        modePaiement: orderMap['mode_paiement'] ?? "N/A",
+        status: orderMap['status'],
+        orderLines: orderLines,
+        remainingAmount: remaining,
+        globalDiscount: globalDiscount,
+        isPercentageDiscount: isPercentageDiscount, // Fix here
+        idClient: orderMap['id_client'],
+      ));
+    }
+
+    return orders;
   }
-
-  return orders;
-}
 
   Future<int> updateProductStock(String productCode, int newStock) async {
     final db1 = await db;
@@ -402,16 +410,15 @@ class SqlDb {
 
       // Create the Order object with the list of OrderLines
       orders.add(Order(
-        idOrder: orderId,
-        date: orderMap['date'],
-        orderLines: orderLines,
-        total: (orderMap['total'] ?? 0.0).toDouble(), // Ensure double
-        modePaiement: orderMap['mode_paiement'] ?? "N/A",
-        status: orderMap['status'] ?? "Pending",
-        idClient: orderMap['id_client'],
-        globalDiscount: orderMap['global_discount'].toDouble(),
-        isPercentageDiscount: orderMap['is_percentage_discount']
-      ));
+          idOrder: orderId,
+          date: orderMap['date'],
+          orderLines: orderLines,
+          total: (orderMap['total'] ?? 0.0).toDouble(), // Ensure double
+          modePaiement: orderMap['mode_paiement'] ?? "N/A",
+          status: orderMap['status'] ?? "Pending",
+          idClient: orderMap['id_client'],
+          globalDiscount: orderMap['global_discount'].toDouble(),
+          isPercentageDiscount: orderMap['is_percentage_discount']));
     }
 
     return orders;
@@ -511,7 +518,8 @@ class SqlDb {
     );
   }
 
-  Future<List<Product>> searchProducts({String? category, required String query}) async {
+  Future<List<Product>> searchProducts(
+      {String? category, required String query}) async {
     final dbClient = await db;
     print("Exécution de la recherche: catégorie=$category, query=$query");
 
