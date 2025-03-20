@@ -67,20 +67,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
       dateController.text = widget.product!.dateExpiration;
       selectedCategoryId = widget.product!.categoryId;
       selectedSubCategoryId = widget.product!.subCategoryId;
+      remiseMaxController.text = widget.product!.remiseMax.toString();
+      margeController.text = widget.product!.marge.toString();
       selectedTax = widget.product?.taxe ?? 0.0; // Valeur par défaut : 0.0
+      double prixHT = widget.product!.prixHT;
+      double marge = widget.product!.marge;
+      double remiseMax = widget.product!.remiseMax;
+      double profit = (prixHT * marge) / 100;
+      double remiseValeurMax = (profit * remiseMax) / 100;
+      remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
+
+
       if (![0.0, 7.0, 12.0, 19.0].contains(selectedTax)) {
         selectedTax =
             0.0; // Forcer une valeur valide si la taxe n'est pas valide
       }
       // Charger les sous-catégories de la catégorie sélectionnée
       _loadSubCategories(selectedCategoryId!);
-
-      double marge = ((widget.product!.prixTTC - widget.product!.prixHT) /
-              widget.product!.prixHT) *
-          100;
-      margeController.text = marge.toStringAsFixed(2);
-
-      double profit = widget.product!.prixTTC - widget.product!.prixHT;
+      
       profitController.text = profit.toStringAsFixed(2);
 
       // Récupérer les variantes du produit
@@ -91,6 +95,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
     taxController.addListener(calculateValues);
     margeController.addListener(calculateValues);
     profitController.addListener(calculateValues);
+    remiseMaxController.addListener(() {
+      calculerRemiseValeurMax();
+    });
+  }
+
+  void calculerRemiseValeurMax() {
+    double profit = double.tryParse(profitController.text) ?? 0;
+    double remiseMax = double.tryParse(remiseMaxController.text) ?? 0;
+
+    // Calcul : remise valeur max = profit * (remise% max / 100)
+    double remiseValeurMax = (profit * remiseMax) / 100;
+
+    // Mise à jour du champ
+    remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
+  }
+
+  @override
+  void dispose() {
+    remiseMaxController.dispose();
+    profitController.dispose();
+    remiseValeurMaxController.dispose();
+    super.dispose();
   }
 
   // Méthode pour charger les sous-catégories
@@ -382,6 +408,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         controller: profitController,
                         label: 'Profit',
                         keyboardType: TextInputType.number,
+                        enabled: false,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Le champ "Profit" ne doit pas être vide.';
@@ -394,20 +421,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       _buildTextFormField(
-                        controller:
-                            remiseValeurMaxController, // New controller for remise valeur max
+                        controller: remiseValeurMaxController,
                         label: 'Remise Valeur Max',
                         keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Remise Valeur Max" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) < 0) {
-                            return 'La remise valeur max doit être un nombre positif ou nul.';
-                          }
-                          return null;
-                        },
+                        enabled:
+                            false, // Désactive l'input pour éviter la modification manuelle
                       ),
                       DropdownButtonFormField<double>(
                         decoration: _inputDecoration('Taxe (%)'),
@@ -925,9 +943,8 @@ class SubCategoryTree extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Filtrer les sous-catégories par parentId
-    final children = subCategories
-        .where((subCat) => subCat.parentId == parentId)
-        .toList();
+    final children =
+        subCategories.where((subCat) => subCat.parentId == parentId).toList();
 
     // Si aucune sous-catégorie n'est trouvée, retourner un widget vide
     if (children.isEmpty) {
