@@ -127,6 +127,14 @@ class Getorderlist {
     }
   }
 
+  static double calculateTotalBeforeDiscount(Order order) {
+    double total = 0.0;
+    for (var orderLine in order.orderLines) {
+      total += orderLine.prixUnitaire * orderLine.quantite;
+    }
+    return total;
+  }
+
   static Future<void> cancelOrderLine(
       BuildContext context, Order order, OrderLine orderLine) async {
     final SqlDb sqldb = SqlDb();
@@ -276,19 +284,23 @@ class Getorderlist {
                                   }
 
                                   Product product = snapshot.data!;
-                                  double discountedPrice = orderLine.prixUnitaire *
-                                      (1 - orderLine.discount / 100);
+                                  double discountedPrice =
+                                      orderLine.prixUnitaire *
+                                          (1 - orderLine.discount / 100);
                                   return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Expanded(
                                           flex: 1,
                                           child: Text(
                                             "x${orderLine.quantite}",
                                             style: TextStyle(
-                                                fontSize: 16, color: Color(0xFF000000)),
+                                                fontSize: 16,
+                                                color: Color(0xFF000000)),
                                           ),
                                         ),
                                         Expanded(
@@ -296,7 +308,8 @@ class Getorderlist {
                                           child: Text(
                                             product.designation,
                                             style: TextStyle(
-                                                fontSize: 16, color: Color(0xFF000000)),
+                                                fontSize: 16,
+                                                color: Color(0xFF000000)),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -305,7 +318,8 @@ class Getorderlist {
                                           child: Text(
                                             "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                             style: TextStyle(
-                                                fontSize: 16, color: Color(0xFF000000)),
+                                                fontSize: 16,
+                                                color: Color(0xFF000000)),
                                             textAlign: TextAlign.center,
                                           ),
                                         ),
@@ -404,7 +418,7 @@ class Getorderlist {
     );
   }
 
-   static void _updateSemiPaidOrder(BuildContext context, Order order) {
+  static void _updateSemiPaidOrder(BuildContext context, Order order) {
     // Calculate the remaining amount
     double remainingAmount = order.remainingAmount;
 
@@ -493,8 +507,9 @@ class Getorderlist {
 
   static void _showOrderTicketPopup(BuildContext context, Order order) {
     final SqlDb sqldb = SqlDb();
-    bool isPercentageDiscount =
-        order.isPercentageDiscount; 
+    bool isPercentageDiscount = order.isPercentageDiscount;
+    double totalBeforeDiscount =
+        calculateTotalBeforeDiscount(order); // Ajoutez cette ligne
 
     showDialog(
       context: context,
@@ -658,6 +673,27 @@ class Getorderlist {
 
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
+                // Total avant remise
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Total avant remise:",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF000000)),
+                    ),
+                    Text(
+                      "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF000000)),
+                    ),
+                  ],
+                ),
+
                 // Global Discount
                 if (isPercentageDiscount && order.globalDiscount > 0)
                   Row(
@@ -705,7 +741,7 @@ class Getorderlist {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Total:",
+                      "Total après remise:",
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -764,6 +800,9 @@ class Getorderlist {
     final pdf = pw.Document();
     bool isPercentageDiscount =
         order.isPercentageDiscount; // Vérifie si la remise est en pourcentage
+
+    // Calcul du total avant remise
+    double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 
     // Define the page format for a standard receipt (80mm width, auto height)
     const double pageWidth = 70 * PdfPageFormat.mm;
@@ -875,6 +914,27 @@ class Getorderlist {
 
             pw.Divider(),
 
+            // Total avant remise
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  "Total avant remise:",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+                pw.Text(
+                  "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 8,
+                  ),
+                ),
+              ],
+            ),
+
             // Global Discount
             if (isPercentageDiscount && order.globalDiscount > 0)
               pw.Row(
@@ -917,12 +977,12 @@ class Getorderlist {
                 ],
               ),
 
-            // Total and payment method
+            // Total et Mode de paiement
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  "Total:",
+                  "Total après remise:",
                   style: pw.TextStyle(
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 8,

@@ -123,6 +123,17 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Calcul des totaux
+    double totalBeforeDiscount = calculateTotalBeforeDiscount(
+        selectedProducts, quantityProducts);
+    double total = calculateTotal(
+        selectedProducts,
+        quantityProducts,
+        discounts,
+        typeDiscounts,
+        globalDiscount,
+        isPercentageDiscount);
+
     return Scaffold(
       appBar: Header(),
       body: Padding(
@@ -131,8 +142,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
           children: [
             // Table Command Section
             TableCmd(
-              total: calculateTotal(selectedProducts, quantityProducts,
-                  discounts, typeDiscounts, globalDiscount,isPercentageDiscount),
+              total: total,
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
@@ -196,39 +206,51 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
+  // Calculate the total price before applying any discounts
+  static double calculateTotalBeforeDiscount(
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+  ) {
+    double total = 0.0;
+    for (int i = 0; i < selectedProducts.length; i++) {
+      total += selectedProducts[i].prixTTC * quantityProducts[i];
+    }
+    return total;
+  }
+
   // Calculate the total price including discounts
   static double calculateTotal(
-  List<Product> selectedProducts,
-  List<int> quantityProducts,
-  List<double> discounts,
-  List<bool> typeDiscounts,
-  double globalDiscount,
-  bool isPercentageDiscount, // Ajoutez ce paramètre
-) {
-  double total = 0.0;
-  for (int i = 0; i < selectedProducts.length; i++) {
-    double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+    List<bool> typeDiscounts,
+    double globalDiscount,
+    bool isPercentageDiscount,
+  ) {
+    double total = 0.0;
+    for (int i = 0; i < selectedProducts.length; i++) {
+      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
 
-    if (typeDiscounts[i]) {
-      productTotal *= (1 - discounts[i] / 100);
+      if (typeDiscounts[i]) {
+        productTotal *= (1 - discounts[i] / 100);
+      } else {
+        productTotal -= discounts[i];
+      }
+
+      if (productTotal < 0) {
+        productTotal = 0.0;
+      }
+
+      total += productTotal;
+    }
+
+    // Appliquer la remise globale
+    if (isPercentageDiscount) {
+      total *= (1 - globalDiscount / 100);
     } else {
-      productTotal -= discounts[i];
+      total -= globalDiscount;
     }
 
-    if (productTotal < 0) {
-      productTotal = 0.0;
-    }
-
-    total += productTotal;
+    return total;
   }
-
-  // Appliquer la remise globale
-  if (isPercentageDiscount) {
-    total *= (1 - globalDiscount / 100);
-  } else {
-    total -= globalDiscount;
-  }
-
-  return total;
-}
 }

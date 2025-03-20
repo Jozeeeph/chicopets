@@ -60,6 +60,8 @@ class Addorder {
     double globalDiscount = order.globalDiscount;
     double globalDiscountValue = 0.0;
     bool isPercentageDiscount = order.isPercentageDiscount;
+    double totalBeforeDiscount = calculateTotalBeforeDiscount(
+        selectedProducts, quantityProducts, discounts, typeDiscounts);
     double total = calculateTotal(
         selectedProducts,
         quantityProducts,
@@ -81,6 +83,8 @@ class Addorder {
           builder: (context, setState) {
             void updateTotalAndChange() {
               setState(() {
+                totalBeforeDiscount = calculateTotalBeforeDiscount(
+                    selectedProducts, quantityProducts, discounts, typeDiscounts);
                 total = calculateTotal(
                     selectedProducts,
                     quantityProducts,
@@ -262,7 +266,26 @@ class Addorder {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                "Total:",
+                                "Total avant remise:",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Total après remise:",
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -282,7 +305,7 @@ class Addorder {
                                     ),
                                     SizedBox(height: 4),
                                     Text(
-                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
+                                      "${total.toStringAsFixed(2)} DT",
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -305,7 +328,7 @@ class Addorder {
                                     ),
                                     SizedBox(height: 4),
                                     Text(
-                                      "Total après remise: ${total.toStringAsFixed(2)} DT",
+                                      "${total.toStringAsFixed(2)} DT",
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -547,8 +570,7 @@ class Addorder {
     List<double> discounts,
     List<bool> typeDiscounts,
     double globalDiscount,
-    bool
-        isPercentageDiscount, // Indique si la remise globale est en pourcentage
+    bool isPercentageDiscount,
   ) async {
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -557,34 +579,34 @@ class Addorder {
       return;
     }
 
-    // Calcul du total de la commande
+    double totalBeforeDiscount = calculateTotalBeforeDiscount(
+        selectedProducts, quantityProducts, discounts, typeDiscounts);
     double total = calculateTotal(
       selectedProducts,
       quantityProducts,
       discounts,
       typeDiscounts,
       globalDiscount,
-      isPercentageDiscount, // Passer le type de remise globale
+      isPercentageDiscount,
     );
 
-    // Déterminer le statut de la commande et le montant restant
     String status;
     double remainingAmount;
 
     if (amountGiven >= total) {
       status = "payée";
-      remainingAmount = 0.0; // La commande est entièrement payée
+      remainingAmount = 0.0;
     } else {
       status = "semi-payée";
-      remainingAmount = total - amountGiven; // Calcul du montant restant
+      remainingAmount = total - amountGiven;
     }
 
-    print("Total calculé: $total");
+    print("Total avant remise: $totalBeforeDiscount");
+    print("Total après remise: $total");
     print("Montant donné: $amountGiven");
     print("Statut de la commande: $status");
     print("Montant restant: $remainingAmount");
 
-    // Création des lignes de commande
     List<OrderLine> orderLines = selectedProducts.map((product) {
       int productIndex = selectedProducts.indexOf(product);
       return OrderLine(
@@ -597,27 +619,24 @@ class Addorder {
       );
     }).toList();
 
-    // Création de l'objet Order
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
       total: total,
-      modePaiement: "Espèces", // Mode de paiement par défaut
-      status: status, // Statut de la commande (payée ou semi-payée)
-      remainingAmount: remainingAmount, // Montant restant à payer
+      modePaiement: "Espèces",
+      status: status,
+      remainingAmount: remainingAmount,
       globalDiscount: globalDiscount,
-      isPercentageDiscount: isPercentageDiscount, // Type de remise globale
+      isPercentageDiscount: isPercentageDiscount,
     );
 
     print("Order to be saved: ${order.toMap()}");
 
     try {
-      // Enregistrement de la commande dans la base de données
       int orderId = await SqlDb().addOrder(order);
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
 
-        // Vérification du stock des produits
         bool isValidOrder = true;
         for (int i = 0; i < selectedProducts.length; i++) {
           if (selectedProducts[i].stock == 0) {
@@ -642,17 +661,15 @@ class Addorder {
         }
 
         if (!isValidOrder) {
-          return; // Annuler l'enregistrement si le stock est insuffisant
+          return;
         }
 
-        // Mise à jour du stock des produits
         for (int i = 0; i < selectedProducts.length; i++) {
           selectedProducts[i].stock -= quantityProducts[i];
           await SqlDb().updateProductStock(
               selectedProducts[i].code, selectedProducts[i].stock);
         }
 
-        // Affichage d'un message de succès
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Commande passée avec succès !"),
@@ -660,7 +677,6 @@ class Addorder {
           ),
         );
 
-        // Réinitialisation des listes
         selectedProducts.clear();
         quantityProducts.clear();
         discounts.clear();
@@ -691,7 +707,7 @@ class Addorder {
     List<double> discounts,
     List<bool> typeDiscounts,
     double globalDiscount,
-    bool isPercentageDiscount, // Ajoutez ce paramètre
+    bool isPercentageDiscount,
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -710,13 +726,26 @@ class Addorder {
       total += productTotal;
     }
 
-    // Appliquer la remise globale
     if (isPercentageDiscount) {
       total *= (1 - globalDiscount / 100);
     } else {
       total -= globalDiscount;
     }
 
+    return total;
+  }
+
+  static double calculateTotalBeforeDiscount(
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+    List<bool> typeDiscounts,
+  ) {
+    double total = 0.0;
+    for (int i = 0; i < selectedProducts.length; i++) {
+      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+      total += productTotal;
+    }
     return total;
   }
 }

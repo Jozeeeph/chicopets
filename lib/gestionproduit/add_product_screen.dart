@@ -1,5 +1,6 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/subcategory.dart';
 import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
@@ -46,7 +47,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   int? selectedSubCategoryId;
   bool isCategoryFormVisible = false;
   List<Category> categories = [];
-  List<DropdownMenuItem<int>> subCategoryItems = [];
+  List<SubCategory> subCategories = [];
 
   // Variables pour la gestion des variantes
   bool hasVariants = false;
@@ -95,17 +96,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // Méthode pour charger les sous-catégories
   void _loadSubCategories(int categoryId) async {
     final dbClient = await sqldb.db;
-    final subCategories = await dbClient.query(
+    final subCategoriesData = await dbClient.query(
       'sub_categories',
       where: 'category_id = ?',
       whereArgs: [categoryId],
     );
 
     setState(() {
-      subCategoryItems = subCategories.map((subCat) {
-        return DropdownMenuItem<int>(
-          value: subCat['id_sub_category'] as int,
-          child: Text(subCat['sub_category_name'] as String),
+      subCategories = subCategoriesData.map((subCat) {
+        return SubCategory(
+          id: subCat['id_sub_category'] as int,
+          name: subCat['sub_category_name'] as String,
+          parentId: subCat['parent_id'] as int?,
+          categoryId: subCat['category_id'] as int,
         );
       }).toList();
     });
@@ -538,20 +541,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       const SizedBox(height: 16),
                       Visibility(
                         visible: selectedCategoryId != null,
-                        child: DropdownButtonFormField<int>(
-                          decoration: _inputDecoration('Sous-catégorie'),
-                          value: selectedSubCategoryId,
-                          items: subCategoryItems,
-                          onChanged: (val) {
+                        child: SubCategoryTree(
+                          subCategories: subCategories,
+                          parentId:
+                              null, // Commencer avec les sous-catégories de premier niveau
+                          onSelect: (subCategoryId) {
                             setState(() {
-                              selectedSubCategoryId = val;
+                              selectedSubCategoryId = subCategoryId;
                             });
-                          },
-                          validator: (value) {
-                            if (value == null) {
-                              return "Veuillez sélectionner une sous-catégorie";
-                            }
-                            return null;
                           },
                         ),
                       ),
@@ -835,8 +832,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 selectedSubCategoryId!,
                 double.tryParse(margeController.text) ?? 0.0,
                 productReferenceId,
-                double.tryParse(remiseMaxController.text) ?? 0.0, // Include remiseMax
-                double.tryParse(remiseValeurMaxController.text) ?? 0.0, // Include remiseValeurMax
+                double.tryParse(remiseMaxController.text) ??
+                    0.0, // Include remiseMax
+                double.tryParse(remiseValeurMaxController.text) ??
+                    0.0, // Include remiseValeurMax
               );
 
               // Ajouter les variantes du nouveau produit
@@ -907,6 +906,59 @@ class _AddProductScreenState extends State<AddProductScreen> {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF26A9E0)),
       ),
+    );
+  }
+}
+
+// Recursive widget to display subcategory hierarchy
+class SubCategoryTree extends StatelessWidget {
+  final List<SubCategory> subCategories;
+  final int? parentId;
+  final Function(int) onSelect;
+
+  const SubCategoryTree({
+    required this.subCategories,
+    this.parentId,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Filtrer les sous-catégories par parentId
+    final children = subCategories
+        .where((subCat) => subCat.parentId == parentId)
+        .toList();
+
+    // Si aucune sous-catégorie n'est trouvée, retourner un widget vide
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true, // Éviter les problèmes de hauteur infinie
+      physics: const NeverScrollableScrollPhysics(), // Désactiver le défilement
+      itemCount: children.length,
+      itemBuilder: (context, index) {
+        final subCat = children[index];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              title: Text(subCat.name),
+              onTap: () => onSelect(subCat.id!),
+            ),
+            // Afficher les sous-catégories enfants de manière récursive
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0),
+              child: SubCategoryTree(
+                subCategories: subCategories,
+                parentId: subCat.id,
+                onSelect: onSelect,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
