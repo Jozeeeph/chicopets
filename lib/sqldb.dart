@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -128,6 +128,7 @@ class SqlDb {
   CREATE TABLE IF NOT EXISTS gallery_images (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     image_path TEXT NOT NULL,
+    name TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   )
 ''');
@@ -774,15 +775,23 @@ class SqlDb {
   }
 
   // Méthode pour insérer une image dans la base de données
-  Future<int> insertImage(String imagePath) async {
+  Future<int> insertImage(String imagePath, String name) async {
     final dbClient = await db;
     return await dbClient.insert(
       'gallery_images',
-      {'image_path': imagePath},
+      {'image_path': imagePath, 'name': name},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
+Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
+  final dbClient = await db;
+  return await dbClient.query(
+    'gallery_images',
+    where: 'name LIKE ?',
+    whereArgs: ['%$name%'],
+  );
+}
 // Méthode pour récupérer toutes les images de la galerie
   Future<List<Map<String, dynamic>>> getGalleryImages() async {
     final dbClient = await db;
@@ -798,4 +807,13 @@ class SqlDb {
       whereArgs: [id],
     );
   }
+  Future<int> updateImageName(int id, String name) async {
+  final dbClient = await db;
+  return await dbClient.update(
+    'gallery_images',
+    {'name': name}, // Mettre à jour le nom de l'image
+    where: 'id = ?', // Condition : l'ID de l'image
+    whereArgs: [id], // Passer l'ID de l'image
+  );
+}
 }
