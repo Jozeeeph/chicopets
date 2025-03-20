@@ -833,6 +833,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               marge: double.tryParse(margeController.text) ?? 0.0,
               productReferenceId: productReferenceId, // Nouvel attribut
               variants: variants, // Liste des variantes
+              remiseMax:double.tryParse(remiseMaxController.text) ?? 0.0,
+              remiseValeurMax:double.tryParse(remiseValeurMaxController.text) ?? 0.0,
             );
 
             // Sauvegarder le produit

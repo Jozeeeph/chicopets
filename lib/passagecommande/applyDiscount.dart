@@ -24,13 +24,15 @@ class Applydiscount {
     double prixAchat = product.prixHT; // Prix d'achat (coût)
     double profitAvantRemise = (product.marge / 100) * prixAchat;
 
-    // Calculer la remise max en pourcentage
-    double maxDiscountFromProfit = (profitAvantRemise / prixTTC) * 50; // 50% du profit
-    double remiseMaxPourcentage = product.remiseMax != null
-        ? product.remiseMax.clamp(0, maxDiscountFromProfit)
-        : maxDiscountFromProfit;
+    // Calculer la remise max en pourcentage, basé sur la marge
+    double remiseMaxPourcentage = product.remiseMax;
+    double remiseMaxValeur = product.remiseValeurMax;
 
-    double remiseMaxValeur = product.remiseValeurMax ?? prixTTC;
+    // Calculate the maximum discount value based on the profit
+    double maxDiscountValue = (remiseMaxPourcentage / 100) * profitAvantRemise;
+
+    // Convert this discount value to a percentage of the total price
+    double remiseMaxPourcentageOnPrice = (maxDiscountValue / prixTTC) * 100;
 
     showDialog(
       context: context,
@@ -47,13 +49,14 @@ class Applydiscount {
                 double discountedPrice = isPercentage
                     ? prixTTC * (1 - discountValue / 100)
                     : prixTTC - discountValue;
-                double profitApresRemise = profitAvantRemise - (prixTTC-discountedPrice);
+                double profitApresRemise =
+                    profitAvantRemise - (prixTTC - discountedPrice);
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Remise max: ${remiseMaxPourcentage.toStringAsFixed(2)}% '
+                      'Remise max: ${remiseMaxPourcentageOnPrice.toStringAsFixed(2)}% '
                       '(${remiseMaxValeur.toStringAsFixed(2)} DT)',
                       style: const TextStyle(fontSize: 16, color: Colors.red),
                     ),
@@ -126,12 +129,13 @@ class Applydiscount {
                                           double.tryParse(enteredDiscount);
                                       if (discount != null && discount >= 0) {
                                         if (isPercentage &&
-                                            discount > remiseMaxPourcentage) {
+                                            discount >
+                                                remiseMaxPourcentageOnPrice) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                  'La remise ne peut pas dépasser ${remiseMaxPourcentage.toStringAsFixed(2)}% (50% du profit).'),
+                                                  'La remise ne peut pas dépasser ${remiseMaxPourcentageOnPrice.toStringAsFixed(2)}% du prix total.'),
                                             ),
                                           );
                                         } else if (!isPercentage &&
