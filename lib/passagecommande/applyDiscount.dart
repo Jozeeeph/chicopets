@@ -18,26 +18,19 @@ class Applydiscount {
     String enteredDiscount = "";
     bool isPercentage = true;
     Product product = selectedProducts[productIndex];
-    double costPrice = product.prixHT; // Prix de revient (prixHT)
-    double sellingPrice = product.prixTTC; // Prix de vente (prixTTC)
-    double profit = (product.marge / 100) * costPrice; // Calcul du profit à partir de la marge
 
-    // Vérification des limites de remise avec les valeurs définies par le produit
-    double maxPercentageDiscount = (profit / sellingPrice) * 100; // Remise max basée sur le profit
-    double maxFixedDiscount = profit; // Remise max en valeur
+    // Prix et profit initiaux
+    double prixTTC = product.prixTTC;
+    double prixAchat = product.prixHT; // Prix d'achat (coût)
+    double profitAvantRemise = (product.marge / 100) * prixAchat;
 
-    // Application des limites du produit
-    if (product.remiseMax != null) {
-      maxPercentageDiscount = maxPercentageDiscount < product.remiseMax
-          ? maxPercentageDiscount
-          : product.remiseMax;
-    }
+    // Calculer la remise max en pourcentage
+    double maxDiscountFromProfit = (profitAvantRemise / prixTTC) * 50; // 50% du profit
+    double remiseMaxPourcentage = product.remiseMax != null
+        ? product.remiseMax.clamp(0, maxDiscountFromProfit)
+        : maxDiscountFromProfit;
 
-    if (product.remiseValeurMax != null) {
-      maxFixedDiscount = maxFixedDiscount < product.remiseValeurMax
-          ? maxFixedDiscount
-          : product.remiseValeurMax;
-    }
+    double remiseMaxValeur = product.remiseValeurMax ?? prixTTC;
 
     showDialog(
       context: context,
@@ -45,22 +38,23 @@ class Applydiscount {
         return AlertDialog(
           title: const Text('Choisir la remise'),
           content: SizedBox(
-            width: 400, // Ajustez la largeur selon vos besoins
+            width: 400,
             child: StatefulBuilder(
               builder: (context, setDialogState) {
                 double discountValue = enteredDiscount.isEmpty
                     ? 0
                     : double.tryParse(enteredDiscount) ?? 0;
                 double discountedPrice = isPercentage
-                    ? sellingPrice * (1 - discountValue / 100)
-                    : sellingPrice - discountValue;
-                double newProfit = (product.marge / 100) * costPrice - (sellingPrice - discountedPrice);
+                    ? prixTTC * (1 - discountValue / 100)
+                    : prixTTC - discountValue;
+                double profitApresRemise = profitAvantRemise - (prixTTC-discountedPrice);
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Vous pouvez faire une remise de maximum ${maxPercentageDiscount.toStringAsFixed(2)}% (${maxFixedDiscount.toStringAsFixed(2)} DT)',
+                      'Remise max: ${remiseMaxPourcentage.toStringAsFixed(2)}% '
+                      '(${remiseMaxValeur.toStringAsFixed(2)} DT)',
                       style: const TextStyle(fontSize: 16, color: Colors.red),
                     ),
                     const SizedBox(height: 10),
@@ -88,24 +82,34 @@ class Applydiscount {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Prix avant remise: ${sellingPrice.toStringAsFixed(2)} DT',
+                      'Prix avant remise: ${prixTTC.toStringAsFixed(2)} DT',
                       style: const TextStyle(fontSize: 16),
                     ),
                     Text(
                       'Prix après remise: ${discountedPrice.toStringAsFixed(2)} DT',
                       style: const TextStyle(fontSize: 16),
                     ),
+                    const SizedBox(height: 10),
                     Text(
-                      'Nouveau profit: ${newProfit.toStringAsFixed(2)} DT',
-                      style: const TextStyle(fontSize: 16),
+                      'Profit avant remise: ${profitAvantRemise.toStringAsFixed(2)} DT',
+                      style: const TextStyle(fontSize: 16, color: Colors.green),
+                    ),
+                    Text(
+                      'Profit après remise: ${profitApresRemise.toStringAsFixed(2)} DT',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: profitApresRemise >= 0
+                            ? Colors.green
+                            : Colors.red, // Rouge si perte
+                      ),
                     ),
                     const SizedBox(height: 10),
                     for (var row in [
                       ['1', '2', '3'],
                       ['4', '5', '6'],
                       ['7', '8', '9'],
-                      ['.', '0', 'C'], // Bouton "C" pour effacer
-                      ['OK'] // Bouton "OK" pour valider
+                      ['.', '0', 'C'],
+                      ['OK']
                     ])
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -122,21 +126,21 @@ class Applydiscount {
                                           double.tryParse(enteredDiscount);
                                       if (discount != null && discount >= 0) {
                                         if (isPercentage &&
-                                            discount > maxPercentageDiscount) {
+                                            discount > remiseMaxPourcentage) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                  'La remise ne peut pas dépasser ${maxPercentageDiscount.toStringAsFixed(2)}%'),
+                                                  'La remise ne peut pas dépasser ${remiseMaxPourcentage.toStringAsFixed(2)}% (50% du profit).'),
                                             ),
                                           );
                                         } else if (!isPercentage &&
-                                            discount > maxFixedDiscount) {
+                                            discount > remiseMaxValeur) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             SnackBar(
                                               content: Text(
-                                                  'La remise ne peut pas dépasser ${maxFixedDiscount.toStringAsFixed(2)} DT'),
+                                                  'La remise ne peut pas dépasser ${remiseMaxValeur.toStringAsFixed(2)} DT'),
                                             ),
                                           );
                                         } else {
@@ -181,10 +185,10 @@ class Applydiscount {
                                 padding: const EdgeInsets.all(12.0),
                                 decoration: BoxDecoration(
                                   color: number == "C"
-                                      ? const Color(0xFFE53935) // Rouge pour "C"
+                                      ? const Color(0xFFE53935)
                                       : number == "OK"
-                                          ? const Color(0xFF009688) // Vert pour "OK"
-                                          : const Color(0xFF0056A6), // Bleu pour les autres boutons
+                                          ? const Color(0xFF009688)
+                                          : const Color(0xFF0056A6),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Center(

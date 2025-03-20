@@ -193,6 +193,7 @@ class Addprod {
                         );
                         return;
                       }
+                      
                       String generateProductReferenceId() {
                         var uuid = Uuid();
                         return uuid.v4(); // Generates a unique ID
@@ -200,6 +201,7 @@ class Addprod {
 
 // Dans la méthode de sauvegarde du produit
                       final productReferenceId = generateProductReferenceId();
+                      print("reference produit $productReferenceId");
 
                       await sqldb.addProduct(
                           codeController.text,
