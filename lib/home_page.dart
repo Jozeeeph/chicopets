@@ -25,27 +25,39 @@ class HomePage extends StatelessWidget {
               Text(
                 'Bienvenue à Votre Caisse',
                 style: GoogleFonts.poppins(
-                  fontSize: 24,
+                  fontSize: 22, // Taille de la police réduite
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 40),
-              _buildButton(
-                context,
-                label: 'Tableau de bord',
-                icon: Icons.dashboard,
-                page: const DashboardPage(),
-                color: const Color(0xFF009688),
-              ),
-              const SizedBox(height: 20),
-              _buildButton(
-                context,
-                label: 'Passage de commande',
-                icon: Icons.shopping_cart,
-                page: const CashDeskPage(),
-                color: const Color(0xFFFF9800),
+              const SizedBox(height: 30), // Espacement réduit
+              // Utilisation d'un GridView pour les cartes
+              SizedBox(
+                width: MediaQuery.of(context).size.width * 0.6, // Largeur réduite
+                child: GridView.count(
+                  shrinkWrap: true,
+                  crossAxisCount: 2, // 2 cartes par ligne
+                  crossAxisSpacing: 12, // Espacement horizontal entre les cartes
+                  mainAxisSpacing: 12, // Espacement vertical entre les cartes
+                  childAspectRatio: 1.0, // Ratio pour des cartes carrées
+                  children: [
+                    _buildCard(
+                      context,
+                      label: 'Tableau de bord',
+                      icon: Icons.dashboard,
+                      page: const DashboardPage(),
+                      color: const Color(0xFF009688),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Passage de commande',
+                      icon: Icons.shopping_cart,
+                      page: const CashDeskPage(),
+                      color: const Color(0xFFFF9800),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -54,34 +66,51 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(BuildContext context, {
+  Widget _buildCard(
+    BuildContext context, {
     required String label,
     required IconData icon,
     required Widget page,
     required Color color,
   }) {
-    return ElevatedButton.icon(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => page),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 5,
+    return Card(
+      elevation: 4, // Élévation légère
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(50), // Border radius réduit
       ),
-      icon: Icon(icon, color: Colors.white),
-      label: Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+      color: color,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => page),
+          );
+        },
+        borderRadius: BorderRadius.circular(30),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0), // Padding réduit
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 30, // Taille de l'icône
+                color: Colors.white,
+              ),
+              const SizedBox(height: 8), // Espacement entre l'icône et le texte
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 20, // Taille de la police réduite
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2, // Limite le texte à 2 lignes
+                overflow: TextOverflow.ellipsis, // Points de suspension si nécessaire
+              ),
+            ],
+          ),
         ),
       ),
     );

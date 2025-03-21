@@ -31,7 +31,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   // Define the color palette
   final Color deepBlue = const Color(0xFF0056A6); // Primary deep blue
-  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79); // Accent sky blue
+  final Color darkBlue =
+      const Color.fromARGB(255, 1, 42, 79); // Accent sky blue
   final Color white = Colors.white; // White
   final Color lightGray = const Color(0xFFE0E0E0); // Light gray
   final Color tealGreen = const Color(0xFF009688); // Accent teal green
@@ -102,8 +103,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Expanded(
       child: Row(
         children: [
-          // Colonne des catégories
+          // Colonne des catégories (1/4 de l'espace)
           Expanded(
+            flex: 2, // 1 part sur 4
             child: RefreshIndicator(
               onRefresh: () async {
                 refreshData();
@@ -125,11 +127,12 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
-                      childAspectRatio: 1.5,
-                      mainAxisSpacing: 30.0,
-                      crossAxisSpacing: 30.0,
+                      childAspectRatio:
+                          1.0, // Ajusté pour des conteneurs plus grands
+                      mainAxisSpacing: 5.0, // Espacement vertical réduit
+                      crossAxisSpacing: 5.0, // Espacement horizontal réduit
                     ),
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(1.0),
                     itemCount: snapshot.data!.length,
                     itemBuilder: (context, index) {
                       final category = snapshot.data![index];
@@ -146,10 +149,11 @@ class _CategorieetproductState extends State<Categorieetproduct> {
           ),
           VerticalDivider(
             color: lightGray,
-            thickness: 1,
+            thickness: 2,
           ),
-          // Colonne des produits
+          // Colonne des produits (3/4 de l'espace)
           Expanded(
+            flex: 4, // 3 parts sur 4
             child: RefreshIndicator(
               onRefresh: () async {
                 refreshData();
@@ -197,7 +201,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                               style: TextStyle(
                                 color: white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                                fontSize: 15,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -232,39 +236,39 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       },
       child: Container(
         margin: const EdgeInsets.all(4.0),
-        width: 80,
-        height: 80,
+        width: 140,
+        height: 180, // Augmenter la hauteur (par exemple, 180 au lieu de 160)
         decoration: BoxDecoration(
           color: darkBlue.withOpacity(0.1),
           border: Border.all(color: deepBlue, width: 1.5),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(80),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(50),
               child: categoryImagePath.startsWith('assets/')
                   ? Image.asset(
                       categoryImagePath,
-                      width: 100,
-                      height: 100,
+                      width: 90,
+                      height: 90,
                       fit: BoxFit.cover,
                     )
                   : Image.file(
                       File(categoryImagePath),
-                      width: 100,
-                      height: 100,
+                      width: 90,
+                      height: 90,
                       fit: BoxFit.cover,
                     ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             SizedBox(
               child: Text(
                 categoryName,
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,

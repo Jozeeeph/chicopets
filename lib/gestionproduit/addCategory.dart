@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/subcategory.dart';
 import 'package:flutter/material.dart';
@@ -63,28 +64,28 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   Future<void> fetchSubCategories(int categoryId) async {
-  try {
-    List<Map<String, dynamic>> fetchedSubCategories =
-        await sqldb.getSubCategoriesByCategory(categoryId);
+    try {
+      List<Map<String, dynamic>> fetchedSubCategories =
+          await sqldb.getSubCategoriesByCategory(categoryId);
 
-    // Debugging: Print fetched subcategories
-    print("Fetched subcategories: $fetchedSubCategories");
+      // Debugging: Print fetched subcategories
+      print("Fetched subcategories: $fetchedSubCategories");
 
-    setState(() {
-      subCategories = fetchedSubCategories.map((map) {
-        return SubCategory(
-          id: map['id_sub_category'],
-          name: map['sub_category_name'] ?? 'Unknown',
-          parentId: map['parent_id'],
-          categoryId: map['category_id'] ?? 0,
-        );
-      }).toList();
-    });
-  } catch (e) {
-    print("Error fetching subcategories: $e");
-    _showMessage("Erreur lors du chargement des sous-catégories !");
+      setState(() {
+        subCategories = fetchedSubCategories.map((map) {
+          return SubCategory(
+            id: map['id_sub_category'],
+            name: map['sub_category_name'] ?? 'Unknown',
+            parentId: map['parent_id'],
+            categoryId: map['category_id'] ?? 0,
+          );
+        }).toList();
+      });
+    } catch (e) {
+      print("Error fetching subcategories: $e");
+      _showMessage("Erreur lors du chargement des sous-catégories !");
+    }
   }
-}
 
   Future<void> pickImage() async {
     final pickedFile =
@@ -94,6 +95,51 @@ class _AddCategoryState extends State<AddCategory> {
         selectedImage = File(pickedFile.path);
       });
     }
+  }
+
+  Future<void> pickImageFromGallery() async {
+    final selectedImageFromGallery = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GalleryPage(),
+      ),
+    );
+
+    if (selectedImageFromGallery != null && selectedImageFromGallery is File) {
+      setState(() {
+        selectedImage =
+            selectedImageFromGallery; // Mettre à jour l'image sélectionnée
+      });
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Choisir la source de l'image"),
+          content: const Text(
+              "Voulez-vous choisir une image depuis la galerie ou depuis votre PC ?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                pickImageFromGallery();
+              },
+              child: const Text("Galerie"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                pickImage();
+              },
+              child: const Text("PC"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void addCategory() async {
@@ -362,7 +408,7 @@ class _AddCategoryState extends State<AddCategory> {
                 : Image.file(selectedImage!, height: 100),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: pickImage,
+              onPressed: _showImageSourceDialog,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF26A9E0), // Sky Blue
                 shape: RoundedRectangleBorder(

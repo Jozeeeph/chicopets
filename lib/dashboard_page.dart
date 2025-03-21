@@ -29,59 +29,56 @@ class DashboardPage extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
         ),
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(8.0), // Padding global ajusté
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                'Tableau de bord',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              const SizedBox(height: 12), // Espacement ajusté
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 5, // 3 cartes par ligne
+                  crossAxisSpacing: 10, // Espacement horizontal entre les cartes
+                  mainAxisSpacing: 10, // Espacement vertical entre les cartes
+                  childAspectRatio: 0.8, // Ratio pour des cartes rectangulaires
+                  children: [
+                    _buildCard(
+                      context,
+                      label: 'Gestion de produit',
+                      icon: Icons.inventory,
+                      page: const ManageProductPage(),
+                      color: const Color(0xFF009688),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Gestion de commandes',
+                      icon: Icons.shopping_cart,
+                      page: const ManageCommand(),
+                      color: const Color.fromARGB(255, 86, 0, 207),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Importer des produits',
+                      icon: Icons.upload_file,
+                      page: const ImportProductPage(),
+                      color: const Color(0xFFFF9800),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Gestion de catégorie',
+                      icon: Icons.category,
+                      page: const ManageCategoriePage(),
+                      color: const Color(0xFF673AB7),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Galerie de photos',
+                      icon: Icons.photo_library,
+                      page: const GalleryPage(),
+                      color: const Color(0xFFE91E63),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-              _buildButton(
-                context,
-                label: 'Gestion de produit',
-                icon: Icons.inventory,
-                page: const ManageProductPage(),
-                color: const Color(0xFF009688),
-              ),
-              const SizedBox(height: 20),
-              _buildButton(
-                context,
-                label: 'Gestion de commandes',
-                icon: Icons.shopping_cart,
-                page: const ManageCommand(),
-                color: const Color.fromARGB(255, 86, 0, 207),
-              ),
-              const SizedBox(height: 20),
-              _buildButton(
-                context,
-                label: 'Importer des produits',
-                icon: Icons.upload_file,
-                page: const ImportProductPage(),
-                color: const Color(0xFFFF9800),
-              ),
-              const SizedBox(height: 20),
-              _buildButton(
-                context,
-                label: 'Gestion de catégorie',
-                icon: Icons.category,
-                page: const ManageCategoriePage(),
-                color: const Color(0xFF673AB7),
-              ),
-              const SizedBox(height: 20),
-              _buildButton(
-                context,
-                label: 'Galerie de photos', // Nouveau bouton
-                icon: Icons.photo_library, // Icône pour la galerie
-                page: const GalleryPage(), // Assurez-vous que cette page existe
-                color: const Color(0xFFE91E63), // Une couleur attrayante
               ),
             ],
           ),
@@ -90,35 +87,51 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(
+  Widget _buildCard(
     BuildContext context, {
     required String label,
     required IconData icon,
     required Widget page,
     required Color color,
   }) {
-    return ElevatedButton.icon(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => page),
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 5,
+    return Card(
+      elevation: 3, // Élévation légèrement augmentée
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(29), // Border radius augmenté
       ),
-      icon: Icon(icon, color: Colors.white),
-      label: Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+      color: color,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => page),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0), // Padding ajusté
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 30, // Taille de l'icône augmentée
+                color: Colors.white,
+              ),
+              const SizedBox(height: 8), // Espacement entre l'icône et le texte
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 20, // Taille de la police augmentée
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2, // Limite le texte à 2 lignes
+                overflow: TextOverflow.ellipsis, // Ajoute des points de suspension si nécessaire
+              ),
+            ],
+          ),
         ),
       ),
     );
