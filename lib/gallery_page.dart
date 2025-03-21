@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'sqldb.dart'; // Assurez-vous que ce fichier existe et est correctement configuré
+import 'sqldb.dart';
 
 class GalleryPage extends StatefulWidget {
   const GalleryPage({super.key});
@@ -11,12 +11,11 @@ class GalleryPage extends StatefulWidget {
 }
 
 class _GalleryPageState extends State<GalleryPage> {
-  final List<File> _images = []; // Liste des images sélectionnées
-  final List<TextEditingController> _nameControllers =
-      []; // Contrôleurs pour les noms des images
+  final List<File> _images = [];
+  final List<TextEditingController> _nameControllers = [];
   final ImagePicker _picker = ImagePicker();
-  final TextEditingController _searchController =
-      TextEditingController(); // Contrôleur pour la barre de recherche
+  final TextEditingController _searchController = TextEditingController();
+  File? selectedImage; // Variable pour stocker l'image sélectionnée
 
   @override
   void initState() {
@@ -39,8 +38,7 @@ class _GalleryPageState extends State<GalleryPage> {
     if (pickedFiles != null) {
       for (var file in pickedFiles) {
         final imagePath = file.path;
-        await SqlDb()
-            .insertImage(imagePath, ''); // Ajouter l'image sans nom initial
+        await SqlDb().insertImage(imagePath, '');
       }
       setState(() {
         _images.addAll(pickedFiles.map((file) => File(file.path)));
@@ -52,12 +50,10 @@ class _GalleryPageState extends State<GalleryPage> {
   }
 
   Future<void> _pickFromCamera() async {
-    final XFile? pickedFile =
-        await _picker.pickImage(source: ImageSource.camera);
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.camera);
     if (pickedFile != null) {
       final imagePath = pickedFile.path;
-      await SqlDb()
-          .insertImage(imagePath, ''); // Ajouter l'image sans nom initial
+      await SqlDb().insertImage(imagePath, '');
       setState(() {
         _images.add(File(pickedFile.path));
         _nameControllers.add(TextEditingController());
@@ -69,37 +65,29 @@ class _GalleryPageState extends State<GalleryPage> {
     final imagePath = _images[index].path;
     final imageName = _nameControllers[index].text;
 
-    // Récupérer l'ID de l'image à partir de la base de données
     final imagesFromDb = await SqlDb().getGalleryImages();
     final imageToUpdate =
         imagesFromDb.firstWhere((image) => image['image_path'] == imagePath);
 
-    // Mettre à jour le nom de l'image dans la base de données
     await SqlDb().updateImageName(imageToUpdate['id'], imageName);
   }
 
   void _removeImage(int index) async {
     final imagePath = _images[index].path;
 
-    // Afficher une boîte de dialogue de confirmation
     bool confirmDelete = await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Confirmer la suppression"),
-          content:
-              const Text("Êtes-vous sûr de vouloir supprimer cette image ?"),
+          content: const Text("Êtes-vous sûr de vouloir supprimer cette image ?"),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false); // Retourne false pour annuler
-              },
+              onPressed: () => Navigator.pop(context, false),
               child: const Text("Annuler"),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(true); // Retourne true pour confirmer
-              },
+              onPressed: () => Navigator.pop(context, true),
               child: const Text("Supprimer"),
             ),
           ],
@@ -107,21 +95,18 @@ class _GalleryPageState extends State<GalleryPage> {
       },
     );
 
-    // Si l'utilisateur confirme la suppression
     if (confirmDelete == true) {
       final imagesFromDb = await SqlDb().getGalleryImages();
       final imageToDelete =
           imagesFromDb.firstWhere((image) => image['image_path'] == imagePath);
 
-      await SqlDb().deleteImage(
-          imageToDelete['id']); // Supprimer l'image de la base de données
+      await SqlDb().deleteImage(imageToDelete['id']);
 
       setState(() {
-        _images.removeAt(index); // Supprimer l'image de la liste
-        _nameControllers.removeAt(index); // Supprimer le contrôleur associé
+        _images.removeAt(index);
+        _nameControllers.removeAt(index);
       });
 
-      // Optionnel : Afficher un message de succès
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Image supprimée avec succès")),
       );
@@ -129,18 +114,14 @@ class _GalleryPageState extends State<GalleryPage> {
   }
 
   void _selectImages() async {
-    // Sauvegarder tous les noms des images avant de naviguer
-    for (int i = 0; i < _images.length; i++) {
-      await _saveImageName(i);
+    if (selectedImage != null) {
+      // Retourner l'image sélectionnée à AddCategory
+      Navigator.pop(context, selectedImage);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez sélectionner une image")),
+      );
     }
-
-    // Afficher un message de succès une seule fois
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Noms des images mis à jour")),
-    );
-
-    // Naviguer vers la page précédente
-    Navigator.pop(context, _images);
   }
 
   Future<void> _searchImagesByName(String name) async {
@@ -164,12 +145,11 @@ class _GalleryPageState extends State<GalleryPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.check),
-            onPressed: _selectImages, // Valider la sélection
+            onPressed: _selectImages,
           )
         ],
       ),
       body: SingleChildScrollView(
-        // Ajout d'un SingleChildScrollView pour permettre le défilement
         child: Column(
           children: [
             Padding(
@@ -181,7 +161,7 @@ class _GalleryPageState extends State<GalleryPage> {
                   suffixIcon: Icon(Icons.search),
                 ),
                 onChanged: (value) {
-                  _searchImagesByName(value); // Rechercher des images par nom
+                  _searchImagesByName(value);
                 },
               ),
             ),
@@ -202,70 +182,78 @@ class _GalleryPageState extends State<GalleryPage> {
             _images.isEmpty
                 ? const Center(child: Text("Aucune image sélectionnée"))
                 : GridView.builder(
-                    shrinkWrap:
-                        true, // Permet au GridView de s'adapter à son contenu
-                    physics:
-                        const NeverScrollableScrollPhysics(), // Désactive le défilement du GridView
-                    padding: const EdgeInsets.all(5), // Réduire l'espacement
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(5),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          3, // 3 images par ligne (ajustez selon vos besoins)
-                      crossAxisSpacing: 2, // Espacement horizontal réduit
-                      mainAxisSpacing: 2, // Espacement vertical réduit
-                      childAspectRatio: 1, // Ratio carré pour les images
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 2,
+                      mainAxisSpacing: 2,
+                      childAspectRatio: 1,
                     ),
                     itemCount: _images.length,
                     itemBuilder: (context, index) {
-                      return Column(
-                        children: [
-                          Container(
-                            height: 120, // Réduire la hauteur de l'image
-                            width: 120, // Réduire la largeur de l'image
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(5),
-                              image: DecorationImage(
-                                image: FileImage(_images[index]),
-                                fit: BoxFit
-                                    .cover, // Ajuster l'image pour couvrir l'espace
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedImage = _images[index]; // Sélectionner l'image
+                          });
+                        },
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 120,
+                              width: 120,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: selectedImage == _images[index]
+                                      ? Colors.blue // Bordure bleue si sélectionnée
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                                image: DecorationImage(
+                                  image: FileImage(_images[index]),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
-                            ),
-                            child: Stack(
-                              children: [
-                                Positioned(
-                                  top: 2,
-                                  right: 2,
-                                  child: GestureDetector(
-                                    onTap: () => _removeImage(index),
-                                    child: const CircleAvatar(
-                                      backgroundColor: Colors.red,
-                                      radius: 10,
-                                      child: Icon(Icons.close,
-                                          size: 14, color: Colors.white),
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: GestureDetector(
+                                      onTap: () => _removeImage(index),
+                                      child: const CircleAvatar(
+                                        backgroundColor: Colors.red,
+                                        radius: 10,
+                                        child: Icon(Icons.close,
+                                            size: 14, color: Colors.white),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: 120,
-                            child: TextField(
-                              controller: _nameControllers[index],
-                              decoration: const InputDecoration(
-                                hintText: 'Nom',
-                                border: OutlineInputBorder(),
-                                contentPadding:
-                                    EdgeInsets.symmetric(horizontal: 5),
+                                ],
                               ),
-                              onSubmitted: (value) {
-                                _saveImageName(
-                                    index); // Sauvegarder le nom lors de la soumission
-                              },
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: 120,
+                              child: TextField(
+                                controller: _nameControllers[index],
+                                decoration: const InputDecoration(
+                                  hintText: 'Nom',
+                                  border: OutlineInputBorder(),
+                                  contentPadding:
+                                      EdgeInsets.symmetric(horizontal: 5),
+                                ),
+                                onSubmitted: (value) {
+                                  _saveImageName(index);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),

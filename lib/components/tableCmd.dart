@@ -18,7 +18,7 @@ class TableCmd extends StatefulWidget {
   final RefreshCallback onAddProduct;
   final VoidCallback onSearchProduct;
   final double globalDiscount;
-  final bool isPercentageDiscount; // Nouveau paramètre pour le type de remise globale
+  final bool isPercentageDiscount;
 
   final Function(int) onQuantityChange;
   final double Function(List<Product>, List<int>, List<double>, List<bool>,
@@ -42,7 +42,7 @@ class TableCmd extends StatefulWidget {
     required this.calculateTotal,
     required this.onFetchOrders,
     required this.onPlaceOrder,
-    required this.isPercentageDiscount, // Ajoutez ce paramètre
+    required this.isPercentageDiscount,
   });
 
   @override
@@ -83,7 +83,7 @@ class _TableCmdState extends State<TableCmd> {
   }
 
   void handleBarcodeScan(String barcodeScanRes) async {
-    print("Code scanné : $barcodeScanRes");
+    print("Code scanné ou saisi : $barcodeScanRes");
 
     if (barcodeScanRes.isEmpty) return;
 
@@ -98,8 +98,8 @@ class _TableCmdState extends State<TableCmd> {
         } else {
           widget.selectedProducts.add(scannedProduct);
           widget.quantityProducts.add(1);
-          widget.discounts.add(0.0); // Ajouter une remise par défaut
-          widget.typeDiscounts.add(true); // Par défaut, la remise est en pourcentage
+          widget.discounts.add(0.0);
+          widget.typeDiscounts.add(true);
         }
       });
     } else {
@@ -108,6 +108,17 @@ class _TableCmdState extends State<TableCmd> {
       );
     }
     barcodeController.clear();
+  }
+
+  void _handleManualBarcodeInput() {
+    final manualBarcode = barcodeController.text.trim();
+    if (manualBarcode.isNotEmpty) {
+      handleBarcodeScan(manualBarcode);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez saisir un code-barres !")),
+      );
+    }
   }
 
   @override
@@ -174,13 +185,26 @@ class _TableCmdState extends State<TableCmd> {
               const SizedBox(height: 15),
 
               // Champ de saisie pour le code-barres
-              TextField(
-                controller: barcodeController,
-                focusNode: barcodeFocusNode,
-                decoration: const InputDecoration(
-                  labelText: "Scanner Code-Barres",
-                  border: InputBorder.none,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: barcodeController,
+                      focusNode: barcodeFocusNode,
+                      decoration: const InputDecoration(
+                        labelText: "Scanner ou saisir Code-Barres",
+                        border: InputBorder.none,
+                      ),
+                      onSubmitted: (value) {
+                        _handleManualBarcodeInput();
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.check, color: Colors.green),
+                    onPressed: _handleManualBarcodeInput,
+                  ),
+                ],
               ),
 
               const SizedBox(height: 10),
@@ -206,22 +230,22 @@ class _TableCmdState extends State<TableCmd> {
                         children: [
                           Expanded(
                               child: Text('Code',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                           Expanded(
                               child: Text('Désignation',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                           Expanded(
                               child: Text('Quantité',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                           Expanded(
                               child: Text('Remise',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                           Expanded(
                               child: Text('Prix U',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                           Expanded(
                               child: Text('Montant',
-                                  style: TextStyle(color: Colors.white))),
+                                  style: TextStyle(color: Colors.white,fontSize: 15))),
                         ],
                       ),
                     ),
