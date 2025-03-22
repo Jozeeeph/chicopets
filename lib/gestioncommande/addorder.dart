@@ -40,15 +40,26 @@ class Addorder {
     }
 
     String cleanInput(String input) {
+      // Supprime tous les caractères non numériques sauf '.'
       input = input.replaceAll(RegExp(r'[^0-9.]'), '');
+
+      // Évite d'avoir plusieurs points décimaux
       List<String> parts = input.split('.');
       if (parts.length > 2) {
         input = parts[0] + '.' + parts.sublist(1).join('');
       }
-      double? value = double.tryParse(input);
-      if (value != null && value < 0) {
-        return 'NEGATIVE';
+
+      // Empêche l'entrée de '.' seul au début
+      if (input.startsWith('.')) {
+        input = '0$input';
       }
+
+      // Vérifie si la valeur est négative
+      double? value = double.tryParse(input);
+      if (value == null)
+        return ''; // Retourne une chaîne vide pour éviter les erreurs
+      if (value < 0) return 'NEGATIVE';
+
       return input;
     }
 
@@ -84,7 +95,10 @@ class Addorder {
             void updateTotalAndChange() {
               setState(() {
                 totalBeforeDiscount = calculateTotalBeforeDiscount(
-                    selectedProducts, quantityProducts, discounts, typeDiscounts);
+                    selectedProducts,
+                    quantityProducts,
+                    discounts,
+                    typeDiscounts);
                 total = calculateTotal(
                     selectedProducts,
                     quantityProducts,
@@ -475,41 +489,55 @@ class Addorder {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         TextField(
-                          controller: amountGivenController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: "Donnée (DT)",
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              String cleanedValue = cleanInput(value);
-                              if (cleanedValue == 'NEGATIVE') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      "Veuillez entrer un nombre positif.",
-                                      style: TextStyle(color: Colors.white),
+                            controller: amountGivenController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Donnée (Exp:12.50 DT)",
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                String cleanedValue = cleanInput(value);
+
+                                if (cleanedValue == 'NEGATIVE') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        "Veuillez entrer un nombre positif.",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.red,
                                     ),
-                                    backgroundColor: Colors.red,
-                                  ),
+                                  );
+                                  amountGivenController.text = '';
+                                  return;
+                                }
+
+                                if (cleanedValue == 'USE_DOT') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        "Utilisez un point (.) au lieu d'une virgule (,).",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                amountGivenController.text = cleanedValue;
+                                amountGivenController.selection =
+                                    TextSelection.fromPosition(
+                                  TextPosition(offset: cleanedValue.length),
                                 );
-                                amountGivenController.text = '';
-                                return;
-                              }
-                              amountGivenController.text = cleanedValue;
-                              amountGivenController.selection =
-                                  TextSelection.fromPosition(
-                                TextPosition(offset: cleanedValue.length),
-                              );
-                              amountGiven =
-                                  double.tryParse(cleanedValue) ?? 0.0;
-                              changeReturned = amountGiven - total;
-                              changeReturnedController.text =
-                                  changeReturned.toStringAsFixed(2);
-                            });
-                          },
-                        ),
+                                amountGiven =
+                                    double.tryParse(cleanedValue) ?? 0.0;
+                                changeReturned = amountGiven - total;
+                                changeReturnedController.text =
+                                    changeReturned.toStringAsFixed(2);
+                              });
+                            }),
                         SizedBox(height: 10),
                         TextField(
                           controller: changeReturnedController,
