@@ -298,7 +298,7 @@ class Getorderlist {
                                           flex: 1,
                                           child: Text(
                                             "x${orderLine.quantite}",
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                                 fontSize: 16,
                                                 color: Color(0xFF000000)),
                                           ),
@@ -307,7 +307,7 @@ class Getorderlist {
                                           flex: 2,
                                           child: Text(
                                             product.designation,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                                 fontSize: 16,
                                                 color: Color(0xFF000000)),
                                             overflow: TextOverflow.ellipsis,
@@ -315,22 +315,41 @@ class Getorderlist {
                                         ),
                                         Expanded(
                                           flex: 1,
-                                          child: Text(
-                                            "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                color: Color(0xFF000000)),
-                                            textAlign: TextAlign.center,
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                                style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: Color(0xFF000000)),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              if (orderLine.discount >
+                                                  0) // Show discount only if applicable
+                                                Text(
+                                                  orderLine.isPercentage
+                                                      ? "-${orderLine.discount.toStringAsFixed(2)}%" // Show percentage
+                                                      : "-${orderLine.discount.toStringAsFixed(2)} DT", // Show DT
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.red,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF000000)),
+                                            "${(orderLine.finalPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF000000),
+                                            ),
                                             textAlign: TextAlign.end,
                                           ),
                                         ),
