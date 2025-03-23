@@ -48,6 +48,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool isCategoryFormVisible = false;
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
+  bool hasExpirationDate = false; // Nouvelle variable d'état
 
   // Variables pour la gestion des variantes
   bool hasVariants = false;
@@ -77,14 +78,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
       double remiseValeurMax = (profit * remiseMax) / 100;
       remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
 
-
       if (![0.0, 7.0, 12.0, 19.0].contains(selectedTax)) {
         selectedTax =
             0.0; // Forcer une valeur valide si la taxe n'est pas valide
       }
       // Charger les sous-catégories de la catégorie sélectionnée
       _loadSubCategories(selectedCategoryId!);
-      
+
       profitController.text = profit.toStringAsFixed(2);
 
       // Récupérer les variantes du produit
@@ -325,6 +325,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             if (int.tryParse(value) == null) {
                               return 'Le "Code à Barre" doit être un nombre.';
                             }
+                            if (int.parse(value) < 0) {
+                              return 'Le "Code à Barre" doit être un nombre positif.';
+                            }
                             return null;
                           },
                         ),
@@ -464,34 +467,54 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         controller: priceTTCController,
                         label: 'Prix TTC',
                       ),
+                      const SizedBox(height: 16),
+
+                      CheckboxListTile(
+                        title: const Text(
+                            'Ce produit a-t-il une date d\'expiration ?'),
+                        value: hasExpirationDate,
+                        onChanged: (value) {
+                          setState(() {
+                            hasExpirationDate = value ?? false;
+                            if (!hasExpirationDate) {
+                              dateController
+                                  .clear(); // Effacer la date si le checkbox est désactivé
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
                       _buildTextFormField(
                         controller: dateController,
                         label: 'Date Expiration',
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Date Expiration" ne doit pas être vide.';
-                          }
-                          List<String> possibleFormats = [
-                            "dd-MM-yyyy",
-                            "MM-dd-yyyy",
-                            "yyyy-MM-dd",
-                            "dd/MM/yyyy",
-                            "MM/dd/yyyy"
-                          ];
-                          DateTime? date;
-                          for (String format in possibleFormats) {
-                            try {
-                              date = DateFormat(format).parseStrict(value);
-                              break;
-                            } catch (e) {
-                              continue;
+                          if (hasExpirationDate) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Date Expiration" ne doit pas être vide.';
                             }
-                          }
-                          if (date == null) {
-                            return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
-                          }
-                          if (!date.isAfter(DateTime.now())) {
-                            return 'La date doit être dans le futur.';
+                            List<String> possibleFormats = [
+                              "dd-MM-yyyy",
+                              "MM-dd-yyyy",
+                              "yyyy-MM-dd",
+                              "dd/MM/yyyy",
+                              "MM/dd/yyyy"
+                            ];
+                            DateTime? date;
+                            for (String format in possibleFormats) {
+                              try {
+                                date = DateFormat(format).parseStrict(value);
+                                break;
+                              } catch (e) {
+                                continue;
+                              }
+                            }
+                            if (date == null) {
+                              return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
+                            }
+                            if (!date.isAfter(DateTime.now())) {
+                              return 'La date doit être dans le futur.';
+                            }
                           }
                           return null;
                         },
@@ -530,7 +553,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   onChanged: (val) {
                                     setState(() {
                                       selectedCategoryId = val;
-                                      selectedSubCategoryId = null;
+                                      selectedSubCategoryId =
+                                          null; // Réinitialiser la sélection
                                       _loadSubCategories(val!);
                                     });
                                   },
@@ -565,9 +589,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               null, // Commencer avec les sous-catégories de premier niveau
                           onSelect: (subCategoryId) {
                             setState(() {
-                              selectedSubCategoryId = subCategoryId;
+                              selectedSubCategoryId =
+                                  subCategoryId; // Mettre à jour la sélection
                             });
                           },
+                          selectedSubCategoryId:
+                              selectedSubCategoryId, // Passer la sélection
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -827,14 +854,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
               prixHT: minPrixHT,
               taxe: selectedTax ?? 0.0,
               prixTTC: double.tryParse(priceTTCController.text) ?? 0.0,
-              dateExpiration: dateController.text,
+              dateExpiration: hasExpirationDate ? dateController.text : '',
               categoryId: selectedCategoryId!,
               subCategoryId: selectedSubCategoryId!,
               marge: double.tryParse(margeController.text) ?? 0.0,
               productReferenceId: productReferenceId, // Nouvel attribut
               variants: variants, // Liste des variantes
-              remiseMax:double.tryParse(remiseMaxController.text) ?? 0.0,
-              remiseValeurMax:double.tryParse(remiseValeurMaxController.text) ?? 0.0,
+              remiseMax: double.tryParse(remiseMaxController.text) ?? 0.0,
+              remiseValeurMax:
+                  double.tryParse(remiseValeurMaxController.text) ?? 0.0,
             );
 
             // Sauvegarder le produit
@@ -934,12 +962,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
 class SubCategoryTree extends StatelessWidget {
   final List<SubCategory> subCategories;
   final int? parentId;
-  final Function(int) onSelect;
+  final int? selectedSubCategoryId; // Nouvelle propriété
+  final Function(int) onSelect; // Fonction de rappel pour la sélection
 
   const SubCategoryTree({
     required this.subCategories,
     this.parentId,
     required this.onSelect,
+    this.selectedSubCategoryId, // Nouvelle propriété
   });
 
   @override
@@ -964,7 +994,10 @@ class SubCategoryTree extends StatelessWidget {
           children: [
             ListTile(
               title: Text(subCat.name),
-              onTap: () => onSelect(subCat.id!),
+              onTap: () => onSelect(subCat.id!), // Appeler onSelect avec l'ID
+              tileColor: selectedSubCategoryId == subCat.id
+                  ? Colors.blue[50] // Mettre en surbrillance si sélectionné
+                  : null,
             ),
             // Afficher les sous-catégories enfants de manière récursive
             Padding(
@@ -973,6 +1006,8 @@ class SubCategoryTree extends StatelessWidget {
                 subCategories: subCategories,
                 parentId: subCat.id,
                 onSelect: onSelect,
+                selectedSubCategoryId:
+                    selectedSubCategoryId, // Passer la sélection
               ),
             ),
           ],

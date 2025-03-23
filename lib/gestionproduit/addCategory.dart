@@ -143,38 +143,79 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   void addCategory() async {
-    if (nameController.text.isEmpty || selectedImage == null) {
-      _showMessage("Veuillez remplir tous les champs !");
-      return;
-    }
+  if (nameController.text.isEmpty || selectedImage == null) {
+    _showMessage("Veuillez remplir tous les champs !");
+    return;
+  }
 
-    // Add the category
-    int categoryId =
-        await sqldb.addCategory(nameController.text, selectedImage!.path);
-    if (categoryId > 0) {
-      // Add subcategories
-      for (var subCategory in subCategories) {
-        await sqldb.addSubCategory(
+  // Ajoute la catégorie
+  int categoryId = await sqldb.addCategory(nameController.text, selectedImage!.path);
+  if (categoryId > 0) {
+    // Trie les sous-catégories pour enregistrer les parents avant les enfants
+    List<SubCategory> sortedSubCategories = _sortSubCategoriesByParent(subCategories);
+
+    // Map pour stocker les ID temporaires et les ID réels des sous-catégories
+    Map<int, int> tempIdToRealId = {};
+
+    // Enregistre les sous-catégories parentes d'abord
+    for (var subCategory in sortedSubCategories) {
+      if (subCategory.parentId == null) {
+        int subCategoryId = await sqldb.addSubCategory(
           SubCategory(
             name: subCategory.name,
             parentId: subCategory.parentId,
             categoryId: categoryId,
           ),
         );
-      }
 
-      _showMessageSuccess(
-          "Catégorie et sous-catégories ajoutées avec succès !");
-      setState(() {
-        nameController.clear();
-        selectedImage = null;
-        subCategories.clear();
-        fetchCategories();
-      });
-    } else {
-      _showMessage("Échec de l'ajout de la catégorie !");
+        // Stocke l'ID réel de la sous-catégorie parente
+        tempIdToRealId[subCategory.id ?? -1] = subCategoryId;
+      }
+    }
+
+    // Enregistre les sous-catégories filles avec les parent_id corrects
+    for (var subCategory in sortedSubCategories) {
+      if (subCategory.parentId != null) {
+        int realParentId = tempIdToRealId[subCategory.parentId] ?? -1;
+        if (realParentId != -1) {
+          await sqldb.addSubCategory(
+            SubCategory(
+              name: subCategory.name,
+              parentId: realParentId,
+              categoryId: categoryId,
+            ),
+          );
+        }
+      }
+    }
+
+    _showMessageSuccess("Catégorie et sous-catégories ajoutées avec succès !");
+    setState(() {
+      nameController.clear();
+      selectedImage = null;
+      subCategories.clear();
+      fetchCategories();
+    });
+  } else {
+    _showMessage("Échec de l'ajout de la catégorie !");
+  }
+}
+
+List<SubCategory> _sortSubCategoriesByParent(List<SubCategory> subCategories) {
+  List<SubCategory> sortedSubCategories = [];
+  List<SubCategory> remainingSubCategories = List.from(subCategories);
+
+  while (remainingSubCategories.isNotEmpty) {
+    for (var subCategory in remainingSubCategories.toList()) {
+      if (subCategory.parentId == null || sortedSubCategories.any((subCat) => subCat.id == subCategory.parentId)) {
+        sortedSubCategories.add(subCategory);
+        remainingSubCategories.remove(subCategory);
+      }
     }
   }
+
+  return sortedSubCategories;
+}
 
   void updateCategory() async {
     if (nameController.text.isEmpty || selectedImage == null) {
