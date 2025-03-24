@@ -4,7 +4,7 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uuid/uuid.dart';
+import 'package:caissechicopets/product.dart';
 
 class ImportProductPage extends StatefulWidget {
   const ImportProductPage({super.key});
@@ -15,15 +15,11 @@ class ImportProductPage extends StatefulWidget {
 
 class _ImportProductPageState extends State<ImportProductPage> {
   final SqlDb _sqlDb = SqlDb();
-
-  // Variables d'état
-  String _importStatus = 'Prêt ?'; // État initial
-  int _importedProductsCount = 0; // Nombre de produits importés
-  String _errorMessage = ''; // Message d'erreur
-  bool _isImporting = false; // Indicateur d'importation en cours
-  double _progress = 0.0; // Progression de l'importation
-
-  // Fonction pour importer les produits
+  String _importStatus = 'Prêt à importer';
+  int _importedProductsCount = 0;
+  String _errorMessage = '';
+  bool _isImporting = false;
+  double _progress = 0.0;
   Future<void> importProducts() async {
     setState(() {
       _importStatus = 'Importation en cours...';
@@ -34,82 +30,88 @@ class _ImportProductPageState extends State<ImportProductPage> {
     });
 
     try {
-      // Sélection du fichier Excel
+
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
       );
 
-      if (result != null) {
+      if (result != null && result.files.isNotEmpty) {
         PlatformFile file = result.files.first;
         String? filePath = file.path;
 
-        var bytes = File(filePath!).readAsBytesSync();
+        if (filePath == null) {
+          throw Exception('Chemin du fichier non disponible');
+        }
+
+        var bytes = File(filePath).readAsBytesSync();
         var excel = Excel.decodeBytes(bytes);
 
-        // Calcul du nombre total de lignes à importer
-        int totalRows = excel.tables.values.fold(0, (sum, table) => sum + table.rows.length - 1);
-
-        // Parcours des tables et des lignes du fichier Excel
+        int totalRows = excel.tables.values.fold(
+            0, (sum, table) => sum + table.rows.length - 1);
         for (var table in excel.tables.keys) {
           var sheet = excel.tables[table]!;
+          
+          // Vérifier que le fichier a le bon format
+          if (sheet.rows.isEmpty || sheet.rows.first.length < 9) {
+            throw Exception('Format de fichier incorrect. Vérifiez les colonnes.');
+          }
 
           for (var row in sheet.rows) {
-            if (row == sheet.rows.first) continue; // Ignorer la première ligne (en-têtes)
+            if (row == sheet.rows.first) continue;
 
-            // Arrêter l'importation si l'utilisateur a interrompu
             if (!_isImporting) break;
 
-            // Extraction des données de la ligne
-            String code = row[0]?.value.toString() ?? '';
-            String designation = row[1]?.value.toString() ?? '';
-            int stock = int.tryParse(row[2]?.value.toString() ?? '0') ?? 0;
-            double prixHT = double.tryParse(row[3]?.value.toString() ?? '0.0') ?? 0.0;
-            double taxe = double.tryParse(row[4]?.value.toString() ?? '0.0') ?? 0.0;
-            double prixTTC = double.tryParse(row[5]?.value.toString() ?? '0.0') ?? 0.0;
-            String dateExpiration = row[6]?.value.toString() ?? '';
-            String categoryName = row[7]?.value.toString() ?? '';
-            String subCategoryName = row[8]?.value.toString() ?? '';
-            String categoryImagePath = row[9]?.value.toString() ?? 'assets/images/default.jpg';
+            try {
+              String code = row[0]?.value?.toString() ?? '';
+              String designation = row[1]?.value?.toString() ?? '';
+              int stock = int.tryParse(row[2]?.value?.toString() ?? '0') ?? 0;
+              double prixHT = double.tryParse(row[3]?.value?.toString() ?? '0') ?? 0.0;
+              double taxe = double.tryParse(row[4]?.value?.toString() ?? '0') ?? 0.0;
+              double prixTTC = double.tryParse(row[5]?.value?.toString() ?? '0') ?? 0.0;
+              String dateExpiration = row[6]?.value?.toString() ?? '';
+              String categoryName = row[7]?.value?.toString() ?? '';
+              String subCategoryName = row[8]?.value?.toString() ?? '';
 
-            // Gestion des catégories et sous-catégories
-            int categoryId = await _getOrCreateCategoryIdByName(categoryName, categoryImagePath);
-            int subCategoryId = await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
+              // Validation des données obligatoires
+              if (code.isEmpty || designation.isEmpty) {
+                throw Exception('Code et désignation sont obligatoires');
+              }
 
-            // Génération d'un ID unique pour le produit
-            String generateProductReferenceId() {
-              var uuid = Uuid();
-              return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
+              int categoryId = await _getOrCreateCategoryIdByName(categoryName);
+              int subCategoryId = await _getOrCreateSubCategoryIdByName(
+                  subCategoryName, categoryId);
+
+              // Création de l'objet Product
+              final product = Product(
+                code: code,
+                designation: designation,
+                stock: stock,
+                prixHT: prixHT,
+                taxe: taxe,
+                prixTTC: prixTTC,
+                dateExpiration: dateExpiration,
+                categoryId: categoryId,
+                subCategoryId: subCategoryId,
+                marge: prixTTC - prixHT,
+                remiseMax: 0.0,
+                remiseValeurMax: 0.0,
+              );
+
+              // Insertion du produit
+              await _sqlDb.addProduct(product);
+
+              setState(() {
+                _importedProductsCount++;
+                _progress = _importedProductsCount / totalRows;
+              });
+            } catch (e) {
+              debugPrint('Erreur lors du traitement de la ligne: $e');
+              continue; // Passe à la ligne suivante en cas d'erreur
             }
-
-            final productReferenceId = generateProductReferenceId();
-
-            // Ajout du produit à la base de données
-            await _sqlDb.addProduct(
-              code,
-              designation,
-              stock,
-              prixHT,
-              taxe,
-              prixTTC,
-              dateExpiration,
-              categoryId,
-              subCategoryId,
-              prixTTC - prixHT,
-              productReferenceId,
-              0.0,
-              0
-            );
-
-            // Mise à jour de la progression
-            setState(() {
-              _importedProductsCount++;
-              _progress = _importedProductsCount / totalRows;
-            });
           }
         }
 
-        // Si l'importation est terminée avec succès
         if (_isImporting) {
           setState(() {
             _importStatus = 'Importation réussie!';
@@ -117,12 +119,15 @@ class _ImportProductPageState extends State<ImportProductPage> {
           });
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Importation réussie!')),
+            SnackBar(
+              content: Text('$_importedProductsCount produits importés avec succès'),
+              duration: const Duration(seconds: 3),
+            ),
           );
         }
       }
-    } catch (e) {
-      // Gestion des erreurs
+    } 
+    catch (e) {
       setState(() {
         _importStatus = 'Erreur lors de l\'importation';
         _errorMessage = e.toString();
@@ -130,13 +135,15 @@ class _ImportProductPageState extends State<ImportProductPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l\'importation: $e')),
+        SnackBar(
+          content: Text('Erreur: $_errorMessage'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  // Fonction pour obtenir ou créer une catégorie par son nom
-  Future<int> _getOrCreateCategoryIdByName(String categoryName, String categoryImagePath) async {
+  Future<int> _getOrCreateCategoryIdByName(String categoryName) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'categories',
@@ -145,18 +152,18 @@ class _ImportProductPageState extends State<ImportProductPage> {
     );
 
     if (result.isNotEmpty) {
-      return result.first['id_category'];
+      return result.first['id_category'] as int;
     } else {
-      int newCategoryId = await dbClient.insert(
+      return await dbClient.insert(
         'categories',
-        {'category_name': categoryName, 'image_path': categoryImagePath},
+        {'category_name': categoryName},
       );
-      return newCategoryId;
+
     }
   }
 
-  // Fonction pour obtenir ou créer une sous-catégorie par son nom
-  Future<int> _getOrCreateSubCategoryIdByName(String subCategoryName, int categoryId) async {
+  Future<int> _getOrCreateSubCategoryIdByName(
+      String subCategoryName, int categoryId) async {
     final dbClient = await _sqlDb.db;
     List<Map<String, dynamic>> result = await dbClient.query(
       'sub_categories',
@@ -165,17 +172,19 @@ class _ImportProductPageState extends State<ImportProductPage> {
     );
 
     if (result.isNotEmpty) {
-      return result.first['id_sub_category'];
+      return result.first['id_sub_category'] as int;
     } else {
-      int newSubCategoryId = await dbClient.insert(
+      return await dbClient.insert(
         'sub_categories',
-        {'sub_category_name': subCategoryName, 'category_id': categoryId},
+        {
+          'sub_category_name': subCategoryName,
+          'category_id': categoryId,
+        },
       );
-      return newSubCategoryId;
+
     }
   }
-
-  // Fonction pour confirmer l'interruption de l'importation
+  
   void _confirmCancelImport() {
     showDialog(
       context: context,
@@ -185,16 +194,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
           content: const Text('Êtes-vous sûr de vouloir interrompre l\'importation ?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Non'),
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  _isImporting = false;
-                });
+                setState(() => _isImporting = false);
                 Navigator.of(context).pop();
               },
               child: const Text('Oui'),
@@ -209,12 +214,9 @@ class _ImportProductPageState extends State<ImportProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text('Importer des produits'),
         backgroundColor: const Color(0xFF0056A6),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('Importer des produits', style: TextStyle(color: Colors.white)),
+
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -225,90 +227,109 @@ class _ImportProductPageState extends State<ImportProductPage> {
           ),
         ),
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Bouton pour importer un fichier Excel
-              ElevatedButton.icon(
-                onPressed: _isImporting ? null : importProducts,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  backgroundColor: const Color(0xFFFF9800),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Card(
                   elevation: 5,
-                ),
-                icon: const Icon(Icons.upload_file, color: Colors.white),
-                label: Text(
-                  'Importer un fichier Excel',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.upload_file, size: 50, color: Colors.blue),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Importer des produits depuis Excel',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Format attendu: Code, Désignation, Stock, Prix HT, Taxe, Prix TTC, Date Expiration, Catégorie, Sous-catégorie',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: _isImporting ? null : importProducts,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF009688),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 30, vertical: 15),
+                          ),
+                          child: Text(
+                            _isImporting ? 'Importation en cours...' : 'Sélectionner un fichier',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Affichage de la progression
-              if (_isImporting)
-                Column(
-                  children: [
-                    LinearProgressIndicator(
-                      value: _progress,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                const SizedBox(height: 30),
+                if (_isImporting) ...[
+                  LinearProgressIndicator(
+                    value: _progress,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${(_progress * 100).toStringAsFixed(1)}% complété',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '${(_progress * 100).toStringAsFixed(0)}%',
+                  ),
+                  Text(
+                    '$_importedProductsCount produits importés',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: _confirmCancelImport,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                    child: const Text('Annuler l\'importation'),
+                  ),
+                ],
+                if (_errorMessage.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: Text(
+                      _errorMessage,
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.white,
+                        color: Colors.red,
+                        fontSize: 14,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _confirmCancelImport,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Interrompre l\'importation'),
-                    ),
-                  ],
-                ),
-
-              // Affichage du statut de l'importation
-              Text(
-                _importStatus,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
-              ),
-
-              // Affichage du nombre de produits importés
-              if (_importedProductsCount > 0)
+                  ),
                 Text(
-                  'Produits importés: $_importedProductsCount',
+                  _importStatus,
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
                     color: Colors.white,
-                  ),
-                ),
-
-              // Affichage des erreurs
-              if (_errorMessage.isNotEmpty)
-                Text(
-                  'Erreur: $_errorMessage',
-                  style: GoogleFonts.poppins(
                     fontSize: 16,
-                    color: Colors.red,
+
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

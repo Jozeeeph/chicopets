@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
-import 'package:uuid/uuid.dart';
+import 'package:caissechicopets/product.dart';
 
 class Addprod {
   static void showAddProductPopup(BuildContext context, Function refreshData) {
@@ -16,7 +16,8 @@ class Addprod {
     final TextEditingController dateController = TextEditingController();
     final TextEditingController margeController = TextEditingController();
     final TextEditingController remiseMaxController = TextEditingController();
-    final TextEditingController remiseValeurMaxController =TextEditingController();
+    final TextEditingController remiseValeurMaxController =
+        TextEditingController();
 
     final SqlDb sqldb = SqlDb();
 
@@ -33,7 +34,6 @@ class Addprod {
         double prixTTC = prixHT + (prixHT * taxe / 100);
         priceTTCController.text = prixTTC.toStringAsFixed(2);
 
-        // Calculate marge automatically
         double marge = prixTTC - prixHT;
         margeController.text = marge.toStringAsFixed(2);
       } else {
@@ -54,13 +54,13 @@ class Addprod {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              backgroundColor: Colors.white, // White background for clarity
-              title: const Text(
+              backgroundColor: Colors.white,
+              title: Text(
                 'Ajouter un Produit',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056A6), // Deep Blue for title
+                  color: Color(0xFF0056A6),
                 ),
               ),
               content: SizedBox(
@@ -85,47 +85,155 @@ class Addprod {
                             return null;
                           },
                         ),
+                        _buildTextFormField(
+                          controller: designationController,
+                          label: 'Désignation',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Désignation" ne doit pas être vide.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: stockController,
+                          label: 'Stock',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Stock" ne doit pas être vide.';
+                            }
+                            if (int.tryParse(value) == null ||
+                                int.parse(value) < 0) {
+                              return 'Le stock doit être un nombre entier positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: priceHTController,
+                          label: 'Prix HT',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Prix HT" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null ||
+                                double.parse(value) <= 0) {
+                              return 'Le prix doit être un nombre positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: taxController,
+                          label: 'Taxe (%)',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Taxe" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null ||
+                                double.parse(value) < 0) {
+                              return 'La taxe doit être un nombre positif.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: priceTTCController,
+                          label: 'Prix TTC',
+                          keyboardType: TextInputType.number,
+                          enabled: false,
+                        ),
+                        _buildTextFormField(
+                          controller: margeController,
+                          label: 'Marge',
+                          keyboardType: TextInputType.number,
+                          enabled: false,
+                        ),
+                        _buildTextFormField(
+                          controller: remiseMaxController,
+                          label: 'Remise Max (%)',
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Le champ "Remise Max" ne doit pas être vide.';
+                            }
+                            if (double.tryParse(value) == null ||
+                                double.parse(value) < 0 ||
+                                double.parse(value) > 100) {
+                              return 'La remise doit être entre 0 et 100%.';
+                            }
+                            return null;
+                          },
+                        ),
+                        _buildTextFormField(
+                          controller: remiseValeurMaxController,
+                          label: 'Valeur Remise Max',
+                          keyboardType: TextInputType.number,
+                          enabled: false,
+                        ),
+                        _buildTextFormField(
+                          controller: dateController,
+                          label: 'Date d\'expiration',
+                        ),
                         FutureBuilder<List<Category>>(
-                          future: sqldb.getCategories(),
+                          future: sqldb
+                              .getCategories(), // This dynamically calls the method
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return const CircularProgressIndicator(
-                                color:
-                                    Color(0xFF0056A6), // Deep Blue for loader
+                                color: Color(0xFF0056A6),
                               );
                             }
 
-                            categories = snapshot.data!;
+                            categories = snapshot
+                                .data!; // Categories fetched from the database
                             return DropdownButtonFormField<int>(
                               decoration: _inputDecoration('Catégorie'),
                               value: selectedCategoryId,
                               items: categories.map((category) {
                                 return DropdownMenuItem<int>(
-                                    value: category.id,
-                                    child: Text(
-                                      category.name,
-                                      style: const TextStyle(
-                                          color: Color(
-                                              0xFF0056A6)), // Deep Blue text
-                                    ));
+                                  value: category.id,
+                                  child: Text(
+                                    category.name,
+                                    style: const TextStyle(
+                                        color: Color(0xFF0056A6)),
+                                  ),
+                                );
                               }).toList(),
                               onChanged: (val) {
                                 setState(() {
                                   selectedCategoryId = val;
                                   selectedSubCategoryId = null;
-                                  subCategoryItems = categories
-                                      .firstWhere((cat) => cat.id == val)
-                                      .subCategories
-                                      .map((subCat) => DropdownMenuItem<int>(
+
+                                  // Find the category matching the selected value
+                                  var selectedCategory = categories.firstWhere(
+                                    (cat) => cat.id == val,
+                                    orElse: () => Category(
+                                      id: -1,
+                                      name: 'Unknown',
+                                      imagePath: '',
+                                      subCategories: [],
+                                    ),
+                                  );
+
+                                  // If the category is found, update subCategories
+                                  subCategoryItems = selectedCategory
+                                          .subCategories.isNotEmpty
+                                      ? selectedCategory.subCategories
+                                          .map((subCat) {
+                                          return DropdownMenuItem<int>(
                                             value: subCat.id,
                                             child: Text(
                                               subCat.name,
                                               style: const TextStyle(
-                                                  color: Color(
-                                                      0xFF0056A6)), // Deep Blue text
+                                                  color: Color(0xFF0056A6)),
                                             ),
-                                          ))
-                                      .toList();
+                                          );
+                                        }).toList()
+                                      : []; // If no subCategories, return an empty list
                                 });
                               },
                               validator: (value) => value == null
@@ -155,12 +263,11 @@ class Addprod {
                           children: [
                             const Text(
                               "Ajouter une catégorie:",
-                              style: TextStyle(
-                                  color: Color(0xFF0056A6)), // Deep Blue text
+                              style: TextStyle(color: Color(0xFF0056A6)),
                             ),
                             IconButton(
                               icon: const Icon(Icons.add,
-                                  color: Color(0xFF26A9E0)), // Sky Blue icon
+                                  color: Color(0xFF26A9E0)),
                               onPressed: () {
                                 setState(() {
                                   isCategoryFormVisible =
@@ -170,7 +277,7 @@ class Addprod {
                             ),
                           ],
                         ),
-                        if (isCategoryFormVisible) AddCategory(),
+                        if (isCategoryFormVisible) const AddCategory(),
                       ],
                     ),
                   ),
@@ -178,67 +285,56 @@ class Addprod {
               ),
               actions: [
                 ElevatedButton(
-                  style: _buttonStyle(
-                      const Color(0xFF009688)), // Teal Green for success
+                  style: _buttonStyle(Color(0xFF009688)),
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
-                      if (selectedSubCategoryId == null) {
+                      if (selectedCategoryId == null ||
+                          selectedSubCategoryId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                                "Veuillez sélectionner une sous-catégorie"),
-                            backgroundColor:
-                                Color(0xFFE53935), // Warm Red for error
-                          ),
+                              content: Text(
+                                  "Veuillez sélectionner une catégorie et sous-catégorie"),
+                              backgroundColor: Color(0xFFE53935)),
                         );
                         return;
                       }
-                      
-                      String generateProductReferenceId() {
-                        var uuid = Uuid();
-                        return uuid.v4(); // Generates a unique ID
-                      }
 
-// Dans la méthode de sauvegarde du produit
-                      final productReferenceId = generateProductReferenceId();
-                      print("reference produit $productReferenceId");
+                      final newProduct = Product(
+                        code: codeController.text,
+                        designation: designationController.text,
+                        stock: int.tryParse(stockController.text) ?? 0,
+                        prixHT: double.tryParse(priceHTController.text) ?? 0.0,
+                        taxe: double.tryParse(taxController.text) ?? 0.0,
+                        prixTTC:
+                            double.tryParse(priceTTCController.text) ?? 0.0,
+                        dateExpiration: dateController.text,
+                        categoryId: selectedCategoryId!,
+                        subCategoryId: selectedSubCategoryId!,
+                        marge: double.tryParse(margeController.text) ?? 0.0,
+                        remiseMax:
+                            double.tryParse(remiseMaxController.text) ?? 0.0,
+                        remiseValeurMax:
+                            double.tryParse(remiseValeurMaxController.text) ??
+                                0.0,
+                      );
 
-                      await sqldb.addProduct(
-                          codeController.text,
-                          designationController.text,
-                          int.tryParse(stockController.text) ?? 0,
-                          double.tryParse(priceHTController.text) ?? 0.0,
-                          double.tryParse(taxController.text) ?? 0.0,
-                          double.tryParse(priceTTCController.text) ?? 0.0,
-                          dateController.text,
-                          selectedCategoryId!,
-                          selectedSubCategoryId!,
-                          double.tryParse(margeController.text) ?? 0.0,
-                          productReferenceId,
-                          0.0,
-                          0
-                          );
+                      final productId = await sqldb.addProduct(newProduct);
+                      print('Nouveau produit créé avec ID: $productId');
+
                       refreshData();
                       Navigator.of(context).pop();
                     }
                   },
-                  child: const Text(
-                    'Ajouter',
-                    style: TextStyle(
-                        color: Colors.white), // White text for contrast
-                  ),
+                  child: const Text('Ajouter',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 ElevatedButton(
-                  style: _buttonStyle(
-                      const Color(0xFFE53935)), // Warm Red for cancel
+                  style: _buttonStyle(Color(0xFFE53935)),
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: const Text(
-                    'Annuler',
-                    style: TextStyle(
-                        color: Colors.white), // White text for contrast
-                  ),
+                  child: const Text('Annuler',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -251,28 +347,20 @@ class Addprod {
   static InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle:
-          const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
+      labelStyle: const TextStyle(color: Color(0xFF0056A6)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+        borderSide: const BorderSide(color: Color(0xFF26A9E0)),
       ),
     );
   }
 
-  static ButtonStyle _buttonStyle(Color color) {
+  static ButtonStyle _buttonStyle(Color backgroundColor) {
     return ElevatedButton.styleFrom(
-      backgroundColor: color,
+      backgroundColor: backgroundColor,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(15),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     );
   }
 
@@ -280,21 +368,15 @@ class Addprod {
     required TextEditingController controller,
     required String label,
     TextInputType keyboardType = TextInputType.text,
+    FormFieldValidator<String>? validator,
     bool enabled = true,
-    String? Function(String?)? validator,
-    ValueChanged<String>? onChanged,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextFormField(
-        controller: controller,
-        decoration: _inputDecoration(label),
-        keyboardType: keyboardType,
-        enabled: enabled,
-        validator: validator,
-        onChanged: onChanged,
-        style: const TextStyle(color: Color(0xFF0056A6)), // Deep Blue text
-      ),
+    return TextFormField(
+      controller: controller,
+      decoration: _inputDecoration(label),
+      keyboardType: keyboardType,
+      enabled: enabled,
+      validator: validator,
     );
   }
 }

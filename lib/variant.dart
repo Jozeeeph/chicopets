@@ -1,45 +1,49 @@
 class Variant {
+  int id; // Nouvel ID auto-incrémenté
   String code;
-  String combinationName; // Nom de la combinaison (ex: "Small-Red")
-  double price; // Prix de base
-  double priceImpact; // Prix d'impact (positif ou négatif)
-  double finalPrice; // Prix total après application du prix d'impact
+  String combinationName;
+  double price;
+  double priceImpact;
+  double finalPrice;
   int stock;
-  Map<String, String> attributes; // Attributs de la variante (ex: {"size": "small", "color": "red"})
-  String productReferenceId; // Nouvel attribut (clé étrangère)
+  Map<String, String> attributes;
+  int productId; // Maintenant un int pour référencer l'ID du produit
 
   Variant({
+    this.id = 0,
     required this.code,
     required this.combinationName,
     required this.price,
     required this.priceImpact,
     required this.stock,
     required this.attributes,
-    required this.productReferenceId, // Nouvel attribut
-  }) : finalPrice = price + priceImpact; // Calcul du prix total
+    required this.productId,
+  }) : finalPrice = price + priceImpact;
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'code': code,
       'combination_name': combinationName,
       'price': price,
       'price_impact': priceImpact,
       'final_price': finalPrice,
       'stock': stock,
-      'attributes': attributes.toString(), // Convertir Map en String pour la base de données
-      'product_reference_id': productReferenceId, // Nouvel attribut
+      'attributes': attributes.toString(),
+      'product_id': productId, // Changé de product_reference_id à product_id
     };
   }
 
   factory Variant.fromMap(Map<String, dynamic> map) {
     return Variant(
+      id: map['id'] ?? 0,
       code: map['code'],
       combinationName: map['combination_name'],
       price: map['price'],
       priceImpact: map['price_impact'] ?? 0.0,
       stock: map['stock'],
-      attributes: _parseAttributes(map['attributes']), // Convertir String en Map
-      productReferenceId: map['product_reference_id'], // Nouvel attribut
+      attributes: _parseAttributes(map['attributes']),
+      productId: map['product_id'], // Changé ici aussi
     );
   }
 

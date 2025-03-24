@@ -142,25 +142,48 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // Méthode pour charger les variantes
   void _loadVariants() async {
-    if (widget.product != null) {
-      final variantsFromDb = await sqldb
-          .getVariantsByProductReferenceId(widget.product!.productReferenceId);
-      setState(() {
-        variants = variantsFromDb;
-        hasVariants = variants.isNotEmpty;
-        if (hasVariants) {
-          // Récupérer les attributs des variantes
-          for (var variant in variants) {
-            for (var entry in variant.attributes.entries) {
-              if (attributes.containsKey(entry.key)) {
-                attributes[entry.key]!.add(entry.value);
-              } else {
-                attributes[entry.key] = [entry.value];
+    if (widget.product != null && widget.product!.id != 0) {
+      try {
+        final variantsFromDb =
+            await sqldb.getVariantsByProductId(widget.product!.id!);
+
+        setState(() {
+          variants = variantsFromDb;
+          hasVariants = variants.isNotEmpty;
+          attributes
+              .clear(); // Réinitialiser les attributs avant de les remplir
+
+          if (hasVariants) {
+            // Récupérer les attributs uniques des variantes
+            for (final variant in variants) {
+              for (final entry in variant.attributes.entries) {
+                attributes.update(
+                  entry.key,
+                  (values) => values..add(entry.value),
+                  ifAbsent: () => [entry.value],
+                );
+              }
+            }
+
+            // Vérifier que tous les variants ont un code-barres
+            for (final variant in variants) {
+              if (variant.code.isEmpty) {
+                debugPrint(
+                    'Attention: Variant ${variant.id} n\'a pas de code-barres');
               }
             }
           }
-        }
-      });
+        });
+      } catch (e) {
+        debugPrint('Erreur lors du chargement des variantes: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Erreur lors du chargement des variantes: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -240,7 +263,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         priceImpact: 0.0, // L'utilisateur saisira le prix d'impact
         stock: 0, // L'utilisateur saisira le stock
         attributes: combination,
-        productReferenceId: '', // Sera mis à jour lors de la sauvegarde
+        productId: 0, // Sera mis à jour lors de la sauvegarde
       ));
     }
     setState(() {});
@@ -824,94 +847,106 @@ class _AddProductScreenState extends State<AddProductScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           if (_formKey.currentState!.validate()) {
+            // Validation des catégories
             if (selectedCategoryId == null || selectedSubCategoryId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text(
+                const SnackBar(
+                  content: Text(
                     'Veuillez sélectionner une catégorie et une sous-catégorie.',
                     style: TextStyle(color: Colors.white),
                   ),
-                  backgroundColor: const Color(0xFFE53935),
+                  backgroundColor: Color(0xFFE53935),
                 ),
               );
               return;
             }
 
-            // Calcul automatique du stock et du prix HT en fonction des variantes
-            int totalStock = hasVariants
-                ? variants.fold(0, (sum, v) => sum + v.stock)
-                : int.tryParse(stockController.text) ?? 0;
-            double minPrixHT = hasVariants
-                ? variants.map((v) => v.price).reduce((a, b) => a < b ? a : b)
-                : double.tryParse(priceHTController.text) ?? 0.0;
+            try {
+              // Calcul des valeurs
+              final totalStock = hasVariants
+                  ? variants.fold(0, (sum, v) => sum + v.stock)
+                  : int.parse(stockController.text);
 
-            final productReferenceId = generateProductReferenceId();
-            print(generateProductReferenceId());
-            final updatedProduct = Product(
-              code: codeController.text,
-              designation: designationController.text,
-              stock: totalStock,
-              prixHT: minPrixHT,
-              taxe: selectedTax ?? 0.0,
-              prixTTC: double.tryParse(priceTTCController.text) ?? 0.0,
-              dateExpiration: hasExpirationDate ? dateController.text : '',
-              categoryId: selectedCategoryId!,
-              subCategoryId: selectedSubCategoryId!,
-              marge: double.tryParse(margeController.text) ?? 0.0,
-              productReferenceId: productReferenceId, // Nouvel attribut
-              variants: variants, // Liste des variantes
-              remiseMax: double.tryParse(remiseMaxController.text) ?? 0.0,
-              remiseValeurMax:
-                  double.tryParse(remiseValeurMaxController.text) ?? 0.0,
-            );
+              final minPrixHT = hasVariants
+                  ? variants.map((v) => v.price).reduce((a, b) => a < b ? a : b)
+                  : double.parse(priceHTController.text);
 
-            // Sauvegarder le produit
-            if (widget.product == null) {
-              // Ajout d'un nouveau produit
-              await sqldb.addProduct(
-                codeController.text,
-                designationController.text,
-                totalStock,
-                minPrixHT,
-                selectedTax ?? 0.0,
-                double.tryParse(priceTTCController.text) ?? 0.0,
-                dateController.text,
-                selectedCategoryId!,
-                selectedSubCategoryId!,
-                double.tryParse(margeController.text) ?? 0.0,
-                productReferenceId,
-                double.tryParse(remiseMaxController.text) ??
-                    0.0, // Include remiseMax
-                double.tryParse(remiseValeurMaxController.text) ??
-                    0.0, // Include remiseValeurMax
+              final prixTTC = double.parse(priceTTCController.text);
+              final marge = double.parse(margeController.text);
+              final remiseMax = double.parse(remiseMaxController.text);
+              final remiseValeurMax =
+                  double.parse(remiseValeurMaxController.text);
+
+              // Création du produit avec toutes les valeurs validées
+              final product = Product(
+                id: widget.product?.id ?? 0,
+                code: codeController.text.trim(),
+                designation: designationController.text.trim(),
+                stock: totalStock,
+                prixHT: minPrixHT,
+                taxe: selectedTax ?? 0.0,
+                prixTTC: prixTTC,
+                dateExpiration:
+                    hasExpirationDate ? dateController.text.trim() : '',
+                categoryId: selectedCategoryId!,
+                subCategoryId: selectedSubCategoryId!,
+                marge: marge,
+                remiseMax: remiseMax,
+                remiseValeurMax: remiseValeurMax,
               );
 
-              // Ajouter les variantes du nouveau produit
-              for (var variant in variants) {
-                variant.productReferenceId = productReferenceId;
-                await sqldb.addVariant(variant);
-              }
-            } else {
-              // Mise à jour d'un produit existant
-              await sqldb.updateProduct(updatedProduct);
+              debugPrint('Product to save: ${product.toString()}');
 
-              if (hasVariants) {
-                // Supprimer uniquement les anciennes variantes du produit existant
-                await sqldb.deleteVariantsByProductReferenceId(
-                    updatedProduct.productReferenceId);
+              // Sauvegarde en base
+              final db = await sqldb.db;
+              if (widget.product == null) {
+                // Insertion d'un nouveau produit
+                product.id = await db.insert('products', product.toMap());
 
-                // Ajouter les nouvelles variantes
-                for (var variant in variants) {
-                  variant.productReferenceId =
-                      updatedProduct.productReferenceId;
-                  await sqldb.addVariant(variant);
+                // Sauvegarde des variantes si elles existent
+                if (hasVariants) {
+                  for (final variant in variants) {
+                    variant.productId = product.id;
+                    await db.insert('variants', variant.toMap());
+                  }
+                }
+              } else {
+                // Mise à jour du produit existant
+                await db.update(
+                  'products',
+                  product.toMap(),
+                  where: 'id = ?',
+                  whereArgs: [product.id],
+                );
+
+                // Gestion des variantes pour la mise à jour
+                if (hasVariants) {
+                  await db.delete(
+                    'variants',
+                    where: 'product_id = ?',
+                    whereArgs: [product.id],
+                  );
+
+                  for (final variant in variants) {
+                    variant.productId = product.id;
+                    await db.insert('variants', variant.toMap());
+                  }
                 }
               }
-            }
 
-            // Rafraîchir les données et fermer l'écran
-            widget.refreshData();
-            Navigator.of(context).pop();
+              // Rafraîchir l'interface et fermer
+              widget.refreshData();
+              if (mounted) Navigator.pop(context);
+            } catch (e) {
+              debugPrint('Error saving product: $e');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text('Erreur lors de la sauvegarde: ${e.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         },
         backgroundColor: const Color(0xFF009688),

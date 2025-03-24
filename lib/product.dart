@@ -1,6 +1,7 @@
 import 'package:caissechicopets/variant.dart';
 
 class Product {
+  int id; // Nouvel ID auto-incrémenté
   String code;
   String designation;
   int stock;
@@ -12,14 +13,14 @@ class Product {
   String? categoryName;
   int subCategoryId;
   String? subCategoryName;
-  int isDeleted; // Nouvelle colonne
-  double marge; // Nouveau champ pour la marge %
-  String productReferenceId; // Nouvel attribut
-  List<Variant> variants; // Liste des variantes
-  double remiseMax; // Nouvel attribut pour la remise maximale en pourcentage
-  double remiseValeurMax; // Nouvel attribut pour la valeur maximale de la remise
+  int isDeleted;
+  double marge;
+  List<Variant> variants;
+  double remiseMax;
+  double remiseValeurMax;
 
   Product({
+    this.id = 0, // 0 signifie que l'ID n'est pas encore attribué
     required this.code,
     required this.designation,
     required this.stock,
@@ -31,21 +32,21 @@ class Product {
     this.categoryName,
     required this.subCategoryId,
     this.subCategoryName,
-    this.isDeleted = 0, // Valeur par défaut 0 (non supprimé)
+    this.isDeleted = 0,
     required this.marge,
-    required this.productReferenceId, // Nouvel attribut
-    this.variants = const [], // Liste des variantes (vide par défaut)
-    this.remiseMax = 0.0, // Valeur par défaut 0.0
-    this.remiseValeurMax = 0.0, // Valeur par défaut 0.0
+    this.variants = const [],
+    this.remiseMax = 0.0,
+    this.remiseValeurMax = 0.0,
   });
 
-  // Méthode pour calculer la marge %
-  double calculateMargePercentage() {
-    return ((prixTTC - prixHT) / prixHT) * 100;
-  }
+  // Méthode pour obtenir la référence produit (utilise maintenant l'ID)
+  String get productReferenceId => id.toString();
+
+  // ... (autres méthodes restent inchangées jusqu'à toMap)
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id, // Ajout de l'ID dans la map
       'code': code,
       'designation': designation,
       'stock': stock,
@@ -59,14 +60,15 @@ class Product {
       'sub_category_name': subCategoryName,
       'is_deleted': isDeleted,
       'marge': marge,
-      'product_reference_id': productReferenceId, // Nouvel attribut
-      'remise_max': remiseMax, // Nouvel attribut
-      'remise_valeur_max': remiseValeurMax, // Nouvel attribut
+      'remise_max': remiseMax,
+      'remise_valeur_max': remiseValeurMax,
+      // product_reference_id n'est plus nécessaire car calculé à partir de l'ID
     };
   }
 
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
+      id: map['id'] ?? 0, // Récupération de l'ID
       code: map['code'],
       designation: map['designation'],
       stock: map['stock'],
@@ -80,14 +82,13 @@ class Product {
       subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
       isDeleted: map['is_deleted'] ?? 0,
       marge: map['marge'] ?? 0.0,
-      productReferenceId: map['product_reference_id'], // Nouvel attribut
-      remiseMax: map['remise_max'] ?? 0.0, // Nouvel attribut
-      remiseValeurMax: map['remise_valeur_max'] ?? 0.0, // Nouvel attribut
+      remiseMax: map['remise_max'] ?? 0.0,
+      remiseValeurMax: map['remise_valeur_max'] ?? 0.0,
     );
   }
 
   @override
   String toString() {
-    return 'Product(code: $code, designation: $designation, stock: $stock, prixTTC: $prixTTC, dateExpiration: $dateExpiration, categoryName: ${categoryName ?? "N/A"}, subCategoryId: $subCategoryId, subCategoryName: ${subCategoryName ?? "N/A"}, isDeleted: $isDeleted, marge: $marge%, productReferenceId: $productReferenceId, remiseMax: $remiseMax%, remiseValeurMax: $remiseValeurMax)';
+    return 'Product(id: $id, code: $code, designation: $designation, ...)';
   }
 }
