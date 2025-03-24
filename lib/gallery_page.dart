@@ -172,7 +172,7 @@ class _GalleryPageState extends State<GalleryPage> {
                 ElevatedButton.icon(
                   onPressed: _pickImages,
                   icon: const Icon(Icons.photo_library),
-                  label: const Text("Importer depuis la galerie"),
+                  label: const Text("Importer depuis votre PC"),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 93, 212, 220)),
                 ),
@@ -187,7 +187,7 @@ class _GalleryPageState extends State<GalleryPage> {
                     padding: const EdgeInsets.all(5),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                      crossAxisCount: 8,
                       crossAxisSpacing: 2,
                       mainAxisSpacing: 2,
                       childAspectRatio: 1,

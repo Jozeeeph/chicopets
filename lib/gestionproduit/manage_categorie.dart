@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
+import 'package:caissechicopets/gestionproduit/products_to_delete_screen.dart';
 
 class ManageCategoriePage extends StatefulWidget {
   const ManageCategoriePage({super.key});
@@ -42,6 +43,16 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
     } catch (e) {
       _showMessage("Erreur lors du chargement des catégories !");
     }
+  }
+
+  Future<bool> _checkProductsBeforeDelete(List<Category> categories) async {
+    for (var category in categories) {
+      bool hasProducts = await sqldb.hasProductsInCategory(category.id!);
+      if (hasProducts) {
+        return true; // Il y a des produits associés
+      }
+    }
+    return false; // Aucun produit associé
   }
 
   void _onSearchChanged() {
@@ -85,6 +96,132 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   }
 
   Future<void> _confirmDelete({Category? singleCategory}) async {
+    // Créer une liste des catégories à supprimer
+    List<Category> categoriesToDelete =
+        singleCategory != null ? [singleCategory] : _selectedCategories;
+
+    // Récupérer les produits concernés
+    List<String> productCodes = [];
+    for (var category in categoriesToDelete) {
+      productCodes.addAll(await sqldb.getProductsInCategory(category.id!));
+    }
+
+    if (productCodes.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            title: Column(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 40, color: Colors.orange),
+                const SizedBox(height: 8),
+                Text(
+                  "Action impossible",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  singleCategory != null
+                      ? "Cette catégorie contient des produits associés :"
+                      : "Les catégories sélectionnées contiennent des produits :",
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12), // Correction ici
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.info_outline,
+                          size: 16, color: Colors.blue),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Vous devez d'abord supprimer ces produits\n"
+                        "avant de pouvoir supprimer la catégorie.",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${productCodes.length} produit(s) concerné(s)",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ], // Correction : fermeture correcte du children
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey[600],
+                ),
+                child: const Text("Annuler"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProductsToDeleteScreen(
+                        productCodes: productCodes,
+                        onProductsDeleted: fetchCategories,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                child: const Text(
+                  "Voir les produits",
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+            actionsPadding:
+                const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          );
+        },
+      );
+      return;
+    }
+
+    // Si pas de produits, demander confirmation
     final TextEditingController confirmController = TextEditingController();
     bool isConfirmed = false;
 
@@ -148,11 +285,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                   onPressed: isConfirmed
                       ? () async {
                           Navigator.of(context).pop();
-                          if (singleCategory != null) {
-                            await _deleteCategories([singleCategory]);
-                          } else {
-                            await _deleteCategories(_selectedCategories);
-                          }
+                          await _deleteCategories(categoriesToDelete);
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -171,15 +304,29 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
 
   Future<void> _deleteCategories(List<Category> categories) async {
     try {
+      int successCount = 0;
+
       for (var category in categories) {
-        await sqldb.deleteCategory(category.id!);
+        int result = await sqldb.deleteCategory(category.id!);
+        if (result > 0) {
+          successCount++;
+        } else if (result == -2) {
+          // Code spécial pour catégorie avec produits
+          _showMessage(
+              "La catégorie '${category.name}' n'a pas pu être supprimée car elle contient des produits");
+        }
       }
-      _showMessage("${categories.length} catégories supprimées avec succès !");
+
+      if (successCount > 0) {
+        _showMessage("$successCount catégorie(s) supprimée(s) avec succès !");
+      }
+
       _selectedCategories
           .clear(); // Vider la liste des catégories sélectionnées
       fetchCategories(); // Rafraîchir la liste
     } catch (e) {
-      _showMessage("Erreur lors de la suppression des catégories !");
+      _showMessage(
+          "Erreur lors de la suppression des catégories : ${e.toString()}");
     }
   }
 

@@ -512,6 +512,13 @@ class SqlDb {
 
   Future<int> deleteCategory(int id) async {
     final dbClient = await db;
+
+    // Vérifier d'abord s'il y a des produits associés
+    bool hasProducts = await hasProductsInCategory(id);
+    if (hasProducts) {
+      return -2; // Code spécial pour indiquer qu'il y a des produits
+    }
+
     return await dbClient.delete(
       'categories',
       where: 'id_category = ?',
@@ -625,6 +632,21 @@ class SqlDb {
   /// **Supprimer une sous-catégorie**
   Future<int> deleteSubCategory(int subCategoryId) async {
     final dbClient = await db;
+
+    // Vérifier d'abord s'il y a des produits associés (directement ou indirectement)
+    bool hasProducts = await hasProductsInSubCategory(subCategoryId);
+    if (hasProducts) {
+      return -2; // Code spécial pour indiquer qu'il y a des produits
+    }
+
+    // Si c'est une sous-catégorie parente, déplacer ses enfants au niveau supérieur
+    await dbClient.update(
+      'sub_categories',
+      {'parent_id': null},
+      where: 'parent_id = ?',
+      whereArgs: [subCategoryId],
+    );
+
     return await dbClient.delete(
       'sub_categories',
       where: 'id_sub_category = ?',
@@ -784,14 +806,15 @@ class SqlDb {
     );
   }
 
-Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
-  final dbClient = await db;
-  return await dbClient.query(
-    'gallery_images',
-    where: 'name LIKE ?',
-    whereArgs: ['%$name%'],
-  );
-}
+  Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
+    final dbClient = await db;
+    return await dbClient.query(
+      'gallery_images',
+      where: 'name LIKE ?',
+      whereArgs: ['%$name%'],
+    );
+  }
+
 // Méthode pour récupérer toutes les images de la galerie
   Future<List<Map<String, dynamic>>> getGalleryImages() async {
     final dbClient = await db;
@@ -807,13 +830,103 @@ Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
       whereArgs: [id],
     );
   }
+
   Future<int> updateImageName(int id, String name) async {
-  final dbClient = await db;
-  return await dbClient.update(
-    'gallery_images',
-    {'name': name}, // Mettre à jour le nom de l'image
-    where: 'id = ?', // Condition : l'ID de l'image
-    whereArgs: [id], // Passer l'ID de l'image
-  );
-}
+    final dbClient = await db;
+    return await dbClient.update(
+      'gallery_images',
+      {'name': name}, // Mettre à jour le nom de l'image
+      where: 'id = ?', // Condition : l'ID de l'image
+      whereArgs: [id], // Passer l'ID de l'image
+    );
+  }
+
+// Vérifie si une catégorie a des produits associés
+  Future<bool> hasProductsInCategory(int categoryId) async {
+    final dbClient = await db;
+    final result = await dbClient.query(
+      'products',
+      where: 'category_id = ? AND is_deleted = 0',
+      whereArgs: [categoryId],
+      limit: 1,
+    );
+    return result.isNotEmpty;
+  }
+
+// Vérifie si une sous-catégorie a des produits associés
+  Future<bool> hasProductsInSubCategory(int subCategoryId) async {
+    final dbClient = await db;
+
+    // Vérifier les produits directement assignés
+    final directProducts = await dbClient.query(
+      'products',
+      where: 'sub_category_id = ? AND is_deleted = 0',
+      whereArgs: [subCategoryId],
+      limit: 1,
+    );
+
+    if (directProducts.isNotEmpty) {
+      return true;
+    }
+
+    // Vérifier les sous-catégories enfants
+    final childSubCategories = await dbClient.query(
+      'sub_categories',
+      where: 'parent_id = ?',
+      whereArgs: [subCategoryId],
+    );
+
+    // Vérifier récursivement chaque sous-catégorie enfant
+    for (var child in childSubCategories) {
+      bool hasProducts =
+          await hasProductsInSubCategory(child['id_sub_category'] as int);
+      if (hasProducts) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+// Récupère les IDs des produits associés à une catégorie
+  Future<List<String>> getProductsInCategory(int categoryId) async {
+    final dbClient = await db;
+    final result = await dbClient.query(
+      'products',
+      where: 'category_id = ? AND is_deleted = 0',
+      whereArgs: [categoryId],
+      columns: ['code'],
+    );
+    return result.map((e) => e['code'] as String).toList();
+  }
+
+// Récupère les IDs des produits associés à une sous-catégorie (récursivement)
+  Future<List<String>> getProductsInSubCategory(int subCategoryId) async {
+    final dbClient = await db;
+    List<String> productCodes = [];
+
+    // Produits directs
+    final directProducts = await dbClient.query(
+      'products',
+      where: 'sub_category_id = ? AND is_deleted = 0',
+      whereArgs: [subCategoryId],
+      columns: ['code'],
+    );
+    productCodes.addAll(directProducts.map((e) => e['code'] as String));
+
+    // Sous-catégories enfants
+    final childSubCategories = await dbClient.query(
+      'sub_categories',
+      where: 'parent_id = ?',
+      whereArgs: [subCategoryId],
+    );
+
+    // Produits des enfants (récursivement)
+    for (var child in childSubCategories) {
+      productCodes.addAll(
+          await getProductsInSubCategory(child['id_sub_category'] as int));
+    }
+
+    return productCodes;
+  }
 }
