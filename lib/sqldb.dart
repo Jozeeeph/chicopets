@@ -22,7 +22,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -37,7 +37,8 @@ class SqlDb {
         print("Creating tables...");
         await db.execute('''
   CREATE TABLE products (
-    code TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
     designation TEXT,
     stock INTEGER,
     prix_ht REAL,
@@ -50,7 +51,6 @@ class SqlDb {
     sub_category_name TEXT,
     is_deleted INTEGER DEFAULT 0,
     marge REAL,
-    product_reference_id TEXT, -- Now it's not UNIQUE
     remise_max REAL DEFAULT 0.0, -- Nouvel attribut pour la remise maximale en pourcentage
     remise_valeur_max REAL DEFAULT 0.0 -- Nouvel attribut pour la valeur maximale de la remise
 );
@@ -111,15 +111,17 @@ class SqlDb {
 
         await db.execute('''
   CREATE TABLE IF NOT EXISTS variants (
-    code TEXT PRIMARY KEY,
-    combination_name TEXT,
-    price REAL,
-    price_impact REAL,
-    final_price REAL,
-    stock INTEGER,
-    attributes TEXT,
-    product_reference_id TEXT,
-    FOREIGN KEY(product_reference_id) REFERENCES products(product_reference_id) ON DELETE CASCADE
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE,
+    combination_name TEXT NOT NULL,
+    price REAL NOT NULL,
+    price_impact REAL DEFAULT 0.0,
+    final_price REAL NOT NULL,
+    stock INTEGER NOT NULL DEFAULT 0,
+    attributes TEXT NOT NULL,
+    product_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 ''');
         print("Variants table created");
@@ -153,10 +155,15 @@ class SqlDb {
   Future<List<Product>> getProducts() async {
     final dbClient = await db;
     final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
-    SELECT p.*, c.category_name
+    SELECT 
+      p.*, 
+      c.category_name,
+      sc.sub_category_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id_category
+    LEFT JOIN sub_categories sc ON p.sub_category_id = sc.id_sub_category
     WHERE p.is_deleted = 0
+    ORDER BY p.designation ASC
   ''');
 
     return result.map((e) => Product.fromMap(e)).toList();
@@ -212,41 +219,31 @@ class SqlDb {
   ''');
   }
 
-  Future<void> addProduct(
-    String code,
-    String designation,
-    int stock,
-    double prixHT,
-    double taxe,
-    double prixTTC,
-    String date,
-    int categoryId,
-    int subCategoryId,
-    double marge,
-    String productReferenceId,
-    double remiseMax, // Ajout de remiseMax
-    double remiseValeurMax, // Ajout de remiseValeurMax
-  ) async {
+  Future<int> addProduct(Product product) async {
     final dbClient = await db;
-    await dbClient.insert(
+
+    // Insérer le produit et retourner l'ID généré
+    int productId = await dbClient.insert(
       'products',
       {
-        'code': code,
-        'designation': designation,
-        'stock': stock,
-        'prix_ht': prixHT,
-        'taxe': taxe,
-        'prix_ttc': prixTTC,
-        'date_expiration': date,
-        'category_id': categoryId,
-        'sub_category_id': subCategoryId,
-        'marge': marge,
-        'product_reference_id': productReferenceId,
-        'remise_max': remiseMax, // Ajout dans la base
-        'remise_valeur_max': remiseValeurMax, // Ajout dans la base
+        'code': product.code,
+        'designation': product.designation,
+        'stock': product.stock,
+        'prix_ht': product.prixHT,
+        'taxe': product.taxe,
+        'prix_ttc': product.prixTTC,
+        'date_expiration': product.dateExpiration,
+        'category_id': product.categoryId,
+        'sub_category_id': product.subCategoryId,
+        'marge': product.marge,
+        'remise_max': product.remiseMax,
+        'remise_valeur_max': product.remiseValeurMax,
+        'is_deleted': product.isDeleted,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    return productId; // Retourne l'ID auto-généré
   }
 
   Future<int> addOrder(Order order) async {
@@ -717,30 +714,103 @@ class SqlDb {
 
   Future<int> addVariant(Variant variant) async {
     final dbClient = await db;
+
+    // Vérifier que le produit existe
+    final productExists = await dbClient.query('products',
+        where: 'id = ?', whereArgs: [variant.productId], limit: 1);
+
+    if (productExists.isEmpty) {
+      throw Exception('Le produit parent n\'existe pas');
+    }
+
+    // Vérifier l'unicité du code-barres
+    if (variant.code.isNotEmpty) {
+      final existing = await dbClient.query('variants',
+          where: 'code = ?', whereArgs: [variant.code], limit: 1);
+
+      if (existing.isNotEmpty) {
+        throw Exception('Un variant avec ce code-barres existe déjà');
+      }
+    }
+
     return await dbClient.insert(
       'variants',
-      variant.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.abort,
+      {
+        'code': variant.code,
+        'combination_name': variant.combinationName,
+        'price': variant.price,
+        'price_impact': variant.priceImpact,
+        'final_price': variant.finalPrice,
+        'stock': variant.stock,
+        'attributes': variant.attributes.toString(),
+        'product_id': variant.productId,
+      },
+      conflictAlgorithm: ConflictAlgorithm.fail,
     );
   }
 
   Future<List<Variant>> getVariantsByProductCode(String productCode) async {
     final dbClient = await db;
+
+    // D'abord trouver l'ID du produit
+    final product = await dbClient.query('products',
+        where: 'code = ?', whereArgs: [productCode], limit: 1);
+
+    if (product.isEmpty) return [];
+
+    final productId = product.first['id'] as int;
+
+    // Puis récupérer les variantes
     final List<Map<String, dynamic>> maps = await dbClient.query(
       'variants',
-      where: 'product_code = ?',
-      whereArgs: [productCode],
+      where: 'product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'combination_name ASC',
     );
+
+    return maps.map((map) => Variant.fromMap(map)).toList();
+  }
+
+  Future<List<Variant>> getVariantsByProductId(int productId) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps = await dbClient.query(
+      'variants',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+      orderBy: 'combination_name ASC',
+    );
+
     return maps.map((map) => Variant.fromMap(map)).toList();
   }
 
   Future<int> updateVariant(Variant variant) async {
     final dbClient = await db;
+
+    // Vérifier l'unicité du code-barres
+    if (variant.code.isNotEmpty) {
+      final existing = await dbClient.query('variants',
+          where: 'code = ? AND id != ?',
+          whereArgs: [variant.code, variant.id],
+          limit: 1);
+
+      if (existing.isNotEmpty) {
+        throw Exception('Un variant avec ce code-barres existe déjà');
+      }
+    }
+
     return await dbClient.update(
       'variants',
-      variant.toMap(),
-      where: 'code = ?',
-      whereArgs: [variant.code],
+      {
+        'code': variant.code,
+        'combination_name': variant.combinationName,
+        'price': variant.price,
+        'price_impact': variant.priceImpact,
+        'final_price': variant.finalPrice,
+        'stock': variant.stock,
+        'attributes': variant.attributes.toString(),
+      },
+      where: 'id = ?',
+      whereArgs: [variant.id],
     );
   }
 
@@ -752,18 +822,7 @@ class SqlDb {
       whereArgs: [variantCode],
     );
   }
-
-  Future<List<Variant>> getVariantsByProductReferenceId(
-      String productReferenceId) async {
-    final dbClient = await db;
-    final List<Map<String, dynamic>> maps = await dbClient.query(
-      'variants',
-      where: 'product_reference_id = ?',
-      whereArgs: [productReferenceId],
-    );
-    return maps.map((map) => Variant.fromMap(map)).toList();
-  }
-
+  
   Future<int> deleteVariantsByProductReferenceId(
       String productReferenceId) async {
     final dbClient = await db;
@@ -784,14 +843,15 @@ class SqlDb {
     );
   }
 
-Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
-  final dbClient = await db;
-  return await dbClient.query(
-    'gallery_images',
-    where: 'name LIKE ?',
-    whereArgs: ['%$name%'],
-  );
-}
+  Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
+    final dbClient = await db;
+    return await dbClient.query(
+      'gallery_images',
+      where: 'name LIKE ?',
+      whereArgs: ['%$name%'],
+    );
+  }
+
 // Méthode pour récupérer toutes les images de la galerie
   Future<List<Map<String, dynamic>>> getGalleryImages() async {
     final dbClient = await db;
@@ -807,13 +867,14 @@ Future<List<Map<String, dynamic>>> searchImagesByName(String name) async {
       whereArgs: [id],
     );
   }
+
   Future<int> updateImageName(int id, String name) async {
-  final dbClient = await db;
-  return await dbClient.update(
-    'gallery_images',
-    {'name': name}, // Mettre à jour le nom de l'image
-    where: 'id = ?', // Condition : l'ID de l'image
-    whereArgs: [id], // Passer l'ID de l'image
-  );
-}
+    final dbClient = await db;
+    return await dbClient.update(
+      'gallery_images',
+      {'name': name}, // Mettre à jour le nom de l'image
+      where: 'id = ?', // Condition : l'ID de l'image
+      whereArgs: [id], // Passer l'ID de l'image
+    );
+  }
 }
