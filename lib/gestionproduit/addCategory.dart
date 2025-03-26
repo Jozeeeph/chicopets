@@ -98,19 +98,22 @@ class _AddCategoryState extends State<AddCategory> {
     }
   }
 
+  // Dans la méthode pickImageFromGallery de addCategory.dart
   Future<void> pickImageFromGallery() async {
     final selectedImageFromGallery = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const GalleryPage(),
+        builder: (context) => const GalleryPage(isSelectionMode: true),
       ),
     );
 
     if (selectedImageFromGallery != null && selectedImageFromGallery is File) {
       setState(() {
-        selectedImage =
-            selectedImageFromGallery; // Mettre à jour l'image sélectionnée
+        selectedImage = selectedImageFromGallery;
       });
+    } else if (selectedImageFromGallery != null) {
+      // Gérer d'autres types de retour si nécessaire
+      print("Unexpected return type from GalleryPage");
     }
   }
 
