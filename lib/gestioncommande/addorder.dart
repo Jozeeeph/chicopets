@@ -719,10 +719,9 @@ class Addorder {
       List<Product> products, List<int> quantities) {
     double maxDiscountValue = 0.0;
     for (int i = 0; i < products.length; i++) {
-      double productMaxDiscount = products[i].remiseMax;
-      double productPrice = products[i].prixTTC;
+      double productMaxDiscount = products[i].remiseValeurMax;
       int quantity = quantities[i];
-      maxDiscountValue += productPrice * quantity * (productMaxDiscount / 100);
+      maxDiscountValue +=quantity * productMaxDiscount;
     }
     return maxDiscountValue;
   }
