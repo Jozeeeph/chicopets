@@ -453,7 +453,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   await sqldb.getSubCategoryNameById(selectedSubCategoryId!);
 
               final product = Product(
-                id: 0, // Will be set by database
                 code: codeController.text.trim(),
                 designation: designationController.text.trim(),
                 stock: int.parse(stockController.text),

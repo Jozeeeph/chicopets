@@ -105,8 +105,8 @@ class Product {
       'has_variants': hasVariants ? 1 : 0,
     };
 
-    // Only include ID if it's not null (for updates)
-    if (id != null) {
+    // Only include ID if it's not null and not 0 (for updates)
+    if (id != null && id != 0) {
       map['id'] = id;
     }
 
