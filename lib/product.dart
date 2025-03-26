@@ -1,7 +1,7 @@
 import 'package:caissechicopets/variant.dart';
 
 class Product {
-  int id; // Nouvel ID auto-incrémenté
+  int? id; // Changed from int id = 0 to nullable
   String code;
   String designation;
   int stock;
@@ -10,17 +10,18 @@ class Product {
   double prixTTC;
   String dateExpiration;
   int categoryId;
-  String? categoryName;
   int subCategoryId;
+  String? categoryName;
   String? subCategoryName;
   int isDeleted;
   double marge;
   List<Variant> variants;
   double remiseMax;
   double remiseValeurMax;
+  bool hasVariants;
 
   Product({
-    this.id = 0, // 0 signifie que l'ID n'est pas encore attribué
+    this.id, // Changed from default 0 to nullable
     required this.code,
     required this.designation,
     required this.stock,
@@ -37,16 +38,55 @@ class Product {
     this.variants = const [],
     this.remiseMax = 0.0,
     this.remiseValeurMax = 0.0,
+    this.hasVariants = false,
   });
 
-  // Méthode pour obtenir la référence produit (utilise maintenant l'ID)
-  String get productReferenceId => id.toString();
+  String get productReferenceId => id?.toString() ?? 'new';
 
-  // ... (autres méthodes restent inchangées jusqu'à toMap)
+  Product copyWith({
+    int? id,
+    String? code,
+    String? designation,
+    int? stock,
+    double? prixHT,
+    double? taxe,
+    double? prixTTC,
+    String? dateExpiration,
+    int? categoryId,
+    String? categoryName,
+    int? subCategoryId,
+    String? subCategoryName,
+    int? isDeleted,
+    double? marge,
+    List<Variant>? variants,
+    double? remiseMax,
+    double? remiseValeurMax,
+    bool? hasVariants,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      code: code ?? this.code,
+      designation: designation ?? this.designation,
+      stock: stock ?? this.stock,
+      prixHT: prixHT ?? this.prixHT,
+      taxe: taxe ?? this.taxe,
+      prixTTC: prixTTC ?? this.prixTTC,
+      dateExpiration: dateExpiration ?? this.dateExpiration,
+      categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
+      subCategoryId: subCategoryId ?? this.subCategoryId,
+      subCategoryName: subCategoryName ?? this.subCategoryName,
+      isDeleted: isDeleted ?? this.isDeleted,
+      marge: marge ?? this.marge,
+      variants: variants ?? this.variants,
+      remiseMax: remiseMax ?? this.remiseMax,
+      remiseValeurMax: remiseValeurMax ?? this.remiseValeurMax,
+      hasVariants: hasVariants ?? this.hasVariants,
+    );
+  }
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id, // Ajout de l'ID dans la map
+    final map = {
       'code': code,
       'designation': designation,
       'stock': stock,
@@ -62,33 +102,61 @@ class Product {
       'marge': marge,
       'remise_max': remiseMax,
       'remise_valeur_max': remiseValeurMax,
-      // product_reference_id n'est plus nécessaire car calculé à partir de l'ID
+      'has_variants': hasVariants ? 1 : 0,
     };
+
+    // Only include ID if it's not null (for updates)
+    if (id != null) {
+      map['id'] = id;
+    }
+
+    return map;
   }
 
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
-      id: map['id'] ?? 0, // Récupération de l'ID
-      code: map['code'],
-      designation: map['designation'],
-      stock: map['stock'],
-      prixHT: map['prix_ht'],
-      taxe: map['taxe'],
-      prixTTC: map['prix_ttc'],
-      dateExpiration: map['date_expiration'],
+      id: map['id'], // No default value here
+      code: map['code'] ?? '',
+      designation: map['designation'] ?? '',
+      stock: map['stock'] ?? 0,
+      prixHT: (map['prix_ht'] ?? 0.0).toDouble(),
+      taxe: (map['taxe'] ?? 0.0).toDouble(),
+      prixTTC: (map['prix_ttc'] ?? 0.0).toDouble(),
+      dateExpiration: map['date_expiration'] ?? '',
       categoryId: map['category_id'] ?? 0,
       categoryName: map['category_name'],
       subCategoryId: map['sub_category_id'] ?? 0,
-      subCategoryName: map['sub_category_name'] ?? "Sans sous-catégorie",
+      subCategoryName: map['sub_category_name'],
       isDeleted: map['is_deleted'] ?? 0,
-      marge: map['marge'] ?? 0.0,
-      remiseMax: map['remise_max'] ?? 0.0,
-      remiseValeurMax: map['remise_valeur_max'] ?? 0.0,
+      marge: (map['marge'] ?? 0.0).toDouble(),
+      remiseMax: (map['remise_max'] ?? 0.0).toDouble(),
+      remiseValeurMax: (map['remise_valeur_max'] ?? 0.0).toDouble(),
+      hasVariants: map['has_variants'] == 1,
     );
+  }
+
+  // Helper method to calculate total stock including variants
+  int get totalStock {
+    if (variants.isNotEmpty) {
+      return variants.fold(0, (sum, variant) => sum + variant.stock);
+    }
+    return stock;
+  }
+
+  // Helper method to get minimum price (for variants)
+  double get minPrice {
+    if (variants.isNotEmpty) {
+      return variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
+    }
+    return prixHT;
   }
 
   @override
   String toString() {
-    return 'Product(id: $id, code: $code, designation: $designation, ...)';
+    return 'Product(id: $id, code: $code, designation: $designation, '
+        'stock: $stock, prixHT: $prixHT, taxe: $taxe, prixTTC: $prixTTC, '
+        'category: $categoryName ($categoryId), '
+        'subCategory: $subCategoryName ($subCategoryId), '
+        'variants: ${variants.length}';
   }
 }
