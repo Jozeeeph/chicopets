@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/variant.dart';
@@ -7,7 +8,9 @@ import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/subcategory.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart'; // Added to get the correct database path
+import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqlite_api.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Added to get the correct database path
 
 class SqlDb {
   static Database? _db;
@@ -52,7 +55,8 @@ class SqlDb {
     is_deleted INTEGER DEFAULT 0,
     marge REAL,
     remise_max REAL DEFAULT 0.0, -- Nouvel attribut pour la remise maximale en pourcentage
-    remise_valeur_max REAL DEFAULT 0.0 -- Nouvel attribut pour la valeur maximale de la remise
+    remise_valeur_max REAL DEFAULT 0.0, -- Nouvel attribut pour la valeur maximale de la remise
+    has_variants INTEGER DEFAULT 0
 );
 ''');
         print("Products table created");
@@ -110,18 +114,17 @@ class SqlDb {
         print("Sub-categories table created");
 
         await db.execute('''
-  CREATE TABLE IF NOT EXISTS variants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT UNIQUE,
-    combination_name TEXT NOT NULL,
-    price REAL NOT NULL,
-    price_impact REAL DEFAULT 0.0,
-    final_price REAL NOT NULL,
-    stock INTEGER NOT NULL DEFAULT 0,
-    attributes TEXT NOT NULL,
-    product_id INTEGER NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+  CREATE TABLE variants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  combination_name TEXT NOT NULL,
+  price REAL NOT NULL,
+  price_impact REAL NOT NULL,
+  final_price REAL NOT NULL,
+  stock INTEGER NOT NULL,
+  attributes TEXT NOT NULL,
+  product_id INTEGER NOT NULL,
+  FOREIGN KEY (product_id) REFERENCES products(id)
 );
 ''');
         print("Variants table created");
@@ -221,29 +224,34 @@ class SqlDb {
 
   Future<int> addProduct(Product product) async {
     final dbClient = await db;
+    return await dbClient.transaction((txn) async {
+      // Insert product
+      final productId = await txn.insert(
+        'products',
+        product.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
-    // Insérer le produit et retourner l'ID généré
-    int productId = await dbClient.insert(
-      'products',
-      {
-        'code': product.code,
-        'designation': product.designation,
-        'stock': product.stock,
-        'prix_ht': product.prixHT,
-        'taxe': product.taxe,
-        'prix_ttc': product.prixTTC,
-        'date_expiration': product.dateExpiration,
-        'category_id': product.categoryId,
-        'sub_category_id': product.subCategoryId,
-        'marge': product.marge,
-        'remise_max': product.remiseMax,
-        'remise_valeur_max': product.remiseValeurMax,
-        'is_deleted': product.isDeleted,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+      // Insert variants if they exist
+      if (product.variants.isNotEmpty) {
+        for (final variant in product.variants) {
+          await txn.insert(
+            'variants',
+            variant.copyWith(productId: productId).toMap(),
+          );
+        }
 
-    return productId; // Retourne l'ID auto-généré
+        // Update has_variants flag
+        await txn.update(
+          'products',
+          {'has_variants': 1},
+          where: 'id = ?',
+          whereArgs: [productId],
+        );
+      }
+
+      return productId;
+    });
   }
 
   Future<int> addOrder(Order order) async {
@@ -452,6 +460,35 @@ class SqlDb {
     );
   }
 
+  // In your sqldb class
+  Future<String> getCategoryNameById(int id) async {
+    final db = await this.db;
+    final result = await db.query(
+      'categories',
+      where: 'id_category = ?',
+      whereArgs: [id],
+      columns: ['category_name'],
+    );
+    if (result.isNotEmpty) {
+      return result.first['category_name'] as String;
+    }
+    return 'Unknown Category';
+  }
+
+  Future<String> getSubCategoryNameById(int id) async {
+    final db = await this.db;
+    final result = await db.query(
+      'sub_categories',
+      where: 'id_sub_category = ?',
+      whereArgs: [id],
+      columns: ['sub_category_name'],
+    );
+    if (result.isNotEmpty) {
+      return result.first['sub_category_name'] as String;
+    }
+    return 'Unknown Sub-Category';
+  }
+
   Future<Product?> getDesignationByCode(String code) async {
     final dbClient = await db;
     final List<Map<String, Object?>> result = await dbClient.query(
@@ -507,7 +544,7 @@ class SqlDb {
     }
   }
 
- Future<int> deleteCategory(int id) async {
+  Future<int> deleteCategory(int id) async {
     final dbClient = await db;
 
     // Vérifier d'abord s'il y a des produits associés
@@ -737,39 +774,51 @@ class SqlDb {
 
   Future<int> addVariant(Variant variant) async {
     final dbClient = await db;
+    return await dbClient.transaction((txn) async {
+      // Verify parent product exists
+      final productExists = await txn.query(
+        'products',
+        where: 'id = ? AND is_deleted = 0',
+        whereArgs: [variant.productId],
+        limit: 1,
+      );
 
-    // Vérifier que le produit existe
-    final productExists = await dbClient.query('products',
-        where: 'id = ?', whereArgs: [variant.productId], limit: 1);
-
-    if (productExists.isEmpty) {
-      throw Exception('Le produit parent n\'existe pas');
-    }
-
-    // Vérifier l'unicité du code-barres
-    if (variant.code.isNotEmpty) {
-      final existing = await dbClient.query('variants',
-          where: 'code = ?', whereArgs: [variant.code], limit: 1);
-
-      if (existing.isNotEmpty) {
-        throw Exception('Un variant avec ce code-barres existe déjà');
+      if (productExists.isEmpty) {
+        throw Exception('Le produit parent n\'existe pas ou a été supprimé');
       }
-    }
 
-    return await dbClient.insert(
-      'variants',
-      {
-        'code': variant.code,
-        'combination_name': variant.combinationName,
-        'price': variant.price,
-        'price_impact': variant.priceImpact,
-        'final_price': variant.finalPrice,
-        'stock': variant.stock,
-        'attributes': variant.attributes.toString(),
-        'product_id': variant.productId,
-      },
-      conflictAlgorithm: ConflictAlgorithm.fail,
-    );
+      // Verify barcode uniqueness for this product
+      if (variant.code.isNotEmpty) {
+        final existing = await txn.query(
+          'variants',
+          where: 'code = ? AND product_id = ?',
+          whereArgs: [variant.code, variant.productId],
+          limit: 1,
+        );
+
+        if (existing.isNotEmpty) {
+          throw Exception(
+              'Un variant avec ce code-barres existe déjà pour ce produit');
+        }
+      }
+
+      // Insert variant
+      final id = await txn.insert(
+        'variants',
+        variant.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.fail,
+      );
+
+      // Update has_variants flag on product
+      await txn.update(
+        'products',
+        {'has_variants': 1},
+        where: 'id = ?',
+        whereArgs: [variant.productId],
+      );
+
+      return id;
+    });
   }
 
   Future<List<Variant>> getVariantsByProductCode(String productCode) async {
@@ -800,10 +849,9 @@ class SqlDb {
       'variants',
       where: 'product_id = ?',
       whereArgs: [productId],
-      orderBy: 'combination_name ASC',
     );
 
-    return maps.map((map) => Variant.fromMap(map)).toList();
+    return maps.map(Variant.fromMap).toList();
   }
 
   Future<int> updateVariant(Variant variant) async {
@@ -845,7 +893,7 @@ class SqlDb {
       whereArgs: [variantCode],
     );
   }
-  
+
   Future<int> deleteVariantsByProductReferenceId(
       String productReferenceId) async {
     final dbClient = await db;
@@ -900,7 +948,8 @@ class SqlDb {
       whereArgs: [id], // Passer l'ID de l'image
     );
   }
-   Future<bool> hasProductsInCategory(int categoryId) async {
+
+  Future<bool> hasProductsInCategory(int categoryId) async {
     final dbClient = await db;
     final result = await dbClient.query(
       'products',
@@ -944,6 +993,63 @@ class SqlDb {
     }
 
     return false;
+  }
+
+  Future<Product> getProductWithVariants(int productId) async {
+    final dbClient = await db;
+    final product = await dbClient.query(
+      'products',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [productId],
+      limit: 1,
+    );
+
+    if (product.isEmpty) {
+      throw Exception('Produit non trouvé');
+    }
+
+    final variants = await getVariantsByProductId(productId);
+    return Product.fromMap(product.first)..variants = variants;
+  }
+
+  Future<int> updateProductWithVariants(Product product) async {
+    final dbClient = await db;
+    return await dbClient.transaction((txn) async {
+      // Update product
+      await txn.update(
+        'products',
+        product.toMap(),
+        where: 'id = ?',
+        whereArgs: [product.id],
+      );
+
+      // Delete existing variants
+      await txn.delete(
+        'variants',
+        where: 'product_id = ?',
+        whereArgs: [product.id],
+      );
+
+      // Insert new variants if they exist
+      if (product.variants.isNotEmpty) {
+        for (final variant in product.variants) {
+          await txn.insert(
+            'variants',
+            variant.copyWith(productId: product.id!).toMap(),
+          );
+        }
+      }
+
+      // Update has_variants flag
+      await txn.update(
+        'products',
+        {'has_variants': product.variants.isNotEmpty ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [product.id],
+      );
+
+      return 1;
+    });
   }
 
 // Récupère les IDs des produits associés à une catégorie

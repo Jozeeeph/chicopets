@@ -1,20 +1,16 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/subcategory.dart';
-import 'package:caissechicopets/variant.dart';
-import 'package:flutter/material.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 
 class AddProductScreen extends StatefulWidget {
-  final Product? product;
   final Function refreshData;
 
   const AddProductScreen({
     super.key,
-    this.product,
     required this.refreshData,
   });
 
@@ -34,80 +30,38 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController =
-      TextEditingController();
-  final TextEditingController attributeNameController = TextEditingController();
-  final TextEditingController attributeValuesController =
-      TextEditingController();
+  final TextEditingController remiseValeurMaxController = TextEditingController();
 
   final SqlDb sqldb = SqlDb();
-  double? selectedTax;
+  double? selectedTax = 0.0;
 
   int? selectedCategoryId;
   int? selectedSubCategoryId;
   bool isCategoryFormVisible = false;
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
-  bool hasExpirationDate = false; // Nouvelle variable d'état
-
-  // Variables pour la gestion des variantes
-  bool hasVariants = false;
-  List<Variant> variants = [];
-  Map<String, List<String>> attributes = {};
+  bool hasExpirationDate = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.product != null) {
-      codeController.text = widget.product!.code;
-      designationController.text = widget.product!.designation;
-      stockController.text = widget.product!.stock.toString();
-      priceHTController.text = widget.product!.prixHT.toString();
-      taxController.text = widget.product!.taxe.toString();
-      priceTTCController.text = widget.product!.prixTTC.toString();
-      dateController.text = widget.product!.dateExpiration;
-      selectedCategoryId = widget.product!.categoryId;
-      selectedSubCategoryId = widget.product!.subCategoryId;
-      remiseMaxController.text = widget.product!.remiseMax.toString();
-      margeController.text = widget.product!.marge.toString();
-      selectedTax = widget.product?.taxe ?? 0.0; // Valeur par défaut : 0.0
-      double prixHT = widget.product!.prixHT;
-      double marge = widget.product!.marge;
-      double remiseMax = widget.product!.remiseMax;
-      double profit = (prixHT * marge) / 100;
-      double remiseValeurMax = (profit * remiseMax) / 100;
-      remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
-
-      if (![0.0, 7.0, 12.0, 19.0].contains(selectedTax)) {
-        selectedTax =
-            0.0; // Forcer une valeur valide si la taxe n'est pas valide
-      }
-      // Charger les sous-catégories de la catégorie sélectionnée
-      _loadSubCategories(selectedCategoryId!);
-
-      profitController.text = profit.toStringAsFixed(2);
-
-      // Récupérer les variantes du produit
-      _loadVariants();
-    }
-
+    
+    // Initialize default values for new product
+    remiseMaxController.text = '0.0';
+    remiseValeurMaxController.text = '0.0';
+    taxController.text = '0.0';
+    
     priceHTController.addListener(calculateValues);
     taxController.addListener(calculateValues);
     margeController.addListener(calculateValues);
     profitController.addListener(calculateValues);
-    remiseMaxController.addListener(() {
-      calculerRemiseValeurMax();
-    });
+    remiseMaxController.addListener(calculerRemiseValeurMax);
   }
 
   void calculerRemiseValeurMax() {
     double profit = double.tryParse(profitController.text) ?? 0;
     double remiseMax = double.tryParse(remiseMaxController.text) ?? 0;
-
-    // Calcul : remise valeur max = profit * (remise% max / 100)
     double remiseValeurMax = (profit * remiseMax) / 100;
-
-    // Mise à jour du champ
     remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
   }
 
@@ -119,7 +73,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
-  // Méthode pour charger les sous-catégories
   void _loadSubCategories(int categoryId) async {
     final dbClient = await sqldb.db;
     final subCategoriesData = await dbClient.query(
@@ -138,53 +91,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
         );
       }).toList();
     });
-  }
-
-  // Méthode pour charger les variantes
-  void _loadVariants() async {
-    if (widget.product != null && widget.product!.id != 0) {
-      try {
-        final variantsFromDb =
-            await sqldb.getVariantsByProductId(widget.product!.id!);
-
-        setState(() {
-          variants = variantsFromDb;
-          hasVariants = variants.isNotEmpty;
-          attributes
-              .clear(); // Réinitialiser les attributs avant de les remplir
-
-          if (hasVariants) {
-            // Récupérer les attributs uniques des variantes
-            for (final variant in variants) {
-              for (final entry in variant.attributes.entries) {
-                attributes.update(
-                  entry.key,
-                  (values) => values..add(entry.value),
-                  ifAbsent: () => [entry.value],
-                );
-              }
-            }
-
-            // Vérifier que tous les variants ont un code-barres
-            for (final variant in variants) {
-              if (variant.code.isEmpty) {
-                debugPrint(
-                    'Attention: Variant ${variant.id} n\'a pas de code-barres');
-              }
-            }
-          }
-        });
-      } catch (e) {
-        debugPrint('Erreur lors du chargement des variantes: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Erreur lors du chargement des variantes: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   void calculateValues() {
@@ -211,108 +117,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  void addAttribute() {
-    String attributeName = attributeNameController.text.trim();
-    String attributeValues = attributeValuesController.text.trim();
-
-    if (attributeName.isNotEmpty && attributeValues.isNotEmpty) {
-      // Normaliser le nom de l'attribut (en minuscules et sans espaces)
-      String normalizedAttributeName =
-          attributeName.toLowerCase().replaceAll(' ', '');
-
-      // Vérifier si l'attribut existe déjà
-      if (attributes.containsKey(normalizedAttributeName)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('L\'attribut "$attributeName" existe déjà.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Sépare les valeurs par une virgule
-      List<String> values =
-          attributeValues.split(',').map((value) => value.trim()).toList();
-
-      setState(() {
-        attributes[normalizedAttributeName] = values;
-        attributeNameController.clear();
-        attributeValuesController.clear();
-      });
-    }
-  }
-
-  String generateProductReferenceId() {
-    var uuid = Uuid();
-    return uuid.v4(); // Génère un UUID de version 4 (aléatoire)
-  }
-
-  void generateVariants() {
-    variants.clear();
-    List<Map<String, String>> combinations = _generateCombinations(attributes);
-
-    // Récupérer la valeur du prixTTC
-    double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
-
-    for (var combination in combinations) {
-      variants.add(Variant(
-        code: '', // L'utilisateur saisira le code à barres
-        combinationName: combination.values.join('-'),
-        price: prixTTC, // Utiliser la valeur du prixTTC
-        priceImpact: 0.0, // L'utilisateur saisira le prix d'impact
-        stock: 0, // L'utilisateur saisira le stock
-        attributes: combination,
-        productId: 0, // Sera mis à jour lors de la sauvegarde
-      ));
-    }
-    setState(() {});
-  }
-
-  List<Map<String, String>> _generateCombinations(
-      Map<String, List<String>> attributes) {
-    List<Map<String, String>> combinations = [];
-    List<String> attributeNames = attributes.keys.toList();
-    List<List<String>> attributeValues = attributes.values.toList();
-
-    _generateCombinationsHelper(
-        attributeNames, attributeValues, 0, {}, combinations);
-
-    return combinations;
-  }
-
-  void _generateCombinationsHelper(
-      List<String> attributeNames,
-      List<List<String>> attributeValues,
-      int index,
-      Map<String, String> currentCombination,
-      List<Map<String, String>> combinations) {
-    if (index == attributeNames.length) {
-      combinations.add(Map.from(currentCombination));
-      return;
-    }
-
-    String currentAttribute = attributeNames[index];
-    for (String value in attributeValues[index]) {
-      currentCombination[currentAttribute] = value;
-      _generateCombinationsHelper(attributeNames, attributeValues, index + 1,
-          currentCombination, combinations);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: widget.product == null
-            ? const Text(
-                'Ajouter un Produit',
-                style: TextStyle(color: Colors.white),
-              )
-            : const Text(
-                'Modifier le Produit',
-                style: TextStyle(color: Colors.white),
-              ),
+        title: const Text(
+          'Ajouter un Produit',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFF0056A6),
       ),
       body: Padding(
@@ -327,60 +139,47 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Checkbox pour les variantes
-                      CheckboxListTile(
-                        title: const Text('Ce produit a-t-il des variantes ?'),
-                        value: hasVariants,
-                        onChanged: (value) {
-                          setState(() {
-                            hasVariants = value ?? false;
-                          });
+                      _buildTextFormField(
+                        controller: codeController,
+                        label: 'Code à Barre',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Code à Barre" ne doit pas être vide.';
+                          }
+                          if (int.tryParse(value) == null) {
+                            return 'Le "Code à Barre" doit être un nombre.';
+                          }
+                          if (int.parse(value) < 0) {
+                            return 'Le "Code à Barre" doit être un nombre positif.';
+                          }
+                          return null;
                         },
                       ),
-                      if (!hasVariants) ...[
-                        _buildTextFormField(
-                          controller: codeController,
-                          label: 'Code à Barre',
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Le champ "Code à Barre" ne doit pas être vide.';
-                            }
-                            if (int.tryParse(value) == null) {
-                              return 'Le "Code à Barre" doit être un nombre.';
-                            }
-                            if (int.parse(value) < 0) {
-                              return 'Le "Code à Barre" doit être un nombre positif.';
-                            }
-                            return null;
-                          },
-                        ),
-                        _buildTextFormField(
-                          controller: designationController,
-                          label: 'Désignation',
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Le champ "Désignation" ne doit pas être vide.';
-                            }
-                            return null;
-                          },
-                        ),
-                        _buildTextFormField(
-                          controller: stockController,
-                          label: 'Stock',
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Le champ "Stock" ne doit pas être vide.';
-                            }
-                            if (int.tryParse(value) == null ||
-                                int.parse(value) < 0) {
-                              return 'Le stock doit être un nombre entier positif.';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-
+                      _buildTextFormField(
+                        controller: designationController,
+                        label: 'Désignation',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Désignation" ne doit pas être vide.';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextFormField(
+                        controller: stockController,
+                        label: 'Stock',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Stock" ne doit pas être vide.';
+                          }
+                          if (int.tryParse(value) == null ||
+                              int.parse(value) < 0) {
+                            return 'Le stock doit être un nombre entier positif.';
+                          }
+                          return null;
+                        },
+                      ),
                       _buildTextFormField(
                         controller: priceHTController,
                         label: 'Prix d\'achat',
@@ -412,8 +211,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       _buildTextFormField(
-                        controller:
-                            remiseMaxController, // New controller for remise% max
+                        controller: remiseMaxController,
                         label: 'Remise % Max',
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -450,8 +248,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         controller: remiseValeurMaxController,
                         label: 'Remise Valeur Max',
                         keyboardType: TextInputType.number,
-                        enabled:
-                            false, // Désactive l'input pour éviter la modification manuelle
+                        enabled: false,
                       ),
                       DropdownButtonFormField<double>(
                         decoration: _inputDecoration('Taxe (%)'),
@@ -471,9 +268,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             });
                             calculateValues();
                           } else {
-                            // Gérer le cas où la valeur n'est pas valide
                             setState(() {
-                              selectedTax = 0.0; // Valeur par défaut
+                              selectedTax = 0.0;
                               taxController.text = '0.0';
                             });
                           }
@@ -491,7 +287,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         label: 'Prix TTC',
                       ),
                       const SizedBox(height: 16),
-
                       CheckboxListTile(
                         title: const Text(
                             'Ce produit a-t-il une date d\'expiration ?'),
@@ -500,14 +295,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           setState(() {
                             hasExpirationDate = value ?? false;
                             if (!hasExpirationDate) {
-                              dateController
-                                  .clear(); // Effacer la date si le checkbox est désactivé
+                              dateController.clear();
                             }
                           });
                         },
                       ),
                       const SizedBox(height: 16),
-
                       _buildTextFormField(
                         controller: dateController,
                         label: 'Date Expiration',
@@ -576,8 +369,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   onChanged: (val) {
                                     setState(() {
                                       selectedCategoryId = val;
-                                      selectedSubCategoryId =
-                                          null; // Réinitialiser la sélection
+                                      selectedSubCategoryId = null;
                                       _loadSubCategories(val!);
                                     });
                                   },
@@ -593,8 +385,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                           const SizedBox(width: 10),
                           IconButton(
-                            icon:
-                                const Icon(Icons.add, color: Color(0xFF26A9E0)),
+                            icon: const Icon(Icons.add, color: Color(0xFF26A9E0)),
                             onPressed: () {
                               setState(() {
                                 isCategoryFormVisible = !isCategoryFormVisible;
@@ -608,220 +399,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         visible: selectedCategoryId != null,
                         child: SubCategoryTree(
                           subCategories: subCategories,
-                          parentId:
-                              null, // Commencer avec les sous-catégories de premier niveau
+                          parentId: null,
                           onSelect: (subCategoryId) {
                             setState(() {
-                              selectedSubCategoryId =
-                                  subCategoryId; // Mettre à jour la sélection
+                              selectedSubCategoryId = subCategoryId;
                             });
                           },
-                          selectedSubCategoryId:
-                              selectedSubCategoryId, // Passer la sélection
+                          selectedSubCategoryId: selectedSubCategoryId,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      if (hasVariants) ...[
-                        _buildTextFormField(
-                          controller: attributeNameController,
-                          label: 'Nom de l\'attribut (ex: Taille)',
-                        ),
-                        _buildTextFormField(
-                          controller: attributeValuesController,
-                          label:
-                              'Valeurs de l\'attribut (séparées par une virgule, ex: M,S,L)',
-                          onFieldSubmitted: (value) {
-                            addAttribute();
-                          },
-                        ),
-                        ElevatedButton(
-                          onPressed: addAttribute,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0056A6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.add, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Ajouter un attribut',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ...attributes.entries.map((entry) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.key,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Wrap(
-                                spacing: 8.0,
-                                children: entry.value.map((value) {
-                                  return Chip(
-                                    label: Text(value),
-                                    onDeleted: () {
-                                      setState(() {
-                                        entry.value.remove(value);
-                                        if (entry.value.isEmpty) {
-                                          attributes.remove(entry.key);
-                                        }
-                                      });
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          );
-                        }),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: generateVariants,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF009688),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.autorenew, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text(
-                                'Générer les variantes',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (variants.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Variantes générées :',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              border:
-                                  Border.all(color: const Color(0xFFE0E0E0)),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(
-                                    label: Text('Combinaison',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                    label: Text('Prix',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                    label: Text('Prix d\'impact',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                    label: Text('Prix total',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                                // Toujours afficher les colonnes "Stock" et "Code à barre"
-                                DataColumn(
-                                    label: Text('Stock',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                                DataColumn(
-                                    label: Text('Code à barre',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold))),
-                              ],
-                              rows: variants.map((variant) {
-                                return DataRow(cells: [
-                                  DataCell(Text(variant.combinationName)),
-                                  DataCell(TextFormField(
-                                    initialValue: variant.price.toString(),
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        variant.price =
-                                            double.tryParse(value) ?? 0.0;
-                                        variant.finalPrice =
-                                            variant.price + variant.priceImpact;
-                                      });
-                                    },
-                                  )),
-                                  DataCell(TextFormField(
-                                    initialValue:
-                                        variant.priceImpact.toString(),
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        variant.priceImpact =
-                                            double.tryParse(value) ?? 0.0;
-                                        variant.finalPrice =
-                                            variant.price + variant.priceImpact;
-                                      });
-                                    },
-                                  )),
-                                  DataCell(Text(
-                                      variant.finalPrice.toStringAsFixed(2))),
-                                  // Toujours afficher les cellules "Stock" et "Code à barre"
-                                  DataCell(TextFormField(
-                                    initialValue: variant.stock.toString(),
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        variant.stock =
-                                            int.tryParse(value) ?? 0;
-                                      });
-                                    },
-                                  )),
-                                  DataCell(TextFormField(
-                                    initialValue: variant.code,
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        variant.code = value;
-                                      });
-                                    },
-                                  )),
-                                ]);
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ],
                     ],
                   ),
                 ),
@@ -847,7 +433,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           if (_formKey.currentState!.validate()) {
-            // Validation des catégories
             if (selectedCategoryId == null || selectedSubCategoryId == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -862,87 +447,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
             }
 
             try {
-              // Calcul des valeurs
-              final totalStock = hasVariants
-                  ? variants.fold(0, (sum, v) => sum + v.stock)
-                  : int.parse(stockController.text);
+              final categoryName =
+                  await sqldb.getCategoryNameById(selectedCategoryId!);
+              final subCategoryName =
+                  await sqldb.getSubCategoryNameById(selectedSubCategoryId!);
 
-              final minPrixHT = hasVariants
-                  ? variants.map((v) => v.price).reduce((a, b) => a < b ? a : b)
-                  : double.parse(priceHTController.text);
-
-              final prixTTC = double.parse(priceTTCController.text);
-              final marge = double.parse(margeController.text);
-              final remiseMax = double.parse(remiseMaxController.text);
-              final remiseValeurMax =
-                  double.parse(remiseValeurMaxController.text);
-
-              // Création du produit avec toutes les valeurs validées
               final product = Product(
-                id: widget.product?.id ?? 0,
+                id: 0, // Will be set by database
                 code: codeController.text.trim(),
                 designation: designationController.text.trim(),
-                stock: totalStock,
-                prixHT: minPrixHT,
+                stock: int.parse(stockController.text),
+                prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
-                prixTTC: prixTTC,
-                dateExpiration:
-                    hasExpirationDate ? dateController.text.trim() : '',
+                prixTTC: double.parse(priceTTCController.text),
+                dateExpiration: hasExpirationDate ? dateController.text.trim() : '',
                 categoryId: selectedCategoryId!,
                 subCategoryId: selectedSubCategoryId!,
-                marge: marge,
-                remiseMax: remiseMax,
-                remiseValeurMax: remiseValeurMax,
+                categoryName: categoryName,
+                subCategoryName: subCategoryName,
+                marge: double.parse(margeController.text),
+                remiseMax: double.parse(remiseMaxController.text),
+                remiseValeurMax: double.parse(remiseValeurMaxController.text),
               );
 
-              debugPrint('Product to save: ${product.toString()}');
-
-              // Sauvegarde en base
               final db = await sqldb.db;
-              if (widget.product == null) {
-                // Insertion d'un nouveau produit
-                product.id = await db.insert('products', product.toMap());
+              product.id = await db.insert('products', product.toMap());
 
-                // Sauvegarde des variantes si elles existent
-                if (hasVariants) {
-                  for (final variant in variants) {
-                    variant.productId = product.id;
-                    await db.insert('variants', variant.toMap());
-                  }
-                }
-              } else {
-                // Mise à jour du produit existant
-                await db.update(
-                  'products',
-                  product.toMap(),
-                  where: 'id = ?',
-                  whereArgs: [product.id],
-                );
-
-                // Gestion des variantes pour la mise à jour
-                if (hasVariants) {
-                  await db.delete(
-                    'variants',
-                    where: 'product_id = ?',
-                    whereArgs: [product.id],
-                  );
-
-                  for (final variant in variants) {
-                    variant.productId = product.id;
-                    await db.insert('variants', variant.toMap());
-                  }
-                }
-              }
-
-              // Rafraîchir l'interface et fermer
               widget.refreshData();
               if (mounted) Navigator.pop(context);
             } catch (e) {
               debugPrint('Error saving product: $e');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content:
-                      Text('Erreur lors de la sauvegarde: ${e.toString()}'),
+                  content: Text('Erreur lors de la sauvegarde: ${e.toString()}'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -993,34 +530,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 }
 
-// Recursive widget to display subcategory hierarchy
 class SubCategoryTree extends StatelessWidget {
   final List<SubCategory> subCategories;
   final int? parentId;
-  final int? selectedSubCategoryId; // Nouvelle propriété
-  final Function(int) onSelect; // Fonction de rappel pour la sélection
+  final int? selectedSubCategoryId;
+  final Function(int) onSelect;
 
   const SubCategoryTree({
     required this.subCategories,
     this.parentId,
     required this.onSelect,
-    this.selectedSubCategoryId, // Nouvelle propriété
+    this.selectedSubCategoryId,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Filtrer les sous-catégories par parentId
     final children =
         subCategories.where((subCat) => subCat.parentId == parentId).toList();
 
-    // Si aucune sous-catégorie n'est trouvée, retourner un widget vide
     if (children.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return ListView.builder(
-      shrinkWrap: true, // Éviter les problèmes de hauteur infinie
-      physics: const NeverScrollableScrollPhysics(), // Désactiver le défilement
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: children.length,
       itemBuilder: (context, index) {
         final subCat = children[index];
@@ -1029,20 +563,18 @@ class SubCategoryTree extends StatelessWidget {
           children: [
             ListTile(
               title: Text(subCat.name),
-              onTap: () => onSelect(subCat.id!), // Appeler onSelect avec l'ID
+              onTap: () => onSelect(subCat.id!),
               tileColor: selectedSubCategoryId == subCat.id
-                  ? Colors.blue[50] // Mettre en surbrillance si sélectionné
+                  ? Colors.blue[50]
                   : null,
             ),
-            // Afficher les sous-catégories enfants de manière récursive
             Padding(
               padding: const EdgeInsets.only(left: 16.0),
               child: SubCategoryTree(
                 subCategories: subCategories,
                 parentId: subCat.id,
                 onSelect: onSelect,
-                selectedSubCategoryId:
-                    selectedSubCategoryId, // Passer la sélection
+                selectedSubCategoryId: selectedSubCategoryId,
               ),
             ),
           ],

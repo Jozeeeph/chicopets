@@ -1,3 +1,5 @@
+import 'package:caissechicopets/gestionproduit/editProduct.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/add_product_screen.dart';
@@ -16,6 +18,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
   List<Product> _filteredProducts = [];
   final TextEditingController _searchController = TextEditingController();
   List<Product> _selectedProducts = [];
+  final Map<int, bool> _expandedProducts = {};
 
   @override
   void initState() {
@@ -33,9 +36,21 @@ class _ManageProductPageState extends State<ManageProductPage> {
 
   Future<void> _loadProducts() async {
     List<Product> products = await sqldb.getProducts();
+
+    // Load variants for each product
+    for (var product in products) {
+      if (product.id != null) {
+        product.variants = await sqldb.getVariantsByProductId(product.id!);
+      }
+    }
+
     setState(() {
       _products = products;
       _filteredProducts = products;
+      // Initialize expanded state for each product
+      for (var product in products) {
+        _expandedProducts[product.id ?? 0] = false;
+      }
     });
   }
 
@@ -47,6 +62,12 @@ class _ManageProductPageState extends State<ManageProductPage> {
             product.designation.toLowerCase().contains(query) ||
             (product.categoryName ?? '').toLowerCase().contains(query);
       }).toList();
+    });
+  }
+
+  void _toggleProductExpansion(int productId) {
+    setState(() {
+      _expandedProducts[productId] = !(_expandedProducts[productId] ?? false);
     });
   }
 
@@ -169,6 +190,46 @@ class _ManageProductPageState extends State<ManageProductPage> {
     });
   }
 
+  Widget _buildVariantList(List<Variant> variants) {
+    if (variants.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
+        child: Text(
+          'No variants available',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: variants.map((variant) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_right, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${variant.combinationName} - Stock: ${variant.stock} - Price: ${variant.price}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,8 +263,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                     : Icons.select_all,
                 color: Colors.white,
               ),
-              onPressed:
-                  _toggleSelectAll, // Sélectionner ou désélectionner tout
+              onPressed: _toggleSelectAll,
             ),
           if (_selectedProducts.isNotEmpty)
             IconButton(
@@ -245,55 +305,88 @@ class _ManageProductPageState extends State<ManageProductPage> {
                     itemBuilder: (context, index) {
                       final product = _filteredProducts[index];
                       final isSelected = _selectedProducts.contains(product);
+                      final isExpanded =
+                          _expandedProducts[product.id ?? 0] ?? false;
+
                       return Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 3,
                         margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(15),
-                          leading: Checkbox(
-                            value: isSelected,
-                            onChanged: (value) {
-                              _toggleProductSelection(product);
-                            },
-                          ),
-                          title: Text(
-                            product.designation,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Code: ${product.code} - Stock: ${product.stock}',
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit,
-                                    color: Color(0xFF009688)),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => AddProductScreen(
-                                        product: product,
-                                        refreshData: _loadProducts,
-                                      ),
-                                    ),
-                                  );
+                        child: Column(
+                          children: [
+                            ListTile(
+                              contentPadding: const EdgeInsets.all(15),
+                              leading: Checkbox(
+                                value: isSelected,
+                                onChanged: (value) {
+                                  _toggleProductSelection(product);
                                 },
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Color(0xFFE53935)),
-                                onPressed: () =>
-                                    _confirmDelete(singleProduct: product),
+                              title: Text(
+                                product.designation,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
-                            ],
-                          ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Code: ${product.code}',
+                                    style:
+                                        const TextStyle(color: Colors.black54),
+                                  ),
+                                  Text(
+                                    'Total Stock: ${product.variants.isNotEmpty ? product.variants.fold(0, (sum, variant) => sum + variant.stock) : product.stock}',
+                                    style:
+                                        const TextStyle(color: Colors.black54),
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      isExpanded
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
+                                      color: Colors.grey,
+                                    ),
+                                    onPressed: () {
+                                      _toggleProductExpansion(product.id ?? 0);
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit,
+                                      color: Color(0xFF009688),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              EditProductScreen(
+                                            product: product,
+                                            refreshData: _loadProducts,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Color(0xFFE53935)),
+                                    onPressed: () =>
+                                        _confirmDelete(singleProduct: product),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isExpanded) _buildVariantList(product.variants),
+                          ],
                         ),
                       );
                     },
@@ -304,4 +397,3 @@ class _ManageProductPageState extends State<ManageProductPage> {
     );
   }
 }
-
