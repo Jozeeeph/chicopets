@@ -281,7 +281,7 @@ class _GalleryPageState extends State<GalleryPage> {
                     ? const Padding(
                         padding: EdgeInsets.all(20.0),
                         child: Text(
-                          "Aucune image disponible\nAjoutez des images depuis votre galerie ou appareil photo",
+                          "Aucune image disponible\nAjoutez des images depuis votre galerie",
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 16),
                         ),

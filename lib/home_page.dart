@@ -1,4 +1,5 @@
 import 'package:caissechicopets/cash_desk_page.dart';
+import 'package:caissechicopets/code_verification_page.dart'; // Ajoutez cette ligne
 import 'package:caissechicopets/dashboard_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,35 +26,40 @@ class HomePage extends StatelessWidget {
               Text(
                 'Bienvenue à Votre Caisse',
                 style: GoogleFonts.poppins(
-                  fontSize: 22, // Taille de la police réduite
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 30), // Espacement réduit
-              // Utilisation d'un GridView pour les cartes
+              const SizedBox(height: 30),
               SizedBox(
-                width: MediaQuery.of(context).size.width * 0.6, // Largeur réduite
+                width: MediaQuery.of(context).size.width * 0.6,
                 child: GridView.count(
                   shrinkWrap: true,
-                  crossAxisCount: 2, // 2 cartes par ligne
-                  crossAxisSpacing: 12, // Espacement horizontal entre les cartes
-                  mainAxisSpacing: 12, // Espacement vertical entre les cartes
-                  childAspectRatio: 1.0, // Ratio pour des cartes carrées
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.0,
                   children: [
                     _buildCard(
                       context,
                       label: 'Tableau de bord',
                       icon: Icons.dashboard,
-                      page: const DashboardPage(),
+                      page: const CodeVerificationPage(
+                        targetPage: DashboardPage(),
+                        pageName: 'Tableau de bord',
+                      ),
                       color: const Color(0xFF009688),
                     ),
                     _buildCard(
                       context,
                       label: 'Passage de commande',
                       icon: Icons.shopping_cart,
-                      page: const CashDeskPage(),
+                      page: const CodeVerificationPage(
+                        targetPage: CashDeskPage(),
+                        pageName: 'Passage de commande',
+                      ),
                       color: const Color(0xFFFF9800),
                     ),
                   ],
@@ -74,9 +80,9 @@ class HomePage extends StatelessWidget {
     required Color color,
   }) {
     return Card(
-      elevation: 4, // Élévation légère
+      elevation: 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(50), // Border radius réduit
+        borderRadius: BorderRadius.circular(50),
       ),
       color: color,
       child: InkWell(
@@ -88,26 +94,26 @@ class HomePage extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(30),
         child: Padding(
-          padding: const EdgeInsets.all(12.0), // Padding réduit
+          padding: const EdgeInsets.all(12.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                size: 30, // Taille de l'icône
+                size: 30,
                 color: Colors.white,
               ),
-              const SizedBox(height: 8), // Espacement entre l'icône et le texte
+              const SizedBox(height: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 20, // Taille de la police réduite
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 2, // Limite le texte à 2 lignes
-                overflow: TextOverflow.ellipsis, // Points de suspension si nécessaire
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
