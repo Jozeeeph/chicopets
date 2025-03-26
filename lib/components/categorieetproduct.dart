@@ -80,6 +80,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     }
   }
 
+  void updateStock(Product product, int quantity) {
+  setState(() {
+    product.stock -= quantity;
+  });
+}
+
+
   Future<List<Product>> _fetchProducts() async {
     try {
       final productsMap = await sqldb.getProducts();
@@ -181,30 +188,83 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
                   return GridView.count(
                     crossAxisCount: 6,
-                    childAspectRatio: 1.2,
-                    mainAxisSpacing: 6.0,
-                    crossAxisSpacing: 6.0,
+                    childAspectRatio:
+                        1.26, // Ajusté pour correspondre à la forme désirée
+                    mainAxisSpacing: 8.0,
+                    crossAxisSpacing: 8.0,
                     children: filteredProducts.map((product) {
                       return InkWell(
                         onTap: () {
                           widget.onProductSelected(product);
                         },
                         child: Container(
-                          margin: const EdgeInsets.all(2.0),
+                          width: 160, // Largeur ajustée
+                          height: 90, // Hauteur ajustée
                           decoration: BoxDecoration(
                             color: darkBlue,
-                            borderRadius: BorderRadius.circular(17),
-                          ),
-                          child: Center(
-                            child: Text(
-                              "${product.designation} (${product.categoryName ?? 'Sans catégorie'})",
-                              style: TextStyle(
-                                color: white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                            borderRadius:
+                                BorderRadius.circular(20), // Bords arrondis
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 2,
+                                offset: const Offset(0, 2),
                               ),
-                              textAlign: TextAlign.center,
-                            ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 12),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Nom du produit + catégorie
+                              Text(
+                                "${product.designation}",
+                                style: TextStyle(
+                                  color: white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+
+                              const SizedBox(height: 4), // Espacement réduit
+
+                              // Prix
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orangeAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "${product.prixTTC.toStringAsFixed(2)} DT",
+                                  style: TextStyle(
+                                    color: Colors.orangeAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 4), // Espacement réduit
+
+                              // Stock
+                              Text(
+                                "Stock: ${product.stock}",
+                                style: TextStyle(
+                                  color: product.stock > 5
+                                      ? const Color.fromARGB(255, 55, 231, 61)
+                                      : warmRed,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );

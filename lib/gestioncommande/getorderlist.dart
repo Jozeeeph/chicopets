@@ -538,12 +538,20 @@ class Getorderlist {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Center(
-            child: Text(
-              "🧾 Ticket de Commande",
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Color(0xFF000000)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.receipt, color: Color(0xFF000000)), // Icône
+                SizedBox(width: 8), // Espacement entre l'icône et le texte
+                Text(
+                  "Ticket de Commande",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF000000),
+                  ),
+                ),
+              ],
             ),
           ),
           content: SingleChildScrollView(

@@ -38,7 +38,7 @@ class DashboardPage extends StatelessWidget {
               Expanded(
                 child: GridView.count(
                   crossAxisCount: 5, // 3 cartes par ligne
-                  crossAxisSpacing: 10, // Espacement horizontal entre les cartes
+                  crossAxisSpacing: 31, // Espacement horizontal entre les cartes
                   mainAxisSpacing: 10, // Espacement vertical entre les cartes
                   childAspectRatio: 0.8, // Ratio pour des cartes rectangulaires
                   children: [
@@ -76,6 +76,13 @@ class DashboardPage extends StatelessWidget {
                       icon: Icons.photo_library,
                       page: const GalleryPage(),
                       color: const Color(0xFFE91E63),
+                    ),
+                     _buildCard(
+                      context,
+                      label: 'Gestion de comptes',
+                      icon: Icons.people,
+                      page: const GalleryPage(),
+                      color: const Color.fromARGB(255, 0, 164, 201),
                     ),
                   ],
                 ),
