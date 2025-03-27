@@ -4,6 +4,7 @@ import 'package:caissechicopets/subcategory.dart';
 import 'package:caissechicopets/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -30,7 +31,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController = TextEditingController();
+  final TextEditingController remiseValeurMaxController =
+      TextEditingController();
 
   final SqlDb sqldb = SqlDb();
   double? selectedTax = 0.0;
@@ -45,12 +47,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize default values for new product
     remiseMaxController.text = '0.0';
     remiseValeurMaxController.text = '0.0';
     taxController.text = '0.0';
-    
+
     priceHTController.addListener(calculateValues);
     taxController.addListener(calculateValues);
     margeController.addListener(calculateValues);
@@ -180,76 +182,166 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
-                      _buildTextFormField(
-                        controller: priceHTController,
-                        label: 'Prix d\'achat',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Prix d\'achat" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'Le prix doit être un nombre positif.';
-                          }
-                          return null;
-                        },
+
+                      // Price HT and TTC aligned
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextFormField(
+                              controller: priceHTController,
+                              label: 'Prix d\'achat',
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Le champ "Prix d\'achat" ne doit pas être vide.';
+                                }
+                                if (double.tryParse(value) == null ||
+                                    double.parse(value) <= 0) {
+                                  return 'Le prix doit être un nombre positif.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: _buildTextFormField(
+                              controller: priceTTCController,
+                              label: 'Prix TTC',
+                              enabled: false,
+                            ),
+                          ),
+                        ],
                       ),
-                      _buildTextFormField(
-                        controller: margeController,
-                        label: 'Marge (%)',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Marge (%)" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'La marge doit être un nombre positif.';
-                          }
-                          return null;
-                        },
+                      const SizedBox(height: 16),
+
+                      // Margin and Profit aligned
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextFormField(
+                              controller: margeController,
+                              label: 'Marge (%)',
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Le champ "Marge (%)" ne doit pas être vide.';
+                                }
+                                if (double.tryParse(value) == null ||
+                                    double.parse(value) <= 0) {
+                                  return 'La marge doit être un nombre positif.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: _buildTextFormField(
+                              controller: profitController,
+                              label: 'Profit',
+                              keyboardType: TextInputType.number,
+                              enabled: false,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Le champ "Profit" ne doit pas être vide.';
+                                }
+                                if (double.tryParse(value) == null ||
+                                    double.parse(value) <= 0) {
+                                  return 'Le profit doit être un nombre positif.';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      _buildTextFormField(
-                        controller: remiseMaxController,
-                        label: 'Remise % Max',
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Remise % Max" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) < 0) {
-                            return 'La remise % max doit être un nombre positif ou nul.';
-                          }
-                          if (double.parse(value) > 100) {
-                            return 'La remise % max ne peut pas dépasser 100%.';
-                          }
-                          return null;
-                        },
+                      const SizedBox(height: 16),
+
+                      // Discount % and Value aligned (like Price TTC)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextFormField(
+                              controller: remiseMaxController,
+                              label: 'Remise % Max',
+                              keyboardType: TextInputType.numberWithOptions(
+                                  decimal: true),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Le champ "Remise % Max" ne doit pas être vide.';
+                                }
+                                final percentage = double.tryParse(value);
+                                if (percentage == null || percentage < 0) {
+                                  return 'La remise % max doit être un nombre positif ou nul.';
+                                }
+                                if (percentage > 100) {
+                                  return 'La remise % max ne peut pas dépasser 100%.';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty) {
+                                  final profit =
+                                      double.tryParse(profitController.text) ??
+                                          0;
+                                  final percentage =
+                                      double.tryParse(value) ?? 0;
+                                  final discountValue =
+                                      (profit * percentage) / 100;
+                                  remiseValeurMaxController.text =
+                                      discountValue.toStringAsFixed(2);
+                                } else {
+                                  remiseValeurMaxController.clear();
+                                }
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: remiseValeurMaxController,
+                              decoration: _inputDecoration('Remise Valeur Max'),
+                              keyboardType: TextInputType.numberWithOptions(
+                                  decimal: true),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d{0,2}')),
+                              ],
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Le champ "Remise Valeur Max" ne doit pas être vide.';
+                                }
+                                final discountValue = double.tryParse(value);
+                                if (discountValue == null ||
+                                    discountValue < 0) {
+                                  return 'La remise valeur max doit être un nombre positif ou nul.';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty) {
+                                  final profit =
+                                      double.tryParse(profitController.text) ??
+                                          0;
+                                  final discountValue =
+                                      double.tryParse(value) ?? 0;
+                                  if (profit > 0) {
+                                    final percentage =
+                                        (discountValue / profit) * 100;
+                                    remiseMaxController.text =
+                                        percentage.toStringAsFixed(2);
+                                  }
+                                } else {
+                                  remiseMaxController.clear();
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      _buildTextFormField(
-                        controller: profitController,
-                        label: 'Profit',
-                        keyboardType: TextInputType.number,
-                        enabled: false,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Profit" ne doit pas être vide.';
-                          }
-                          if (double.tryParse(value) == null ||
-                              double.parse(value) <= 0) {
-                            return 'Le profit doit être un nombre positif.';
-                          }
-                          return null;
-                        },
-                      ),
-                      _buildTextFormField(
-                        controller: remiseValeurMaxController,
-                        label: 'Remise Valeur Max',
-                        keyboardType: TextInputType.number,
-                        enabled: false,
-                      ),
+                      const SizedBox(height: 16),
+
                       DropdownButtonFormField<double>(
                         decoration: _inputDecoration('Taxe (%)'),
                         value: selectedTax,
@@ -282,11 +374,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _buildTextFormField(
-                        controller: priceTTCController,
-                        label: 'Prix TTC',
-                      ),
-                      const SizedBox(height: 16),
                       CheckboxListTile(
                         title: const Text(
                             'Ce produit a-t-il une date d\'expiration ?'),
@@ -301,39 +388,42 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      _buildTextFormField(
-                        controller: dateController,
-                        label: 'Date Expiration',
-                        validator: (value) {
-                          if (hasExpirationDate) {
-                            if (value == null || value.isEmpty) {
-                              return 'Le champ "Date Expiration" ne doit pas être vide.';
-                            }
-                            List<String> possibleFormats = [
-                              "dd-MM-yyyy",
-                              "MM-dd-yyyy",
-                              "yyyy-MM-dd",
-                              "dd/MM/yyyy",
-                              "MM/dd/yyyy"
-                            ];
-                            DateTime? date;
-                            for (String format in possibleFormats) {
-                              try {
-                                date = DateFormat(format).parseStrict(value);
-                                break;
-                              } catch (e) {
-                                continue;
+                      Visibility(
+                        visible: hasExpirationDate,
+                        child: _buildTextFormField(
+                          controller: dateController,
+                          label: 'Date Expiration',
+                          validator: (value) {
+                            if (hasExpirationDate) {
+                              if (value == null || value.isEmpty) {
+                                return 'Le champ "Date Expiration" ne doit pas être vide.';
+                              }
+                              List<String> possibleFormats = [
+                                "dd-MM-yyyy",
+                                "MM-dd-yyyy",
+                                "yyyy-MM-dd",
+                                "dd/MM/yyyy",
+                                "MM/dd/yyyy"
+                              ];
+                              DateTime? date;
+                              for (String format in possibleFormats) {
+                                try {
+                                  date = DateFormat(format).parseStrict(value);
+                                  break;
+                                } catch (e) {
+                                  continue;
+                                }
+                              }
+                              if (date == null) {
+                                return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
+                              }
+                              if (!date.isAfter(DateTime.now())) {
+                                return 'La date doit être dans le futur.';
                               }
                             }
-                            if (date == null) {
-                              return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
-                            }
-                            if (!date.isAfter(DateTime.now())) {
-                              return 'La date doit être dans le futur.';
-                            }
-                          }
-                          return null;
-                        },
+                            return null;
+                          },
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -385,7 +475,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                           const SizedBox(width: 10),
                           IconButton(
-                            icon: const Icon(Icons.add, color: Color(0xFF26A9E0)),
+                            icon:
+                                const Icon(Icons.add, color: Color(0xFF26A9E0)),
                             onPressed: () {
                               setState(() {
                                 isCategoryFormVisible = !isCategoryFormVisible;
@@ -459,7 +550,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
                 prixTTC: double.parse(priceTTCController.text),
-                dateExpiration: hasExpirationDate ? dateController.text.trim() : '',
+                dateExpiration:
+                    hasExpirationDate ? dateController.text.trim() : '',
                 categoryId: selectedCategoryId!,
                 subCategoryId: selectedSubCategoryId!,
                 categoryName: categoryName,
@@ -478,7 +570,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               debugPrint('Error saving product: $e');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Erreur lors de la sauvegarde: ${e.toString()}'),
+                  content:
+                      Text('Erreur lors de la sauvegarde: ${e.toString()}'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -497,6 +590,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
     void Function(String)? onFieldSubmitted,
   }) {
     return Padding(
@@ -508,6 +602,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         enabled: enabled,
         validator: validator,
         style: const TextStyle(color: Colors.black),
+        onChanged: onChanged,
         onFieldSubmitted: onFieldSubmitted,
       ),
     );
@@ -563,9 +658,8 @@ class SubCategoryTree extends StatelessWidget {
             ListTile(
               title: Text(subCat.name),
               onTap: () => onSelect(subCat.id!),
-              tileColor: selectedSubCategoryId == subCat.id
-                  ? Colors.blue[50]
-                  : null,
+              tileColor:
+                  selectedSubCategoryId == subCat.id ? Colors.blue[50] : null,
             ),
             Padding(
               padding: const EdgeInsets.only(left: 16.0),
