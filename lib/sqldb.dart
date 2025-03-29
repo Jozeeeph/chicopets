@@ -6,6 +6,7 @@ import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/subcategory.dart';
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -714,44 +715,38 @@ class SqlDb {
   }
 
   // Fetch categories with their subcategories
-  // Fetch categories with their subcategories
   Future<List<Category>> getCategoriesWithSubcategories() async {
-    final dbClient = await db;
+    final db = await this.db;
+    try {
+      // Get all categories
+      final List<Map<String, dynamic>> categoriesData = await db.query(
+        'categories',
+        where: 'category_name IS NOT NULL',
+      );
 
-    List<Map<String, dynamic>> results = await dbClient.rawQuery('''
-    SELECT 
-      c.id_category, c.category_name, c.image_path,
-      s.id_sub_category, s.sub_category_name
-    FROM categories c
-    LEFT JOIN subcategories s ON c.id_category = s.category_id
-  ''');
+      List<Category> categories = [];
 
-    // Organiser les résultats dans une structure de données correcte
-    Map<int, Category> categoryMap = {};
-
-    for (var row in results) {
-      int categoryId = row['id_category'];
-
-      if (!categoryMap.containsKey(categoryId)) {
-        categoryMap[categoryId] = Category(
-          id: categoryId,
-          name: row['category_name'],
-          imagePath: row['image_path'],
-          subCategories: [],
+      for (var categoryData in categoriesData) {
+        // Get subcategories for each category
+        final List<Map<String, dynamic>> subCategoriesData = await db.query(
+          'sub_categories',
+          where: 'category_id = ?',
+          whereArgs: [categoryData['id_category']],
         );
+
+        categories.add(Category.fromMap(
+          categoryData,
+          subCategories: subCategoriesData
+              .map((subCat) => SubCategory.fromMap(subCat))
+              .toList(),
+        ));
       }
 
-      if (row['id_sub_category'] != null) {
-        categoryMap[categoryId]!.subCategories.add(
-              SubCategory(
-                id: row['id_sub_category'],
-                name: row['sub_category_name'],
-                categoryId: categoryId,
-              ),
-            );
-      }
+      return categories;
+    } catch (e) {
+      debugPrint('Error loading categories: $e');
+      return [];
     }
-    return categoryMap.values.toList();
   }
 
   // Fetch subcategory by id and category_id

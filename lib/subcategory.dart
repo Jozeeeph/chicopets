@@ -1,8 +1,8 @@
 class SubCategory {
   final int? id;
   final String name;
-  final int? parentId; // Référence à la sous-catégorie parente
-  final int? categoryId; // Référence à la catégorie principale
+  final int? parentId;
+  final int? categoryId;
 
   SubCategory({
     this.id,
@@ -22,10 +22,10 @@ class SubCategory {
 
   factory SubCategory.fromMap(Map<String, dynamic> map) {
     return SubCategory(
-      id: map['id_sub_category'],
-      name: map['sub_category_name'],
-      parentId: map['parent_id'],
-      categoryId: map['category_id'],
+      id: map['id_sub_category'] as int?,
+      name: (map['sub_category_name'] ?? 'Unnamed Subcategory') as String,
+      parentId: map['parent_id'] as int?,
+      categoryId: map['category_id'] as int?,
     );
   }
 }

@@ -1,15 +1,15 @@
 import 'package:caissechicopets/subcategory.dart';
 
 class Category {
-  int? id;
-  String name;
-  String imagePath;
-  List<SubCategory> subCategories;
+  final int? id;
+  final String name;
+  final String? imagePath;
+  final List<SubCategory> subCategories;
 
   Category({
     this.id,
     required this.name,
-    required this.imagePath,
+    this.imagePath,
     this.subCategories = const [],
   });
 
@@ -18,15 +18,15 @@ class Category {
       'id_category': id,
       'category_name': name,
       'image_path': imagePath,
-      'sub_categories': subCategories.map((sub) => sub.toMap()).toList(),
     };
   }
 
-  factory Category.fromMap(Map<String, dynamic> map, {List<SubCategory>? subCategories}) {
+  factory Category.fromMap(Map<String, dynamic> map,
+      {List<SubCategory>? subCategories}) {
     return Category(
-      id: map['id_category'],
-      name: map['category_name'],
-      imagePath: map['image_path'],
+      id: map['id_category'] as int?,
+      name: (map['category_name'] ?? 'Unnamed Category') as String,
+      imagePath: map['image_path'] as String?,
       subCategories: subCategories ?? [],
     );
   }
