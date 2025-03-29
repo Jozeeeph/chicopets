@@ -16,14 +16,34 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   List<Category> _categories = [];
   List<Category> _filteredCategories = [];
   final TextEditingController _searchController = TextEditingController();
-  List<Category> _selectedCategories =
-      []; // Pour stocker les catégories sélectionnées
+  List<Category> _selectedCategories = [];
+  String _importStatus = 'Ready';
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    fetchCategories();
+    _initializeDatabase();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _initializeDatabase() async {
+    try {
+      final db = await sqldb.db;
+      // Verify tables exist
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('categories', 'sub_categories')",
+      );
+      if (tables.length < 2) {
+        throw Exception('Required database tables not found');
+      }
+      await fetchCategories();
+    } catch (e) {
+      setState(() {
+        _importStatus = 'Error';
+        _errorMessage = 'Database initialization failed: ${e.toString()}';
+      });
+    }
   }
 
   @override
@@ -34,25 +54,46 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   }
 
   Future<void> fetchCategories() async {
+    setState(() {
+      _importStatus = 'Loading';
+      _errorMessage = '';
+    });
+
     try {
-      List<Category> fetchedCategories = await sqldb.getCategories();
+      List<Category> fetchedCategories =
+          await sqldb.getCategoriesWithSubcategories();
+
+      // Filter out any invalid categories
+      fetchedCategories = fetchedCategories.where((category) {
+        return category.name.isNotEmpty && category.id != null;
+      }).toList();
+
       setState(() {
         _categories = fetchedCategories;
         _filteredCategories = fetchedCategories;
+        _importStatus = 'Ready';
       });
     } catch (e) {
-      _showMessage("Erreur lors du chargement des catégories !");
+      setState(() {
+        _importStatus = 'Error';
+        _errorMessage = 'Failed to load categories: ${e.toString()}';
+      });
     }
   }
 
   Future<bool> _checkProductsBeforeDelete(List<Category> categories) async {
-    for (var category in categories) {
-      bool hasProducts = await sqldb.hasProductsInCategory(category.id!);
-      if (hasProducts) {
-        return true; // Il y a des produits associés
+    try {
+      for (var category in categories) {
+        bool hasProducts = await sqldb.hasProductsInCategory(category.id!);
+        if (hasProducts) {
+          return true;
+        }
       }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking products: $e');
+      return true; // Assume there are products to be safe
     }
-    return false; // Aucun produit associé
   }
 
   void _onSearchChanged() {
@@ -81,7 +122,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       context,
       MaterialPageRoute(builder: (context) => const AddCategory()),
     );
-    fetchCategories(); // Rafraîchir la liste après l'ajout d'une catégorie
+    await fetchCategories();
   }
 
   void _editCategory(Category category) async {
@@ -92,241 +133,150 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         settings: RouteSettings(arguments: category),
       ),
     );
-    fetchCategories(); // Rafraîchir la liste après la modification d'une catégorie
+    await fetchCategories();
   }
 
   Future<void> _confirmDelete({Category? singleCategory}) async {
-    // Créer une liste des catégories à supprimer
     List<Category> categoriesToDelete =
         singleCategory != null ? [singleCategory] : _selectedCategories;
 
-    // Récupérer les produits concernés
-    List<String> productCodes = [];
-    for (var category in categoriesToDelete) {
-      productCodes.addAll(await sqldb.getProductsInCategory(category.id!));
-    }
+    bool hasProducts = await _checkProductsBeforeDelete(categoriesToDelete);
 
-    if (productCodes.isNotEmpty) {
-      showDialog(
+    if (hasProducts) {
+      List<String> productCodes = [];
+      for (var category in categoriesToDelete) {
+        productCodes.addAll(await sqldb.getProductsInCategory(category.id!));
+      }
+
+      await showDialog(
         context: context,
-        builder: (context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            title: Column(
-              children: [
-                const Icon(Icons.warning_amber_rounded,
-                    size: 40, color: Colors.orange),
-                const SizedBox(height: 8),
-                Text(
-                  "Action impossible",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  singleCategory != null
-                      ? "Cette catégorie contient des produits associés :"
-                      : "Les catégories sélectionnées contiennent des produits :",
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 12), // Correction ici
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(Icons.info_outline,
-                          size: 16, color: Colors.blue),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "Vous devez d'abord supprimer ces produits\n"
-                        "avant de pouvoir supprimer la catégorie.",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "${productCodes.length} produit(s) concerné(s)",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ], // Correction : fermeture correcte du children
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.grey[600],
-                ),
-                child: const Text("Annuler"),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProductsToDeleteScreen(
-                        productCodes: productCodes,
-                        onProductsDeleted: fetchCategories,
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
-                child: const Text(
-                  "Voir les produits",
-                  style: TextStyle(color: Colors.white),
+        builder: (context) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Column(
+            children: [
+              const Icon(Icons.warning, size: 40, color: Colors.orange),
+              const SizedBox(height: 8),
+              Text(
+                "Cannot Delete Category",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
             ],
-            actionsPadding:
-                const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-          );
-        },
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "This category contains ${productCodes.length} product(s). "
+                "You must delete these products first.",
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "Products: ${productCodes.join(', ')}",
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductsToDeleteScreen(
+                      productCodes: productCodes,
+                      onProductsDeleted: fetchCategories,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+              ),
+              child: const Text("View Products",
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
       );
       return;
     }
 
-    // Si pas de produits, demander confirmation
-    final TextEditingController confirmController = TextEditingController();
-    bool isConfirmed = false;
+    bool confirmed = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Confirm Delete"),
+            content:
+                const Text("Are you sure you want to delete these categories?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child:
+                    const Text("Delete", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
 
-    await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              title: Row(
-                children: [
-                  const Icon(Icons.warning, color: Colors.red),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Confirmation',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    singleCategory != null
-                        ? 'Tapez "confirmer" pour supprimer cette catégorie :'
-                        : 'Tapez "confirmer" pour supprimer les catégories sélectionnées :',
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: confirmController,
-                    onChanged: (value) {
-                      setState(() {
-                        isConfirmed =
-                            (value.trim().toLowerCase() == "confirmer");
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'confirmer',
-                      filled: true,
-                      fillColor: Colors.grey[200],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: isConfirmed
-                      ? () async {
-                          Navigator.of(context).pop();
-                          await _deleteCategories(categoriesToDelete);
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isConfirmed ? Colors.red : Colors.grey[400],
-                  ),
-                  child: const Text('Supprimer'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    if (confirmed) {
+      await _deleteCategories(categoriesToDelete);
+    }
   }
 
   Future<void> _deleteCategories(List<Category> categories) async {
     try {
       int successCount = 0;
+      final db = await sqldb.db;
 
-      for (var category in categories) {
-        int result = await sqldb.deleteCategory(category.id!);
-        if (result > 0) {
-          successCount++;
-        } else if (result == -2) {
-          // Code spécial pour catégorie avec produits
-          _showMessage(
-              "La catégorie '${category.name}' n'a pas pu être supprimée car elle contient des produits");
+      await db.transaction((txn) async {
+        for (var category in categories) {
+          // Delete subcategories first
+          await txn.delete(
+            'sub_categories',
+            where: 'category_id = ?',
+            whereArgs: [category.id],
+          );
+
+          // Then delete category
+          int result = await txn.delete(
+            'categories',
+            where: 'id_category = ?',
+            whereArgs: [category.id],
+          );
+
+          if (result > 0) successCount++;
         }
-      }
+      });
 
       if (successCount > 0) {
-        _showMessage("$successCount catégorie(s) supprimée(s) avec succès !");
+        _showMessage("Deleted $successCount category(ies)");
+        await fetchCategories();
       }
-
-      _selectedCategories
-          .clear(); // Vider la liste des catégories sélectionnées
-      fetchCategories(); // Rafraîchir la liste
     } catch (e) {
-      _showMessage(
-          "Erreur lors de la suppression des catégories : ${e.toString()}");
+      _showMessage("Error deleting categories: ${e.toString()}");
     }
   }
 
@@ -343,28 +293,158 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   void _toggleSelectAll() {
     setState(() {
       if (_selectedCategories.length == _filteredCategories.length) {
-        _selectedCategories.clear(); // Désélectionner tout
+        _selectedCategories.clear();
       } else {
-        _selectedCategories =
-            List.from(_filteredCategories); // Sélectionner tout
+        _selectedCategories = List.from(_filteredCategories);
       }
     });
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text("Loading categories..."),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(
+            "Error loading categories",
+            style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: fetchCategories,
+            child: const Text("Retry"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.category_outlined, size: 48, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            "No categories found",
+            style: TextStyle(fontSize: 18),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _navigateToAddCategory,
+            child: const Text("Add your first category"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(10),
+      itemCount: _filteredCategories.length,
+      itemBuilder: (context, index) {
+        final category = _filteredCategories[index];
+        final isSelected = _selectedCategories.contains(category);
+        final subcategoryCount = category.subCategories.length;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: isSelected
+                ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+                : BorderSide.none,
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _toggleCategorySelection(category),
+            onLongPress: () => _editCategory(category),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                leading: Checkbox(
+                  value: isSelected,
+                  onChanged: (value) => _toggleCategorySelection(category),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                title: Text(
+                  category.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  "$subcategoryCount ${subcategoryCount == 1 ? 'subcategory' : 'subcategories'}",
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      tooltip: 'Edit category',
+                      onPressed: () => _editCategory(category),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Delete category',
+                      onPressed: () => _confirmDelete(singleCategory: category),
+                    ),
+                  ],
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestion des Catégories'),
+        title: const Text('Manage Categories'),
         backgroundColor: const Color(0xFF0056A6),
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
+            icon: const Icon(Icons.add),
             onPressed: _navigateToAddCategory,
           ),
           if (_filteredCategories.isNotEmpty)
@@ -373,14 +453,12 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                 _selectedCategories.length == _filteredCategories.length
                     ? Icons.deselect
                     : Icons.select_all,
-                color: Colors.white,
               ),
-              onPressed:
-                  _toggleSelectAll, // Sélectionner ou désélectionner tout
+              onPressed: _toggleSelectAll,
             ),
           if (_selectedCategories.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.white),
+              icon: const Icon(Icons.delete),
               onPressed: () => _confirmDelete(),
             ),
         ],
@@ -392,77 +470,22 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Rechercher une catégorie',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF26A9E0)),
-                filled: true,
-                fillColor: const Color(0xFFE0E0E0),
+                labelText: 'Search categories',
+                prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
           ),
           Expanded(
-            child: _filteredCategories.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucune catégorie trouvée',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(10),
-                    itemCount: _filteredCategories.length,
-                    itemBuilder: (context, index) {
-                      final category = _filteredCategories[index];
-                      final isSelected = _selectedCategories.contains(category);
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(15),
-                          leading: Checkbox(
-                            value: isSelected,
-                            onChanged: (value) {
-                              _toggleCategorySelection(category);
-                            },
-                          ),
-                          title: Text(
-                            category.name,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${category.subCategories.length} sous-catégories',
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit,
-                                    color: Color(0xFF009688)),
-                                onPressed: () {
-                                  _editCategory(category);
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Color(0xFFE53935)),
-                                onPressed: () =>
-                                    _confirmDelete(singleCategory: category),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+            child: _importStatus == 'Loading'
+                ? _buildLoadingState()
+                : _importStatus == 'Error'
+                    ? _buildErrorState()
+                    : _filteredCategories.isEmpty
+                        ? _buildEmptyState()
+                        : _buildCategoryList(),
           ),
         ],
       ),

@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/variant.dart';
+import 'package:sqflite/sqflite.dart';
 
 class ImportProductPage extends StatefulWidget {
   const ImportProductPage({super.key});
@@ -15,22 +17,24 @@ class ImportProductPage extends StatefulWidget {
 
 class _ImportProductPageState extends State<ImportProductPage> {
   final SqlDb _sqlDb = SqlDb();
-  String _importStatus = 'Prêt à importer';
+  String _importStatus = 'Ready to import';
   int _importedProductsCount = 0;
+  int _importedVariantsCount = 0;
   String _errorMessage = '';
   bool _isImporting = false;
   double _progress = 0.0;
-  Future<void> importProducts() async {
+
+  Future<void> importProductsWithVariants() async {
     setState(() {
-      _importStatus = 'Importation en cours...';
+      _importStatus = 'Importing...';
       _importedProductsCount = 0;
+      _importedVariantsCount = 0;
       _errorMessage = '';
       _isImporting = true;
       _progress = 0.0;
     });
 
     try {
-
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
@@ -41,168 +45,276 @@ class _ImportProductPageState extends State<ImportProductPage> {
         String? filePath = file.path;
 
         if (filePath == null) {
-          throw Exception('Chemin du fichier non disponible');
+          throw Exception('File path not available');
         }
 
         var bytes = File(filePath).readAsBytesSync();
         var excel = Excel.decodeBytes(bytes);
 
-        int totalRows = excel.tables.values.fold(
-            0, (sum, table) => sum + table.rows.length - 1);
-        for (var table in excel.tables.keys) {
-          var sheet = excel.tables[table]!;
-          
-          // Vérifier que le fichier a le bon format
-          if (sheet.rows.isEmpty || sheet.rows.first.length < 9) {
-            throw Exception('Format de fichier incorrect. Vérifiez les colonnes.');
-          }
+        // Use the first sheet
+        var sheet = excel.tables.values.first;
+        if (sheet == null) {
+          throw Exception('No sheet found in Excel file');
+        }
 
-          for (var row in sheet.rows) {
-            if (row == sheet.rows.first) continue;
+        // Process each row (skip header)
+        int totalRows = sheet.rows.length - 1;
+        int processedRows = 0;
 
-            if (!_isImporting) break;
+        for (var row in sheet.rows.skip(1)) {
+          if (!_isImporting) break;
 
-            try {
-              String code = row[0]?.value?.toString() ?? '';
-              String designation = row[1]?.value?.toString() ?? '';
-              int stock = int.tryParse(row[2]?.value?.toString() ?? '0') ?? 0;
-              double prixHT = double.tryParse(row[3]?.value?.toString() ?? '0') ?? 0.0;
-              double taxe = double.tryParse(row[4]?.value?.toString() ?? '0') ?? 0.0;
-              double prixTTC = double.tryParse(row[5]?.value?.toString() ?? '0') ?? 0.0;
-              String dateExpiration = row[6]?.value?.toString() ?? '';
-              String categoryName = row[7]?.value?.toString() ?? '';
-              String subCategoryName = row[8]?.value?.toString() ?? '';
+          try {
+            // Parse product data with null checks
+            String code = row[0]?.value?.toString() ?? '';
+            String designation = row[1]?.value?.toString() ?? '';
+            double prixHT = _parseDouble(row[2]?.value?.toString() ?? '0');
+            double taxe = _parseDouble(row[3]?.value?.toString() ?? '0');
+            String categoryName = (row[4]?.value?.toString() ?? '').trim();
+            String subCategoryName = (row[5]?.value?.toString() ?? '').trim();
+            double marge = _parseDouble(row[6]?.value?.toString() ?? '0');
+            double remiseMax = _parseDouble(row[7]?.value?.toString() ?? '0');
+            bool hasVariants = (row[8]?.value?.toString() ?? 'false').toLowerCase() == 'true';
 
-              // Validation des données obligatoires
-              if (code.isEmpty || designation.isEmpty) {
-                throw Exception('Code et désignation sont obligatoires');
+            // Validate required fields
+            if (code.isEmpty || designation.isEmpty) {
+              throw Exception('Missing required fields for product');
+            }
+
+            // Handle empty category names
+            if (categoryName.isEmpty) categoryName = 'Default';
+            if (subCategoryName.isEmpty) subCategoryName = 'Default';
+
+            // Get or create category IDs with retry logic
+            int categoryId = await _getOrCreateCategoryWithRetry(categoryName);
+            int subCategoryId = await _getOrCreateSubCategoryWithRetry(subCategoryName, categoryId);
+
+            // Calculate derived values
+            double prixTTC = prixHT * (1 + marge / 100);
+            double remiseValeurMax = (marge * remiseMax) / 100;
+
+            // Create product
+            final product = Product(
+              code: code,
+              designation: designation,
+              stock: 0, // Will be set from variant or directly
+              prixHT: prixHT,
+              taxe: taxe,
+              prixTTC: prixTTC,
+              dateExpiration: '',
+              categoryId: categoryId,
+              subCategoryId: subCategoryId,
+              marge: marge,
+              remiseMax: remiseMax,
+              remiseValeurMax: remiseValeurMax,
+              hasVariants: hasVariants,
+              variants: [],
+            );
+
+            // Handle variants if exists
+            if (hasVariants) {
+              String variantCode = row[9]?.value?.toString() ?? '';
+              String attributesStr = row[10]?.value?.toString() ?? '';
+              double variantPrice = _parseDouble(row[11]?.value?.toString() ?? '0');
+              double priceImpact = _parseDouble(row[12]?.value?.toString() ?? '0');
+              int variantStock = int.tryParse(row[13]?.value?.toString() ?? '0') ?? 0;
+
+              if (variantCode.isEmpty) {
+                throw Exception('Variant code missing for product $code');
               }
 
-              int categoryId = await _getOrCreateCategoryIdByName(categoryName);
-              int subCategoryId = await _getOrCreateSubCategoryIdByName(
-                  subCategoryName, categoryId);
+              // Parse attributes
+              Map<String, String> attributes = {};
+              if (attributesStr.isNotEmpty) {
+                attributesStr.split(',').forEach((attrPair) {
+                  var parts = attrPair.split(':');
+                  if (parts.length == 2) {
+                    attributes[parts[0].trim()] = parts[1].trim();
+                  }
+                });
+              }
 
-              // Création de l'objet Product
-              final product = Product(
-                code: code,
-                designation: designation,
-                stock: stock,
-                prixHT: prixHT,
-                taxe: taxe,
-                prixTTC: prixTTC,
-                dateExpiration: dateExpiration,
-                categoryId: categoryId,
-                subCategoryId: subCategoryId,
-                marge: prixTTC - prixHT,
-                remiseMax: 0.0,
-                remiseValeurMax: 0.0,
+              // Insert product first
+              product.id = await _sqlDb.addProduct(product);
+              
+              // Create variant
+              final variant = Variant(
+                code: variantCode,
+                combinationName: attributes.values.join('-'),
+                price: variantPrice,
+                priceImpact: priceImpact,
+                stock: variantStock,
+                attributes: attributes,
+                productId: product.id!,
               );
 
-              // Insertion du produit
-              await _sqlDb.addProduct(product);
+              // Insert variant
+              variant.id = await _sqlDb.addVariant(variant);
+              product.variants.add(variant);
 
               setState(() {
-                _importedProductsCount++;
-                _progress = _importedProductsCount / totalRows;
+                _importedVariantsCount++;
               });
-            } catch (e) {
-              debugPrint('Erreur lors du traitement de la ligne: $e');
-              continue; // Passe à la ligne suivante en cas d'erreur
+            } else {
+              // For non-variant products, use the stock value directly
+              product.stock = int.tryParse(row[13]?.value?.toString() ?? '0') ?? 0;
+              product.id = await _sqlDb.addProduct(product);
             }
+
+            setState(() {
+              _importedProductsCount++;
+              processedRows++;
+              _progress = processedRows / totalRows;
+            });
+          } catch (e) {
+            debugPrint('Error processing row ${processedRows + 1}: ${e.toString()}');
+            processedRows++;
+            continue;
           }
         }
 
         if (_isImporting) {
           setState(() {
-            _importStatus = 'Importation réussie!';
+            _importStatus = 'Import successful!';
             _isImporting = false;
           });
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$_importedProductsCount produits importés avec succès'),
+              content: Text('Successfully imported $_importedProductsCount products and $_importedVariantsCount variants'),
               duration: const Duration(seconds: 3),
             ),
           );
         }
       }
-    } 
-    catch (e) {
+    } catch (e) {
       setState(() {
-        _importStatus = 'Erreur lors de l\'importation';
+        _importStatus = 'Import failed';
         _errorMessage = e.toString();
         _isImporting = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: $_errorMessage'),
+          content: Text('Error: $_errorMessage'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  Future<int> _getOrCreateCategoryIdByName(String categoryName) async {
-    final dbClient = await _sqlDb.db;
-    List<Map<String, dynamic>> result = await dbClient.query(
-      'categories',
-      where: 'category_name = ?',
-      whereArgs: [categoryName],
-    );
-
-    if (result.isNotEmpty) {
-      return result.first['id_category'] as int;
-    } else {
-      return await dbClient.insert(
-        'categories',
-        {'category_name': categoryName},
-      );
-
+  Future<int> _getOrCreateCategoryWithRetry(String categoryName, {int retryCount = 3}) async {
+    int attempt = 0;
+    while (attempt < retryCount) {
+      try {
+        return await _getOrCreateCategoryIdByName(categoryName);
+      } catch (e) {
+        attempt++;
+        if (attempt >= retryCount) {
+          debugPrint('Falling back to default category after $retryCount attempts');
+          return await _getOrCreateCategoryIdByName('Default');
+        }
+        await Future.delayed(Duration(milliseconds: 100 * attempt));
+      }
     }
+    return await _getOrCreateCategoryIdByName('Default');
   }
 
-  Future<int> _getOrCreateSubCategoryIdByName(
-      String subCategoryName, int categoryId) async {
-    final dbClient = await _sqlDb.db;
-    List<Map<String, dynamic>> result = await dbClient.query(
-      'sub_categories',
-      where: 'sub_category_name = ? AND category_id = ?',
-      whereArgs: [subCategoryName, categoryId],
-    );
+  Future<int> _getOrCreateSubCategoryWithRetry(String subCategoryName, int categoryId, {int retryCount = 3}) async {
+    int attempt = 0;
+    while (attempt < retryCount) {
+      try {
+        return await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
+      } catch (e) {
+        attempt++;
+        if (attempt >= retryCount) {
+          debugPrint('Falling back to default subcategory after $retryCount attempts');
+          return await _getOrCreateSubCategoryIdByName('Default', categoryId);
+        }
+        await Future.delayed(Duration(milliseconds: 100 * attempt));
+      }
+    }
+    return await _getOrCreateSubCategoryIdByName('Default', categoryId);
+  }
 
-    if (result.isNotEmpty) {
-      return result.first['id_sub_category'] as int;
-    } else {
-      return await dbClient.insert(
+  Future<int> _getOrCreateCategoryIdByName(String categoryName) async {
+    final db = await _sqlDb.db;
+    
+    return await db.transaction((txn) async {
+      // Try to find existing category
+      var result = await txn.query(
+        'categories',
+        where: 'category_name = ? COLLATE NOCASE',
+        whereArgs: [categoryName.trim()],
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['id_category'] as int;
+      }
+
+      // Create new category if not found
+      return await txn.insert(
+        'categories',
+        {
+          'category_name': categoryName.trim(),
+          'image_path': null,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+  }
+
+  Future<int> _getOrCreateSubCategoryIdByName(String subCategoryName, int categoryId) async {
+    final db = await _sqlDb.db;
+    
+    return await db.transaction((txn) async {
+      // Try to find existing subcategory
+      var result = await txn.query(
+        'sub_categories',
+        where: 'sub_category_name = ? COLLATE NOCASE AND category_id = ?',
+        whereArgs: [subCategoryName.trim(), categoryId],
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['id_sub_category'] as int;
+      }
+
+      // Create new subcategory if not found
+      return await txn.insert(
         'sub_categories',
         {
-          'sub_category_name': subCategoryName,
+          'sub_category_name': subCategoryName.trim(),
           'category_id': categoryId,
+          'parent_id': null,
         },
+        conflictAlgorithm: ConflictAlgorithm.replace,
       );
-
-    }
+    });
   }
-  
+
+  double _parseDouble(String value) {
+    // Handle both comma and dot decimal separators
+    return double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+  }
+
   void _confirmCancelImport() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Interrompre l\'importation'),
-          content: const Text('Êtes-vous sûr de vouloir interrompre l\'importation ?'),
+          title: const Text('Cancel Import'),
+          content: const Text('Are you sure you want to cancel the import?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Non'),
+              child: const Text('No'),
             ),
             TextButton(
               onPressed: () {
                 setState(() => _isImporting = false);
                 Navigator.of(context).pop();
               },
-              child: const Text('Oui'),
+              child: const Text('Yes'),
             ),
           ],
         );
@@ -214,9 +326,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Importer des produits'),
+        title: const Text('Import Products'),
         backgroundColor: const Color(0xFF0056A6),
-
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -244,7 +355,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         const Icon(Icons.upload_file, size: 50, color: Colors.blue),
                         const SizedBox(height: 20),
                         Text(
-                          'Importer des produits depuis Excel',
+                          'Import Products with Variants',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -252,20 +363,20 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Format attendu: Code, Désignation, Stock, Prix HT, Taxe, Prix TTC, Date Expiration, Catégorie, Sous-catégorie',
+                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, Marge, RemiseMax, HasVariants, VariantCode, Attributes, VariantPrice, PriceImpact, VariantStock',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: _isImporting ? null : importProducts,
+                          onPressed: _isImporting ? null : importProductsWithVariants,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF009688),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 30, vertical: 15),
                           ),
                           child: Text(
-                            _isImporting ? 'Importation en cours...' : 'Sélectionner un fichier',
+                            _isImporting ? 'Importing...' : 'Select File',
                             style: GoogleFonts.poppins(
                               fontSize: 16,
                               color: Colors.white,
@@ -285,14 +396,21 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '${(_progress * 100).toStringAsFixed(1)}% complété',
+                    '${(_progress * 100).toStringAsFixed(1)}% completed',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
-                    '$_importedProductsCount produits importés',
+                    '$_importedProductsCount products imported',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    '$_importedVariantsCount variants imported',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
@@ -305,7 +423,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
                     ),
-                    child: const Text('Annuler l\'importation'),
+                    child: const Text('Cancel Import'),
                   ),
                 ],
                 if (_errorMessage.isNotEmpty)
@@ -325,7 +443,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 16,
-
                   ),
                 ),
               ],
