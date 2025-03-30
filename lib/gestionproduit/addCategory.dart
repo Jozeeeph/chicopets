@@ -15,6 +15,16 @@ class AddCategory extends StatefulWidget {
 }
 
 class _AddCategoryState extends State<AddCategory> {
+  // Palette de couleurs
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
+
+  // Contrôleurs et état
   final TextEditingController nameController = TextEditingController();
   final TextEditingController subCategoryNameController =
       TextEditingController();
@@ -28,7 +38,7 @@ class _AddCategoryState extends State<AddCategory> {
   final TextEditingController _editSubCategoryController =
       TextEditingController();
   int? selectedParentSubCategoryId;
-  int _nextSubCategoryId = 1; // For generating unique IDs
+  int _nextSubCategoryId = 1;
 
   @override
   void initState() {
@@ -46,7 +56,6 @@ class _AddCategoryState extends State<AddCategory> {
       selectedCategoryId = categoryToEdit!.id;
       selectedImage = File(categoryToEdit!.imagePath!);
 
-      // Load subcategories for the category being edited
       if (selectedCategoryId != null) {
         fetchSubCategories(selectedCategoryId!);
       }
@@ -68,9 +77,6 @@ class _AddCategoryState extends State<AddCategory> {
     try {
       List<Map<String, dynamic>> fetchedSubCategories =
           await sqldb.getSubCategoriesByCategory(categoryId);
-
-      // Debugging: Print fetched subcategories
-      print("Fetched subcategories: $fetchedSubCategories");
 
       setState(() {
         subCategories = fetchedSubCategories.map((map) {
@@ -98,7 +104,6 @@ class _AddCategoryState extends State<AddCategory> {
     }
   }
 
-  // Dans la méthode pickImageFromGallery de addCategory.dart
   Future<void> pickImageFromGallery() async {
     final selectedImageFromGallery = await Navigator.push(
       context,
@@ -112,7 +117,6 @@ class _AddCategoryState extends State<AddCategory> {
         selectedImage = selectedImageFromGallery;
       });
     } else if (selectedImageFromGallery != null) {
-      // Gérer d'autres types de retour si nécessaire
       print("Unexpected return type from GalleryPage");
     }
   }
@@ -152,18 +156,14 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Ajoute la catégorie
     int categoryId =
         await sqldb.addCategory(nameController.text, selectedImage!.path);
     if (categoryId > 0) {
-      // Trie les sous-catégories pour enregistrer les parents avant les enfants
       List<SubCategory> sortedSubCategories =
           _sortSubCategoriesByParent(subCategories);
 
-      // Map pour stocker les ID temporaires et les ID réels des sous-catégories
       Map<int, int> tempIdToRealId = {};
 
-      // Enregistre les sous-catégories parentes d'abord
       for (var subCategory in sortedSubCategories) {
         if (subCategory.parentId == null) {
           int subCategoryId = await sqldb.addSubCategory(
@@ -174,12 +174,10 @@ class _AddCategoryState extends State<AddCategory> {
             ),
           );
 
-          // Stocke l'ID réel de la sous-catégorie parente
           tempIdToRealId[subCategory.id ?? -1] = subCategoryId;
         }
       }
 
-      // Enregistre les sous-catégories filles avec les parent_id corrects
       for (var subCategory in sortedSubCategories) {
         if (subCategory.parentId != null) {
           int realParentId = tempIdToRealId[subCategory.parentId] ?? -1;
@@ -233,7 +231,6 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Update the category
     int result = await sqldb.updateCategory(
       categoryToEdit!.id!,
       nameController.text,
@@ -241,13 +238,10 @@ class _AddCategoryState extends State<AddCategory> {
     );
 
     if (result > 0) {
-      // Debugging: Print the subcategories before updating
       print("Subcategories before update: $subCategories");
 
-      // Update subcategories
       for (var subCategory in subCategories) {
         if (subCategory.id == null) {
-          // Add a new subcategory
           int newSubCategoryId = await sqldb.addSubCategory(
             SubCategory(
               name: subCategory.name,
@@ -258,7 +252,6 @@ class _AddCategoryState extends State<AddCategory> {
           print(
               "Added new subcategory: ${subCategory.name}, ID: $newSubCategoryId");
         } else {
-          // Update an existing subcategory
           final updateResult = await sqldb.updateSubCategory(subCategory);
           if (updateResult <= 0) {
             _showMessage(
@@ -270,10 +263,8 @@ class _AddCategoryState extends State<AddCategory> {
         }
       }
 
-      // Fetch the updated subcategories after updating the category
       await fetchSubCategories(categoryToEdit!.id!);
 
-      // Debugging: Print the subcategories after updating
       print("Subcategories after update: $subCategories");
 
       _showMessageSuccess(
@@ -290,7 +281,6 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Save the subcategory to the database
     int subCategoryId = await sqldb.addSubCategory(
       SubCategory(
         name: subCategoryNameController.text,
@@ -310,10 +300,9 @@ class _AddCategoryState extends State<AddCategory> {
           ),
         );
         subCategoryNameController.clear();
-        selectedParentSubCategoryId = null; // Reset the selected parent ID
+        selectedParentSubCategoryId = null;
       });
 
-      // Debugging
       print("Added SubCategory: ${subCategories.last.name}");
       print("Parent ID: ${subCategories.last.parentId}");
       print("SubCategories: $subCategories");
@@ -323,7 +312,6 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   void _confirmDeleteSubCategory(int subCategoryId) async {
-    // Vérifier d'abord s'il y a des produits associés (directement ou dans les enfants)
     final productCodes = await sqldb.getProductsInSubCategory(subCategoryId);
 
     if (productCodes.isNotEmpty) {
@@ -451,44 +439,38 @@ class _AddCategoryState extends State<AddCategory> {
       return;
     }
 
-    // Si pas de produits, demander confirmation
     bool confirm = await showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-                12), // Coins arrondis pour un look moderne
+            borderRadius: BorderRadius.circular(12),
           ),
           title: const Text(
             "Confirmer la suppression",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 18, // Augmentation de la taille du texte
+              fontSize: 18,
             ),
           ),
           content: const Text(
             "Êtes-vous sûr de vouloir supprimer cette sous-catégorie ?",
-            style: TextStyle(fontSize: 16), // Texte plus lisible
+            style: TextStyle(fontSize: 16),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               style: TextButton.styleFrom(
-                foregroundColor:
-                    Colors.blue, // Couleur plus visible pour annuler
-                textStyle: TextStyle(fontSize: 16), // Taille du texte améliorée
+                foregroundColor: Colors.blue,
+                textStyle: TextStyle(fontSize: 16),
               ),
               child: const Text("Annuler"),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
               style: TextButton.styleFrom(
-                foregroundColor:
-                    Colors.red, // Couleur rouge pour indiquer danger
-                textStyle: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold), // Texte plus lisible
+                foregroundColor: Colors.red,
+                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               child: const Text("Supprimer"),
             ),
@@ -502,7 +484,7 @@ class _AddCategoryState extends State<AddCategory> {
       if (result > 0) {
         _showMessageSuccess("Sous-catégorie supprimée avec succès !");
         if (selectedCategoryId != null) {
-          fetchSubCategories(selectedCategoryId!); // Rafraîchir la liste
+          fetchSubCategories(selectedCategoryId!);
         }
       } else if (result == -2) {
         _showMessage("Cette sous-catégorie contient des produits !");
@@ -581,7 +563,7 @@ class _AddCategoryState extends State<AddCategory> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFFE53935), // Warm Red for error
+        backgroundColor: warmRed,
       ),
     );
   }
@@ -590,8 +572,7 @@ class _AddCategoryState extends State<AddCategory> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor:
-            const Color.fromARGB(255, 64, 180, 46), // Green for success
+        backgroundColor: tealGreen,
       ),
     );
   }
@@ -600,130 +581,285 @@ class _AddCategoryState extends State<AddCategory> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(categoryToEdit == null
-            ? 'Ajouter une catégorie'
-            : 'Modifier la catégorie'),
+        title: Text(
+          categoryToEdit == null
+              ? 'Ajouter une catégorie'
+              : 'Modifier la catégorie',
+          style: TextStyle(color: white),
+        ),
+        backgroundColor: deepBlue,
+        iconTheme: IconThemeData(color: white),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTextFormField(
-              controller: nameController,
-              label: 'Nom de la catégorie',
-            ),
-            const SizedBox(height: 16),
-            selectedImage == null
-                ? Text(
-                    "Aucune image sélectionnée",
-                    style: TextStyle(color: Colors.grey[600]),
-                  )
-                : Image.file(selectedImage!, height: 100),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _showImageSourceDialog,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF26A9E0), // Sky Blue
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Section Catégorie
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.category, color: deepBlue),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Informations de la catégorie',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextFormField(
+                            controller: nameController,
+                            label: 'Nom de la catégorie',
+                            icon: Icons.text_fields,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Image de la catégorie",
+                            style: TextStyle(
+                              color: darkBlue.withOpacity(0.8),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Icon(Icons.subdirectory_arrow_right, color: darkBlue.withOpacity(0.6)),
+                          const SizedBox(height: 8),
+                          if (selectedImage != null)
+                            Center(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: 220,
+                                    minHeight: 70,
+                                    maxWidth:
+                                        MediaQuery.of(context).size.width *
+                                            0.9, // 90% de la largeur de l'écran
+                                  ),
+                                  child: Image.file(
+                                    selectedImage!,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 120,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: lightGray),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.image, size: 40, color: lightGray),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "Aucune image sélectionnée",
+                                    style: TextStyle(color: lightGray),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          Center(
+                            child: SizedBox(
+                              width: 190,
+                              child: ElevatedButton.icon(
+                                onPressed: _showImageSourceDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: tealGreen,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                icon: Icon(Icons.image_search, color: white),
+                                label: Text(
+                                  "Choisir une image",
+                                  style: TextStyle(color: white),
+                                ),
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section Sous-catégories
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.subdirectory_arrow_right,
+                                  color: deepBlue),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Gestion des sous-catégories',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: darkBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextFormField(
+                                  controller: subCategoryNameController,
+                                  label: 'Nom de la sous-catégorie',
+                                  icon: Icons.text_snippet,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: lightGray),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: DropdownButton<int>(
+                                  value: selectedParentSubCategoryId,
+                                  hint: Text('Parent',
+                                      style: TextStyle(
+                                          color: darkBlue.withOpacity(0.6))),
+                                  icon: Icon(Icons.arrow_drop_down,
+                                      color: deepBlue),
+                                  underline: const SizedBox(),
+                                  items: [
+                                    DropdownMenuItem<int>(
+                                      value: null,
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.horizontal_rule,
+                                              size: 20, color: darkBlue),
+                                          const SizedBox(width: 4),
+                                          Text('Aucun parent'),
+                                        ],
+                                      ),
+                                    ),
+                                    ...subCategories.map((subCategory) {
+                                      return DropdownMenuItem<int>(
+                                        value: subCategory.id,
+                                        child: Text(subCategory.name),
+                                      );
+                                    }).toList(),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedParentSubCategoryId = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              CircleAvatar(
+                                backgroundColor: tealGreen,
+                                child: IconButton(
+                                  icon: Icon(Icons.add, color: white),
+                                  onPressed: addSubCategory,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (subCategories.isNotEmpty) ...[
+                            Text(
+                              "Liste des sous-catégories",
+                              style: TextStyle(
+                                color: darkBlue.withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: lightGray),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: SubCategoryTree(
+                                subCategories: subCategories,
+                                parentId: null,
+                                onEdit: _editSubCategory,
+                                onDelete: _confirmDeleteSubCategory,
+                                deepBlue: deepBlue,
+                                tealGreen: tealGreen,
+                                warmRed: warmRed,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text(
-                "Choisir une image",
-                style: TextStyle(color: Colors.white),
-              ),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
+          ),
+
+          // Bouton principal en bas
+          Container(
+            padding: const EdgeInsets.all(16),
+            width: 240,
+            child: ElevatedButton.icon(
               onPressed: categoryToEdit == null ? addCategory : updateCategory,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF009688), // Teal Green
+                backgroundColor: deepBlue,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: Text(
-                categoryToEdit == null ? "Ajouter" : "Mettre à jour",
-                style: const TextStyle(color: Colors.white),
+              icon: Icon(
+                categoryToEdit == null ? Icons.add : Icons.save,
+                color: white,
               ),
-            ),
-            const Divider(
-              color: Color(0xFFE0E0E0), // Light Gray divider
-              thickness: 2,
-            ),
-            const SizedBox(height: 16),
-
-            // Ajout des sous-catégories
-            const Text(
-              "Ajouter des sous-catégories :",
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0056A6)), // Deep Blue
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextFormField(
-                    controller: subCategoryNameController,
-                    label: 'Nom de la sous-catégorie',
-                  ),
-                ),
-                const SizedBox(width: 10),
-                DropdownButton<int>(
-                  value: selectedParentSubCategoryId,
-                  hint: const Text('Select Parent'),
-                  items: [
-                    // Add a "No Parent" option
-                    const DropdownMenuItem<int>(
-                      value: null,
-                      child: Text('No Parent'),
-                    ),
-                    // Add all subcategories as options
-                    ...subCategories.map((subCategory) {
-                      return DropdownMenuItem<int>(
-                        value: subCategory.id,
-                        child: Text(subCategory.name),
-                      );
-                    }).toList(),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      selectedParentSubCategoryId = value;
-                    });
-                  },
-                ),
-                const SizedBox(width: 10),
-                IconButton(
-                  icon: const Icon(
-                    Icons.add,
-                    color: Color(0xFF26A9E0), // Sky Blue icon
-                  ),
-                  onPressed: addSubCategory,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Affichage des sous-catégories
-            if (subCategories.isNotEmpty) ...[
-              const Text(
-                "Sous-catégories :",
+              label: Text(
+                categoryToEdit == null
+                    ? "Ajouter la catégorie"
+                    : "Mettre à jour",
                 style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0056A6)), // Deep Blue
+                  color: white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
-              const SizedBox(height: 8),
-              SubCategoryTree(
-                subCategories: subCategories,
-                parentId: null, // Start with top-level subcategories
-                onEdit: _editSubCategory, // Pass the edit method
-                onDelete: _confirmDeleteSubCategory, // Pass the delete method
-              ),
-            ],
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -731,94 +867,109 @@ class _AddCategoryState extends State<AddCategory> {
   Widget _buildTextFormField({
     required TextEditingController controller,
     required String label,
+    IconData? icon,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextFormField(
-        controller: controller,
-        decoration: _inputDecoration(label),
-        style: const TextStyle(color: Colors.black),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle:
-          const TextStyle(color: Color(0xFF0056A6)), // Deep Blue for label
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFFE0E0E0)), // Light Gray border
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFF26A9E0)), // Sky Blue on focus
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: darkBlue),
+        prefixIcon: icon != null ? Icon(icon, color: deepBlue) : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: lightGray),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: deepBlue),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       ),
     );
   }
 }
 
-// Recursive widget to display subcategory hierarchy
 class SubCategoryTree extends StatelessWidget {
   final List<SubCategory> subCategories;
   final int? parentId;
   final Function(SubCategory) onEdit;
   final Function(int) onDelete;
+  final Color deepBlue;
+  final Color tealGreen;
+  final Color warmRed;
 
   const SubCategoryTree({
     required this.subCategories,
     this.parentId,
     required this.onEdit,
     required this.onDelete,
+    required this.deepBlue,
+    required this.tealGreen,
+    required this.warmRed,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Filter subcategories by parentId
     final children =
         subCategories.where((subCat) => subCat.parentId == parentId).toList();
-
-    // Debugging: Print the filtered children
-    print("Filtered subcategories for parentId $parentId: $children");
-
-    // If no children, return an empty widget
     if (children.isEmpty) return const SizedBox.shrink();
 
     return ListView.builder(
-      shrinkWrap: true, // Avoid infinite height issues
-      physics: const NeverScrollableScrollPhysics(), // Disable scrolling
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: children.length,
       itemBuilder: (context, index) {
         final subCat = children[index];
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              title: Text(subCat.name),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, color: Color(0xFF009688)),
-                    onPressed: () => onEdit(subCat),
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                leading: Icon(
+                  parentId == null
+                      ? Icons.folder
+                      : Icons.subdirectory_arrow_right,
+                  color: deepBlue,
+                ),
+                title: Text(
+                  subCat.name,
+                  style: TextStyle(
+                    color: Colors.grey[800],
+                    fontWeight: FontWeight.w500,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Color(0xFFE53935)),
-                    onPressed: () => onDelete(subCat.id!),
-                  ),
-                ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit, color: tealGreen),
+                      onPressed: () => onEdit(subCat),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete, color: warmRed),
+                      onPressed: () => onDelete(subCat.id!),
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 16.0),
+              padding: const EdgeInsets.only(left: 24.0),
               child: SubCategoryTree(
                 subCategories: subCategories,
                 parentId: subCat.id,
                 onEdit: onEdit,
                 onDelete: onDelete,
+                deepBlue: deepBlue,
+                tealGreen: tealGreen,
+                warmRed: warmRed,
               ),
             ),
           ],

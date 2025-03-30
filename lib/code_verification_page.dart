@@ -1,13 +1,18 @@
+import 'dart:convert';
+
+import 'package:caissechicopets/cash_desk_page.dart';
+import 'package:caissechicopets/dashboard_page.dart';
+import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CodeVerificationPage extends StatefulWidget {
-  final Widget targetPage;
   final String pageName;
 
   const CodeVerificationPage({
     super.key,
-    required this.targetPage,
     required this.pageName,
   });
 
@@ -16,7 +21,7 @@ class CodeVerificationPage extends StatefulWidget {
 }
 
 class _CodeVerificationPageState extends State<CodeVerificationPage> {
-  final String _correctCode = "0000";
+  final SqlDb _sqlDb = SqlDb();
   String _enteredCode = "";
   bool _showError = false;
   bool _isLoading = false;
@@ -24,10 +29,9 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
   // Couleurs optimisées
   final Color lightBlue = const Color(0xFF26A9E0);
   final Color darkBlue = const Color(0xFF0056A6);
-  final Color lightText = const Color(0xFFF5F5F5); // Blanc légèrement grisé
-  final Color buttonColor =
-      const Color(0xFFE3F2FD); // Bleu très clair transparent
-  final Color errorColor = const Color(0xFFFFCDD2); // Rouge clair
+  final Color lightText = const Color(0xFFF5F5F5);
+  final Color buttonColor = const Color(0xFFE3F2FD);
+  final Color errorColor = const Color(0xFFFFCDD2);
 
   void _onNumberPressed(String number) async {
     if (_isLoading) return;
@@ -39,22 +43,48 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
       }
 
       if (_enteredCode.length == 4) {
-        if (_enteredCode == _correctCode) {
-          _isLoading = true;
-        } else {
-          _showError = true;
-          _enteredCode = "";
-        }
+        _verifyCode();
       }
     });
+  }
 
-    if (_isLoading) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => widget.targetPage),
-      );
+  Future<void> _verifyCode() async {
+    setState(() => _isLoading = true);
+    
+    final user = await _sqlDb.getUserByCode(_enteredCode);
+    
+    if (user != null && user.isActive) {
+      // Sauvegarder la session utilisateur
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user', jsonEncode(user.toMap()));
+      
+      // Naviguer vers la page appropriée selon le rôle
+      if (widget.pageName == 'Tableau de bord' && user.role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
+      } else if (widget.pageName == 'Passage de commande') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const CashDeskPage()),
+        );
+      } else {
+        setState(() {
+          _showError = true;
+          _enteredCode = "";
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Accès non autorisé')),
+        );
+      }
+    } else {
+      setState(() {
+        _showError = true;
+        _enteredCode = "";
+        _isLoading = false;
+      });
     }
   }
 
@@ -107,10 +137,10 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Entrez le code pour y accéder.',
+                  'Entrez votre code pour accéder à ${widget.pageName}',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700, // Gras plus épais 
+                    fontWeight: FontWeight.w700,
                     color: const Color.fromARGB(255, 1, 42, 79),
                   ),
                   textAlign: TextAlign.center,

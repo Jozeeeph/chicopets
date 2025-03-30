@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/user.dart';
 import 'package:caissechicopets/variant.dart';
 import 'package:caissechicopets/order.dart';
 import 'package:caissechicopets/orderline.dart';
@@ -139,6 +140,17 @@ class SqlDb {
   )
 ''');
         print("Gallery images table created");
+
+        await db.execute('''
+  CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL,
+    role TEXT NOT NULL, -- 'admin' ou 'cashier'
+    is_active INTEGER DEFAULT 1
+  )
+''');
+        print("Users table created");
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -1087,5 +1099,61 @@ class SqlDb {
     }
 
     return productCodes;
+  }
+
+  // Méthodes pour gérer les utilisateurs
+  Future<int> addUser(User user) async {
+    final dbClient = await db;
+    return await dbClient.insert(
+      'users',
+      user.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.fail,
+    );
+  }
+
+  Future<User?> getUserByUsername(String username) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.query(
+      'users',
+      where: 'username = ?',
+      whereArgs: [username],
+      limit: 1,
+    );
+    return result.isNotEmpty ? User.fromMap(result.first) : null;
+  }
+
+  Future<List<User>> getAllUsers() async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.query('users');
+    return result.map((map) => User.fromMap(map)).toList();
+  }
+
+  Future<bool> hasAdminAccount() async {
+    final dbClient = await db;
+    final count = Sqflite.firstIntValue(
+      await dbClient
+          .rawQuery('SELECT COUNT(*) FROM users WHERE role = "admin"'),
+    );
+    return count != null && count > 0;
+  }
+
+  Future<bool> verifyCode(String code) async {
+    final dbClient = await db;
+    final count = Sqflite.firstIntValue(
+      await dbClient
+          .rawQuery('SELECT COUNT(*) FROM users WHERE code = ?', [code]),
+    );
+    return count != null && count > 0;
+  }
+
+  Future<User?> getUserByCode(String code) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.query(
+      'users',
+      where: 'code = ?',
+      whereArgs: [code],
+      limit: 1,
+    );
+    return result.isNotEmpty ? User.fromMap(result.first) : null;
   }
 }
