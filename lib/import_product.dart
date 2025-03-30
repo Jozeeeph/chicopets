@@ -72,9 +72,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
             double taxe = _parseDouble(row[3]?.value?.toString() ?? '0');
             String categoryName = (row[4]?.value?.toString() ?? '').trim();
             String subCategoryName = (row[5]?.value?.toString() ?? '').trim();
-            double marge = _parseDouble(row[6]?.value?.toString() ?? '0');
-            double remiseMax = _parseDouble(row[7]?.value?.toString() ?? '0');
-            bool hasVariants = (row[8]?.value?.toString() ?? 'false').toLowerCase() == 'true';
+            String imagePath = row[6]?.value?.toString() ?? '';
+            double marge = _parseDouble(row[7]?.value?.toString() ?? '0');
+            double remiseMax = _parseDouble(row[8]?.value?.toString() ?? '0');
+            bool hasVariants =
+                (row[9]?.value?.toString() ?? 'false').toLowerCase() == 'true';
 
             // Validate required fields
             if (code.isEmpty || designation.isEmpty) {
@@ -86,8 +88,10 @@ class _ImportProductPageState extends State<ImportProductPage> {
             if (subCategoryName.isEmpty) subCategoryName = 'Default';
 
             // Get or create category IDs with retry logic
-            int categoryId = await _getOrCreateCategoryWithRetry(categoryName);
-            int subCategoryId = await _getOrCreateSubCategoryWithRetry(subCategoryName, categoryId);
+            int categoryId = await _getOrCreateCategoryWithRetry(categoryName,
+                imagePath: imagePath.isNotEmpty ? imagePath : null);
+            int subCategoryId = await _getOrCreateSubCategoryWithRetry(
+                subCategoryName, categoryId);
 
             // Calculate derived values
             double prixTTC = prixHT * (1 + marge / 100);
@@ -113,11 +117,14 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
             // Handle variants if exists
             if (hasVariants) {
-              String variantCode = row[9]?.value?.toString() ?? '';
-              String attributesStr = row[10]?.value?.toString() ?? '';
-              double variantPrice = _parseDouble(row[11]?.value?.toString() ?? '0');
-              double priceImpact = _parseDouble(row[12]?.value?.toString() ?? '0');
-              int variantStock = int.tryParse(row[13]?.value?.toString() ?? '0') ?? 0;
+              String variantCode = row[10]?.value?.toString() ?? '';
+              String attributesStr = row[11]?.value?.toString() ?? '';
+              double variantPrice =
+                  _parseDouble(row[12]?.value?.toString() ?? '0');
+              double priceImpact =
+                  _parseDouble(row[13]?.value?.toString() ?? '0');
+              int variantStock =
+                  int.tryParse(row[14]?.value?.toString() ?? '0') ?? 0;
 
               if (variantCode.isEmpty) {
                 throw Exception('Variant code missing for product $code');
@@ -136,7 +143,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
               // Insert product first
               product.id = await _sqlDb.addProduct(product);
-              
+
               // Create variant
               final variant = Variant(
                 code: variantCode,
@@ -157,7 +164,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
               });
             } else {
               // For non-variant products, use the stock value directly
-              product.stock = int.tryParse(row[13]?.value?.toString() ?? '0') ?? 0;
+              product.stock =
+                  int.tryParse(row[14]?.value?.toString() ?? '0') ?? 0;
               product.id = await _sqlDb.addProduct(product);
             }
 
@@ -167,7 +175,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
               _progress = processedRows / totalRows;
             });
           } catch (e) {
-            debugPrint('Error processing row ${processedRows + 1}: ${e.toString()}');
+            debugPrint(
+                'Error processing row ${processedRows + 1}: ${e.toString()}');
             processedRows++;
             continue;
           }
@@ -181,7 +190,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Successfully imported $_importedProductsCount products and $_importedVariantsCount variants'),
+              content: Text(
+                  'Successfully imported $_importedProductsCount products and $_importedVariantsCount variants'),
               duration: const Duration(seconds: 3),
             ),
           );
@@ -203,32 +213,40 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
-  Future<int> _getOrCreateCategoryWithRetry(String categoryName, {int retryCount = 3}) async {
+  Future<int> _getOrCreateCategoryWithRetry(String categoryName,
+      {String? imagePath, int retryCount = 3}) async {
     int attempt = 0;
     while (attempt < retryCount) {
       try {
-        return await _getOrCreateCategoryIdByName(categoryName);
+        return await _getOrCreateCategoryIdByName(categoryName,
+            imagePath: imagePath);
       } catch (e) {
         attempt++;
         if (attempt >= retryCount) {
-          debugPrint('Falling back to default category after $retryCount attempts');
-          return await _getOrCreateCategoryIdByName('Default');
+          debugPrint(
+              'Falling back to default category after $retryCount attempts');
+          return await _getOrCreateCategoryIdByName('Default',
+              imagePath: imagePath);
         }
         await Future.delayed(Duration(milliseconds: 100 * attempt));
       }
     }
-    return await _getOrCreateCategoryIdByName('Default');
+    return await _getOrCreateCategoryIdByName('Default', imagePath: imagePath);
   }
 
-  Future<int> _getOrCreateSubCategoryWithRetry(String subCategoryName, int categoryId, {int retryCount = 3}) async {
+  Future<int> _getOrCreateSubCategoryWithRetry(
+      String subCategoryName, int categoryId,
+      {int retryCount = 3}) async {
     int attempt = 0;
     while (attempt < retryCount) {
       try {
-        return await _getOrCreateSubCategoryIdByName(subCategoryName, categoryId);
+        return await _getOrCreateSubCategoryIdByName(
+            subCategoryName, categoryId);
       } catch (e) {
         attempt++;
         if (attempt >= retryCount) {
-          debugPrint('Falling back to default subcategory after $retryCount attempts');
+          debugPrint(
+              'Falling back to default subcategory after $retryCount attempts');
           return await _getOrCreateSubCategoryIdByName('Default', categoryId);
         }
         await Future.delayed(Duration(milliseconds: 100 * attempt));
@@ -237,9 +255,10 @@ class _ImportProductPageState extends State<ImportProductPage> {
     return await _getOrCreateSubCategoryIdByName('Default', categoryId);
   }
 
-  Future<int> _getOrCreateCategoryIdByName(String categoryName) async {
+  Future<int> _getOrCreateCategoryIdByName(String categoryName,
+      {String? imagePath}) async {
     final db = await _sqlDb.db;
-    
+
     return await db.transaction((txn) async {
       // Try to find existing category
       var result = await txn.query(
@@ -249,6 +268,17 @@ class _ImportProductPageState extends State<ImportProductPage> {
       );
 
       if (result.isNotEmpty) {
+        // Update image path if it's provided and different from existing
+        if (imagePath != null &&
+            imagePath.isNotEmpty &&
+            result.first['image_path'] != imagePath) {
+          await txn.update(
+            'categories',
+            {'image_path': imagePath},
+            where: 'id_category = ?',
+            whereArgs: [result.first['id_category']],
+          );
+        }
         return result.first['id_category'] as int;
       }
 
@@ -257,16 +287,17 @@ class _ImportProductPageState extends State<ImportProductPage> {
         'categories',
         {
           'category_name': categoryName.trim(),
-          'image_path': null,
+          'image_path': imagePath?.isNotEmpty == true ? imagePath : null,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     });
   }
 
-  Future<int> _getOrCreateSubCategoryIdByName(String subCategoryName, int categoryId) async {
+  Future<int> _getOrCreateSubCategoryIdByName(
+      String subCategoryName, int categoryId) async {
     final db = await _sqlDb.db;
-    
+
     return await db.transaction((txn) async {
       // Try to find existing subcategory
       var result = await txn.query(
@@ -352,7 +383,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
                       children: [
-                        const Icon(Icons.upload_file, size: 50, color: Colors.blue),
+                        const Icon(Icons.upload_file,
+                            size: 50, color: Colors.blue),
                         const SizedBox(height: 20),
                         Text(
                           'Import Products with Variants',
@@ -363,13 +395,14 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, Marge, RemiseMax, HasVariants, VariantCode, Attributes, VariantPrice, PriceImpact, VariantStock',
+                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, ImagePath, Marge, RemiseMax, HasVariants, VariantCode, Attributes, VariantPrice, PriceImpact, VariantStock',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: _isImporting ? null : importProductsWithVariants,
+                          onPressed:
+                              _isImporting ? null : importProductsWithVariants,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF009688),
                             padding: const EdgeInsets.symmetric(
@@ -392,7 +425,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   LinearProgressIndicator(
                     value: _progress,
                     backgroundColor: Colors.grey[300],
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.green),
                   ),
                   const SizedBox(height: 10),
                   Text(
