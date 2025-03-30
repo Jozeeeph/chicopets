@@ -1,14 +1,51 @@
 import 'package:caissechicopets/cash_desk_page.dart';
-import 'package:caissechicopets/code_verification_page.dart'; // Ajoutez cette ligne
+import 'package:caissechicopets/code_verification_page.dart';
+import 'package:caissechicopets/create_admin_account_page.dart';
 import 'package:caissechicopets/dashboard_page.dart';
+import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final SqlDb _sqlDb = SqlDb();
+  bool _hasAdmin = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminAccount();
+  }
+
+  Future<void> _checkAdminAccount() async {
+    final hasAdmin = await _sqlDb.hasAdminAccount();
+    setState(() {
+      _hasAdmin = hasAdmin;
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (!_hasAdmin) {
+      return const CreateAdminAccountPage();
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -47,7 +84,6 @@ class HomePage extends StatelessWidget {
                       label: 'Tableau de bord',
                       icon: Icons.dashboard,
                       page: const CodeVerificationPage(
-                        targetPage: DashboardPage(),
                         pageName: 'Tableau de bord',
                       ),
                       color: const Color(0xFF009688),
@@ -57,7 +93,6 @@ class HomePage extends StatelessWidget {
                       label: 'Passage de commande',
                       icon: Icons.shopping_cart,
                       page: const CodeVerificationPage(
-                        targetPage: CashDeskPage(),
                         pageName: 'Passage de commande',
                       ),
                       color: const Color(0xFFFF9800),

@@ -1,16 +1,59 @@
+import 'dart:convert';
+
+import 'package:caissechicopets/accounts_page.dart';
+import 'package:caissechicopets/cash_desk_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
 import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
-import 'package:caissechicopets/import_product.dart'; // Importez le nouveau fichier
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
+import 'package:caissechicopets/home_page.dart';
+import 'package:caissechicopets/import_product.dart';
+import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
+  _DashboardPageState createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  String? _userRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('current_user');
+    if (userJson != null) {
+      final user = User.fromMap(jsonDecode(userJson));
+      setState(() {
+        _userRole = user.role;
+      });
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('current_user');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePage()),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isAdmin = _userRole == 'admin';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF0056A6),
@@ -18,6 +61,12 @@ class DashboardPage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: _logout,
+          ),
+        ],
         title: const Text('Tableau de bord',
             style: TextStyle(color: Colors.white)),
       ),
@@ -30,46 +79,55 @@ class DashboardPage extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8.0), // Padding global ajusté
+          padding: const EdgeInsets.all(8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 12), // Espacement ajusté
+              const SizedBox(height: 12),
               Expanded(
                 child: GridView.count(
-                  crossAxisCount: 5, // 3 cartes par ligne
-                  crossAxisSpacing: 31, // Espacement horizontal entre les cartes
-                  mainAxisSpacing: 10, // Espacement vertical entre les cartes
-                  childAspectRatio: 0.8, // Ratio pour des cartes rectangulaires
+                  crossAxisCount: 5,
+                  crossAxisSpacing: 31,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.8,
                   children: [
-                    _buildCard(
-                      context,
-                      label: 'Gestion de produit',
-                      icon: Icons.inventory,
-                      page: const ManageProductPage(),
-                      color: const Color(0xFF009688),
-                    ),
-                    _buildCard(
-                      context,
-                      label: 'Gestion de commandes',
-                      icon: Icons.shopping_cart,
-                      page: const ManageCommand(),
-                      color: const Color.fromARGB(255, 86, 0, 207),
-                    ),
-                    _buildCard(
-                      context,
-                      label: 'Importer des produits',
-                      icon: Icons.upload_file,
-                      page: const ImportProductPage(),
-                      color: const Color(0xFFFF9800),
-                    ),
-                    _buildCard(
-                      context,
-                      label: 'Gestion de catégorie',
-                      icon: Icons.category,
-                      page: const ManageCategoriePage(),
-                      color: const Color(0xFF673AB7),
-                    ),
+                    if (isAdmin) ...[
+                      _buildCard(
+                        context,
+                        label: 'Gestion de produit',
+                        icon: Icons.inventory,
+                        page: const ManageProductPage(),
+                        color: const Color(0xFF009688),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Gestion de commandes',
+                        icon: Icons.shopping_cart,
+                        page: const ManageCommand(),
+                        color: const Color.fromARGB(255, 86, 0, 207),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Importer des produits',
+                        icon: Icons.upload_file,
+                        page: const ImportProductPage(),
+                        color: const Color(0xFFFF9800),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Gestion de catégorie',
+                        icon: Icons.category,
+                        page: const ManageCategoriePage(),
+                        color: const Color(0xFF673AB7),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Gestion de comptes',
+                        icon: Icons.people,
+                        page: const AccountsPage(),
+                        color: const Color.fromARGB(255, 0, 164, 201),
+                      ),
+                    ],
                     _buildCard(
                       context,
                       label: 'Galerie de photos',
@@ -77,12 +135,12 @@ class DashboardPage extends StatelessWidget {
                       page: const GalleryPage(),
                       color: const Color(0xFFE91E63),
                     ),
-                     _buildCard(
+                    _buildCard(
                       context,
-                      label: 'Gestion de comptes',
-                      icon: Icons.people,
-                      page: const GalleryPage(),
-                      color: const Color.fromARGB(255, 0, 164, 201),
+                      label: 'Passage de commande',
+                      icon: Icons.point_of_sale,
+                      page: const CashDeskPage(),
+                      color: const Color(0xFF4CAF50),
                     ),
                   ],
                 ),
@@ -102,9 +160,9 @@ class DashboardPage extends StatelessWidget {
     required Color color,
   }) {
     return Card(
-      elevation: 3, // Élévation légèrement augmentée
+      elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(29), // Border radius augmenté
+        borderRadius: BorderRadius.circular(29),
       ),
       color: color,
       child: InkWell(
@@ -116,26 +174,26 @@ class DashboardPage extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(8.0), // Padding ajusté
+          padding: const EdgeInsets.all(8.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                size: 30, // Taille de l'icône augmentée
+                size: 30,
                 color: Colors.white,
               ),
-              const SizedBox(height: 8), // Espacement entre l'icône et le texte
+              const SizedBox(height: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 20, // Taille de la police augmentée
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 2, // Limite le texte à 2 lignes
-                overflow: TextOverflow.ellipsis, // Ajoute des points de suspension si nécessaire
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

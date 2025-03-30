@@ -46,10 +46,16 @@ class _GalleryPageState extends State<GalleryPage> {
       _nameControllers.clear();
       _images.addAll(imagesFromDb.map((image) => File(image['image_path'])));
       _nameControllers.addAll(
-        imagesFromDb
-            .map((image) => TextEditingController(text: image['name'] ?? '')),
+        imagesFromDb.map((image) => TextEditingController(
+            text: image['name'] ?? _generateDefaultName(image['image_path']))),
       );
     });
+  }
+
+  String _generateDefaultName(String path) {
+    final fileName = path.split('/').last;
+    final date = DateTime.now().toString().split(' ')[0];
+    return 'Image_${fileName.hashCode.toString().substring(0, 4)}_$date';
   }
 
   Future<void> _pickImages() async {
@@ -63,123 +69,134 @@ class _GalleryPageState extends State<GalleryPage> {
 
       for (var file in pickedFiles) {
         try {
-          await SqlDb().insertImage(file.path, 'Nom image');
-          setState(() {
-            _importedCount++;
-          });
+          await SqlDb().insertImage(file.path, _generateDefaultName(file.path));
+          setState(() => _importedCount++);
         } catch (e) {
-          debugPrint('Erreur lors de l\'importation: ${e.toString()}');
+          debugPrint('Erreur lors de l\'importation: $e');
         }
       }
 
       await _loadImagesFromDatabase();
-      setState(() {
-        _isImporting = false;
-      });
+      setState(() => _isImporting = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('$_importedCount/$_totalToImport images importées'),
-              ),
-            ],
-          ),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showImportResultSnackbar();
     }
   }
 
+  void _showImportResultSnackbar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+                _importedCount == _totalToImport
+                    ? Icons.check_circle
+                    : Icons.warning,
+                color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _importedCount == _totalToImport
+                    ? 'Toutes les images ($_importedCount) ont été importées'
+                    : '$_importedCount/$_totalToImport images importées',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor:
+            _importedCount == _totalToImport ? Colors.green : Colors.orange,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _pickFromCamera() async {
-    final XFile? pickedFile =
-        await _picker.pickImage(source: ImageSource.camera);
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 90,
+    );
+
     if (pickedFile != null) {
-      setState(() {
-        _isImporting = true;
-      });
+      setState(() => _isImporting = true);
 
       try {
         await SqlDb().insertImage(pickedFile.path,
-            'Photo du ${DateTime.now().toString().split(' ')[0]}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Photo importée avec succès"),
-            duration: Duration(seconds: 2),
-          ),
-        );
+            'Photo_${DateTime.now().toString().replaceAll(RegExp(r'[^0-9]'), '').substring(0, 8)}');
+
+        _showSnackbar(
+            "Photo importée avec succès", Colors.green, Icons.check_circle);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erreur lors de l'importation: ${e.toString()}"),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        _showSnackbar("Erreur lors de l'importation: ${e.toString()}",
+            Colors.red, Icons.error);
       } finally {
-        setState(() {
-          _isImporting = false;
-        });
+        setState(() => _isImporting = false);
         await _loadImagesFromDatabase();
       }
     }
   }
 
+  void _showSnackbar(String message, Color color, IconData icon) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(message),
+          ],
+        ),
+        backgroundColor: color,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _saveImageName(int index) async {
-    if (_nameControllers[index].text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Le nom ne peut pas être vide"),
-            duration: Duration(seconds: 1)),
-      );
+    final name = _nameControllers[index].text.trim();
+
+    if (name.isEmpty) {
+      _showSnackbar(
+          "Le nom ne peut pas être vide", Colors.orange, Icons.warning);
       return;
     }
 
     final imagePath = _images[index].path;
-    final imageName = _nameControllers[index].text;
-
     final imagesFromDb = await SqlDb().getGalleryImages();
     final imageToUpdate =
         imagesFromDb.firstWhere((image) => image['image_path'] == imagePath);
 
-    await SqlDb().updateImageName(imageToUpdate['id'], imageName);
+    await SqlDb().updateImageName(imageToUpdate['id'], name);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text("Nom sauvegardé"), 
-          duration: Duration(seconds: 1)),
-    );
+    _showSnackbar("Nom sauvegardé", Colors.green, Icons.check_circle);
+
+    // Perte le focus après sauvegarde
+    FocusScope.of(context).unfocus();
   }
 
   Future<void> _removeImage(int index) async {
-    bool confirmDelete = await showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirmer la suppression"),
-          content:
-              const Text("Êtes-vous sûr de vouloir supprimer cette image ?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Annuler"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Supprimer"),
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text("Confirmer la suppression"),
+        content: const Text("Êtes-vous sûr de vouloir supprimer cette image ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Annuler"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Supprimer", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
 
-    if (confirmDelete == true) {
+    if (confirmed == true) {
       final imagePath = _images[index].path;
       final imagesFromDb = await SqlDb().getGalleryImages();
       final imageToDelete =
@@ -187,9 +204,8 @@ class _GalleryPageState extends State<GalleryPage> {
 
       await SqlDb().deleteImage(imageToDelete['id']);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Image supprimée avec succès")),
-      );
+      _showSnackbar(
+          "Image supprimée avec succès", Colors.green, Icons.check_circle);
 
       await _loadImagesFromDatabase();
     }
@@ -199,9 +215,8 @@ class _GalleryPageState extends State<GalleryPage> {
     if (selectedImage != null) {
       Navigator.pop(context, selectedImage);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez sélectionner une image")),
-      );
+      _showSnackbar(
+          "Veuillez sélectionner une image", Colors.orange, Icons.warning);
     }
   }
 
@@ -222,6 +237,115 @@ class _GalleryPageState extends State<GalleryPage> {
     });
   }
 
+  Widget _buildImageCard(int index) {
+    return GestureDetector(
+      onTap: () {
+        if (widget.isSelectionMode) {
+          setState(() => selectedImage = _images[index]);
+        }
+      },
+      child: Card(
+        elevation: selectedImage == _images[index] ? 4 : 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selectedImage == _images[index]
+                ? Theme.of(context).primaryColor
+                : Colors.grey.withOpacity(0.2),
+            width: selectedImage == _images[index] ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _images[index],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(child: Icon(Icons.broken_image)),
+                    ),
+                  ),
+                  if (selectedImage == _images[index])
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.check_circle,
+                            color: Colors.white, size: 36),
+                      ),
+                    ),
+                  if (!widget.isSelectionMode)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => _removeImage(index),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
+              child: Text(
+                _nameControllers[index].text,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selectedImage == _images[index]
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey[700],
+                  fontWeight: selectedImage == _images[index]
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                ),
+              ),
+            ),
+            if (!widget.isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: TextFormField(
+                  controller: _nameControllers[index],
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  maxLength: 30,
+                  decoration: InputDecoration(
+                    hintText: 'Nom de l\'image',
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    counterText: '',
+                    suffixIcon: _nameControllers[index].text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.check, size: 18),
+                            tooltip: "Sauvegarder le nom de l'image",
+                            onPressed: () => _saveImageName(index),
+                          )
+                        : null,
+                  ),
+                  onFieldSubmitted: (value) => _saveImageName(index),
+                  onChanged: (value) {
+                    if (value.length == 30) {
+                      FocusScope.of(context).unfocus();
+                    }
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -236,18 +360,20 @@ class _GalleryPageState extends State<GalleryPage> {
             )
         ],
       ),
+      
       body: Stack(
         children: [
           SingleChildScrollView(
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     controller: _searchController,
                     focusNode: _searchFocusNode,
                     decoration: InputDecoration(
                       labelText: 'Rechercher par nom',
+                      prefixIcon: const Icon(Icons.search),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
@@ -256,165 +382,73 @@ class _GalleryPageState extends State<GalleryPage> {
                           _loadImagesFromDatabase();
                         },
                       ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
                     onChanged: _searchImagesByName,
                   ),
                 ),
-                const SizedBox(height: 10),
                 if (!widget.isSelectionMode)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SizedBox(
+                      width: 250,
+                      child: ElevatedButton.icon(
                         onPressed: _pickImages,
                         icon: const Icon(Icons.photo_library),
-                        label: const Text("Importer depuis votre PC"),
+                        label: const Text(
+                          "Importer depuis la galerie",
+                          style: TextStyle(color: Colors.blue),
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromARGB(255, 93, 212, 220),
+                          iconColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
                         ),
                       ),
-                      
-                    ],
+                    ),
                   ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
                 _images.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Text(
-                          "Aucune image disponible\nAjoutez des images depuis votre galerie",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16),
+                    ? Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.photo_library,
+                                size: 60, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            const Text(
+                              "Aucune image disponible",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Ajoutez des images depuis votre galerie\nou prenez une nouvelle photo",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 14),
+                            ),
+                          ],
                         ),
                       )
                     : GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(16),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 8,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
+                          crossAxisCount: 7,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
                           childAspectRatio: 0.8,
                         ),
                         itemCount: _images.length,
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onTap: () {
-                              if (widget.isSelectionMode) {
-                                setState(() {
-                                  selectedImage = _images[index];
-                                });
-                              }
-                            },
-                            child: Card(
-                              elevation: selectedImage == _images[index] ? 4 : 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                side: BorderSide(
-                                  color: selectedImage == _images[index]
-                                      ? Colors.blue
-                                      : Colors.grey.withOpacity(0.2),
-                                  width: selectedImage == _images[index] ? 2 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: Stack(
-                                      children: [
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(4),
-                                            image: DecorationImage(
-                                              image: FileImage(_images[index]),
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                        ),
-                                        if (selectedImage == _images[index])
-                                          Container(
-                                            color: Colors.black.withOpacity(0.3),
-                                            child: const Center(
-                                              child: Icon(Icons.check_circle,
-                                                  color: Colors.white, size: 36),
-                                            ),
-                                          ),
-                                        if (!widget.isSelectionMode)
-                                          Positioned(
-                                            top: 4,
-                                            right: 4,
-                                            child: GestureDetector(
-                                              onTap: () => _removeImage(index),
-                                              child: const CircleAvatar(
-                                                backgroundColor: Colors.red,
-                                                radius: 12,
-                                                child: Icon(Icons.close,
-                                                    size: 16, color: Colors.white),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4.0, vertical: 4),
-                                    child: Text(
-                                      _nameControllers[index].text,
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: selectedImage == _images[index]
-                                            ? Colors.blue
-                                            : Colors.grey[700],
-                                        fontWeight: selectedImage == _images[index]
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                  if (!widget.isSelectionMode)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 4.0),
-                                      child: TextField(
-                                        controller: _nameControllers[index],
-                                        textAlign: TextAlign.center,
-                                        maxLines: 1,
-                                        maxLength: 20,
-                                        decoration: InputDecoration(
-                                          hintText: 'Nom de l\'image',
-                                          border: InputBorder.none,
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(horizontal: 4),
-                                          counterText: '',
-                                          suffixIcon: _nameControllers[index]
-                                                  .text
-                                                  .isNotEmpty
-                                              ? IconButton(
-                                                  icon:
-                                                      const Icon(Icons.save, size: 16),
-                                                  onPressed: () =>
-                                                      _saveImageName(index),
-                                                )
-                                              : null,
-                                        ),
-                                        onSubmitted: (value) => _saveImageName(index),
-                                        onChanged: (value) {
-                                          if (value.length == 20) {
-                                            FocusScope.of(context).unfocus();
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        itemBuilder: (context, index) => _buildImageCard(index),
                       ),
               ],
             ),
@@ -422,31 +456,43 @@ class _GalleryPageState extends State<GalleryPage> {
           if (_isImporting)
             Center(
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(height: 16),
+                    const CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                    const SizedBox(height: 20),
                     const Text(
                       'Importation en cours...',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
                       '$_importedCount/$_totalToImport',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (_importedCount > 0) ...[
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(
+                        value: _importedCount / _totalToImport,
+                        backgroundColor: Colors.grey[600],
+                        color: Colors.lightBlueAccent,
+                      ),
+                    ],
                   ],
                 ),
               ),
