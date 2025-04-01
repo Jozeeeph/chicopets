@@ -41,14 +41,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('current_user');
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomePage()),
-    );
-  }
+ Future<void> _logout() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('current_user');
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (context) => const HomePage()),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +58,13 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0056A6),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          },
         ),
         actions: [
           IconButton(
