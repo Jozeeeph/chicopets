@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'package:caissechicopets/cash_desk_page.dart';
-import 'package:caissechicopets/dashboard_page.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
@@ -10,10 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class CodeVerificationPage extends StatefulWidget {
   final String pageName;
+  final Widget destinationPage; // Nouveau paramètre pour la page de destination
 
   const CodeVerificationPage({
     super.key,
     required this.pageName,
+    required this.destinationPage, // Paramètre requis
   });
 
   @override
@@ -48,35 +48,43 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
     });
   }
 
+// Dans la méthode _verifyCode de code_verification_page.dart
   Future<void> _verifyCode() async {
     setState(() => _isLoading = true);
-    
+
     final user = await _sqlDb.getUserByCode(_enteredCode);
-    
+
     if (user != null && user.isActive) {
       // Sauvegarder la session utilisateur
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(user.toMap()));
-      
-      // Naviguer vers la page appropriée selon le rôle
-      if (widget.pageName == 'Tableau de bord' && user.role == 'admin') {
+
+      // Vérifier les autorisations
+      if (widget.pageName == 'Tableau de bord') {
+        if (user.role == 'admin') {
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => widget.destinationPage),
+          );
+        } else {
+          setState(() {
+            _showError = true;
+            _enteredCode = "";
+            _isLoading = false;
+          });
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Accès réservé aux administrateurs')),
+          );
+        }
+      }
+      // Pour la page de commande, tous les utilisateurs actifs peuvent accéder
+      else if (widget.pageName == 'Passage de commande') {
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
-        );
-      } else if (widget.pageName == 'Passage de commande') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const CashDeskPage()),
-        );
-      } else {
-        setState(() {
-          _showError = true;
-          _enteredCode = "";
-          _isLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Accès non autorisé')),
+          MaterialPageRoute(builder: (context) => widget.destinationPage),
         );
       }
     } else {

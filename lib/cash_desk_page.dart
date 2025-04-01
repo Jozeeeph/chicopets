@@ -1,3 +1,4 @@
+import 'package:caissechicopets/home_page.dart';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/components/categorieetproduct.dart';
@@ -12,6 +13,7 @@ import 'package:caissechicopets/components/header.dart';
 import 'package:caissechicopets/components/tableCmd.dart';
 import 'package:caissechicopets/gestionproduit/addprod.dart';
 import 'package:caissechicopets/gestionproduit/searchprod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CashDeskPage extends StatefulWidget {
   const CashDeskPage({super.key});
@@ -41,6 +43,15 @@ class _CashDeskPageState extends State<CashDeskPage> {
     } else {
       print("Invalid product index: $index");
     }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('current_user');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePage()),
+    );
   }
 
   void handleApplyDiscount(int index) {
@@ -124,18 +135,30 @@ class _CashDeskPageState extends State<CashDeskPage> {
   @override
   Widget build(BuildContext context) {
     // Calcul des totaux
-    double totalBeforeDiscount = calculateTotalBeforeDiscount(
-        selectedProducts, quantityProducts);
-    double total = calculateTotal(
-        selectedProducts,
-        quantityProducts,
-        discounts,
-        typeDiscounts,
-        globalDiscount,
-        isPercentageDiscount);
+    double totalBeforeDiscount =
+        calculateTotalBeforeDiscount(selectedProducts, quantityProducts);
+    double total = calculateTotal(selectedProducts, quantityProducts, discounts,
+        typeDiscounts, globalDiscount, isPercentageDiscount);
 
     return Scaffold(
-      appBar: Header(),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          },
+        ),
+        title: const Text('Caisse de vente'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            onPressed: _logout,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(

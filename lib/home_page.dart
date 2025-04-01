@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:caissechicopets/cash_desk_page.dart';
 import 'package:caissechicopets/code_verification_page.dart';
 import 'package:caissechicopets/create_admin_account_page.dart';
 import 'package:caissechicopets/dashboard_page.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,11 +21,23 @@ class _HomePageState extends State<HomePage> {
   final SqlDb _sqlDb = SqlDb();
   bool _hasAdmin = false;
   bool _isLoading = true;
+  User? _currentUser;
 
   @override
   void initState() {
     super.initState();
     _checkAdminAccount();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('current_user');
+    if (userJson != null) {
+      setState(() {
+        _currentUser = User.fromMap(jsonDecode(userJson));
+      });
+    }
   }
 
   Future<void> _checkAdminAccount() async {
@@ -30,6 +46,36 @@ class _HomePageState extends State<HomePage> {
       _hasAdmin = hasAdmin;
       _isLoading = false;
     });
+  }
+
+  void _navigateToPage(Widget page) {
+    if (_currentUser != null) {
+      // Vérification supplémentaire pour le tableau de bord
+      if (page is DashboardPage && _currentUser!.role != 'admin') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Accès réservé aux administrateurs')),
+        );
+        return;
+      }
+      // Si l'utilisateur est déjà connecté, naviguer directement
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => page),
+      );
+    } else {
+      // Sinon, demander le code
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CodeVerificationPage(
+            pageName: page is DashboardPage
+                ? 'Tableau de bord'
+                : 'Passage de commande',
+            destinationPage: page,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -83,18 +129,14 @@ class _HomePageState extends State<HomePage> {
                       context,
                       label: 'Tableau de bord',
                       icon: Icons.dashboard,
-                      page: const CodeVerificationPage(
-                        pageName: 'Tableau de bord',
-                      ),
+                      page: const DashboardPage(),
                       color: const Color(0xFF009688),
                     ),
                     _buildCard(
                       context,
                       label: 'Passage de commande',
                       icon: Icons.shopping_cart,
-                      page: const CodeVerificationPage(
-                        pageName: 'Passage de commande',
-                      ),
+                      page: const CashDeskPage(),
                       color: const Color(0xFFFF9800),
                     ),
                   ],
@@ -121,12 +163,7 @@ class _HomePageState extends State<HomePage> {
       ),
       color: color,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => page),
-          );
-        },
+        onTap: () => _navigateToPage(page),
         borderRadius: BorderRadius.circular(30),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
