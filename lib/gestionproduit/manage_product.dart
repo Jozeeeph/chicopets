@@ -218,7 +218,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${variant.combinationName} - Stock: ${variant.stock} - Price: ${variant.price}',
+                    '${variant.combinationName} - Stock: ${variant.stock} - Price: ${variant.finalPrice}',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ),
