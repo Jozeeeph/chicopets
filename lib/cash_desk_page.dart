@@ -1,4 +1,5 @@
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/components/categorieetproduct.dart';
 import 'package:caissechicopets/gestioncommande/addorder.dart';
@@ -26,20 +27,17 @@ class _CashDeskPageState extends State<CashDeskPage> {
   List<Product> selectedProducts = [];
   List<int> quantityProducts = [];
   List<bool> typeDiscounts = [];
-  List<double> discounts = []; // Track discounts for each product
-  double globalDiscount = 0.0; // Added global discount
+  List<double> discounts = [];
+  double globalDiscount = 0.0;
   int? selectedProductIndex;
   String enteredQuantity = "";
   bool isPercentageDiscount = true;
 
   void handleQuantityChange(int index) {
     if (index >= 0 && index < quantityProducts.length) {
-      print("Changing quantity for product index: $index");
       ModifyQt.showQuantityInput(context, index, quantityProducts, () {
-        setState(() {}); // Refresh UI after quantity update
+        setState(() {});
       });
-    } else {
-      print("Invalid product index: $index");
     }
   }
 
@@ -53,26 +51,23 @@ class _CashDeskPageState extends State<CashDeskPage> {
         selectedProducts,
         () => setState(() {}),
       );
-    } else {
-      print("Invalid product index: $index");
     }
   }
 
   void handlePlaceOrder() {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
-      orderLines: [], // Empty list for orderLines
+      orderLines: [],
       total: calculateTotal(
           selectedProducts,
           quantityProducts,
           discounts,
           typeDiscounts,
           globalDiscount,
-          isPercentageDiscount), // Ajoutez isPercentageDiscount
-      modePaiement: "Espèces", // Default payment method
+          isPercentageDiscount),
+      modePaiement: "Cash",
       globalDiscount: globalDiscount,
-      isPercentageDiscount:
-          isPercentageDiscount, // Assurez-vous de passer cette valeur
+      isPercentageDiscount: isPercentageDiscount,
     );
     Addorder.showPlaceOrderPopup(
       context,
@@ -98,10 +93,10 @@ class _CashDeskPageState extends State<CashDeskPage> {
       context,
       selectedProducts,
       quantityProducts,
-      discounts, // 5th argument
-      typeDiscounts, // 6th argument
+      discounts,
+      typeDiscounts,
       () {
-        setState(() {}); // 7th argument (callback)
+        setState(() {});
       },
     );
   }
@@ -116,33 +111,24 @@ class _CashDeskPageState extends State<CashDeskPage> {
     products = sqldb
         .getProductsWithCategory()
         .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
-    products?.then((productList) {
-      print("Fetched products: $productList");
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calcul des totaux
-    double totalBeforeDiscount = calculateTotalBeforeDiscount(
-        selectedProducts, quantityProducts);
-    double total = calculateTotal(
-        selectedProducts,
-        quantityProducts,
-        discounts,
-        typeDiscounts,
-        globalDiscount,
-        isPercentageDiscount);
-
     return Scaffold(
       appBar: Header(),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            // Table Command Section
             TableCmd(
-              total: total,
+              total: calculateTotal(
+                  selectedProducts,
+                  quantityProducts,
+                  discounts,
+                  typeDiscounts,
+                  globalDiscount,
+                  isPercentageDiscount),
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
@@ -159,41 +145,36 @@ class _CashDeskPageState extends State<CashDeskPage> {
               isPercentageDiscount: isPercentageDiscount,
             ),
 
-            const SizedBox(height: 10), // Add some spacing
+            const SizedBox(height: 10),
 
-            // Main Content (categories + Products)
             Categorieetproduct(
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
-              onProductSelected: (Product product) {
+              onProductSelected: (Product product, [Variant? variant]) {
                 setState(() {
-                  // Debugging: Print the product code being passed in and the codes in selectedProducts
-                  print("List length: ${selectedProducts.length}");
-                  print("List content: $selectedProducts");
-                  print("Selected Product Code: '${product.code}'");
-                  for (var p in selectedProducts) {
-                    print("Existing Product Code: '${p.code}'");
-                  }
-
-                  // Ensuring no spaces or formatting issues
-                  int index = selectedProducts.indexWhere(
-                    (p) =>
-                        p.code.trim().toLowerCase() ==
-                        product.code.trim().toLowerCase(),
-                  );
-                  print("Index found: $index");
+                  int index = selectedProducts.indexWhere((p) {
+                    if (p.code.trim().toLowerCase() == product.code.trim().toLowerCase()) {
+                      if (variant != null && p.variants.isNotEmpty) {
+                        return p.variants.any((v) => v.code == variant.code);
+                      }
+                      return true;
+                    }
+                    return false;
+                  });
 
                   if (index == -1) {
-                    // Product not selected yet, we add it with an initial quantity of 1
-                    selectedProducts.add(product);
+                    Product productToAdd = product;
+                    if (variant != null) {
+                      productToAdd = Product.fromMap(product.toMap())..variants = [variant];
+                    }
+                    
+                    selectedProducts.add(productToAdd);
                     quantityProducts.add(1);
-                    discounts
-                        .add(0.0); // Add a discount value for the new product
+                    discounts.add(0.0);
                     typeDiscounts.add(true);
                     selectedProductIndex = selectedProducts.length - 1;
                   } else {
-                    // Product already selected, we increment the quantity
                     quantityProducts[index]++;
                     selectedProductIndex = index;
                   }
@@ -206,19 +187,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  // Calculate the total price before applying any discounts
-  static double calculateTotalBeforeDiscount(
-    List<Product> selectedProducts,
-    List<int> quantityProducts,
-  ) {
-    double total = 0.0;
-    for (int i = 0; i < selectedProducts.length; i++) {
-      total += selectedProducts[i].prixTTC * quantityProducts[i];
-    }
-    return total;
-  }
 
-  // Calculate the total price including discounts
   static double calculateTotal(
     List<Product> selectedProducts,
     List<int> quantityProducts,
@@ -229,7 +198,11 @@ class _CashDeskPageState extends State<CashDeskPage> {
   ) {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+      double price = selectedProducts[i].hasVariants && selectedProducts[i].variants.isNotEmpty
+        ? selectedProducts[i].variants.first.price
+        : selectedProducts[i].prixTTC;
+      
+      double productTotal = price * quantityProducts[i];
 
       if (typeDiscounts[i]) {
         productTotal *= (1 - discounts[i] / 100);
@@ -244,7 +217,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
       total += productTotal;
     }
 
-    // Appliquer la remise globale
     if (isPercentageDiscount) {
       total *= (1 - globalDiscount / 100);
     } else {

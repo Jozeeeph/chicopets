@@ -19,7 +19,6 @@ class TableCmd extends StatefulWidget {
   final VoidCallback onSearchProduct;
   final double globalDiscount;
   final bool isPercentageDiscount;
-
   final Function(int) onQuantityChange;
   final double Function(List<Product>, List<int>, List<double>, List<bool>,
       double globalDiscount, bool isPercentageDiscount) calculateTotal;
@@ -83,7 +82,7 @@ class _TableCmdState extends State<TableCmd> {
   }
 
   void handleBarcodeScan(String barcodeScanRes) async {
-    print("Code scanné ou saisi : $barcodeScanRes");
+    print("Scanned or entered barcode: $barcodeScanRes");
 
     if (barcodeScanRes.isEmpty) return;
 
@@ -104,7 +103,7 @@ class _TableCmdState extends State<TableCmd> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Produit introuvable !")),
+        const SnackBar(content: Text("Product not found!")),
       );
     }
     barcodeController.clear();
@@ -116,7 +115,7 @@ class _TableCmdState extends State<TableCmd> {
       handleBarcodeScan(manualBarcode);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez saisir un code-barres !")),
+        const SnackBar(content: Text("Please enter a barcode!")),
       );
     }
   }
@@ -131,7 +130,7 @@ class _TableCmdState extends State<TableCmd> {
           flex: 2,
           child: Column(
             children: [
-              // En-tête du tableau avec le total
+              // En-tête avec le total
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -164,14 +163,14 @@ class _TableCmdState extends State<TableCmd> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         const Text(
-                          'Caissier: foulen ben foulen',
+                          'Caissier: Utilisateur',
                           style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white),
                         ),
                         Text(
-                          'Time: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                          'Heure: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -184,7 +183,7 @@ class _TableCmdState extends State<TableCmd> {
               ),
               const SizedBox(height: 15),
 
-              // Champ de saisie pour le code-barres
+              // Champ de saisie code-barres
               Row(
                 children: [
                   Expanded(
@@ -192,7 +191,7 @@ class _TableCmdState extends State<TableCmd> {
                       controller: barcodeController,
                       focusNode: barcodeFocusNode,
                       decoration: const InputDecoration(
-                        labelText: "Scanner ou saisir Code-Barres",
+                        labelText: "Scanner ou saisir code-barres",
                         border: InputBorder.none,
                       ),
                       onSubmitted: (value) {
@@ -230,22 +229,28 @@ class _TableCmdState extends State<TableCmd> {
                         children: [
                           Expanded(
                               child: Text('Code',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                           Expanded(
                               child: Text('Désignation',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                           Expanded(
-                              child: Text('Quantité',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                              child: Text('Qté',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                           Expanded(
                               child: Text('Remise',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                           Expanded(
                               child: Text('Prix U',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                           Expanded(
                               child: Text('Montant',
-                                  style: TextStyle(color: Colors.white,fontSize: 15))),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 15))),
                         ],
                       ),
                     ),
@@ -273,6 +278,11 @@ class _TableCmdState extends State<TableCmd> {
                                       widget.selectedProducts[index];
                                   bool isSelected =
                                       selectedProductIndex == index;
+                                  final hasVariants = product.hasVariants &&
+                                      product.variants.isNotEmpty;
+                                  final variant = hasVariants
+                                      ? product.variants.first
+                                      : null;
 
                                   return GestureDetector(
                                     onTap: () {
@@ -291,21 +301,36 @@ class _TableCmdState extends State<TableCmd> {
                                         children: [
                                           Expanded(child: Text(product.code)),
                                           Expanded(
-                                              child: Text(product.designation)),
+                                            child: Text(
+                                              hasVariants
+                                                  ? '${product.designation} (${variant!.combinationName})'
+                                                  : product.designation,
+                                            ),
+                                          ),
                                           Expanded(
                                               child: Text(
                                                   '${widget.quantityProducts[index]}')),
                                           Expanded(
-                                              child: Text(
-                                                  '${widget.discounts[index]} ${widget.typeDiscounts[index] ? '%' : 'DT'}')),
+                                            child: Text(
+                                              '${widget.discounts[index]} ${widget.typeDiscounts[index] ? '%' : 'DT'}',
+                                            ),
+                                          ),
                                           Expanded(
-                                              child: Text(
-                                                  '${product.prixTTC.toStringAsFixed(2)} DT')),
+                                            child: Text(
+                                              hasVariants
+                                                  ? '${variant!.price.toStringAsFixed(2)} DT'
+                                                  : '${product.prixTTC.toStringAsFixed(2)} DT',
+                                            ),
+                                          ),
                                           Expanded(
                                             child: Text(
                                               widget.typeDiscounts[index]
-                                                  ? "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT"
-                                                  : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT",
+                                                  ? hasVariants
+                                                      ? "${(variant!.finalPrice * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT"
+                                                      : "${(product.prixTTC * widget.quantityProducts[index] * (1 - widget.discounts[index] / 100)).toStringAsFixed(2)} DT"
+                                                  : hasVariants
+                                                      ? "${(variant!.finalPrice * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT"
+                                                      : "${(product.prixTTC * widget.quantityProducts[index] - widget.discounts[index]).toStringAsFixed(2)} DT",
                                             ),
                                           ),
                                         ],
@@ -325,7 +350,7 @@ class _TableCmdState extends State<TableCmd> {
 
         const SizedBox(width: 15),
 
-        // Boutons à droite
+        // Boutons d'action à droite
         Expanded(
           flex: 1,
           child: Column(
@@ -355,7 +380,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.delete, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('SUPPRIMER LIGNE',
+                      Text('SUPPRIMER',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -368,14 +393,7 @@ class _TableCmdState extends State<TableCmd> {
               GestureDetector(
                 onTap: selectedProductIndex != null
                     ? () {
-                        Applydiscount.showDiscountInput(
-                          context,
-                          selectedProductIndex!,
-                          widget.discounts,
-                          widget.typeDiscounts,
-                          widget.selectedProducts,
-                          () => setState(() {}),
-                        );
+                        widget.onApplyDiscount(selectedProductIndex!);
                       }
                     : null,
                 child: Container(
@@ -392,7 +410,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.discount, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('REMISE PAR LIGNE',
+                      Text('REMISE',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -420,7 +438,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.edit, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('CHANGER QUANTITE',
+                      Text('QUANTITÉ',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -444,7 +462,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.search, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('RECHERCHER PRODUITS',
+                      Text('RECHERCHER',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -468,7 +486,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.list, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('AFFICHER COMMANDES',
+                      Text('COMMANDES',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -492,7 +510,7 @@ class _TableCmdState extends State<TableCmd> {
                     children: [
                       Icon(Icons.check_circle, color: Colors.white, size: 18),
                       SizedBox(width: 8),
-                      Text('VALIDER COMMANDE',
+                      Text('VALIDER',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
