@@ -23,7 +23,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
   String _errorMessage = '';
   bool _isImporting = false;
   double _progress = 0.0;
-
   Future<void> importProductsWithVariants() async {
     setState(() {
       _importStatus = 'Importing...';
@@ -57,37 +56,53 @@ class _ImportProductPageState extends State<ImportProductPage> {
           throw Exception('No sheet found in Excel file');
         }
 
-        // Process each row (skip header)
-        int totalRows = sheet.rows.length - 1;
-        int processedRows = 0;
-
+        // First pass: group all rows by product code
+        Map<String, List<List<Data?>>> productRows = {};
         for (var row in sheet.rows.skip(1)) {
+          String code = row[0]?.value?.toString() ?? '';
+          if (code.isNotEmpty) {
+            productRows.putIfAbsent(code, () => []).add(row);
+          }
+        }
+
+        // Process each product with all its variants
+        int totalProducts = productRows.length;
+        int processedProducts = 0;
+
+        for (var entry in productRows.entries) {
           if (!_isImporting) break;
 
+          String code = entry.key;
+          List<List<Data?>> rows = entry.value;
+
           try {
-            // Parse product data with null checks
-            String code = row[0]?.value?.toString() ?? '';
-            String designation = row[1]?.value?.toString() ?? '';
-            double prixHT = _parseDouble(row[2]?.value?.toString() ?? '0');
-            double taxe = _parseDouble(row[3]?.value?.toString() ?? '0');
-            String categoryName = (row[4]?.value?.toString() ?? '').trim();
-            String subCategoryName = (row[5]?.value?.toString() ?? '').trim();
-            String imagePath = row[6]?.value?.toString() ?? '';
-            double marge = _parseDouble(row[7]?.value?.toString() ?? '0');
-            double remiseMax = _parseDouble(row[8]?.value?.toString() ?? '0');
+            // Use first row for product details
+            var firstRow = rows.first;
+
+            String designation = firstRow[1]?.value?.toString() ?? '';
+            double prixHT = _parseDouble(firstRow[2]?.value?.toString() ?? '0');
+            double taxe = _parseDouble(firstRow[3]?.value?.toString() ?? '0');
+            String categoryName = (firstRow[4]?.value?.toString() ?? '').trim();
+            String subCategoryName =
+                (firstRow[5]?.value?.toString() ?? '').trim();
+            String imagePath = firstRow[6]?.value?.toString() ?? '';
+            double marge = _parseDouble(firstRow[7]?.value?.toString() ?? '0');
+            double remiseMax =
+                _parseDouble(firstRow[8]?.value?.toString() ?? '0');
             bool hasVariants =
-                (row[9]?.value?.toString() ?? 'false').toLowerCase() == 'true';
+                (firstRow[9]?.value?.toString() ?? 'false').toLowerCase() ==
+                    'true';
 
             // Validate required fields
-            if (code.isEmpty || designation.isEmpty) {
-              throw Exception('Missing required fields for product');
+            if (designation.isEmpty) {
+              throw Exception('Missing designation for product $code');
             }
 
             // Handle empty category names
             if (categoryName.isEmpty) categoryName = 'Default';
             if (subCategoryName.isEmpty) subCategoryName = 'Default';
 
-            // Get or create category IDs with retry logic
+            // Get or create category IDs
             int categoryId = await _getOrCreateCategoryWithRetry(categoryName,
                 imagePath: imagePath.isNotEmpty ? imagePath : null);
             int subCategoryId = await _getOrCreateSubCategoryWithRetry(
@@ -117,67 +132,99 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
             // Handle variants if exists
             if (hasVariants) {
-              String variantCode = row[10]?.value?.toString() ?? '';
-              String attributesStr = row[11]?.value?.toString() ?? '';
-              double variantPrice =
-                  _parseDouble(row[12]?.value?.toString() ?? '0');
-              double priceImpact =
-                  _parseDouble(row[13]?.value?.toString() ?? '0');
-              int variantStock =
-                  int.tryParse(row[14]?.value?.toString() ?? '0') ?? 0;
+              // Collect all variants from all rows for this product
+              List<Variant> allVariants = [];
 
-              if (variantCode.isEmpty) {
-                throw Exception('Variant code missing for product $code');
-              }
+              for (var row in rows) {
+                String variantCodesStr = row[10]?.value?.toString() ?? '';
+                String attributesStr = row[11]?.value?.toString() ?? '';
+                double variantPrice =
+                    _parseDouble(row[12]?.value?.toString() ?? '0');
+                double priceImpact =
+                    _parseDouble(row[13]?.value?.toString() ?? '0');
+                int variantStock =
+                    int.tryParse(row[14]?.value?.toString() ?? '0') ?? 0;
 
-              // Parse attributes
-              Map<String, String> attributes = {};
-              if (attributesStr.isNotEmpty) {
-                attributesStr.split(',').forEach((attrPair) {
-                  var parts = attrPair.split(':');
-                  if (parts.length == 2) {
-                    attributes[parts[0].trim()] = parts[1].trim();
+                if (variantCodesStr.isEmpty || attributesStr.isEmpty) {
+                  throw Exception(
+                      'Missing variant codes or attributes for product $code');
+                }
+
+                // Parse variant codes (comma-separated)
+                List<String> variantCodes =
+                    variantCodesStr.split(',').map((v) => v.trim()).toList();
+
+                // Parse attributes
+                Map<String, List<String>> attributeValues = {};
+                if (attributesStr.isNotEmpty) {
+                  List<String> attributePairs = attributesStr.split('/');
+                  for (String pair in attributePairs) {
+                    List<String> parts = pair.split(':');
+                    if (parts.length == 2) {
+                      String attributeName = parts[0].trim();
+                      List<String> values =
+                          parts[1].split(',').map((v) => v.trim()).toList();
+                      attributeValues[attributeName] = values;
+                    }
                   }
-                });
+                }
+
+                // Generate all combinations of attributes
+                List<Map<String, String>> variantsAttributes =
+                    _generateAttributeCombinations(attributeValues);
+
+                // Verify we have matching counts
+                if (variantCodes.length != variantsAttributes.length) {
+                  throw Exception(
+                      'Number of variant codes (${variantCodes.length}) does not match number of attribute combinations (${variantsAttributes.length}) for product $code');
+                }
+
+                // Create variants for this row
+                for (int i = 0; i < variantsAttributes.length; i++) {
+                  final variant = Variant(
+                    code: variantCodes[i],
+                    combinationName: variantsAttributes[i]
+                        .entries
+                        .map((e) => '${e.key}:${e.value}')
+                        .join(' - '),
+                    price: variantPrice,
+                    priceImpact: priceImpact,
+                    stock: variantStock,
+                    attributes: variantsAttributes[i],
+                    productId:
+                        product.id ?? 0, // Will be set after product insert
+                  );
+                  allVariants.add(variant);
+                }
               }
 
               // Insert product first
               product.id = await _sqlDb.addProduct(product);
 
-              // Create variant
-              final variant = Variant(
-                code: variantCode,
-                combinationName: attributes.values.join('-'),
-                price: variantPrice,
-                priceImpact: priceImpact,
-                stock: variantStock,
-                attributes: attributes,
-                productId: product.id!,
-              );
-
-              // Insert variant
-              variant.id = await _sqlDb.addVariant(variant);
-              product.variants.add(variant);
-
-              setState(() {
-                _importedVariantsCount++;
-              });
+              // Then insert all variants
+              for (var variant in allVariants) {
+                variant.productId = product.id!;
+                variant.id = await _sqlDb.addVariant(variant);
+                product.variants.add(variant);
+                setState(() {
+                  _importedVariantsCount++;
+                });
+              }
             } else {
-              // For non-variant products, use the stock value directly
+              // For non-variant products, use the stock value from first row
               product.stock =
-                  int.tryParse(row[14]?.value?.toString() ?? '0') ?? 0;
+                  int.tryParse(firstRow[14]?.value?.toString() ?? '0') ?? 0;
               product.id = await _sqlDb.addProduct(product);
             }
 
             setState(() {
               _importedProductsCount++;
-              processedRows++;
-              _progress = processedRows / totalRows;
+              processedProducts++;
+              _progress = processedProducts / totalProducts;
             });
           } catch (e) {
-            debugPrint(
-                'Error processing row ${processedRows + 1}: ${e.toString()}');
-            processedRows++;
+            debugPrint('Error processing product $code: ${e.toString()}');
+            processedProducts++;
             continue;
           }
         }
@@ -211,6 +258,30 @@ class _ImportProductPageState extends State<ImportProductPage> {
         ),
       );
     }
+  }
+
+  // Helper function to generate all combinations of attributes
+  List<Map<String, String>> _generateAttributeCombinations(
+      Map<String, List<String>> attributeValues) {
+    List<Map<String, String>> combinations = [{}];
+
+    attributeValues.forEach((attribute, values) {
+      List<Map<String, String>> newCombinations = [];
+
+      for (var combination in combinations) {
+        for (var value in values) {
+          var newCombination = Map<String, String>.from(combination);
+          newCombination[attribute] = value;
+          newCombinations.add(newCombination);
+        }
+      }
+
+      combinations = newCombinations;
+    });
+
+    print("Generated combinations: $combinations"); // Ajout du log
+
+    return combinations;
   }
 
   Future<int> _getOrCreateCategoryWithRetry(String categoryName,
@@ -395,7 +466,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, ImagePath, Marge, RemiseMax, HasVariants, VariantCode, Attributes, VariantPrice, PriceImpact, VariantStock',
+                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, ImagePath, Marge, RemiseMax, HasVariants, VariantCodes, Attributes, VariantPrice, PriceImpact, VariantStock',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(),
                         ),

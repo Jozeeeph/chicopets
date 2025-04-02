@@ -1,5 +1,6 @@
 import 'package:caissechicopets/home_page.dart';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
+import 'package:caissechicopets/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/components/categorieetproduct.dart';
 import 'package:caissechicopets/gestioncommande/addorder.dart';
@@ -189,34 +190,32 @@ class _CashDeskPageState extends State<CashDeskPage> {
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
-              onProductSelected: (Product product) {
+              onProductSelected: (Product product, [Variant? variant]) {
                 setState(() {
-                  // Debugging: Print the product code being passed in and the codes in selectedProducts
-                  print("List length: ${selectedProducts.length}");
-                  print("List content: $selectedProducts");
-                  print("Selected Product Code: '${product.code}'");
-                  for (var p in selectedProducts) {
-                    print("Existing Product Code: '${p.code}'");
-                  }
-
-                  // Ensuring no spaces or formatting issues
-                  int index = selectedProducts.indexWhere(
-                    (p) =>
-                        p.code.trim().toLowerCase() ==
-                        product.code.trim().toLowerCase(),
-                  );
-                  print("Index found: $index");
+                  int index = selectedProducts.indexWhere((p) {
+                    if (p.code.trim().toLowerCase() ==
+                        product.code.trim().toLowerCase()) {
+                      if (variant != null && p.variants.isNotEmpty) {
+                        return p.variants.any((v) => v.code == variant.code);
+                      }
+                      return true;
+                    }
+                    return false;
+                  });
 
                   if (index == -1) {
-                    // Product not selected yet, we add it with an initial quantity of 1
-                    selectedProducts.add(product);
+                    Product productToAdd = product;
+                    if (variant != null) {
+                      productToAdd = Product.fromMap(product.toMap())
+                        ..variants = [variant];
+                    }
+
+                    selectedProducts.add(productToAdd);
                     quantityProducts.add(1);
-                    discounts
-                        .add(0.0); // Add a discount value for the new product
+                    discounts.add(0.0);
                     typeDiscounts.add(true);
                     selectedProductIndex = selectedProducts.length - 1;
                   } else {
-                    // Product already selected, we increment the quantity
                     quantityProducts[index]++;
                     selectedProductIndex = index;
                   }
