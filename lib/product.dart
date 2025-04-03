@@ -19,6 +19,7 @@ class Product {
   double remiseMax;
   double remiseValeurMax;
   bool hasVariants;
+  bool sellable;
 
   Product({
     this.id, // Changed from default 0 to nullable
@@ -39,6 +40,7 @@ class Product {
     this.remiseMax = 0.0,
     this.remiseValeurMax = 0.0,
     this.hasVariants = false,
+    this.sellable = true,
   });
 
   String get productReferenceId => id?.toString() ?? 'new';
@@ -62,6 +64,7 @@ class Product {
     double? remiseMax,
     double? remiseValeurMax,
     bool? hasVariants,
+    bool? sellable,
   }) {
     return Product(
       id: id ?? this.id,
@@ -82,6 +85,7 @@ class Product {
       remiseMax: remiseMax ?? this.remiseMax,
       remiseValeurMax: remiseValeurMax ?? this.remiseValeurMax,
       hasVariants: hasVariants ?? this.hasVariants,
+      sellable: sellable ?? this.sellable,
     );
   }
 
@@ -103,6 +107,7 @@ class Product {
       'remise_max': remiseMax,
       'remise_valeur_max': remiseValeurMax,
       'has_variants': hasVariants ? 1 : 0,
+      'sellable': sellable ? 1 : 0,
     };
 
     // Only include ID if it's not null and not 0 (for updates)
@@ -132,6 +137,7 @@ class Product {
       remiseMax: (map['remise_max'] ?? 0.0).toDouble(),
       remiseValeurMax: (map['remise_valeur_max'] ?? 0.0).toDouble(),
       hasVariants: map['has_variants'] == 1,
+      sellable: map['sellable'] == 1,
     );
   }
 
@@ -157,6 +163,6 @@ class Product {
         'stock: $stock, prixHT: $prixHT, taxe: $taxe, prixTTC: $prixTTC, '
         'category: $categoryName ($categoryId), '
         'subCategory: $subCategoryName ($subCategoryId), '
-        'variants: ${variants.length}';
+        'variants: ${variants.length} , sellable : $sellable';
   }
 }

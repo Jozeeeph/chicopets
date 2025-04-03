@@ -43,6 +43,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
   bool hasExpirationDate = false;
+  bool sellable = true;
 
   @override
   void initState() {
@@ -425,6 +426,45 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           },
                         ),
                       ),
+
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Text(
+                            'Vendable: ',
+                            style: TextStyle(color: Color(0xFF0056A6)),
+                          ),
+                          const SizedBox(width: 16),
+                          Row(
+                            children: [
+                              Radio<bool>(
+                                value: true,
+                                groupValue: sellable,
+                                onChanged: (value) {
+                                  setState(() {
+                                    sellable = value ?? true;
+                                  });
+                                },
+                                activeColor: const Color(0xFF0056A6),
+                              ),
+                              const Text('Oui'),
+                              const SizedBox(width: 16),
+                              Radio<bool>(
+                                value: false,
+                                groupValue: sellable,
+                                onChanged: (value) {
+                                  setState(() {
+                                    sellable = value ?? false;
+                                  });
+                                },
+                                activeColor: const Color(0xFF0056A6),
+                              ),
+                              const Text('Non'),
+                            ],
+                          ),
+                        ],
+                      ),
+
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -564,13 +604,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 dateExpiration:
                     hasExpirationDate ? dateController.text.trim() : '',
                 categoryId: selectedCategoryId!,
-                subCategoryId:
-                    selectedSubCategoryId, // Peut être null maintenant
+                subCategoryId: selectedSubCategoryId,
                 categoryName: categoryName,
                 subCategoryName: subCategoryName,
                 marge: double.parse(margeController.text),
                 remiseMax: double.parse(remiseMaxController.text),
                 remiseValeurMax: double.parse(remiseValeurMaxController.text),
+                sellable: sellable, // Add this line
               );
 
               final db = await sqldb.db;
