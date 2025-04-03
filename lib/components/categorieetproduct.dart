@@ -115,11 +115,11 @@ class _CategorieetproductState extends State<Categorieetproduct> {
             borderRadius: BorderRadius.circular(20),
           ),
           elevation: 5,
-          backgroundColor: Colors.white, // Changed to white background
+          backgroundColor: Colors.white,
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white, // Changed to white background
+              color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: tealGreen, width: 2),
             ),
@@ -129,7 +129,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                 Text(
                   'Select Variant for ${product.designation}',
                   style: TextStyle(
-                    color: darkBlue, // Changed to dark blue for better contrast
+                    color: darkBlue,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -147,9 +147,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       final variant = product.variants[index];
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 5),
-                        color: variant.stock > 0
-                            ? Colors.white
-                            : Colors.grey[200], // Light background
+                        color:
+                            variant.stock > 0 ? Colors.white : Colors.grey[200],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
@@ -170,7 +169,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                           title: Text(
                             variant.combinationName,
                             style: TextStyle(
-                              color: darkBlue, // Dark text for visibility
+                              color: darkBlue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -180,7 +179,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                               Text(
                                 'Price: ${variant.price} DT',
                                 style: TextStyle(
-                                  color: darkBlue, // Dark text
+                                  color: darkBlue,
                                 ),
                               ),
                               Text(
@@ -195,7 +194,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                           ),
                           trailing: Icon(
                             Icons.arrow_forward_ios,
-                            color: darkBlue, // Dark icon
+                            color: darkBlue,
                             size: 16,
                           ),
                           onTap: variant.stock > 0
@@ -359,34 +358,46 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                 style: TextStyle(
                   color: white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 15, // Taille augmentée comme dans le code 1
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-              Text(
-                '${product.prixTTC.toStringAsFixed(2)} DT',
-                style: TextStyle(
-                  color: tealGreen,
-                  fontSize: 12,
+// Prix avec fond orange transparent comme dans le code 1
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent.withOpacity(0.2), // Style code 1
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  "${product.prixTTC.toStringAsFixed(2)} DT",
+                  style: TextStyle(
+                    color: softOrange, // Orange comme dans le code 1
+                    fontWeight: FontWeight.bold, // Gras ajouté
+                    fontSize: 15, // Taille augmentée
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
+// Stock avec couleur dynamique (code 2) mais style texte du code 1
               Text(
-                'Stock: $totalStock',
+                "Stock: $totalStock",
                 style: TextStyle(
-                  color: totalStock > 0 ? Colors.green : warmRed,
-                  fontSize: 11,
+                  color: totalStock > 5 ? const Color.fromARGB(255, 60, 218, 65) : warmRed,
+                  fontSize: 13, // Taille ajustée
+                  fontWeight: FontWeight.bold, // Gras ajouté
                 ),
               ),
               if (product.hasVariants)
                 Text(
-                  '${product.variants.length} variants',
+                  "${product.variants.length} variante(s)", // Texte en français
                   style: TextStyle(
-                    color: white,
-                    fontSize: 10,
+                    color: const Color.fromARGB(255, 64, 204, 255),
+                    fontSize: 12, // Taille légèrement augmentée
+                    fontWeight: FontWeight.bold, // Optionnel: pour différencier
                   ),
                 ),
             ],
@@ -401,23 +412,24 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Expanded(
       child: Row(
         children: [
-          // Categories column
+          // Categories column - using the design from code 1 but with functionality from code 2
           Expanded(
+            flex: 2,
             child: RefreshIndicator(
-              onRefresh: () async => _loadData(),
+              onRefresh: () async {
+                _loadData();
+              },
               child: FutureBuilder<List<Category>>(
                 future: categories,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No categories found'));
+                  } else if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                        child: Text('Aucune catégorie disponible'));
                   }
 
                   return GridView.builder(
@@ -438,26 +450,28 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               ),
             ),
           ),
-
-          const VerticalDivider(width: 1, color: Colors.grey),
-
-          // Products column
+          VerticalDivider(
+            color: lightGray,
+            thickness: 2,
+          ),
+          // Products column - using the design from code 1 but with functionality from code 2
           Expanded(
+            flex: 4,
             child: RefreshIndicator(
-              onRefresh: () async => _loadData(),
+              onRefresh: () async {
+                _loadData();
+              },
               child: FutureBuilder<List<Product>>(
                 future: products,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No products available'));
+                  } else if (snapshot.hasError) {
+                    return Center(
+                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                        child: Text('Aucun produit disponible'));
                   }
 
                   // Remove duplicate products
@@ -477,14 +491,6 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       : uniqueProducts
                           .where((p) => p.categoryId == selectedCategoryId)
                           .toList();
-
-                  if (filteredProducts.isEmpty) {
-                    return Center(
-                        child: Text(
-                      'No products in selected category',
-                      style: TextStyle(color: darkBlue),
-                    ));
-                  }
 
                   return GridView.count(
                     crossAxisCount: 6,

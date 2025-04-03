@@ -76,7 +76,7 @@ class Applydiscount {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          "%",
+                          "DT",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -92,7 +92,7 @@ class Applydiscount {
                           activeColor: Colors.blue,
                         ),
                         const Text(
-                          "DT",
+                          "%",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
