@@ -1156,4 +1156,22 @@ class SqlDb {
     );
     return result.isNotEmpty ? User.fromMap(result.first) : null;
   }
+
+  Future<int> updateUserCode(String username, String newCode) async {
+    final dbClient = await db;
+    return await dbClient.update(
+      'users',
+      {'code': newCode},
+      where: 'username = ?',
+      whereArgs: [username],
+    );
+  }
+  Future<int> deleteUser(int userId) async {
+  final dbClient = await db;
+  return await dbClient.delete(
+    'users',
+    where: 'id = ?',
+    whereArgs: [userId],
+  );
+}
 }

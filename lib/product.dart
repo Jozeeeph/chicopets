@@ -10,7 +10,7 @@ class Product {
   double prixTTC;
   String dateExpiration;
   int categoryId;
-  int subCategoryId;
+  int? subCategoryId;
   String? categoryName;
   String? subCategoryName;
   int isDeleted;
@@ -31,7 +31,7 @@ class Product {
     required this.dateExpiration,
     required this.categoryId,
     this.categoryName,
-    required this.subCategoryId,
+    this.subCategoryId,
     this.subCategoryName,
     this.isDeleted = 0,
     required this.marge,

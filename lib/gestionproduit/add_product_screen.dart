@@ -488,15 +488,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       const SizedBox(height: 16),
                       Visibility(
                         visible: selectedCategoryId != null,
-                        child: SubCategoryTree(
-                          subCategories: subCategories,
-                          parentId: null,
-                          onSelect: (subCategoryId) {
-                            setState(() {
-                              selectedSubCategoryId = subCategoryId;
-                            });
-                          },
-                          selectedSubCategoryId: selectedSubCategoryId,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Sous-catégorie (optionnelle)',
+                              style: TextStyle(color: Color(0xFF0056A6)),
+                            ),
+                            SubCategoryTree(
+                              subCategories: subCategories,
+                              parentId: null,
+                              onSelect: (subCategoryId) {
+                                setState(() {
+                                  selectedSubCategoryId = subCategoryId;
+                                });
+                              },
+                              selectedSubCategoryId: selectedSubCategoryId,
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -524,11 +533,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           if (_formKey.currentState!.validate()) {
-            if (selectedCategoryId == null || selectedSubCategoryId == null) {
+            if (selectedCategoryId == null) {
+              // Supprimez la vérification de selectedSubCategoryId
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Veuillez sélectionner une catégorie et une sous-catégorie.',
+                    'Veuillez sélectionner une catégorie.',
                     style: TextStyle(color: Colors.white),
                   ),
                   backgroundColor: Color(0xFFE53935),
@@ -540,8 +550,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
             try {
               final categoryName =
                   await sqldb.getCategoryNameById(selectedCategoryId!);
-              final subCategoryName =
-                  await sqldb.getSubCategoryNameById(selectedSubCategoryId!);
+              final subCategoryName = selectedSubCategoryId != null
+                  ? await sqldb.getSubCategoryNameById(selectedSubCategoryId!)
+                  : ''; // Valeur vide si pas de sous-catégorie
 
               final product = Product(
                 code: codeController.text.trim(),
@@ -553,7 +564,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 dateExpiration:
                     hasExpirationDate ? dateController.text.trim() : '',
                 categoryId: selectedCategoryId!,
-                subCategoryId: selectedSubCategoryId!,
+                subCategoryId:
+                    selectedSubCategoryId, // Peut être null maintenant
                 categoryName: categoryName,
                 subCategoryName: subCategoryName,
                 marge: double.parse(margeController.text),
