@@ -27,7 +27,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -58,7 +58,8 @@ class SqlDb {
     marge REAL,
     remise_max REAL DEFAULT 0.0, -- Nouvel attribut pour la remise maximale en pourcentage
     remise_valeur_max REAL DEFAULT 0.0, -- Nouvel attribut pour la valeur maximale de la remise
-    has_variants INTEGER DEFAULT 0
+    has_variants INTEGER DEFAULT 0,
+    sellable INTEGER DEFAULT 1
 );
 ''');
         print("Products table created");
