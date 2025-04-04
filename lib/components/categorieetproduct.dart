@@ -257,33 +257,40 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
       child: Container(
-        margin: const EdgeInsets.all(4.0),
-        width: 80,
-        height: 80,
+        padding: const EdgeInsets.all(12),
+        width: 250, // Augmenté encore plus
+        height: 250, // Augmenté encore plus
+        constraints: BoxConstraints(
+            minWidth: 250, minHeight: 250), // Force une taille minimale
         decoration: BoxDecoration(
           color: selectedCategoryId == category.id
               ? tealGreen.withOpacity(0.2)
               : darkBlue.withOpacity(0.1),
           border: Border.all(
             color: selectedCategoryId == category.id ? tealGreen : deepBlue,
-            width: 1.5,
+            width: 1.8, // Bordure plus épaisse
           ),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(30), // Coins plus arrondis
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(30),
-              child: _buildCategoryImage(category.imagePath),
+              child: SizedBox(
+                width: 80, // Taille fixe pour l'image
+                height: 80,
+                child: _buildCategoryImage(category.imagePath),
+              ),
             ),
-            const SizedBox(height: 4),
-            SizedBox(
+            const SizedBox(height: 12), // Espacement augmenté
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 category.name ?? 'Unnamed',
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 15,
+                  fontSize: 16, // Texte plus grand
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -386,7 +393,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               Text(
                 "Stock: $totalStock",
                 style: TextStyle(
-                  color: totalStock > 5 ? const Color.fromARGB(255, 60, 218, 65) : warmRed,
+                  color: totalStock > 5
+                      ? const Color.fromARGB(255, 60, 218, 65)
+                      : warmRed,
                   fontSize: 13, // Taille ajustée
                   fontWeight: FontWeight.bold, // Gras ajouté
                 ),
