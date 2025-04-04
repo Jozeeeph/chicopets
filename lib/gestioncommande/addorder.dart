@@ -124,6 +124,10 @@ class Addorder {
             }
 
             bool validateDiscounts() {
+              bool hasProductDiscount =
+                  discounts.any((discount) => discount > 0);
+
+              // Vérification des limites de remise par produit
               for (int i = 0; i < selectedProducts.length; i++) {
                 double discount = discounts[i];
                 bool isPercentage = typeDiscounts[i];
@@ -151,38 +155,36 @@ class Addorder {
                 }
               }
 
-              // Vérification de la remise globale
-              double globalDiscountValue = isPercentageDiscount
-                  ? globalDiscount
-                  : globalDiscountValueController.text.isEmpty
-                      ? 0.0
-                      : double.tryParse(globalDiscountValueController.text) ??
-                          0.0;
+              // Vérification des limites de remise globale (même si cachée)
+              if (!hasProductDiscount) {
+                double currentGlobalDiscount =
+                    isPercentageDiscount ? globalDiscount : globalDiscountValue;
 
-              if (isPercentageDiscount &&
-                  globalDiscount >
-                      _calculateMaxGlobalDiscountPercentage(
-                          selectedProducts, quantityProducts)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts)}%."),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return false;
-              } else if (!isPercentageDiscount &&
-                  globalDiscountValue >
-                      _calculateMaxGlobalDiscountValue(
-                          selectedProducts, quantityProducts)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts)} DT."),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return false;
+                if (isPercentageDiscount &&
+                    globalDiscount >
+                        _calculateMaxGlobalDiscountPercentage(
+                            selectedProducts, quantityProducts)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts)}%."),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return false;
+                } else if (!isPercentageDiscount &&
+                    globalDiscountValue >
+                        _calculateMaxGlobalDiscountValue(
+                            selectedProducts, quantityProducts)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts)} DT."),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return false;
+                }
               }
 
               return true;
@@ -450,102 +452,108 @@ class Addorder {
                     SizedBox(height: 16),
 
                     // Remise Globale
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Type de Remise:",
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Row(
-                          children: [
-                            Radio(
-                              value: true,
-                              groupValue: isPercentageDiscount,
-                              onChanged: (value) {
-                                setState(() {
-                                  isPercentageDiscount = value as bool;
-                                  globalDiscountController.text = '';
-                                  globalDiscountValueController.text = '';
-                                  updateTotalAndChange();
-                                });
-                              },
-                            ),
-                            Text("Pourcentage"),
-                            Radio(
-                              value: false,
-                              groupValue: isPercentageDiscount,
-                              onChanged: (value) {
-                                setState(() {
-                                  isPercentageDiscount = value as bool;
-                                  globalDiscountController.text = '';
-                                  globalDiscountValueController.text = '';
-                                  updateTotalAndChange();
-                                });
-                              },
-                            ),
-                            Text("Valeur (DT)"),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-                        if (isPercentageDiscount)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    // Afficher la section Remise Globale seulement si aucune remise produit n'est appliquée
+                    if (!discounts.any((discount) => discount > 0))
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Remise Globale:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          SizedBox(height: 8),
+                          Text("Type de Remise:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Row(
                             children: [
-                              TextField(
-                                controller: globalDiscountController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: "Remise Globale (%)",
-                                  border: OutlineInputBorder(),
-                                ),
+                              Radio(
+                                value: true,
+                                groupValue: isPercentageDiscount,
                                 onChanged: (value) {
                                   setState(() {
-                                    globalDiscount =
-                                        double.tryParse(value) ?? 0.0;
+                                    isPercentageDiscount = value as bool;
+                                    globalDiscountController.text = '';
+                                    globalDiscountValueController.text = '';
                                     updateTotalAndChange();
                                   });
                                 },
                               ),
-                              SizedBox(height: 8),
-                              Text(
-                                discountLimitText,
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        if (!isPercentageDiscount)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: globalDiscountValueController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: "Remise Globale (DT)",
-                                  border: OutlineInputBorder(),
-                                ),
+                              Text("Pourcentage"),
+                              Radio(
+                                value: false,
+                                groupValue: isPercentageDiscount,
                                 onChanged: (value) {
                                   setState(() {
-                                    globalDiscountValue =
-                                        double.tryParse(value) ?? 0.0;
+                                    isPercentageDiscount = value as bool;
+                                    globalDiscountController.text = '';
+                                    globalDiscountValueController.text = '';
                                     updateTotalAndChange();
                                   });
                                 },
                               ),
-                              SizedBox(height: 8),
-                              Text(
-                                discountLimitText,
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              Text("Valeur (DT)"),
                             ],
                           ),
-                      ],
-                    ),
+                          SizedBox(height: 16),
+                          if (isPercentageDiscount)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: globalDiscountController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: "Remise Globale (%)",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      globalDiscount =
+                                          double.tryParse(value) ?? 0.0;
+                                      updateTotalAndChange();
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (!isPercentageDiscount)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: globalDiscountValueController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: "Remise Globale (DT)",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      globalDiscountValue =
+                                          double.tryParse(value) ?? 0.0;
+                                      updateTotalAndChange();
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          SizedBox(height: 16),
+                        ],
+                      ),
 
                     SizedBox(height: 16),
 
@@ -721,7 +729,7 @@ class Addorder {
     for (int i = 0; i < products.length; i++) {
       double productMaxDiscount = products[i].remiseValeurMax;
       int quantity = quantities[i];
-      maxDiscountValue +=quantity * productMaxDiscount;
+      maxDiscountValue += quantity * productMaxDiscount;
     }
     return maxDiscountValue;
   }
@@ -736,6 +744,33 @@ class Addorder {
     double globalDiscount,
     bool isPercentageDiscount,
   ) async {
+    if (!isPercentageDiscount &&
+        globalDiscount >
+            _calculateMaxGlobalDiscountValue(
+                selectedProducts, quantityProducts)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts)} DT."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (isPercentageDiscount &&
+        globalDiscount >
+            _calculateMaxGlobalDiscountPercentage(
+                selectedProducts, quantityProducts)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts)}%."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     if (selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Aucun produit sélectionné.")),
