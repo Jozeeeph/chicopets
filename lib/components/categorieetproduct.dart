@@ -257,11 +257,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
       child: Container(
-        padding: const EdgeInsets.all(12),
-        width: 250, // Augmenté encore plus
-        height: 250, // Augmenté encore plus
-        constraints: BoxConstraints(
-            minWidth: 250, minHeight: 250), // Force une taille minimale
+        width: 80, // Augmenté encore plus
+        height: 80, // Augmenté encore plus
         decoration: BoxDecoration(
           color: selectedCategoryId == category.id
               ? tealGreen.withOpacity(0.2)
@@ -445,9 +442,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
-                      childAspectRatio: 1.5,
-                      mainAxisSpacing: 30.0,
-                      crossAxisSpacing: 30.0,
+                      childAspectRatio: 1,
+                      mainAxisSpacing: 28.0,
+                      crossAxisSpacing: 40.0,
                     ),
                     padding: const EdgeInsets.all(8.0),
                     itemCount: snapshot.data!.length,
