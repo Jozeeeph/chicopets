@@ -92,9 +92,9 @@ class _DashboardPageState extends State<DashboardPage> {
               Expanded(
                 child: GridView.count(
                   crossAxisCount: 5,
-                  crossAxisSpacing: 31,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 0.8,
+                  crossAxisSpacing: 5,
+                  mainAxisSpacing: 5,
+                  childAspectRatio: 0.85,
                   children: [
                     if (isAdmin) ...[
                       _buildCard(

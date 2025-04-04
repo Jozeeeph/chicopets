@@ -313,17 +313,35 @@ class _GalleryPageState extends State<GalleryPage> {
             ),
             if (!widget.isSelectionMode)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
                 child: TextFormField(
                   controller: _nameControllers[index],
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   maxLength: 30,
                   decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.edit,
+                        size: 18, color: Colors.grey), // <-- Ajouté ici
                     hintText: 'Nom de l\'image',
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide:
+                          BorderSide(color: Theme.of(context).primaryColor),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
                     suffixIcon: _nameControllers[index].text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.check, size: 18),
@@ -360,7 +378,6 @@ class _GalleryPageState extends State<GalleryPage> {
             )
         ],
       ),
-      
       body: Stack(
         children: [
           SingleChildScrollView(

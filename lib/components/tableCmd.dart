@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 typedef RefreshCallback = void Function(Function refreshData);
 
@@ -120,6 +123,20 @@ class _TableCmdState extends State<TableCmd> {
     }
   }
 
+  Future<User?> _getCurrentUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString('current_user');
+      if (userJson != null) {
+        return User.fromMap(jsonDecode(userJson));
+      }
+      return null;
+    } catch (e) {
+      print('Error getting current user: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -162,19 +179,46 @@ class _TableCmdState extends State<TableCmd> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text(
-                          'Caissier: Utilisateur',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                        FutureBuilder<User?>(
+                          future: _getCurrentUser(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.done) {
+                              if (snapshot.hasData) {
+                                return Text(
+                                  'Caissier: ${snapshot.data!.username}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              }
+                            }
+                            return const Text(
+                              'Caissier: ...',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
                         ),
-                        Text(
-                          'Heure: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                          style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                        // Ajout de la date et heure avec mise à jour en temps réel
+                        StreamBuilder<DateTime>(
+                          stream: Stream.periodic(const Duration(seconds: 1),
+                              (_) => DateTime.now()),
+                          builder: (context, snapshot) {
+                            return Text(
+                              'Le ${DateFormat('dd/MM/yyyy').format(snapshot.data ?? DateTime.now())} à ${DateFormat('HH:mm:ss').format(snapshot.data ?? DateTime.now())}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
