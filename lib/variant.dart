@@ -1,10 +1,12 @@
+import 'dart:convert';
+
 class Variant {
   int? id;
   String code;
   String combinationName;
   double price;
   double priceImpact;
-  double finalPrice; // Calculated field
+  double finalPrice;
   int stock;
   bool defaultVariant;
   Map<String, String> attributes;
@@ -20,7 +22,7 @@ class Variant {
     required this.defaultVariant,
     required this.attributes,
     required this.productId,
-  }) : finalPrice = price + priceImpact; // Initialize finalPrice in constructor
+  }) : finalPrice = price + priceImpact;
 
   Variant copyWith({
     int? id,
@@ -54,12 +56,11 @@ class Variant {
       'price_impact': priceImpact,
       'final_price': finalPrice,
       'stock': stock,
-      'default_variant': defaultVariant,
+      'default_variant': defaultVariant ? 1 : 0,
       'attributes': _serializeAttributes(attributes),
       'product_id': productId,
     };
 
-    // Only include ID if it's not null
     if (id != null) {
       map['id'] = id as Object;
     }
@@ -75,42 +76,32 @@ class Variant {
       price: (map['price'] ?? 0.0).toDouble(),
       priceImpact: (map['price_impact'] ?? 0.0).toDouble(),
       stock: map['stock'] ?? 0,
-      defaultVariant: map['default_variant'] ?? 0,
+      defaultVariant: (map['default_variant'] ?? 0) == 1, // Convert int to bool
       attributes: _parseAttributes(map['attributes'] ?? '{}'),
       productId: map['product_id'] ?? 0,
     );
   }
 
   static String _serializeAttributes(Map<String, String> attributes) {
-    return attributes.entries.map((e) => '${e.key}:${e.value}').join(',');
+    return jsonEncode(attributes); // Using JSON for more reliable serialization
   }
 
   static Map<String, String> _parseAttributes(String attributesString) {
-    final attributes = <String, String>{};
     try {
-      attributesString =
-          attributesString.replaceAll('{', '').replaceAll('}', '');
-      if (attributesString.trim().isNotEmpty) {
-        for (final pair in attributesString.split(',')) {
-          final keyValue = pair.split(':');
-          if (keyValue.length >= 2) {
-            final key = keyValue[0].trim();
-            final value = keyValue.sublist(1).join(':').trim();
-            attributes[key] = value;
-          }
-        }
-      }
+      final decoded = jsonDecode(attributesString) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, value.toString()));
     } catch (e) {
       print('Error parsing variant attributes: $e');
+      return {};
     }
-    return attributes;
   }
 
   @override
   String toString() {
     return 'Variant(id: $id, code: $code, combination: $combinationName, '
-        'price: $price (impact: $priceImpact), stock: $stock, defaultVariant: $defaultVariant'
-        'productId: $productId, attributes: $attributes)';
+        'price: $price (impact: $priceImpact), stock: $stock, '
+        'defaultVariant: $defaultVariant, productId: $productId, '
+        'attributes: $attributes)';
   }
 
   bool get isValid {

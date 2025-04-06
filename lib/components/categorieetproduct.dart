@@ -177,7 +177,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Price: ${variant.price} DT',
+                                'Price: ${variant.finalPrice} DT',
                                 style: TextStyle(
                                   color: darkBlue,
                                 ),
@@ -190,6 +190,24 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              if (variant.defaultVariant)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: tealGreen.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Default',
+                                    style: TextStyle(
+                                      color: tealGreen,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                           trailing: Icon(
@@ -237,8 +255,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   void _onProductSelected(Product product) {
     if (product.hasVariants && product.variants.isNotEmpty) {
+      final defaultVariant = product.variants.firstWhere(
+        (v) => v.defaultVariant,
+        orElse: () => product.variants.first,
+      );
+      
       if (product.variants.length == 1) {
-        widget.onProductSelected(product, product.variants.first);
+        widget.onProductSelected(product, defaultVariant);
       } else {
         _showVariantSelectionDialog(context, product);
       }
@@ -257,17 +280,17 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return GestureDetector(
       onTap: () => _onCategorySelected(category.id),
       child: Container(
-        width: 80, // Augmenté encore plus
-        height: 80, // Augmenté encore plus
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           color: selectedCategoryId == category.id
               ? tealGreen.withOpacity(0.2)
               : darkBlue.withOpacity(0.1),
           border: Border.all(
             color: selectedCategoryId == category.id ? tealGreen : deepBlue,
-            width: 1.8, // Bordure plus épaisse
+            width: 1.8,
           ),
-          borderRadius: BorderRadius.circular(30), // Coins plus arrondis
+          borderRadius: BorderRadius.circular(30),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -275,19 +298,19 @@ class _CategorieetproductState extends State<Categorieetproduct> {
             ClipRRect(
               borderRadius: BorderRadius.circular(30),
               child: SizedBox(
-                width: 80, // Taille fixe pour l'image
+                width: 80,
                 height: 80,
                 child: _buildCategoryImage(category.imagePath),
               ),
             ),
-            const SizedBox(height: 12), // Espacement augmenté
+            const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Text(
                 category.name ?? 'Unnamed',
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 16, // Texte plus grand
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -341,9 +364,18 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   Widget _buildProductCard(Product product) {
-    final totalStock = product.hasVariants
-        ? product.variants.fold(0, (sum, variant) => sum + variant.stock)
-        : product.stock;
+    // Find default variant or use first variant if none marked as default
+    Variant? defaultVariant;
+    if (product.hasVariants && product.variants.isNotEmpty) {
+      defaultVariant = product.variants.firstWhere(
+        (v) => v.defaultVariant,
+        orElse: () => product.variants.first,
+      );
+    }
+
+    final displayPrice = defaultVariant?.price ?? product.prixTTC;
+    final displayStock = defaultVariant?.stock ?? product.stock;
+    final variantName = defaultVariant?.combinationName;
 
     return Container(
       margin: const EdgeInsets.all(2.0),
@@ -362,48 +394,77 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                 style: TextStyle(
                   color: white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 15, // Taille augmentée comme dans le code 1
+                  fontSize: 15,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-// Prix avec fond orange transparent comme dans le code 1
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.orangeAccent.withOpacity(0.2), // Style code 1
+                  color: Colors.orangeAccent.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(
-                  "${product.prixTTC.toStringAsFixed(2)} DT",
-                  style: TextStyle(
-                    color: softOrange, // Orange comme dans le code 1
-                    fontWeight: FontWeight.bold, // Gras ajouté
-                    fontSize: 15, // Taille augmentée
-                  ),
+                child: Column(
+                  children: [
+                    Text(
+                      "${displayPrice.toStringAsFixed(2)} DT",
+                      style: TextStyle(
+                        color: softOrange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (variantName != null)
+                      Text(
+                        variantName,
+                        style: TextStyle(
+                          color: white,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (defaultVariant?.defaultVariant ?? false)
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: tealGreen.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Default',
+                          style: TextStyle(
+                            color: white,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 4),
-// Stock avec couleur dynamique (code 2) mais style texte du code 1
               Text(
-                "Stock: $totalStock",
+                "Stock: $displayStock",
                 style: TextStyle(
-                  color: totalStock > 5
+                  color: displayStock > 5
                       ? const Color.fromARGB(255, 60, 218, 65)
                       : warmRed,
-                  fontSize: 13, // Taille ajustée
-                  fontWeight: FontWeight.bold, // Gras ajouté
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               if (product.hasVariants)
                 Text(
-                  "${product.variants.length} variante(s)", // Texte en français
+                  "${product.variants.length} variante(s)",
                   style: TextStyle(
                     color: const Color.fromARGB(255, 64, 204, 255),
-                    fontSize: 12, // Taille légèrement augmentée
-                    fontWeight: FontWeight.bold, // Optionnel: pour différencier
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
             ],
@@ -418,7 +479,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Expanded(
       child: Row(
         children: [
-          // Categories column - using the design from code 1 but with functionality from code 2
+          // Categories column
           Expanded(
             flex: 2,
             child: RefreshIndicator(
@@ -460,7 +521,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
             color: lightGray,
             thickness: 2,
           ),
-          // Products column - using the design from code 1 but with functionality from code 2
+          // Products column
           Expanded(
             flex: 4,
             child: RefreshIndicator(

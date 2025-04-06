@@ -183,11 +183,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       _buildTextFormField(
-                        controller: designationController,
-                        label: 'Désignation',
+                        controller: descriptionController,
+                        label: 'Description',
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Le champ "Désignation" ne doit pas être vide.';
+                            return 'Le champ "Description" ne doit pas être vide.';
                           }
                           return null;
                         },
@@ -640,8 +640,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               final product = Product(
                 code: codeController.text.trim(),
                 designation: designationController.text.trim(),
-                description: descriptionController.text
-                    .trim(), // Ajout de la description
+                description: descriptionController.text.trim(), // Ajout de la description
                 stock: int.parse(stockController.text),
                 prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
