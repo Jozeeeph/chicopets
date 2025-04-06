@@ -4,6 +4,7 @@ class Product {
   int? id; // Changed from int id = 0 to nullable
   String code;
   String designation;
+  String? description;
   int stock;
   double prixHT;
   double taxe;
@@ -25,6 +26,7 @@ class Product {
     this.id, // Changed from default 0 to nullable
     required this.code,
     required this.designation,
+    required this.description,
     required this.stock,
     required this.prixHT,
     required this.taxe,
@@ -49,6 +51,7 @@ class Product {
     int? id,
     String? code,
     String? designation,
+    String? description,
     int? stock,
     double? prixHT,
     double? taxe,
@@ -70,6 +73,7 @@ class Product {
       id: id ?? this.id,
       code: code ?? this.code,
       designation: designation ?? this.designation,
+      description: description ?? this.description,
       stock: stock ?? this.stock,
       prixHT: prixHT ?? this.prixHT,
       taxe: taxe ?? this.taxe,
@@ -93,6 +97,7 @@ class Product {
     final map = {
       'code': code,
       'designation': designation,
+      'description': description,
       'stock': stock,
       'prix_ht': prixHT,
       'taxe': taxe,
@@ -123,6 +128,7 @@ class Product {
       id: map['id'], // No default value here
       code: map['code'] ?? '',
       designation: map['designation'] ?? '',
+      description: map['description'] ?? '',
       stock: map['stock'] ?? 0,
       prixHT: (map['prix_ht'] ?? 0.0).toDouble(),
       taxe: (map['taxe'] ?? 0.0).toDouble(),
@@ -159,7 +165,7 @@ class Product {
 
   @override
   String toString() {
-    return 'Product(id: $id, code: $code, designation: $designation, '
+    return 'Product(id: $id, code: $code, designation: $designation, description: $description '
         'stock: $stock, prixHT: $prixHT, taxe: $taxe, prixTTC: $prixTTC, '
         'category: $categoryName ($categoryId), '
         'subCategory: $subCategoryName ($subCategoryId), '
