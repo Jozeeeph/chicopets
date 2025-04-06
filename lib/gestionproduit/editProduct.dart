@@ -24,6 +24,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController codeController = TextEditingController();
   final TextEditingController designationController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
   final TextEditingController stockController = TextEditingController();
   final TextEditingController priceHTController = TextEditingController();
   final TextEditingController priceTTCController = TextEditingController();
@@ -32,11 +33,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController =
-      TextEditingController();
+  final TextEditingController remiseValeurMaxController = TextEditingController();
   final TextEditingController attributeNameController = TextEditingController();
-  final TextEditingController attributeValuesController =
-      TextEditingController();
+  final TextEditingController attributeValuesController = TextEditingController();
 
   final SqlDb sqldb = SqlDb();
   double? selectedTax;
@@ -50,6 +49,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   List<Variant> variants = [];
   Map<String, List<String>> attributes = {};
   bool isLoadingVariants = false;
+  bool defaultVariant = true;
 
   @override
   void initState() {
@@ -57,6 +57,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     // Initialize form fields with product data
     codeController.text = widget.product.code;
     designationController.text = widget.product.designation;
+    descriptionController.text = widget.product.description ?? '';
     stockController.text = widget.product.stock.toString();
     priceHTController.text = widget.product.prixHT.toString();
     taxController.text = widget.product.taxe.toString();
@@ -102,8 +103,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
     setState(() => isLoadingVariants = true);
     try {
-      final variantsFromDb =
-          await sqldb.getVariantsByProductId(widget.product.id!);
+      final variantsFromDb = await sqldb.getVariantsByProductId(widget.product.id!);
 
       setState(() {
         variants = variantsFromDb;
@@ -148,6 +148,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   @override
   void dispose() {
+    descriptionController.dispose();
     remiseMaxController.dispose();
     profitController.dispose();
     remiseValeurMaxController.dispose();
@@ -218,20 +219,22 @@ class _EditProductScreenState extends State<EditProductScreen> {
     if (widget.product.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please save product before adding variants')),
+          content: Text('Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
+        ),
       );
       return;
     }
 
     setState(() {
       variants = _generateCombinations(attributes).map((combination) {
-        final basePrice = double.parse(priceTTCController.text);
+        final basePrice = double.parse(priceHTController.text);
         return Variant(
           code: '',
           combinationName: combination.values.join('-'),
           price: basePrice,
           priceImpact: 0.0,
           stock: 0,
+          defaultVariant: defaultVariant,
           attributes: combination,
           productId: widget.product.id!,
         );
@@ -239,8 +242,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     });
   }
 
-  List<Map<String, String>> _generateCombinations(
-      Map<String, List<String>> attributes) {
+  List<Map<String, String>> _generateCombinations(Map<String, List<String>> attributes) {
     List<Map<String, String>> combinations = [];
     List<String> attributeNames = attributes.keys.toList();
 
@@ -249,11 +251,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
   }
 
   void _generateCombinationHelper(
-      Map<String, List<String>> attributes,
-      List<String> attributeNames,
-      int currentIndex,
-      Map<String, String> currentCombination,
-      List<Map<String, String>> combinations) {
+    Map<String, List<String>> attributes,
+    List<String> attributeNames,
+    int currentIndex,
+    Map<String, String> currentCombination,
+    List<Map<String, String>> combinations,
+  ) {
     if (currentIndex == attributeNames.length) {
       combinations.add(Map.from(currentCombination));
       return;
@@ -332,6 +335,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     },
                   ),
                   _buildTextFormField(
+                    controller: descriptionController,
+                    label: 'Description (optionnelle)',
+                    maxLines: 3,
+                    keyboardType: TextInputType.multiline,
+                  ),
+                  _buildTextFormField(
                     controller: stockController,
                     label: 'Stock',
                     keyboardType: TextInputType.number,
@@ -399,16 +408,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   label: 'Profit',
                   keyboardType: TextInputType.number,
                   enabled: false,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le champ "Profit" ne doit pas être vide.';
-                    }
-                    if (double.tryParse(value) == null ||
-                        double.parse(value) <= 0) {
-                      return 'Le profit doit être un nombre positif.';
-                    }
-                    return null;
-                  },
                 ),
                 _buildTextFormField(
                   controller: remiseValeurMaxController,
@@ -426,8 +425,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     DropdownMenuItem(value: 19.0, child: Text('19%')),
                   ],
                   onChanged: (value) {
-                    if (value != null &&
-                        [0.0, 7.0, 12.0, 19.0].contains(value)) {
+                    if (value != null && [0.0, 7.0, 12.0, 19.0].contains(value)) {
                       setState(() {
                         selectedTax = value;
                         taxController.text = value.toString();
@@ -448,14 +446,34 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildTextFormField(
-                  controller: priceTTCController,
-                  label: 'Prix TTC',
+                Row(
+                  children: [
+                    const Text('Variante par défaut:'),
+                    Radio<bool>(
+                      value: true,
+                      groupValue: defaultVariant,
+                      onChanged: (value) {
+                        setState(() {
+                          defaultVariant = value ?? true;
+                        });
+                      },
+                    ),
+                    const Text('Oui'),
+                    Radio<bool>(
+                      value: false,
+                      groupValue: defaultVariant,
+                      onChanged: (value) {
+                        setState(() {
+                          defaultVariant = value ?? false;
+                        });
+                      },
+                    ),
+                    const Text('Non'),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 CheckboxListTile(
-                  title:
-                      const Text('Ce produit a-t-il une date d\'expiration ?'),
+                  title: const Text('Ce produit a-t-il une date d\'expiration ?'),
                   value: hasExpirationDate,
                   onChanged: (value) {
                     setState(() {
@@ -467,39 +485,42 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                _buildTextFormField(
-                  controller: dateController,
-                  label: 'Date Expiration',
-                  validator: (value) {
-                    if (hasExpirationDate) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le champ "Date Expiration" ne doit pas être vide.';
-                      }
-                      List<String> possibleFormats = [
-                        "dd-MM-yyyy",
-                        "MM-dd-yyyy",
-                        "yyyy-MM-dd",
-                        "dd/MM/yyyy",
-                        "MM/dd/yyyy"
-                      ];
-                      DateTime? date;
-                      for (String format in possibleFormats) {
-                        try {
-                          date = DateFormat(format).parseStrict(value);
-                          break;
-                        } catch (e) {
-                          continue;
+                Visibility(
+                  visible: hasExpirationDate,
+                  child: _buildTextFormField(
+                    controller: dateController,
+                    label: 'Date Expiration',
+                    validator: (value) {
+                      if (hasExpirationDate) {
+                        if (value == null || value.isEmpty) {
+                          return 'Le champ "Date Expiration" ne doit pas être vide.';
+                        }
+                        List<String> possibleFormats = [
+                          "dd-MM-yyyy",
+                          "MM-dd-yyyy",
+                          "yyyy-MM-dd",
+                          "dd/MM/yyyy",
+                          "MM/dd/yyyy"
+                        ];
+                        DateTime? date;
+                        for (String format in possibleFormats) {
+                          try {
+                            date = DateFormat(format).parseStrict(value);
+                            break;
+                          } catch (e) {
+                            continue;
+                          }
+                        }
+                        if (date == null) {
+                          return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
+                        }
+                        if (!date.isAfter(DateTime.now())) {
+                          return 'La date doit être dans le futur.';
                         }
                       }
-                      if (date == null) {
-                        return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
-                      }
-                      if (!date.isAfter(DateTime.now())) {
-                        return 'La date doit être dans le futur.';
-                      }
-                    }
-                    return null;
-                  },
+                      return null;
+                    },
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FutureBuilder<List<Category>>(
@@ -522,11 +543,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                       value: selectedCategoryId,
                       items: categories.map((cat) {
                         return DropdownMenuItem<int>(
-                            value: cat.id,
-                            child: Text(
-                              cat.name,
-                              style: const TextStyle(color: Colors.black),
-                            ));
+                          value: cat.id,
+                          child: Text(
+                            cat.name,
+                            style: const TextStyle(color: Colors.black),
+                          ),
+                        );
                       }).toList(),
                       onChanged: (val) {
                         setState(() {
@@ -643,38 +665,26 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                 DataColumn(
                                   label: const Text('Combinaison'),
                                   numeric: false,
-                                  tooltip: 'Combinaison de variantes',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                                 DataColumn(
                                   label: const Text('Prix'),
                                   numeric: true,
-                                  tooltip: 'Prix de base',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                                 DataColumn(
                                   label: const Text('Impact Prix'),
                                   numeric: true,
-                                  tooltip: 'Impact sur le prix',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                                 DataColumn(
                                   label: const Text('Prix Final'),
                                   numeric: true,
-                                  tooltip: 'Prix final',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                                 DataColumn(
                                   label: const Text('Stock'),
                                   numeric: true,
-                                  tooltip: 'Quantité en stock',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                                 DataColumn(
                                   label: const Text('Code-barres'),
                                   numeric: false,
-                                  tooltip: 'Code-barres unique',
-                                  onSort: (columnIndex, ascending) {},
                                 ),
                               ],
                               rows: variants.map((variant) {
@@ -870,6 +880,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   price: v.price,
                   priceImpact: v.priceImpact,
                   stock: v.stock,
+                  defaultVariant: v.defaultVariant,
                   attributes: v.attributes,
                   productId: v.productId,
                 );
@@ -879,6 +890,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 id: widget.product.id,
                 code: codeController.text.trim(),
                 designation: designationController.text.trim(),
+                description: descriptionController.text.trim(),
                 stock: hasVariants
                     ? updatedVariants.fold(0, (sum, v) => sum + v.stock)
                     : int.parse(stockController.text),
@@ -927,6 +939,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     required String label,
     TextInputType keyboardType = TextInputType.text,
     bool enabled = true,
+    int maxLines = 1,
     String? Function(String?)? validator,
     void Function(String)? onFieldSubmitted,
   }) {
@@ -937,6 +950,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         decoration: _inputDecoration(label),
         keyboardType: keyboardType,
         enabled: enabled,
+        maxLines: maxLines,
         validator: validator,
         style: const TextStyle(color: Colors.black),
         onFieldSubmitted: onFieldSubmitted,

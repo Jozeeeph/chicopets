@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-typedef RefreshCallback = void Function(Function refreshData);
+typedef RefreshCallback = void Function();
 
 class TableCmd extends StatefulWidget {
   final double total;
@@ -27,6 +27,8 @@ class TableCmd extends StatefulWidget {
       double globalDiscount, bool isPercentageDiscount) calculateTotal;
   final VoidCallback onFetchOrders;
   final VoidCallback onPlaceOrder;
+  final int? selectedProductIndex;
+  final Function(int) onProductSelected;
 
   const TableCmd({
     super.key,
@@ -45,6 +47,8 @@ class TableCmd extends StatefulWidget {
     required this.onFetchOrders,
     required this.onPlaceOrder,
     required this.isPercentageDiscount,
+    this.selectedProductIndex,
+    required this.onProductSelected,
   });
 
   @override

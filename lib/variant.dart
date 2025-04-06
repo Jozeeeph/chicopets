@@ -6,6 +6,7 @@ class Variant {
   double priceImpact;
   double finalPrice; // Calculated field
   int stock;
+  bool defaultVariant;
   Map<String, String> attributes;
   int productId;
 
@@ -16,6 +17,7 @@ class Variant {
     required this.price,
     required this.priceImpact,
     required this.stock,
+    required this.defaultVariant,
     required this.attributes,
     required this.productId,
   }) : finalPrice = price + priceImpact; // Initialize finalPrice in constructor
@@ -27,6 +29,7 @@ class Variant {
     double? price,
     double? priceImpact,
     int? stock,
+    bool? defaultVariant,
     Map<String, String>? attributes,
     int? productId,
   }) {
@@ -37,6 +40,7 @@ class Variant {
       price: price ?? this.price,
       priceImpact: priceImpact ?? this.priceImpact,
       stock: stock ?? this.stock,
+      defaultVariant: defaultVariant ?? this.defaultVariant,
       attributes: attributes ?? Map.from(this.attributes),
       productId: productId ?? this.productId,
     )..finalPrice = (price ?? this.price) + (priceImpact ?? this.priceImpact);
@@ -50,6 +54,7 @@ class Variant {
       'price_impact': priceImpact,
       'final_price': finalPrice,
       'stock': stock,
+      'default_variant': defaultVariant,
       'attributes': _serializeAttributes(attributes),
       'product_id': productId,
     };
@@ -70,6 +75,7 @@ class Variant {
       price: (map['price'] ?? 0.0).toDouble(),
       priceImpact: (map['price_impact'] ?? 0.0).toDouble(),
       stock: map['stock'] ?? 0,
+      defaultVariant: map['default_variant'] ?? 0,
       attributes: _parseAttributes(map['attributes'] ?? '{}'),
       productId: map['product_id'] ?? 0,
     );
@@ -103,7 +109,7 @@ class Variant {
   @override
   String toString() {
     return 'Variant(id: $id, code: $code, combination: $combinationName, '
-        'price: $price (impact: $priceImpact), stock: $stock, '
+        'price: $price (impact: $priceImpact), stock: $stock, defaultVariant: $defaultVariant'
         'productId: $productId, attributes: $attributes)';
   }
 

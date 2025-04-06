@@ -33,6 +33,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController profitController = TextEditingController();
   final TextEditingController remiseValeurMaxController =
       TextEditingController();
+  final TextEditingController priceVenteHTController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
 
   final SqlDb sqldb = SqlDb();
   double? selectedTax = 0.0;
@@ -73,6 +75,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     remiseMaxController.dispose();
     profitController.dispose();
     remiseValeurMaxController.dispose();
+    descriptionController.dispose();
+    priceHTController.dispose();
     super.dispose();
   }
 
@@ -97,26 +101,36 @@ class _AddProductScreenState extends State<AddProductScreen> {
   }
 
   void calculateValues() {
-    double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-    double taxe = double.tryParse(taxController.text) ?? 0.0;
+    double prixAchatHT = double.tryParse(priceHTController.text) ?? 0.0;
     double marge = double.tryParse(margeController.text) ?? 0.0;
+    double taxe = double.tryParse(taxController.text) ?? 0.0;
     double profit = double.tryParse(profitController.text) ?? 0.0;
 
-    if (priceHTController.text.isNotEmpty && margeController.text.isNotEmpty) {
-      double prixTTC = prixHT * (1 + marge / 100);
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
-      profitController.text = (prixTTC - prixHT).toStringAsFixed(2);
-    } else if (priceHTController.text.isNotEmpty &&
-        profitController.text.isNotEmpty) {
-      double prixTTC = prixHT + profit;
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
-      margeController.text = ((profit / prixHT) * 100).toStringAsFixed(2);
-    }
+    if (priceHTController.text.isNotEmpty) {
+      if (margeController.text.isNotEmpty) {
+        double prixVenteHT = prixAchatHT * (1 + marge / 100);
+        priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
 
-    if (taxController.text.isNotEmpty) {
-      double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
-      double prixTTCWithTax = prixTTC * (1 + taxe / 100);
-      priceTTCController.text = prixTTCWithTax.toStringAsFixed(2);
+        profitController.text = (prixVenteHT - prixAchatHT).toStringAsFixed(2);
+
+        double prixTTC = prixVenteHT * (1 + taxe / 100);
+        priceTTCController.text = prixTTC.toStringAsFixed(2);
+      } else if (profitController.text.isNotEmpty) {
+        double prixVenteHT = prixAchatHT + profit;
+        priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
+
+        margeController.text =
+            ((profit / prixAchatHT) * 100).toStringAsFixed(2);
+
+        double prixTTC = prixVenteHT * (1 + taxe / 100);
+        priceTTCController.text = prixTTC.toStringAsFixed(2);
+      }
+    }
+    if (taxController.text.isNotEmpty &&
+        priceVenteHTController.text.isNotEmpty) {
+      double prixVenteHT = double.tryParse(priceVenteHTController.text) ?? 0.0;
+      double prixTTC = prixVenteHT * (1 + taxe / 100);
+      priceTTCController.text = prixTTC.toStringAsFixed(2);
     }
   }
 
@@ -169,6 +183,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       _buildTextFormField(
+                        controller: designationController,
+                        label: 'Désignation',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le champ "Désignation" ne doit pas être vide.';
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextFormField(
                         controller: stockController,
                         label: 'Stock',
                         keyboardType: TextInputType.number,
@@ -202,6 +226,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 }
                                 return null;
                               },
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: priceVenteHTController,
+                              decoration: _inputDecoration('Prix Vente HT'),
+                              keyboardType: TextInputType.numberWithOptions(
+                                  decimal: true),
+                              enabled: false,
+                              style: TextStyle(color: Colors.grey[800]),
                             ),
                           ),
                           SizedBox(width: 10),
@@ -557,7 +592,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Expanded(
                 flex: 1,
                 child: isCategoryFormVisible
-                    ? AddCategory()
+                    ? AddCategory(
+                        onCategoryAdded: () async {
+                          // Refresh categories after adding a new one
+                          setState(() async {
+                            categories = await sqldb.getCategories();
+                            isCategoryFormVisible = false;
+                          });
+                        },
+                      )
                     : Center(
                         child: Text(
                           "Cliquez sur '+' pour ajouter une catégorie",
@@ -597,6 +640,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               final product = Product(
                 code: codeController.text.trim(),
                 designation: designationController.text.trim(),
+                description: descriptionController.text
+                    .trim(), // Ajout de la description
                 stock: int.parse(stockController.text),
                 prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
@@ -610,7 +655,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 marge: double.parse(margeController.text),
                 remiseMax: double.parse(remiseMaxController.text),
                 remiseValeurMax: double.parse(remiseValeurMaxController.text),
-                sellable: sellable, // Add this line
+                sellable: sellable,
               );
 
               final db = await sqldb.db;

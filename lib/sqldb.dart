@@ -45,6 +45,7 @@ class SqlDb {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL,
     designation TEXT,
+    description TEXT,
     stock INTEGER,
     prix_ht REAL,
     taxe REAL,
@@ -125,6 +126,7 @@ class SqlDb {
   price_impact REAL NOT NULL,
   final_price REAL NOT NULL,
   stock INTEGER NOT NULL,
+  default_variant INTEGER DEFAULT 0,
   attributes TEXT NOT NULL,
   product_id INTEGER NOT NULL,
   FOREIGN KEY (product_id) REFERENCES products(id)

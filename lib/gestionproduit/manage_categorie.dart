@@ -120,8 +120,16 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   void _navigateToAddCategory() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const AddCategory()),
+      MaterialPageRoute(
+        builder: (context) => AddCategory(
+          onCategoryAdded: () async {
+            // This will be called when a new category is successfully added
+            await fetchCategories();
+          },
+        ),
+      ),
     );
+    // Optional: Additional refresh after returning from the screen
     await fetchCategories();
   }
 
@@ -129,11 +137,16 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddCategory(),
+        builder: (context) => AddCategory(
+          onCategoryAdded: () async {
+            // This callback will be executed when a category is added/updated
+            await fetchCategories();
+          },
+        ),
         settings: RouteSettings(arguments: category),
       ),
     );
-    await fetchCategories();
+    await fetchCategories(); // Optional: Refresh again after returning
   }
 
   Future<void> _confirmDelete({Category? singleCategory}) async {
