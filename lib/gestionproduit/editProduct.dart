@@ -33,9 +33,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController = TextEditingController();
+  final TextEditingController remiseValeurMaxController =
+      TextEditingController();
   final TextEditingController attributeNameController = TextEditingController();
-  final TextEditingController attributeValuesController = TextEditingController();
+  final TextEditingController attributeValuesController =
+      TextEditingController();
 
   final SqlDb sqldb = SqlDb();
   double? selectedTax;
@@ -49,7 +51,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   List<Variant> variants = [];
   Map<String, List<String>> attributes = {};
   bool isLoadingVariants = false;
-  bool defaultVariant = true;
+  String? selectedDefaultVariant;
 
   @override
   void initState() {
@@ -92,6 +94,30 @@ class _EditProductScreenState extends State<EditProductScreen> {
       _loadSubCategories(selectedCategoryId!);
     }
 
+    // Initialize with existing variants if any
+    if (widget.product.variants.isNotEmpty) {
+      variants = widget.product.variants;
+      hasVariants = true;
+      
+      // Find and set the default variant
+      final defaultVariant = variants.firstWhere(
+        (v) => v.defaultVariant,
+        orElse: () => variants.first,
+      );
+      selectedDefaultVariant = defaultVariant.combinationName;
+
+      // Extract attributes from variants
+      for (final variant in variants) {
+        for (final entry in variant.attributes.entries) {
+          attributes.update(
+            entry.key,
+            (values) => values..add(entry.value),
+            ifAbsent: () => [entry.value],
+          );
+        }
+      }
+    }
+
     // Load variants after UI is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadVariants();
@@ -103,13 +129,22 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
     setState(() => isLoadingVariants = true);
     try {
-      final variantsFromDb = await sqldb.getVariantsByProductId(widget.product.id!);
+      final variantsFromDb =
+          await sqldb.getVariantsByProductId(widget.product.id!);
 
       setState(() {
         variants = variantsFromDb;
         hasVariants = variants.isNotEmpty;
 
         if (hasVariants) {
+          // Find and set the default variant
+          final defaultVariant = variants.firstWhere(
+            (v) => v.defaultVariant,
+            orElse: () => variants.first,
+          );
+          selectedDefaultVariant = defaultVariant.combinationName;
+
+          // Extract attributes from variants
           attributes.clear();
           for (final variant in variants) {
             for (final entry in variant.attributes.entries) {
@@ -219,7 +254,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
     if (widget.product.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
+          content: Text(
+              'Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
         ),
       );
       return;
@@ -234,15 +270,22 @@ class _EditProductScreenState extends State<EditProductScreen> {
           price: basePrice,
           priceImpact: 0.0,
           stock: 0,
-          defaultVariant: defaultVariant,
+          defaultVariant: variants.isEmpty, // First variant is default
           attributes: combination,
           productId: widget.product.id!,
         );
       }).toList();
+
+      // Set the first variant as default if none exists
+      if (variants.isNotEmpty && selectedDefaultVariant == null) {
+        selectedDefaultVariant = variants.first.combinationName;
+        variants.first.defaultVariant = true;
+      }
     });
   }
 
-  List<Map<String, String>> _generateCombinations(Map<String, List<String>> attributes) {
+  List<Map<String, String>> _generateCombinations(
+      Map<String, List<String>> attributes) {
     List<Map<String, String>> combinations = [];
     List<String> attributeNames = attributes.keys.toList();
 
@@ -303,6 +346,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                       if (!hasVariants) {
                         variants.clear();
                         attributes.clear();
+                        selectedDefaultVariant = null;
                       }
                     });
                   },
@@ -425,7 +469,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     DropdownMenuItem(value: 19.0, child: Text('19%')),
                   ],
                   onChanged: (value) {
-                    if (value != null && [0.0, 7.0, 12.0, 19.0].contains(value)) {
+                    if (value != null &&
+                        [0.0, 7.0, 12.0, 19.0].contains(value)) {
                       setState(() {
                         selectedTax = value;
                         taxController.text = value.toString();
@@ -446,34 +491,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Text('Variante par défaut:'),
-                    Radio<bool>(
-                      value: true,
-                      groupValue: defaultVariant,
-                      onChanged: (value) {
-                        setState(() {
-                          defaultVariant = value ?? true;
-                        });
-                      },
-                    ),
-                    const Text('Oui'),
-                    Radio<bool>(
-                      value: false,
-                      groupValue: defaultVariant,
-                      onChanged: (value) {
-                        setState(() {
-                          defaultVariant = value ?? false;
-                        });
-                      },
-                    ),
-                    const Text('Non'),
-                  ],
-                ),
-                const SizedBox(height: 16),
                 CheckboxListTile(
-                  title: const Text('Ce produit a-t-il une date d\'expiration ?'),
+                  title:
+                      const Text('Ce produit a-t-il une date d\'expiration ?'),
                   value: hasExpirationDate,
                   onChanged: (value) {
                     setState(() {
@@ -653,7 +673,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                         final double columnSpacing = 8.0;
                         final double totalWidth = constraints.maxWidth;
                         final double columnWidth =
-                            (totalWidth - (5 * columnSpacing)) / 6;
+                            (totalWidth - (6 * columnSpacing)) / 7;
 
                         return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -661,35 +681,42 @@ class _EditProductScreenState extends State<EditProductScreen> {
                             width: totalWidth,
                             child: DataTable(
                               columnSpacing: columnSpacing,
-                              columns: [
+                              columns: const [
+                                DataColumn(label: Text('Défaut')),
+                                DataColumn(label: Text('Combinaison')),
+                                DataColumn(label: Text('Prix'), numeric: true),
                                 DataColumn(
-                                  label: const Text('Combinaison'),
-                                  numeric: false,
-                                ),
+                                    label: Text('Impact Prix'), numeric: true),
                                 DataColumn(
-                                  label: const Text('Prix'),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: const Text('Impact Prix'),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: const Text('Prix Final'),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: const Text('Stock'),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: const Text('Code-barres'),
-                                  numeric: false,
-                                ),
+                                    label: Text('Prix Final'), numeric: true),
+                                DataColumn(label: Text('Stock'), numeric: true),
+                                DataColumn(label: Text('Code-barres')),
                               ],
                               rows: variants.map((variant) {
                                 return DataRow(
                                   cells: [
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Radio<String>(
+                                            value: variant.combinationName,
+                                            groupValue: selectedDefaultVariant,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                selectedDefaultVariant = value;
+                                                for (var v in variants) {
+                                                  v.defaultVariant =
+                                                      (v.combinationName ==
+                                                          value);
+                                                }
+                                              });
+                                            },
+                                          ),
+                                          const Text('Par défaut'),
+                                        ],
+                                      ),
+                                    ),
                                     DataCell(
                                       SizedBox(
                                         width: columnWidth,
@@ -772,8 +799,10 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                                     horizontal: 8),
                                           ),
                                           onChanged: (value) {
-                                            variant.stock =
-                                                int.tryParse(value) ?? 0;
+                                            setState(() {
+                                              variant.stock =
+                                                  int.tryParse(value) ?? 0;
+                                            });
                                           },
                                         ),
                                       ),
@@ -790,7 +819,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                                     horizontal: 8),
                                           ),
                                           onChanged: (value) {
-                                            variant.code = value;
+                                            setState(() {
+                                              variant.code = value;
+                                            });
                                           },
                                         ),
                                       ),
@@ -840,6 +871,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 return;
               }
 
+              // Validate variants
               for (final variant in variants) {
                 if (variant.code.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -864,6 +896,29 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   return;
                 }
               }
+
+              // Ensure only one variant is marked as default
+              final defaultVariants =
+                  variants.where((v) => v.defaultVariant).toList();
+              if (defaultVariants.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Veuillez sélectionner au moins une variante par défaut',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              // If more than one default variant, keep only the first one
+              if (defaultVariants.length > 1) {
+                for (int i = 1; i < defaultVariants.length; i++) {
+                  defaultVariants[i].defaultVariant = false;
+                }
+              }
             }
 
             try {
@@ -872,6 +927,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               final subCategoryName =
                   await sqldb.getSubCategoryNameById(selectedSubCategoryId!);
 
+              // Prepare variants with proper boolean conversion
               final updatedVariants = variants.map((v) {
                 return Variant(
                   id: v.id,
@@ -910,7 +966,30 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 variants: updatedVariants,
               );
 
-              await sqldb.updateProductWithVariants(product);
+              // Save with transaction
+              final db = await sqldb.db;
+
+              await db.transaction((txn) async {
+                // Update product
+                await txn.update(
+                  'products',
+                  product.toMap(),
+                  where: 'id = ?',
+                  whereArgs: [product.id],
+                );
+
+                // Delete existing variants
+                await txn.delete(
+                  'variants',
+                  where: 'product_id = ?',
+                  whereArgs: [product.id],
+                );
+
+                // Insert new variants
+                for (final variant in updatedVariants) {
+                  await txn.insert('variants', variant.toMap());
+                }
+              });
 
               widget.refreshData();
               if (mounted) Navigator.pop(context);
