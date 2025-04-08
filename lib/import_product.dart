@@ -65,12 +65,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
               'Invalid Excel format. Please use the correct template.');
         }
 
-        // First pass: group all rows by product name
+        // First pass: group all rows by product code (since multiple rows can be variants of same product)
         Map<String, List<List<Data?>>> productRows = {};
         for (var row in sheet.rows.skip(1)) {
-          String productName = row[0]?.value?.toString() ?? '';
-          if (productName.isNotEmpty) {
-            productRows.putIfAbsent(productName, () => []).add(row);
+          String productCode = row[0]?.value?.toString() ?? '';
+          if (productCode.isNotEmpty) {
+            productRows.putIfAbsent(productCode, () => []).add(row);
           }
         }
 
@@ -81,45 +81,34 @@ class _ImportProductPageState extends State<ImportProductPage> {
         for (var entry in productRows.entries) {
           if (!_isImporting) break;
 
-          String productName = entry.key;
+          String productCode = entry.key;
           List<List<Data?>> rows = entry.value;
 
           try {
             // Use first row for product details
             var firstRow = rows.first;
 
-            String code = firstRow[1]?.value?.toString() ?? '';
-            String categoryName = (firstRow[2]?.value?.toString() ?? '').trim();
+            String designation = firstRow[1]?.value?.toString() ?? '';
+            String description = firstRow[2]?.value?.toString() ?? '';
+            double prixHT = _parseDouble(firstRow[3]?.value?.toString() ?? '0');
+            double taxe = _parseDouble(firstRow[4]?.value?.toString() ?? '0');
+            String categoryName = (firstRow[5]?.value?.toString() ?? '').trim();
             String subCategoryName =
-                (firstRow[3]?.value?.toString() ?? '').trim();
-            String description = firstRow[4]?.value?.toString() ?? '';
-            double costPrice =
-                _parseDouble(firstRow[5]?.value?.toString() ?? '0');
-            double prixHT = _parseDouble(firstRow[6]?.value?.toString() ?? '0');
-            double taxe = _parseDouble(firstRow[7]?.value?.toString() ?? '0');
-            double prixTTC =
-                _parseDouble(firstRow[8]?.value?.toString() ?? '0');
-            int stock =
-                int.tryParse(firstRow[9]?.value?.toString() ?? '0') ?? 0;
+                (firstRow[6]?.value?.toString() ?? '').trim();
+            String? imagePath = firstRow[7]?.value?.toString();
+            double marge = _parseDouble(firstRow[8]?.value?.toString() ?? '0');
+            double remiseMax =
+                _parseDouble(firstRow[9]?.value?.toString() ?? '0');
             bool sellable =
                 (firstRow[10]?.value?.toString() ?? 'TRUE').toUpperCase() ==
                     'TRUE';
-            bool isSimpleProduct =
-                (firstRow[11]?.value?.toString() ?? 'TRUE').toUpperCase() ==
+            bool hasVariants =
+                (firstRow[11]?.value?.toString() ?? 'FALSE').toUpperCase() ==
                     'TRUE';
-            String variantName = firstRow[12]?.value?.toString() ?? '';
-            bool defaultVariant =
-                (firstRow[13]?.value?.toString() ?? 'FALSE').toUpperCase() ==
-                    'TRUE';
-            String variantImage = firstRow[14]?.value?.toString() ?? '';
-            double priceImpact =
-                _parseDouble(firstRow[15]?.value?.toString() ?? '0');
-            int variantStock =
-                int.tryParse(firstRow[16]?.value?.toString() ?? '0') ?? 0;
 
             // Validate required fields
-            if (code.isEmpty) {
-              throw Exception('Missing code for product $productName');
+            if (designation.isEmpty) {
+              throw Exception('Missing designation for product $productCode');
             }
 
             // Handle empty category names
@@ -127,22 +116,20 @@ class _ImportProductPageState extends State<ImportProductPage> {
             if (subCategoryName.isEmpty) subCategoryName = 'Default';
 
             // Get or create category IDs
-            int categoryId = await _getOrCreateCategoryWithRetry(categoryName);
+            int categoryId = await _getOrCreateCategoryWithRetry(categoryName,
+                imagePath: imagePath);
             int subCategoryId = await _getOrCreateSubCategoryWithRetry(
                 subCategoryName, categoryId);
 
-            // Calculate marge (markup) based on cost price and selling price
-            double marge =
-                prixHT > 0 ? ((prixHT - costPrice) / costPrice) * 100 : 0;
-            double remiseMax = 0.0; // Not provided in this format
-            double remiseValeurMax = 0.0; // Not provided in this format
+            // Calculate prixTTC
+            double prixTTC = prixHT * (1 + taxe / 100);
 
             // Create product
             final product = Product(
-              code: code,
-              designation: productName,
+              code: productCode,
+              designation: designation,
               description: description,
-              stock: stock,
+              stock: 0, // Will be calculated from variants
               prixHT: prixHT,
               taxe: taxe,
               prixTTC: prixTTC,
@@ -151,37 +138,38 @@ class _ImportProductPageState extends State<ImportProductPage> {
               subCategoryId: subCategoryId,
               marge: marge,
               remiseMax: remiseMax,
-              remiseValeurMax: remiseValeurMax,
-              hasVariants: !isSimpleProduct,
+              remiseValeurMax: 0, // Not in this format
+              hasVariants: hasVariants,
               sellable: sellable,
               variants: [],
             );
 
             // Handle variants if exists
-            if (!isSimpleProduct) {
-              // Collect all variants from all rows for this product
+            if (hasVariants) {
               List<Variant> allVariants = [];
 
               for (var row in rows) {
-                String variantName = row[12]?.value?.toString() ?? '';
+                String variantCode = row[12]?.value?.toString() ?? '';
                 bool defaultVariant =
                     (row[13]?.value?.toString() ?? 'FALSE').toUpperCase() ==
                         'TRUE';
-                String variantImage = row[14]?.value?.toString() ?? '';
-                double priceImpact =
+                String attributesStr = row[14]?.value?.toString() ?? '';
+                double variantPrice =
                     _parseDouble(row[15]?.value?.toString() ?? '0');
+                double priceImpact =
+                    _parseDouble(row[16]?.value?.toString() ?? '0');
                 int variantStock =
-                    int.tryParse(row[16]?.value?.toString() ?? '0') ?? 0;
+                    int.tryParse(row[17]?.value?.toString() ?? '0') ?? 0;
 
-                if (variantName.isEmpty) {
+                if (variantCode.isEmpty) {
                   throw Exception(
-                      'Missing variant name for product $productName');
+                      'Missing variant code for product $productCode');
                 }
 
                 // Parse variant attributes (format: "Taille:S/Couleur:Blanc")
                 Map<String, String> attributes = {};
-                if (variantName.contains('/')) {
-                  List<String> attributePairs = variantName.split('/');
+                if (attributesStr.contains('/')) {
+                  List<String> attributePairs = attributesStr.split('/');
                   for (String pair in attributePairs) {
                     List<String> parts = pair.split(':');
                     if (parts.length == 2) {
@@ -190,19 +178,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   }
                 }
 
-                // Generate variant code (product code + first letter of each attribute value)
-                String variantCode = code;
-                attributes.forEach((key, value) {
-                  if (value.isNotEmpty) {
-                    variantCode += '_${value[0].toUpperCase()}';
-                  }
-                });
-
                 // Create variant
                 final variant = Variant(
                   code: variantCode,
-                  combinationName: variantName.replaceAll('/', ' - '),
-                  price: prixHT, // Base price from product
+                  combinationName: attributesStr.replaceAll('/', ' - '),
+                  price: variantPrice,
                   priceImpact: priceImpact,
                   stock: variantStock,
                   defaultVariant: defaultVariant,
@@ -226,7 +206,9 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 });
               }
             } else {
-              // For simple products
+              // For simple products - get stock from first row
+              product.stock =
+                  int.tryParse(firstRow[17]?.value?.toString() ?? '0') ?? 0;
               product.id = await _sqlDb.addProduct(product);
             }
 
@@ -237,7 +219,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
             });
           } catch (e) {
             debugPrint(
-                'Error processing product $productName: ${e.toString()}');
+                'Error processing product $productCode: ${e.toString()}');
             processedProducts++;
             continue;
           }
@@ -275,25 +257,26 @@ class _ImportProductPageState extends State<ImportProductPage> {
   }
 
   bool _verifyHeaders(List<String?> headers) {
-    // Expected headers in order
+    // Expected headers in order for the new format
     List<String> expectedHeaders = [
-      "PRODUCTNAME",
       "Code",
-      "CATEGORY",
-      "SousCat",
+      "Designation",
       "DESCRIPTION",
-      "COSTPRICE",
-      "SELLPRICETAXEXCLUDE",
-      "VAT",
-      "SELLPRICETAXINCLUDE",
-      "QUANTITY",
+      "PrixHT",
+      "Taxe",
+      "Category",
+      "SubCategory",
+      "ImagePath",
+      "Marge",
+      "RemiseMax",
       "SELLABLE",
-      "SIMPLEPRODUCT",
-      "VARIANTNAME",
+      "HasVariants",
+      "VariantCode",
       "DEFAULTVARIANT",
-      "VARIANTIMAGE",
-      "IMPACTPRICE",
-      "QUANTITYVARIANT"
+      "Attributes",
+      "VariantPrice",
+      "PriceImpact",
+      "VariantStock"
     ];
 
     if (headers.length < expectedHeaders.length) {
@@ -301,38 +284,14 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
 
     for (int i = 0; i < expectedHeaders.length; i++) {
-      if (headers[i]?.toUpperCase() != expectedHeaders[i]) {
+      if (headers[i]?.toUpperCase() != expectedHeaders[i].toUpperCase()) {
         return false;
       }
     }
 
     return true;
   }
-
-  // Helper function to generate all combinations of attributes
-  List<Map<String, String>> _generateAttributeCombinations(
-      Map<String, List<String>> attributeValues) {
-    List<Map<String, String>> combinations = [{}];
-
-    attributeValues.forEach((attribute, values) {
-      List<Map<String, String>> newCombinations = [];
-
-      for (var combination in combinations) {
-        for (var value in values) {
-          var newCombination = Map<String, String>.from(combination);
-          newCombination[attribute] = value;
-          newCombinations.add(newCombination);
-        }
-      }
-
-      combinations = newCombinations;
-    });
-
-    print("Generated combinations: $combinations"); // Ajout du log
-
-    return combinations;
-  }
-
+  
   Future<int> _getOrCreateCategoryWithRetry(String categoryName,
       {String? imagePath, int retryCount = 3}) async {
     int attempt = 0;

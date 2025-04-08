@@ -109,6 +109,7 @@ class _TableCmdState extends State<TableCmd> {
         }
       });
     } else {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Product not found!")),
       );
