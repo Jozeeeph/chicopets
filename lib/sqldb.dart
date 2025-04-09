@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/client.dart';
 import 'package:caissechicopets/user.dart';
 import 'package:caissechicopets/variant.dart';
 import 'package:caissechicopets/order.dart';
@@ -27,7 +28,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -154,6 +155,17 @@ class SqlDb {
   )
 ''');
         print("Users table created");
+        await db.execute('''
+  CREATE TABLE IF NOT EXISTS clients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    phone_number TEXT NOT NULL UNIQUE,
+    loyalty_points INTEGER DEFAULT 0,
+    id_orders TEXT DEFAULT '' -- Stocke les IDs de commandes séparés par des virgules
+  )
+''');
+        print("Clients table created");
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -209,7 +221,6 @@ class SqlDb {
       whereArgs: [product.code], // Using 'code' to identify the product
     );
   }
-
 
   Future<int> deleteProduct(String productCode) async {
     final dbClient = await db;
@@ -1179,4 +1190,81 @@ class SqlDb {
       whereArgs: [userId],
     );
   }
+
+  Future<int> addClient(Client client) async {
+  final dbClient = await db;
+  try {
+    int id = await dbClient.insert(
+      'clients',
+      client.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    print('Client ajouté avec ID: $id'); // Debug
+    return id;
+  } catch (e) {
+    print('Erreur lors de l\'ajout du client: $e');
+    return -1; // Retourne -1 en cas d'erreur
+  }
+}
+
+Future<List<Client>> getAllClients() async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> maps = await dbClient.query('clients');
+  print('Clients from DB: $maps'); // Debug
+  return List.generate(maps.length, (i) => Client.fromMap(maps[i]));
+}
+
+Future<Client?> getClientById(int id) async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> result = await dbClient.query(
+    'clients',
+    where: 'id = ?',
+    whereArgs: [id],
+    limit: 1,
+  );
+  return result.isNotEmpty ? Client.fromMap(result.first) : null;
+}
+
+Future<int> updateClient(Client client) async {
+  final dbClient = await db;
+  return await dbClient.update(
+    'clients',
+    client.toMap(),
+    where: 'id = ?',
+    whereArgs: [client.id],
+  );
+}
+
+Future<int> deleteClient(int id) async {
+  final dbClient = await db;
+  return await dbClient.delete(
+    'clients',
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+}
+
+Future<List<Client>> searchClients(String query) async {
+  final dbClient = await db;
+  final List<Map<String, dynamic>> result = await dbClient.query(
+    'clients',
+    where: 'name LIKE ? OR first_name LIKE ? OR phone_number LIKE ?',
+    whereArgs: ['%$query%', '%$query%', '%$query%'],
+  );
+  return result.map((map) => Client.fromMap(map)).toList();
+}
+
+Future<void> addOrderToClient(int clientId, int orderId) async {
+  final dbClient = await db;
+  final client = await getClientById(clientId);
+  if (client != null) {
+    client.idOrders.add(orderId);
+    await dbClient.update(
+      'clients',
+      {'id_orders': client.idOrders.join(',')},
+      where: 'id = ?',
+      whereArgs: [clientId],
+    );
+  }
+}
 }

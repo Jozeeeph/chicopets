@@ -3,8 +3,35 @@ import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
+import 'package:caissechicopets/client.dart';
+import 'package:caissechicopets/client_management.dart';
 
 class Addorder {
+  static void _showClientSelection(
+      BuildContext context, Function(Client) onClientSelected) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sélectionner un client'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ClientManagementWidget(
+            onClientSelected: (client) {
+              onClientSelected(client);
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void showPlaceOrderPopup(
     BuildContext context,
     Order order,
@@ -13,6 +40,8 @@ class Addorder {
     List<double> discounts,
     List<bool> typeDiscounts,
   ) async {
+    Client? selectedClient;
+
     print("seee ${selectedProducts.length}");
 
     if (selectedProducts.isEmpty) {
@@ -380,6 +409,61 @@ class Addorder {
                               ),
                             ],
                           ),
+                          // Nouveau code à intégrer
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.person,
+                                    color: Colors.blue, size: 24),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Client',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      Text(
+                                        selectedClient != null
+                                            ? '${selectedClient!.name} ${selectedClient!.firstName}'
+                                            : 'Non spécifié',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                      selectedClient != null
+                                          ? Icons.edit
+                                          : Icons.add_circle_outline,
+                                      color: Colors.blue),
+                                  onPressed: () {
+                                    _showClientSelection(context, (client) {
+                                      setState(() {
+                                        selectedClient = client;
+                                      });
+                                    });
+                                  },
+                                  tooltip: 'Sélectionner un client',
+                                ),
+                              ],
+                            ),
+                          ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -744,6 +828,7 @@ class Addorder {
     double globalDiscount,
     bool isPercentageDiscount,
   ) async {
+    Client? selectedClient;
     if (!isPercentageDiscount &&
         globalDiscount >
             _calculateMaxGlobalDiscountValue(
@@ -827,12 +912,17 @@ class Addorder {
       remainingAmount: remainingAmount,
       globalDiscount: globalDiscount,
       isPercentageDiscount: isPercentageDiscount,
+      idClient: selectedClient?.id, // Ajout du client associé
     );
 
     print("Order to be saved: ${order.toMap()}");
 
     try {
       int orderId = await SqlDb().addOrder(order);
+      // Associer la commande au client si un client est sélectionné
+      if (selectedClient != null && orderId > 0) {
+        await SqlDb().addOrderToClient(selectedClient!.id!, orderId);
+      }
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
 

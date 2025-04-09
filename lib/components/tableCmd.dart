@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:caissechicopets/client_management.dart'; // Add this import
 
 typedef RefreshCallback = void Function();
 
@@ -140,6 +141,30 @@ class _TableCmdState extends State<TableCmd> {
       print('Error getting current user: $e');
       return null;
     }
+  }
+
+  void _showClientManagement(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Gestion des clients'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ClientManagementWidget(
+            onClientSelected: (client) {
+              // Vous pouvez utiliser ce callback pour associer un client à une commande
+              Navigator.pop(context);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -512,6 +537,32 @@ class _TableCmdState extends State<TableCmd> {
                       Icon(Icons.search, color: Colors.white, size: 18),
                       SizedBox(width: 8),
                       Text('RECHERCHER',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () {
+                  _showClientManagement(context);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0056A6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('CLIENTS',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
