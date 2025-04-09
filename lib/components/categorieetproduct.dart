@@ -259,7 +259,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
         (v) => v.defaultVariant,
         orElse: () => product.variants.first,
       );
-      
+
       if (product.variants.length == 1) {
         widget.onProductSelected(product, defaultVariant);
       } else {
@@ -366,11 +366,21 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   Widget _buildProductCard(Product product) {
     // Find default variant or use first variant if none marked as default
     Variant? defaultVariant;
+    int totalStock = product.stock;
+
     if (product.hasVariants && product.variants.isNotEmpty) {
       defaultVariant = product.variants.firstWhere(
         (v) => v.defaultVariant,
         orElse: () => product.variants.first,
       );
+      // Calculate total stock from variants
+      totalStock =
+          product.variants.fold(0, (sum, variant) => sum + variant.stock);
+    }
+
+    // Don't show product if stock is zero
+    if (totalStock <= 0) {
+      return const SizedBox.shrink();
     }
 
     final displayPrice = defaultVariant?.price ?? product.prixTTC;
@@ -541,7 +551,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         child: Text('Aucun produit disponible'));
                   }
 
-                  // Remove duplicate products
+                  // Remove duplicate products and filter out zero stock products
                   final uniqueProducts = snapshot.data!
                       .fold<Map<String, Product>>({}, (map, product) {
                         if (!map.containsKey(product.code)) {
@@ -550,6 +560,17 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         return map;
                       })
                       .values
+                      .where((product) {
+                        // Calculate total stock
+                        int totalStock = product.stock;
+                        if (product.hasVariants &&
+                            product.variants.isNotEmpty) {
+                          totalStock = product.variants
+                              .fold(0, (sum, variant) => sum + variant.stock);
+                        }
+                        return totalStock >
+                            0; // Only keep products with stock > 0
+                      })
                       .toList();
 
                   // Filter by category if selected
@@ -558,6 +579,15 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       : uniqueProducts
                           .where((p) => p.categoryId == selectedCategoryId)
                           .toList();
+
+                  if (filteredProducts.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Aucun produit disponible dans cette catégorie',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }
 
                   return GridView.count(
                     crossAxisCount: 6,

@@ -129,7 +129,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               code: productCode,
               designation: designation,
               description: description,
-              stock: 0, // Will be calculated from variants
+              stock: 0, // Initialisé à 0, sera mis à jour plus tard
               prixHT: prixHT,
               taxe: taxe,
               prixTTC: prixTTC,
@@ -138,7 +138,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               subCategoryId: subCategoryId,
               marge: marge,
               remiseMax: remiseMax,
-              remiseValeurMax: 0, // Not in this format
+              remiseValeurMax: 0,
               hasVariants: hasVariants,
               sellable: sellable,
               variants: [],
@@ -147,6 +147,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
             // Handle variants if exists
             if (hasVariants) {
               List<Variant> allVariants = [];
+              int totalVariantStock =
+                  0; // Pour calculer la somme des stocks des variantes
 
               for (var row in rows) {
                 String variantCode = row[12]?.value?.toString() ?? '';
@@ -166,7 +168,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                       'Missing variant code for product $productCode');
                 }
 
-                // Parse variant attributes (format: "Taille:S/Couleur:Blanc")
+                // Parse variant attributes
                 Map<String, String> attributes = {};
                 if (attributesStr.contains('/')) {
                   List<String> attributePairs = attributesStr.split('/');
@@ -187,10 +189,10 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   stock: variantStock,
                   defaultVariant: defaultVariant,
                   attributes: attributes,
-                  productId:
-                      product.id ?? 0, // Will be set after product insert
+                  productId: product.id ?? 0,
                 );
                 allVariants.add(variant);
+                totalVariantStock += variantStock; // Ajouter au stock total
               }
 
               // Insert product first
@@ -205,8 +207,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   _importedVariantsCount++;
                 });
               }
+
+              // Mettre à jour le stock du produit avec la somme des stocks des variantes
+              product.stock = totalVariantStock;
+              await _sqlDb.updateProduct(product);
             } else {
-              // For simple products - get stock from first row
+              // Pour les produits sans variantes - prendre le stock directement de la ligne Excel
               product.stock =
                   int.tryParse(firstRow[17]?.value?.toString() ?? '0') ?? 0;
               product.id = await _sqlDb.addProduct(product);
@@ -291,7 +297,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
     return true;
   }
-  
+
   Future<int> _getOrCreateCategoryWithRetry(String categoryName,
       {String? imagePath, int retryCount = 3}) async {
     int attempt = 0;
