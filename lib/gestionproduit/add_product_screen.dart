@@ -1,4 +1,5 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
+import 'package:caissechicopets/gestionproduit/editProduct.dart'; // Make sure to import your EditProductScreen
 import 'package:caissechicopets/product.dart';
 import 'package:caissechicopets/subcategory.dart';
 import 'package:caissechicopets/category.dart';
@@ -31,8 +32,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController =
-      TextEditingController();
+  final TextEditingController remiseValeurMaxController = TextEditingController();
   final TextEditingController priceVenteHTController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
@@ -46,6 +46,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
   List<SubCategory> subCategories = [];
   bool hasExpirationDate = false;
   bool sellable = true;
+  bool hasVariants = false;
+
+  bool get areRequiredFieldsFilled {
+    return designationController.text.isNotEmpty &&
+        stockController.text.isNotEmpty &&
+        priceHTController.text.isNotEmpty &&
+        margeController.text.isNotEmpty &&
+        selectedCategoryId != null;
+  }
 
   @override
   void initState() {
@@ -78,6 +87,64 @@ class _AddProductScreenState extends State<AddProductScreen> {
     descriptionController.dispose();
     priceHTController.dispose();
     super.dispose();
+  }
+
+  Future<int?> _saveProduct() async {
+    if (_formKey.currentState!.validate()) {
+      if (selectedCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Veuillez sélectionner une catégorie.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Color(0xFFE53935),
+          ));
+        return null;
+      }
+
+      try {
+        final categoryName = await sqldb.getCategoryNameById(selectedCategoryId!);
+        final subCategoryName = selectedSubCategoryId != null
+            ? await sqldb.getSubCategoryNameById(selectedSubCategoryId!)
+            : '';
+
+        final product = Product(
+          code: codeController.text.trim(),
+          designation: designationController.text.trim(),
+          description: descriptionController.text.trim(),
+          stock: int.parse(stockController.text),
+          prixHT: double.parse(priceHTController.text),
+          taxe: selectedTax ?? 0.0,
+          prixTTC: double.parse(priceTTCController.text),
+          dateExpiration: hasExpirationDate ? dateController.text.trim() : '',
+          categoryId: selectedCategoryId!,
+          subCategoryId: selectedSubCategoryId,
+          categoryName: categoryName,
+          subCategoryName: subCategoryName,
+          marge: double.parse(margeController.text),
+          remiseMax: double.parse(remiseMaxController.text),
+          remiseValeurMax: double.parse(remiseValeurMaxController.text),
+          sellable: sellable,
+          hasVariants: hasVariants,
+        );
+
+        final db = await sqldb.db;
+        product.id = await db.insert('products', product.toMap());
+        widget.refreshData();
+        return product.id;
+      } catch (e) {
+        debugPrint('Error saving product: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sauvegarde: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return null;
+      }
+    }
+    return null;
   }
 
   void _loadSubCategories(int categoryId) async {
@@ -156,6 +223,76 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Add Variant Button
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: ElevatedButton(
+                          onPressed: areRequiredFieldsFilled
+                              ? () async {
+                                  if (!hasVariants) {
+                                    setState(() {
+                                      hasVariants = !hasVariants;
+                                    });
+                                  } else {
+                                    // Save product and navigate to edit screen
+                                    final productId = await _saveProduct();
+                                    if (productId != null && mounted) {
+                                      // Fetch the newly created product
+                                      final db = await sqldb.db;
+                                      final productData = await db.query(
+                                        'products',
+                                        where: 'id = ?',
+                                        whereArgs: [productId],
+                                      );
+                                      
+                                      if (productData.isNotEmpty) {
+                                        final product = Product.fromMap(productData.first);
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => EditProductScreen(
+                                              product: product,
+                                              refreshData: widget.refreshData,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: hasVariants
+                                ? const Color(0xFF0056A6)
+                                : Colors.grey,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            hasVariants
+                                ? 'Enregistrer et ajouter des variantes'
+                                : 'Ce produit a des variantes',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (hasVariants)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            'Les variantes seront ajoutées après la création du produit de base',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      
                       _buildTextFormField(
                         controller: codeController,
                         label: 'Code à Barre',
@@ -615,63 +752,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          if (_formKey.currentState!.validate()) {
-            if (selectedCategoryId == null) {
-              // Supprimez la vérification de selectedSubCategoryId
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Veuillez sélectionner une catégorie.',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  backgroundColor: Color(0xFFE53935),
-                ),
-              );
-              return;
-            }
-
-            try {
-              final categoryName =
-                  await sqldb.getCategoryNameById(selectedCategoryId!);
-              final subCategoryName = selectedSubCategoryId != null
-                  ? await sqldb.getSubCategoryNameById(selectedSubCategoryId!)
-                  : ''; // Valeur vide si pas de sous-catégorie
-
-              final product = Product(
-                code: codeController.text.trim(),
-                designation: designationController.text.trim(),
-                description: descriptionController.text.trim(), // Ajout de la description
-                stock: int.parse(stockController.text),
-                prixHT: double.parse(priceHTController.text),
-                taxe: selectedTax ?? 0.0,
-                prixTTC: double.parse(priceTTCController.text),
-                dateExpiration:
-                    hasExpirationDate ? dateController.text.trim() : '',
-                categoryId: selectedCategoryId!,
-                subCategoryId: selectedSubCategoryId,
-                categoryName: categoryName,
-                subCategoryName: subCategoryName,
-                marge: double.parse(margeController.text),
-                remiseMax: double.parse(remiseMaxController.text),
-                remiseValeurMax: double.parse(remiseValeurMaxController.text),
-                sellable: sellable,
-              );
-
-              final db = await sqldb.db;
-              product.id = await db.insert('products', product.toMap());
-
-              widget.refreshData();
-              if (mounted) Navigator.pop(context);
-            } catch (e) {
-              debugPrint('Error saving product: $e');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content:
-                      Text('Erreur lors de la sauvegarde: ${e.toString()}'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
+          final productId = await _saveProduct();
+          if (productId != null && mounted) {
+            Navigator.pop(context);
           }
         },
         backgroundColor: const Color(0xFF009688),
