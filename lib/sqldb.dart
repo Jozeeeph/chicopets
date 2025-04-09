@@ -210,6 +210,7 @@ class SqlDb {
     );
   }
 
+
   Future<int> deleteProduct(String productCode) async {
     final dbClient = await db;
     return await dbClient.update(
@@ -1169,12 +1170,13 @@ class SqlDb {
       whereArgs: [username],
     );
   }
+
   Future<int> deleteUser(int userId) async {
-  final dbClient = await db;
-  return await dbClient.delete(
-    'users',
-    where: 'id = ?',
-    whereArgs: [userId],
-  );
-}
+    final dbClient = await db;
+    return await dbClient.delete(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
 }
