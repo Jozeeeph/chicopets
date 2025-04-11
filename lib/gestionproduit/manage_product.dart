@@ -275,125 +275,266 @@ class _ManageProductPageState extends State<ManageProductPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(10),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Rechercher un produit',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF26A9E0)),
-                filled: true,
-                fillColor: const Color(0xFFE0E0E0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            padding: const EdgeInsets.all(16),
+            child: Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(12),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Rechercher...',
+                  hintText: 'Code, désignation ou catégorie',
+                  prefixIcon:
+                      const Icon(Icons.search, color: Color(0xFF0056A6)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
             ),
           ),
           Expanded(
             child: _filteredProducts.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Aucun produit trouvé',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(10),
-                    itemCount: _filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      final product = _filteredProducts[index];
-                      final isSelected = _selectedProducts.contains(product);
-                      final isExpanded =
-                          _expandedProducts[product.id ?? 0] ?? false;
-
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          children: [
-                            ListTile(
-                              contentPadding: const EdgeInsets.all(15),
-                              leading: Checkbox(
-                                value: isSelected,
-                                onChanged: (value) {
-                                  _toggleProductSelection(product);
-                                },
-                              ),
-                              title: Text(
-                                product.designation,
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Code: ${product.code}',
-                                    style:
-                                        const TextStyle(color: Colors.black54),
-                                  ),
-                                  Text(
-                                    'Total Stock: ${product.variants.isNotEmpty ? product.variants.fold(0, (sum, variant) => sum + variant.stock) : product.stock}',
-                                    style:
-                                        const TextStyle(color: Colors.black54),
-                                  ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      isExpanded
-                                          ? Icons.expand_less
-                                          : Icons.expand_more,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      _toggleProductExpansion(product.id ?? 0);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Color(0xFF009688),
-                                    ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              EditProductScreen(
-                                            product: product,
-                                            refreshData: _loadProducts,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Color(0xFFE53935)),
-                                    onPressed: () =>
-                                        _confirmDelete(singleProduct: product),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isExpanded) _buildVariantList(product.variants),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                ? _buildEmptyState()
+                : _buildProductTable(context), // <== CONTEXT ajouté ici
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2,
+              size: 60, color: const Color(0xFF0056A6).withOpacity(0.3)),
+          const SizedBox(height: 20),
+          const Text(
+            'Aucun produit trouvé',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0056A6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// ==> CONTEXT passé en paramètre ici aussi
+  Widget _buildProductTable(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // En-têtes du tableau sous forme de ligne (optionnel)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0056A6).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  const SizedBox(width: 40), // Espace pour la checkbox
+                  Expanded(
+                      flex: 2, child: Text('Code', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 3,
+                      child: Text('Désignation', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2, child: Text('Stock', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Prix HT', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2, child: Text('TVA', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Prix TTC', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Variantes', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Actions', style: _headerTextStyle())),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Contenu sous forme de cartes
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                final isSelected = _selectedProducts.contains(product);
+                final totalStock = product.variants.isNotEmpty
+                    ? product.variants
+                        .fold(0, (sum, variant) => sum + variant.stock)
+                    : product.stock;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedProducts.remove(product);
+                        } else {
+                          _selectedProducts.add(product);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: isSelected,
+                            onChanged: (selected) {
+                              setState(() {
+                                if (selected != null) {
+                                  if (selected) {
+                                    _selectedProducts.add(product);
+                                  } else {
+                                    _selectedProducts.remove(product);
+                                  }
+                                }
+                              });
+                            },
+                          ),
+                          Expanded(
+                              flex: 2,
+                              child:
+                                  Text(product.code, style: _cellTextStyle())),
+                          Expanded(
+                              flex: 3,
+                              child: Text(product.designation,
+                                  style: _cellTextStyle())),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              '$totalStock',
+                              style: _cellTextStyle().copyWith(
+                                color: totalStock <= 0
+                                    ? const Color(0xFFE53935)
+                                    : totalStock < 5
+                                        ? const Color(0xFFFF9800)
+                                        : const Color(0xFF009688),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                              flex: 2,
+                              child: Text(
+                                  '${product.prixHT.toStringAsFixed(2)} DT',
+                                  style: _cellTextStyle())),
+                          Expanded(
+                              flex: 2,
+                              child: Text('${product.taxe}%',
+                                  style: _cellTextStyle())),
+                          Expanded(
+                              flex: 2,
+                              child: Text(
+                                  '${product.prixTTC.toStringAsFixed(2)} DT',
+                                  style: _cellTextStyle())),
+                          Expanded(
+                            flex: 2,
+                            child: product.variants.isNotEmpty
+                                ? Tooltip(
+                                    message: product.variants
+                                        .map((v) =>
+                                            '${v.combinationName} (${v.stock})')
+                                        .join('\n'),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF009688)
+                                            .withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.list_alt,
+                                              size: 16,
+                                              color: Color(0xFF009688)),
+                                          const SizedBox(width: 4),
+                                          Text('      ${product.variants.length} variantes'),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : const Text('-',
+                                    style: TextStyle(color: Colors.grey)),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  color: const Color(0xFF009688),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EditProductScreen(
+                                          product: product,
+                                          refreshData: _loadProducts,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, size: 20),
+                                  color: const Color(0xFFE53935),
+                                  onPressed: () =>
+                                      _confirmDelete(singleProduct: product),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  TextStyle _headerTextStyle() {
+    return const TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Color(0xFF0056A6),
+      fontSize: 14,
+    );
+  }
+
+  TextStyle _cellTextStyle() {
+    return const TextStyle(
+      fontWeight: FontWeight.bold,
+      color: Color.fromARGB(255, 1, 42, 79),
+      fontSize: 14,
     );
   }
 }
