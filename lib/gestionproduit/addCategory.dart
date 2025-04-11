@@ -867,7 +867,7 @@ class SubCategoryTree extends StatelessWidget {
                 title: Text(
                   subCat.name,
                   style: const TextStyle(
-                    color: Colors.grey,
+                    color: Colors.black,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

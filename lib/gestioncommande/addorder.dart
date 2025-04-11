@@ -231,109 +231,51 @@ class Addorder {
                 ),
               ),
               content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.black, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(2, 2),
+                child: Container(
+                  width: MediaQuery.of(context).size.width *
+                      0.65, // Prend 65% de la largeur de l'écran
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Colonne de gauche - Ticket de commande
+                      // Colonne de gauche - Ticket de commande
+                      Expanded(
+                        flex: 5,
+                        child: Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.black, width: 1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(2, 2),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.receipt, size: 24), // Icône Material
-                                SizedBox(width: 8),
-                                Text(
-                                  "Ticket de Commande",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Divider(
-                            thickness: 1,
-                            color: Colors.black,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  flex: 1,
-                                  child: Text(
-                                    "Qt",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.receipt, size: 24),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Ticket de Commande",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    "Article",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 1,
-                                  child: Text(
-                                    "Prix U",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 1,
-                                  child: Text(
-                                    "Montant",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.end,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Divider(
-                            thickness: 1,
-                            color: Colors.black,
-                          ),
-                          if (selectedProducts.isNotEmpty)
-                            ...selectedProducts.map((product) {
-                              int index = selectedProducts.indexOf(product);
-                              double discountedPrice = typeDiscounts[index]
-                                  ? product.prixTTC *
-                                      (1 - discounts[index] / 100)
-                                  : product.prixTTC - discounts[index];
-                              return Padding(
+                              ),
+                              Divider(thickness: 1, color: Colors.black),
+                              Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
                                 child: Row(
@@ -343,28 +285,30 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${quantityProducts[index]}X",
+                                        "Qt",
                                         style: TextStyle(
                                           fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
                                     Expanded(
                                       flex: 2,
                                       child: Text(
-                                        product.designation,
+                                        "Article",
                                         style: TextStyle(
                                           fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${discountedPrice.toStringAsFixed(2)} DT",
+                                        "Prix U",
                                         style: TextStyle(
                                           fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -372,7 +316,7 @@ class Addorder {
                                     Expanded(
                                       flex: 1,
                                       child: Text(
-                                        "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                        "Montant",
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -382,383 +326,479 @@ class Addorder {
                                     ),
                                   ],
                                 ),
-                              );
-                            }).toList()
-                          else
-                            Center(child: Text("Aucun produit sélectionné.")),
-                          Divider(
-                            thickness: 1,
-                            color: Colors.black,
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Total avant remise:",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
                               ),
-                              Text(
-                                "${totalBeforeDiscount.toStringAsFixed(2)} DT",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Divider(thickness: 1, color: Colors.black),
+                              if (selectedProducts.isNotEmpty)
+                                ...selectedProducts.map((product) {
+                                  int index = selectedProducts.indexOf(product);
+                                  double discountedPrice = typeDiscounts[index]
+                                      ? product.prixTTC *
+                                          (1 - discounts[index] / 100)
+                                      : product.prixTTC - discounts[index];
+                                  return Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "${quantityProducts[index]}X",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            product.designation,
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "${discountedPrice.toStringAsFixed(2)} DT",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.end,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList()
+                              else
+                                Center(
+                                    child: Text("Aucun produit sélectionné.")),
+                              Divider(thickness: 1, color: Colors.black),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Total avant remise:",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Section Client ajoutée ici
+                              Divider(thickness: 1, color: Colors.black),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Client:",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    selectedClient != null
+                                        ? "${selectedClient!.name} ${selectedClient!.firstName}"
+                                        : "Non spécifié",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontStyle: selectedClient == null
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Divider(thickness: 1, color: Colors.black),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Total après remise:",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (isPercentageDiscount &&
+                                      globalDiscount > 0)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          "Remise: ${globalDiscount.toStringAsFixed(2)} %",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "${total.toStringAsFixed(2)} DT",
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else if (!isPercentageDiscount &&
+                                      globalDiscountValue > 0)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          "Remise: ${globalDiscountValue.toStringAsFixed(2)} DT",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          "${total.toStringAsFixed(2)} DT",
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    Text(
+                                      "${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
-                          // Nouveau code à intégrer
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.person,
-                                    color: Colors.blue, size: 24),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Client',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
+                        ),
+                      ),
+
+                      SizedBox(width: 16),
+
+                      // Colonne de droite - Options de paiement
+                      Expanded(
+                        flex: 5, // 40% de l'espace
+                        child: Column(
+                          children: [
+                            // Sélection du client
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.person,
+                                      color: Colors.blue, size: 24),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Client',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
-                                      ),
-                                      Text(
+                                        Text(
+                                          selectedClient != null
+                                              ? '${selectedClient!.name} ${selectedClient!.firstName}'
+                                              : 'Non spécifié',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
                                         selectedClient != null
-                                            ? '${selectedClient!.name} ${selectedClient!.firstName}'
-                                            : 'Non spécifié',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            ? Icons.edit
+                                            : Icons.add_circle_outline,
+                                        color: Colors.blue),
+                                    onPressed: () {
+                                      _showClientSelection(context, (client) {
+                                        setState(() {
+                                          selectedClient = client;
+                                        });
+                                      });
+                                    },
+                                    tooltip: 'Sélectionner un client',
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            SizedBox(height: 16),
+
+                            // Remise Globale (si aucune remise produit)
+                            if (!discounts.any((discount) => discount > 0))
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Remise Globale:",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  SizedBox(height: 8),
+                                  Text("Type de Remise:",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      Radio(
+                                        value: true,
+                                        groupValue: isPercentageDiscount,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            isPercentageDiscount =
+                                                value as bool;
+                                            globalDiscountController.text = '';
+                                            globalDiscountValueController.text =
+                                                '';
+                                            updateTotalAndChange();
+                                          });
+                                        },
                                       ),
+                                      Text("Pourcentage"),
+                                      Radio(
+                                        value: false,
+                                        groupValue: isPercentageDiscount,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            isPercentageDiscount =
+                                                value as bool;
+                                            globalDiscountController.text = '';
+                                            globalDiscountValueController.text =
+                                                '';
+                                            updateTotalAndChange();
+                                          });
+                                        },
+                                      ),
+                                      Text("Valeur (DT)"),
                                     ],
                                   ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                      selectedClient != null
-                                          ? Icons.edit
-                                          : Icons.add_circle_outline,
-                                      color: Colors.blue),
-                                  onPressed: () {
-                                    _showClientSelection(context, (client) {
-                                      setState(() {
-                                        selectedClient = client;
-                                      });
-                                    });
-                                  },
-                                  tooltip: 'Sélectionner un client',
+                                  SizedBox(height: 16),
+                                  if (isPercentageDiscount)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: globalDiscountController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: "Remise Globale (%)",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              globalDiscount =
+                                                  double.tryParse(value) ?? 0.0;
+                                              updateTotalAndChange();
+                                            });
+                                          },
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  if (!isPercentageDiscount)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller:
+                                              globalDiscountValueController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: "Remise Globale (DT)",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              globalDiscountValue =
+                                                  double.tryParse(value) ?? 0.0;
+                                              updateTotalAndChange();
+                                            });
+                                          },
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+
+                            SizedBox(height: 16),
+
+                            // Mode de paiement
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Mode de Paiement:",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Row(
+                                  children: [
+                                    Radio<String>(
+                                      value: "Espèce",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Espèce"),
+                                    Radio<String>(
+                                      value: "TPE",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("TPE"),
+                                    Radio<String>(
+                                      value: "Chèque",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Chèque"),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Total après remise:",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              if (isPercentageDiscount && globalDiscount > 0)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      "Remise: ${globalDiscount.toStringAsFixed(2)} %",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      "${total.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else if (!isPercentageDiscount &&
-                                  globalDiscountValue > 0)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      "Remise: ${globalDiscountValue.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      "${total.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else
-                                Text(
-                                  "${total.toStringAsFixed(2)} DT",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
 
-                    SizedBox(height: 16),
+                            SizedBox(height: 16),
 
-                    // Remise Globale
-                    // Afficher la section Remise Globale seulement si aucune remise produit n'est appliquée
-                    if (!discounts.any((discount) => discount > 0))
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Remise Globale:",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          SizedBox(height: 8),
-                          Text("Type de Remise:",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          Row(
-                            children: [
-                              Radio(
-                                value: true,
-                                groupValue: isPercentageDiscount,
-                                onChanged: (value) {
-                                  setState(() {
-                                    isPercentageDiscount = value as bool;
-                                    globalDiscountController.text = '';
-                                    globalDiscountValueController.text = '';
-                                    updateTotalAndChange();
-                                  });
-                                },
-                              ),
-                              Text("Pourcentage"),
-                              Radio(
-                                value: false,
-                                groupValue: isPercentageDiscount,
-                                onChanged: (value) {
-                                  setState(() {
-                                    isPercentageDiscount = value as bool;
-                                    globalDiscountController.text = '';
-                                    globalDiscountValueController.text = '';
-                                    updateTotalAndChange();
-                                  });
-                                },
-                              ),
-                              Text("Valeur (DT)"),
-                            ],
-                          ),
-                          SizedBox(height: 16),
-                          if (isPercentageDiscount)
+                            // Montant donné et rendu
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 TextField(
-                                  controller: globalDiscountController,
+                                  controller: amountGivenController,
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
-                                    labelText: "Remise Globale (%)",
+                                    labelText: "Montant donné (DT)",
                                     border: OutlineInputBorder(),
                                   ),
                                   onChanged: (value) {
                                     setState(() {
-                                      globalDiscount =
-                                          double.tryParse(value) ?? 0.0;
-                                      updateTotalAndChange();
+                                      String cleanedValue = cleanInput(value);
+                                      if (cleanedValue == 'NEGATIVE') {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              "Veuillez entrer un nombre positif.",
+                                              style: TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                        amountGivenController.text = '';
+                                        return;
+                                      }
+                                      amountGivenController.text = cleanedValue;
+                                      amountGivenController.selection =
+                                          TextSelection.fromPosition(
+                                        TextPosition(
+                                            offset: cleanedValue.length),
+                                      );
+                                      amountGiven =
+                                          double.tryParse(cleanedValue) ?? 0.0;
+                                      changeReturned = amountGiven - total;
+                                      changeReturnedController.text =
+                                          changeReturned.toStringAsFixed(2);
                                     });
                                   },
                                 ),
-                                SizedBox(height: 8),
-                                Text(
-                                  "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          if (!isPercentageDiscount)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                                SizedBox(height: 10),
                                 TextField(
-                                  controller: globalDiscountValueController,
-                                  keyboardType: TextInputType.number,
+                                  controller: changeReturnedController,
+                                  readOnly: true,
                                   decoration: InputDecoration(
-                                    labelText: "Remise Globale (DT)",
+                                    labelText: "Monnaie rendue (DT)",
                                     border: OutlineInputBorder(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      globalDiscountValue =
-                                          double.tryParse(value) ?? 0.0;
-                                      updateTotalAndChange();
-                                    });
-                                  },
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
                                   ),
                                 ),
                               ],
                             ),
-                          SizedBox(height: 16),
-                        ],
-                      ),
-
-                    SizedBox(height: 16),
-
-                    // Payment Method Selection
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Mode de Paiement:",
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Row(
-                          children: [
-                            Radio<String>(
-                              value: "Espèce",
-                              groupValue: selectedPaymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedPaymentMethod = value!;
-                                });
-                              },
-                            ),
-                            Text("Espèce"),
-                            Radio<String>(
-                              value: "Carte Bancaire",
-                              groupValue: selectedPaymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedPaymentMethod = value!;
-                                });
-                              },
-                            ),
-                            Text("Carte Bancaire"),
-                            Radio<String>(
-                              value: "Chèque",
-                              groupValue: selectedPaymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedPaymentMethod = value!;
-                                });
-                              },
-                            ),
-                            Text("Chèque"),
                           ],
                         ),
-                      ],
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // Total Amount
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextField(
-                            controller: amountGivenController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: "Donnée (Exp:12.50 DT)",
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                String cleanedValue = cleanInput(value);
-
-                                if (cleanedValue == 'NEGATIVE') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Veuillez entrer un nombre positif.",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  amountGivenController.text = '';
-                                  return;
-                                }
-
-                                if (cleanedValue == 'USE_DOT') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Utilisez un point (.) au lieu d'une virgule (,).",
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                amountGivenController.text = cleanedValue;
-                                amountGivenController.selection =
-                                    TextSelection.fromPosition(
-                                  TextPosition(offset: cleanedValue.length),
-                                );
-                                amountGiven =
-                                    double.tryParse(cleanedValue) ?? 0.0;
-                                changeReturned = amountGiven - total;
-                                changeReturnedController.text =
-                                    changeReturned.toStringAsFixed(2);
-                              });
-                            }),
-                        SizedBox(height: 10),
-                        TextField(
-                          controller: changeReturnedController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: "Rendu (DT)",
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text(
                     "Annuler",
                     style: TextStyle(color: Color(0xFFE53935)),
@@ -766,21 +806,20 @@ class Addorder {
                 ),
                 TextButton(
                   onPressed: () {
-                    if (!validateDiscounts()) {
-                      return;
-                    }
+                    if (!validateDiscounts()) return;
                     Navigator.of(context).pop();
                     _confirmPlaceOrder(
-                        context,
-                        selectedProducts,
-                        quantityProducts,
-                        amountGiven,
-                        discounts,
-                        typeDiscounts,
-                        isPercentageDiscount
-                            ? globalDiscount
-                            : globalDiscountValue,
-                        isPercentageDiscount);
+                      context,
+                      selectedProducts,
+                      quantityProducts,
+                      amountGiven,
+                      discounts,
+                      typeDiscounts,
+                      isPercentageDiscount
+                          ? globalDiscount
+                          : globalDiscountValue,
+                      isPercentageDiscount,
+                    );
                   },
                   child: Text(
                     "Confirmer",
