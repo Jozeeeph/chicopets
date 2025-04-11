@@ -41,14 +41,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
- Future<void> _logout() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.remove('current_user');
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => const HomePage()),
-  );
-}
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('current_user');
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePage()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,10 +91,10 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 12),
               Expanded(
                 child: GridView.count(
-                  crossAxisCount: 5,
+                  crossAxisCount: 6,
                   crossAxisSpacing: 5,
                   mainAxisSpacing: 5,
-                  childAspectRatio: 0.85,
+                  childAspectRatio: 0.71,
                   children: [
                     if (isAdmin) ...[
                       _buildCard(
@@ -132,7 +132,56 @@ class _DashboardPageState extends State<DashboardPage> {
                         page: const AccountsPage(),
                         color: const Color.fromARGB(255, 0, 164, 201),
                       ),
+                      _buildCard(
+                        context,
+                        label: 'Gestion de stock',
+                        icon: Icons.warehouse,
+                        page: null,
+                        color: const Color(0xFF795548),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Comptes client',
+                        icon: Icons.person,
+                        page: null,
+                        color: const Color(0xFF607D8B),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Rapports des ventes',
+                        icon: Icons.bar_chart,
+                        page: null,
+                        color: const Color(0xFF3F51B5),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Rapports financiers',
+                        icon: Icons.attach_money,
+                        page: null,
+                        color: const Color(0xFF8BC34A),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Gestion des Attributs',
+                        icon: Icons.tune,
+                        page: null,
+                        color: const Color(0xFF9C27B0),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Statistiques',
+                        icon: Icons.show_chart,
+                        page: null,
+                        color: const Color(0xFFF44336),
+                      ),
                     ],
+                      _buildCard(
+                      context,
+                      label: 'Passage de commande',
+                      icon: Icons.point_of_sale,
+                      page: const CashDeskPage(),
+                      color: const Color(0xFF4CAF50),
+                    ),
                     _buildCard(
                       context,
                       label: 'Galerie de photos',
@@ -140,13 +189,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       page: const GalleryPage(),
                       color: const Color(0xFFE91E63),
                     ),
-                    _buildCard(
-                      context,
-                      label: 'Passage de commande',
-                      icon: Icons.point_of_sale,
-                      page: const CashDeskPage(),
-                      color: const Color(0xFF4CAF50),
-                    ),
+                  
                   ],
                 ),
               ),
@@ -161,7 +204,7 @@ class _DashboardPageState extends State<DashboardPage> {
     BuildContext context, {
     required String label,
     required IconData icon,
-    required Widget page,
+    required Widget? page,
     required Color color,
   }) {
     return Card(
@@ -171,12 +214,14 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       color: color,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => page),
-          );
-        },
+        onTap: page != null
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => page),
+                );
+              }
+            : null,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(8.0),

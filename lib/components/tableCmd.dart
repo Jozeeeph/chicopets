@@ -424,14 +424,30 @@ class _TableCmdState extends State<TableCmd> {
 
         const SizedBox(width: 15),
 
-        // Boutons d'action à droite
-        Expanded(
-          flex: 1,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              const SizedBox(height: 150),
-              GestureDetector(
+// Boutons d'action à droite - Version Cards corrigée
+Expanded(
+  flex: 1,
+  child: SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.only(top: 150),
+      child: Wrap(
+        spacing: 10, // Espacement horizontal entre les cards
+        runSpacing: 10, // Espacement vertical entre les cards
+        alignment: WrapAlignment.center,
+        children: [
+          // Bouton SUPPRIMER
+          SizedBox(
+            width: 160, // Largeur fixe pour chaque card
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: selectedProductIndex != null
+                  ? const Color(0xFFE53935)
+                  : Colors.grey,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
                 onTap: selectedProductIndex != null
                     ? () {
                         widget.onDeleteProduct(selectedProductIndex!);
@@ -440,188 +456,227 @@ class _TableCmdState extends State<TableCmd> {
                         });
                       }
                     : null,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selectedProductIndex != null
-                        ? const Color(0xFFE53935)
-                        : Colors.grey,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.delete, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('SUPPRIMER',
+                      const Icon(Icons.delete, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('SUPPRIMER PRODUIT',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14)),
+                              fontSize: 12)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
+            ),
+          ),
+
+          // Bouton REMISE
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: selectedProductIndex != null
+                  ? const Color(0xFF0056A6)
+                  : Colors.grey,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
                 onTap: selectedProductIndex != null
                     ? () {
                         widget.onApplyDiscount(selectedProductIndex!);
                       }
                     : null,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selectedProductIndex != null
-                        ? const Color(0xFF0056A6)
-                        : Colors.grey,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.discount, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('REMISE',
+                      const Icon(Icons.discount, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('REMISE PAR LIGNE',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14)),
+                              fontSize: 12)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
+            ),
+          ),
+
+          // Bouton QUANTITÉ
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: selectedProductIndex != null
+                  ? const Color(0xFF0056A6)
+                  : Colors.grey,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
                 onTap: selectedProductIndex != null
                     ? () => widget.onQuantityChange(selectedProductIndex!)
                     : null,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selectedProductIndex != null
-                        ? const Color(0xFF0056A6)
-                        : Colors.grey,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.edit, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('QUANTITÉ',
+                      const Icon(Icons.edit, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('CHANGER QUANTITÉ',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14)),
+                              fontSize: 12)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
+            ),
+          ),
+
+          // Bouton RECHERCHER
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: const Color(0xFF0056A6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
                 onTap: widget.onSearchProduct,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0056A6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('RECHERCHER',
+                      const Icon(Icons.search, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('LISTE PRODUITS',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14)),
+                              fontSize: 12)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
+            ),
+          ),
+
+          // Bouton CLIENTS
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: const Color(0xFF0056A6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
                 onTap: () {
                   _showClientManagement(context);
                 },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0056A6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.person, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('CLIENTS',
+                      const Icon(Icons.person, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('COMPTES CLIENTS',
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14)),
+                              fontSize: 12)),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: widget.onFetchOrders,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0056A6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.list, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('COMMANDES',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: widget.onPlaceOrder,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF009688),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text('VALIDER',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+
+          // Bouton COMMANDES
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: const Color(0xFF0056A6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: widget.onFetchOrders,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.list, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('LISTE COMMANDES',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Bouton VALIDER
+          SizedBox(
+            width: 160,
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              color: const Color(0xFF009688),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(30),
+                onTap: widget.onPlaceOrder,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.white, size: 24),
+                      const SizedBox(height: 8),
+                      const Text('VALIDER COMMANDE',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
       ],
     );
   }

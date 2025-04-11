@@ -137,7 +137,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Total Général: ${_calculateTotalSales(salesData).toStringAsFixed(2)} €',
+                      'Total Général: ${_calculateTotalSales(salesData).toStringAsFixed(2)} DT',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -180,7 +180,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   ),
                 ),
                 trailing: Text(
-                  'Total: ${categoryTotal.toStringAsFixed(2)} €',
+                  'Total: ${categoryTotal.toStringAsFixed(2)} DT',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
@@ -194,7 +194,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   title: Text(productName),
                   subtitle: Text('Quantité vendue: ${productData['quantity']}'),
                   trailing: Text(
-                    'Total: ${productData['total'].toStringAsFixed(2)} €',
+                    'Total: ${productData['total'].toStringAsFixed(2)} DT',
                   ),
                 );
               }).toList(),
@@ -230,13 +230,13 @@ class _CashDeskPageState extends State<CashDeskPage> {
               const Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
               ...order.orderLines.map((line) => ListTile(
                 title: Text(line.idProduct),
-                subtitle: Text('${line.quantite} x ${line.prixUnitaire.toStringAsFixed(2)} €'),
-                trailing: Text('${(line.finalPrice * line.quantite).toStringAsFixed(2)} €'),
+                subtitle: Text('${line.quantite} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
+                trailing: Text('${(line.finalPrice * line.quantite).toStringAsFixed(2)} DT'),
               )).toList(),
               const Divider(),
-              Text('Total: ${order.total.toStringAsFixed(2)} €', 
+              Text('Total: ${order.total.toStringAsFixed(2)} DT', 
                   style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} €',
+              Text('Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: order.remainingAmount > 0 ? Colors.red : Colors.green,

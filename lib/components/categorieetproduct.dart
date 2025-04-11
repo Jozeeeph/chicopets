@@ -391,7 +391,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       margin: const EdgeInsets.all(2.0),
       decoration: BoxDecoration(
         color: darkBlue,
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(30),
       ),
       child: InkWell(
         onTap: () => _onProductSelected(product),
