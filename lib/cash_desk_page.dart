@@ -101,8 +101,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  void _showOrdersReport() async {
-    final orders = await sqldb.getOrdersWithOrderLines();
+  void _showSalesReport() async {
+    final salesData = await sqldb.getSalesByCategoryAndProduct();
+    print(salesData);
     
     if (!mounted) return;
     
@@ -115,7 +116,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
           child: Column(
             children: [
               AppBar(
-                title: const Text('Rapport des commandes'),
+                title: const Text('Rapport des ventes par article'),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -125,33 +126,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    child: DataTable(
-                      columnSpacing: 20,
-                      columns: const [
-                        DataColumn(label: Text('N° Commande')),
-                        DataColumn(label: Text('Date')),
-                        DataColumn(label: Text('Statut')),
-                        DataColumn(label: Text('Mode Paiement')),
-                        DataColumn(label: Text('Total')),
-                        DataColumn(label: Text('Reste à payer')),
-                      ],
-                      rows: orders.map((order) {
-                        final dateFormat = DateFormat('dd/MM/yy HH:mm');
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(order.idOrder?.toString() ?? 'N/A')),
-                            DataCell(Text(dateFormat.format(DateTime.parse(order.date)))),
-                            DataCell(Text(order.status)),
-                            DataCell(Text(order.modePaiement)),
-                            DataCell(Text('${order.total.toStringAsFixed(2)} €')),
-                            DataCell(Text('${order.remainingAmount.toStringAsFixed(2)} €')),
-                          ],
-                          onSelectChanged: (_) => _showOrderDetails(order),
-                        );
-                      }).toList(),
-                    ),
+                  child: Column(
+                    children: _buildSalesReport(salesData),
                   ),
                 ),
               ),
@@ -161,7 +137,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Total: ${orders.fold(0.0, (sum, order) => sum + order.total).toStringAsFixed(2)} €',
+                      'Total Général: ${_calculateTotalSales(salesData).toStringAsFixed(2)} €',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -179,6 +155,63 @@ class _CashDeskPageState extends State<CashDeskPage> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildSalesReport(Map<String, Map<String, dynamic>> salesData) {
+    List<Widget> widgets = [];
+    double grandTotal = 0.0;
+
+    salesData.forEach((category, data) {
+      final products = data['products'] as Map<String, dynamic>;
+      final categoryTotal = data['total'] as double;
+      grandTotal += categoryTotal;
+
+      widgets.add(
+        Card(
+          margin: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              ListTile(
+                title: Text(
+                  'Catégorie: $category',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                trailing: Text(
+                  'Total: ${categoryTotal.toStringAsFixed(2)} €',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(),
+              ...products.entries.map((productEntry) {
+                final productName = productEntry.key;
+                final productData = productEntry.value as Map<String, dynamic>;
+                return ListTile(
+                  title: Text(productName),
+                  subtitle: Text('Quantité vendue: ${productData['quantity']}'),
+                  trailing: Text(
+                    'Total: ${productData['total'].toStringAsFixed(2)} €',
+                  ),
+                );
+              }).toList(),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      );
+    });
+
+    return widgets;
+  }
+
+  double _calculateTotalSales(Map<String, Map<String, dynamic>> salesData) {
+    return salesData.values.fold(0.0, (sum, categoryData) {
+      return sum + (categoryData['total'] as double);
+    });
   }
 
   Future<void> _showOrderDetails(Order order) async {
@@ -355,13 +388,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
         .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
   }
 
-  double _calculateTotalBeforeDiscount() {
-    double total = 0.0;
-    for (int i = 0; i < selectedProducts.length; i++) {
-      total += selectedProducts[i].prixTTC * quantityProducts[i];
-    }
-    return total;
-  }
 
   double _calculateTotal() {
     double total = 0.0;
@@ -401,8 +427,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.receipt),
-            tooltip: 'Rapport commandes',
-            onPressed: _showOrdersReport,
+            tooltip: 'Rapport des ventes',
+            onPressed: _showSalesReport,
           ),
           IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.black),

@@ -52,9 +52,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
         // Use the first sheet
         var sheet = excel.tables.values.first;
-        if (sheet == null) {
-          throw Exception('No sheet found in Excel file');
-        }
 
         // Get headers to verify format
         var headers = sheet.rows.first
@@ -242,6 +239,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               content: Text(
                   'Successfully imported $_importedProductsCount products and $_importedVariantsCount variants'),
               duration: const Duration(seconds: 3),
+              backgroundColor: Colors.green,
             ),
           );
         }

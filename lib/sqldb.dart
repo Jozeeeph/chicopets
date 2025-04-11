@@ -28,7 +28,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -318,6 +318,77 @@ class SqlDb {
     }
 
     return orderId;
+  }
+
+  Future<Map<String, Map<String, dynamic>>>
+      getSalesByCategoryAndProduct() async {
+    final db = await this.db;
+    final salesData = <String, Map<String, dynamic>>{};
+
+    try {
+      // Corrected query with proper parentheses
+      final result = await db.rawQuery('''
+      SELECT 
+        COALESCE(p.category_name, c.category_name, 'Uncategorized') AS category_name,
+        p.designation AS product_name,
+        SUM(oi.quantity) AS total_quantity,
+        SUM(
+          CASE 
+            WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
+            ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
+          END
+        ) AS total_sales
+      FROM 
+        order_items oi
+      JOIN 
+        products p ON oi.product_code = p.code
+      LEFT JOIN
+        categories c ON p.category_id = c.id_category
+      JOIN 
+        orders o ON oi.id_order = o.id_order
+      WHERE 
+        o.status IN ('completed', 'paid', 'semi-payée')
+        AND p.is_deleted = 0
+      GROUP BY 
+        COALESCE(p.category_name, c.category_name, 'Uncategorized'), p.designation
+      ORDER BY 
+        category_name, total_sales DESC
+    ''');
+
+      print('Query result: $result');
+
+      // Process the results
+      for (final row in result) {
+        final category = row['category_name']?.toString() ?? 'Uncategorized';
+        final productName =
+            row['product_name']?.toString() ?? 'Unknown Product';
+        final quantity = row['total_quantity'] as int? ?? 0;
+        final total = row['total_sales'] as double? ?? 0.0;
+
+        // Initialize category if not exists
+        salesData.putIfAbsent(
+            category,
+            () => {
+                  'products': <String, dynamic>{},
+                  'total': 0.0,
+                });
+
+        // Add product to category
+        salesData[category]!['products'][productName] = {
+          'quantity': quantity,
+          'total': total,
+        };
+
+        // Update category total
+        salesData[category]!['total'] =
+            (salesData[category]!['total'] as double) + total;
+      }
+
+      return salesData;
+    } catch (e) {
+      print('Error getting sales by category and product: $e');
+      return {};
+    }
   }
 
   Future<List<Order>> getOrdersWithOrderLines() async {
@@ -1192,79 +1263,79 @@ class SqlDb {
   }
 
   Future<int> addClient(Client client) async {
-  final dbClient = await db;
-  try {
-    int id = await dbClient.insert(
+    final dbClient = await db;
+    try {
+      int id = await dbClient.insert(
+        'clients',
+        client.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      print('Client ajouté avec ID: $id'); // Debug
+      return id;
+    } catch (e) {
+      print('Erreur lors de l\'ajout du client: $e');
+      return -1; // Retourne -1 en cas d'erreur
+    }
+  }
+
+  Future<List<Client>> getAllClients() async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> maps = await dbClient.query('clients');
+    print('Clients from DB: $maps'); // Debug
+    return List.generate(maps.length, (i) => Client.fromMap(maps[i]));
+  }
+
+  Future<Client?> getClientById(int id) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.query(
+      'clients',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return result.isNotEmpty ? Client.fromMap(result.first) : null;
+  }
+
+  Future<int> updateClient(Client client) async {
+    final dbClient = await db;
+    return await dbClient.update(
       'clients',
       client.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-    print('Client ajouté avec ID: $id'); // Debug
-    return id;
-  } catch (e) {
-    print('Erreur lors de l\'ajout du client: $e');
-    return -1; // Retourne -1 en cas d'erreur
-  }
-}
-
-Future<List<Client>> getAllClients() async {
-  final dbClient = await db;
-  final List<Map<String, dynamic>> maps = await dbClient.query('clients');
-  print('Clients from DB: $maps'); // Debug
-  return List.generate(maps.length, (i) => Client.fromMap(maps[i]));
-}
-
-Future<Client?> getClientById(int id) async {
-  final dbClient = await db;
-  final List<Map<String, dynamic>> result = await dbClient.query(
-    'clients',
-    where: 'id = ?',
-    whereArgs: [id],
-    limit: 1,
-  );
-  return result.isNotEmpty ? Client.fromMap(result.first) : null;
-}
-
-Future<int> updateClient(Client client) async {
-  final dbClient = await db;
-  return await dbClient.update(
-    'clients',
-    client.toMap(),
-    where: 'id = ?',
-    whereArgs: [client.id],
-  );
-}
-
-Future<int> deleteClient(int id) async {
-  final dbClient = await db;
-  return await dbClient.delete(
-    'clients',
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-}
-
-Future<List<Client>> searchClients(String query) async {
-  final dbClient = await db;
-  final List<Map<String, dynamic>> result = await dbClient.query(
-    'clients',
-    where: 'name LIKE ? OR first_name LIKE ? OR phone_number LIKE ?',
-    whereArgs: ['%$query%', '%$query%', '%$query%'],
-  );
-  return result.map((map) => Client.fromMap(map)).toList();
-}
-
-Future<void> addOrderToClient(int clientId, int orderId) async {
-  final dbClient = await db;
-  final client = await getClientById(clientId);
-  if (client != null) {
-    client.idOrders.add(orderId);
-    await dbClient.update(
-      'clients',
-      {'id_orders': client.idOrders.join(',')},
       where: 'id = ?',
-      whereArgs: [clientId],
+      whereArgs: [client.id],
     );
   }
-}
+
+  Future<int> deleteClient(int id) async {
+    final dbClient = await db;
+    return await dbClient.delete(
+      'clients',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Client>> searchClients(String query) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> result = await dbClient.query(
+      'clients',
+      where: 'name LIKE ? OR first_name LIKE ? OR phone_number LIKE ?',
+      whereArgs: ['%$query%', '%$query%', '%$query%'],
+    );
+    return result.map((map) => Client.fromMap(map)).toList();
+  }
+
+  Future<void> addOrderToClient(int clientId, int orderId) async {
+    final dbClient = await db;
+    final client = await getClientById(clientId);
+    if (client != null) {
+      client.idOrders.add(orderId);
+      await dbClient.update(
+        'clients',
+        {'id_orders': client.idOrders.join(',')},
+        where: 'id = ?',
+        whereArgs: [clientId],
+      );
+    }
+  }
 }
