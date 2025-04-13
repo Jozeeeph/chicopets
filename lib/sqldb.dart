@@ -28,7 +28,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+//await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -421,7 +421,8 @@ class SqlDb {
       double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
       double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
       bool isPercentageDiscount =
-          (orderMap['is_percentage_discount'] as int?) == 1; // Fix here
+          (orderMap['is_percentage_discount'] as int?) == 1;
+      int? idClient = orderMap['id_client'] as int?; // Récupérez l'ID client
 
       List<Map<String, dynamic>> orderLinesData = await db1.query(
         "order_items",
@@ -436,7 +437,7 @@ class SqlDb {
           quantite: (line['quantity'] ?? 1) as int,
           prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
           discount: (line['discount'] ?? 0.0) as double,
-          isPercentage: (line['isPercentage'] as int?) == 1, // Fix here
+          isPercentage: (line['isPercentage'] as int?) == 1,
         );
       }).toList();
 
@@ -449,8 +450,8 @@ class SqlDb {
         orderLines: orderLines,
         remainingAmount: remaining,
         globalDiscount: globalDiscount,
-        isPercentageDiscount: isPercentageDiscount, // Fix here
-        idClient: orderMap['id_client'],
+        isPercentageDiscount: isPercentageDiscount,
+        idClient: idClient, // Passez l'ID client ici
       ));
     }
 
@@ -1343,6 +1344,9 @@ class SqlDb {
 
   Future<void> addOrderToClient(int clientId, int orderId) async {
     final dbClient = await db;
+    print('Adding order $orderId to client $clientId'); // Debug
+
+    // Méthode 1: Mettre à jour la liste des commandes du client
     final client = await getClientById(clientId);
     if (client != null) {
       client.idOrders.add(orderId);
@@ -1352,6 +1356,37 @@ class SqlDb {
         where: 'id = ?',
         whereArgs: [clientId],
       );
+      print('Updated client orders: ${client.idOrders}'); // Debug
+    }
+
+    // Méthode 2: Alternative plus simple
+    await dbClient.update(
+      'orders',
+      {'id_client': clientId},
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
+    print('Updated order with client ID'); // Debug
+  }
+
+  Future<void> debugCheckOrder(int orderId) async {
+    final dbClient = await db;
+    final order = await dbClient.query(
+      'orders',
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
+    print('Order from DB: ${order.first}');
+
+    if (order.first['id_client'] != null) {
+      final client = await dbClient.query(
+        'clients',
+        where: 'id = ?',
+        whereArgs: [order.first['id_client']],
+      );
+      print('Associated client: ${client.isNotEmpty ? client.first : 'None'}');
     }
   }
+
+
 }
