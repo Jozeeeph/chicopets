@@ -8,6 +8,7 @@ import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:caissechicopets/home_page.dart';
 import 'package:caissechicopets/import_product.dart';
+import 'package:caissechicopets/rapports/rapportVentes.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/user.dart';
 import 'package:flutter/material.dart';
@@ -150,7 +151,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Rapports des ventes',
                         icon: Icons.bar_chart,
-                        page: null,
+                        page: const RapportVentesPage(), // Updated this line
                         color: const Color(0xFF3F51B5),
                       ),
                       _buildCard(
@@ -175,7 +176,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         color: const Color(0xFFF44336),
                       ),
                     ],
-                      _buildCard(
+                    _buildCard(
                       context,
                       label: 'Passage de commande',
                       icon: Icons.point_of_sale,
@@ -189,7 +190,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       page: const GalleryPage(),
                       color: const Color(0xFFE91E63),
                     ),
-                  
                   ],
                 ),
               ),

@@ -9,8 +9,8 @@ class Order {
   String status;
   double remainingAmount;
   int? idClient;
-  double globalDiscount; // Added field
-  bool isPercentageDiscount; // Added field
+  double globalDiscount; 
+  bool isPercentageDiscount; 
 
   Order({
     this.idOrder,
