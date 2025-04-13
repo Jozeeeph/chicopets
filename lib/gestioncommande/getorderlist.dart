@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:caissechicopets/client.dart';
 import 'package:caissechicopets/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -524,11 +525,25 @@ class Getorderlist {
     showListOrdersPopUp(context); // Reload the orders
   }
 
-  static void _showOrderTicketPopup(BuildContext context, Order order) {
+  static void _showOrderTicketPopup(BuildContext context, Order order) async {
     final SqlDb sqldb = SqlDb();
     bool isPercentageDiscount = order.isPercentageDiscount;
-    double totalBeforeDiscount =
-        calculateTotalBeforeDiscount(order); // Ajoutez cette ligne
+    double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
+
+    // Récupérer les informations du client
+    print('Showing ticket for order ID: ${order.idOrder}'); // Debug
+    print('Order client ID: ${order.idClient}'); // Debug
+
+    Client? client;
+
+    if (order.idClient != null) {
+      print('Fetching client with ID: ${order.idClient}'); // Debug
+      client = await sqldb.getClientById(order.idClient!);
+      print('Fetched client: ${client?.name} ${client?.firstName}'); // Debug
+    } else {
+      print('No client ID associated with this order'); // Debug
+    }
+    await SqlDb().debugCheckOrder(order.idOrder!);
 
     showDialog(
       context: context,
@@ -541,8 +556,8 @@ class Getorderlist {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.receipt, color: Color(0xFF000000)), // Icône
-                SizedBox(width: 8), // Espacement entre l'icône et le texte
+                Icon(Icons.receipt, color: Color(0xFF000000)),
+                SizedBox(width: 8),
                 Text(
                   "Ticket de Commande",
                   style: TextStyle(
@@ -570,6 +585,15 @@ class Getorderlist {
                       color: Color(0xFF000000)),
                 ),
 
+                // Affichage du client
+                if (client != null) ...[
+                  SizedBox(height: 8),
+                  Text(
+                    "Client: ${client.name} ${client.firstName}",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Color(0xFF000000)),
+                  ),
+                ],
                 Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
                 // Header Row
@@ -824,12 +848,16 @@ class Getorderlist {
   //Convert to PDF
   static Future<void> generateAndSavePDF(
       BuildContext context, Order order) async {
+    final SqlDb sqldb = SqlDb();
     final pdf = pw.Document();
-    bool isPercentageDiscount =
-        order.isPercentageDiscount; // Vérifie si la remise est en pourcentage
-
-    // Calcul du total avant remise
+    bool isPercentageDiscount = order.isPercentageDiscount;
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
+
+    // Récupérer les informations du client
+    Client? client;
+    if (order.idClient != null) {
+      client = await sqldb.getClientById(order.idClient!);
+    }
 
     // Define the page format for a standard receipt (80mm width, auto height)
     const double pageWidth = 70 * PdfPageFormat.mm;
@@ -874,6 +902,14 @@ class Getorderlist {
               "Date: ${formatDate(order.date)}",
               style: pw.TextStyle(fontSize: 8),
             ),
+
+            // Client information
+            if (client != null)
+              pw.Text(
+                "Client: ${client.name} ${client.firstName}",
+                style: pw.TextStyle(fontSize: 8),
+              ),
+
             pw.Divider(),
 
             // Header row for items

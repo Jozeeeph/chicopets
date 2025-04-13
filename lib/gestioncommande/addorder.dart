@@ -819,6 +819,7 @@ class Addorder {
                           ? globalDiscount
                           : globalDiscountValue,
                       isPercentageDiscount,
+                      selectedClient
                     );
                   },
                   child: Text(
@@ -866,8 +867,8 @@ class Addorder {
     List<bool> typeDiscounts,
     double globalDiscount,
     bool isPercentageDiscount,
+    Client? selectedClient,
   ) async {
-    Client? selectedClient;
     if (!isPercentageDiscount &&
         globalDiscount >
             _calculateMaxGlobalDiscountValue(
@@ -960,7 +961,7 @@ class Addorder {
       int orderId = await SqlDb().addOrder(order);
       // Associer la commande au client si un client est sélectionné
       if (selectedClient != null && orderId > 0) {
-        await SqlDb().addOrderToClient(selectedClient!.id!, orderId);
+        await SqlDb().addOrderToClient(selectedClient.id!, orderId);
       }
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
