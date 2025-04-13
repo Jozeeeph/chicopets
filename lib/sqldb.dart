@@ -320,41 +320,52 @@ class SqlDb {
     return orderId;
   }
 
-  Future<Map<String, Map<String, dynamic>>>
-      getSalesByCategoryAndProduct() async {
+  Future<Map<String, Map<String, dynamic>>> getSalesByCategoryAndProduct({
+    String? dateFilter,
+  }) async {
     final db = await this.db;
     final salesData = <String, Map<String, dynamic>>{};
 
     try {
-      // Corrected query with proper parentheses
-      final result = await db.rawQuery('''
-      SELECT 
-        COALESCE(p.category_name, c.category_name, 'Uncategorized') AS category_name,
-        p.designation AS product_name,
-        SUM(oi.quantity) AS total_quantity,
-        SUM(
-          CASE 
-            WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
-            ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
-          END
-        ) AS total_sales
-      FROM 
-        order_items oi
-      JOIN 
-        products p ON oi.product_code = p.code
-      LEFT JOIN
-        categories c ON p.category_id = c.id_category
-      JOIN 
-        orders o ON oi.id_order = o.id_order
-      WHERE 
-        o.status IN ('completed', 'paid', 'semi-payée')
-        AND p.is_deleted = 0
-      GROUP BY 
-        COALESCE(p.category_name, c.category_name, 'Uncategorized'), p.designation
-      ORDER BY 
-        category_name, total_sales DESC
-    ''');
+      String query = '''
+    SELECT 
+      COALESCE(p.category_name, c.category_name, 'Uncategorized') AS category_name,
+      p.designation AS product_name,
+      SUM(oi.quantity) AS total_quantity,
+      SUM(
+        CASE 
+          WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
+          ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
+        END
+      ) AS total_sales,
+      AVG(oi.discount) AS avg_discount,
+      AVG(CASE WHEN oi.isPercentage = 1 THEN 1 ELSE 0 END) AS is_percentage_discount
+    FROM 
+      order_items oi
+    JOIN 
+      products p ON oi.product_code = p.code
+    LEFT JOIN
+      categories c ON p.category_id = c.id_category
+    JOIN 
+      orders o ON oi.id_order = o.id_order
+    WHERE 
+      o.status IN ('completed', 'paid', 'semi-payée')
+      AND p.is_deleted = 0
+    ''';
 
+      // Add date filter if provided
+      if (dateFilter != null && dateFilter.isNotEmpty) {
+        query += ' $dateFilter';
+      }
+
+      query += '''
+    GROUP BY 
+      COALESCE(p.category_name, c.category_name, 'Uncategorized'), p.designation
+    ORDER BY 
+      category_name, total_sales DESC
+    ''';
+
+      final result = await db.rawQuery(query);
       print('Query result: $result');
 
       // Process the results
@@ -364,6 +375,9 @@ class SqlDb {
             row['product_name']?.toString() ?? 'Unknown Product';
         final quantity = row['total_quantity'] as int? ?? 0;
         final total = row['total_sales'] as double? ?? 0.0;
+        final discount = row['avg_discount'] as double? ?? 0.0;
+        final isPercentage =
+            (row['is_percentage_discount'] as num?)?.toDouble() ?? 0.0 > 0.5;
 
         // Initialize category if not exists
         salesData.putIfAbsent(
@@ -377,6 +391,8 @@ class SqlDb {
         salesData[category]!['products'][productName] = {
           'quantity': quantity,
           'total': total,
+          'discount': discount,
+          'isPercentage': isPercentage,
         };
 
         // Update category total
