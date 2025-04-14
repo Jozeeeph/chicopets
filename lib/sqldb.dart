@@ -210,7 +210,32 @@ class SqlDb {
     );
   }
 
-  // Ajoutez ces méthodes dans la classe SqlDb
+  Future<int> updateProductWithoutId(Product product) async {
+    final db = await this.db;
+    return await db.update(
+      'products',
+      {
+        'code': product.code,
+        'designation': product.designation,
+        'description': product.description,
+        'stock': product.stock,
+        'prix_ht': product.prixHT,
+        'taxe': product.taxe,
+        'prix_ttc': product.prixTTC,
+        'date_expiration': product.dateExpiration,
+        'category_id': product.categoryId,
+        'sub_category_id': product.subCategoryId,
+        'is_deleted': product.isDeleted,
+        'marge': product.marge,
+        'remise_max': product.remiseMax,
+        'remise_valeur_max': product.remiseValeurMax,
+        'has_variants': product.hasVariants ? 1 : 0,
+        'sellable': product.sellable ? 1 : 0,
+      },
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
+  }
 
   Future<int> updateProduct(Product product) async {
     final dbClient = await db;
@@ -1387,6 +1412,4 @@ class SqlDb {
       print('Associated client: ${client.isNotEmpty ? client.first : 'None'}');
     }
   }
-
-
 }
