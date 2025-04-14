@@ -373,7 +373,7 @@ class _TableCmdState extends State<TableCmd> {
                                           vertical: 8, horizontal: 12),
                                       child: Row(
                                         children: [
-                                          Expanded(child: Text(product.code)),
+                                          Expanded(child: Text(product.code ?? '')),
                                           Expanded(
                                             child: Text(
                                               hasVariants

@@ -2,7 +2,7 @@ import 'package:caissechicopets/variant.dart';
 
 class Product {
   int? id; // Changed from int id = 0 to nullable
-  String code;
+  String? code;
   String designation;
   String? description;
   int stock;
@@ -24,9 +24,9 @@ class Product {
 
   Product({
     this.id, // Changed from default 0 to nullable
-    required this.code,
+    this.code,
     required this.designation,
-    required this.description,
+    this.description,
     required this.stock,
     required this.prixHT,
     required this.taxe,

@@ -58,7 +58,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
     String query = _searchController.text.toLowerCase();
     setState(() {
       _filteredProducts = _products.where((product) {
-        return product.code.toLowerCase().contains(query) ||
+        return (product.code?.toLowerCase() ?? '').contains(query) ||
             product.designation.toLowerCase().contains(query) ||
             (product.categoryName ?? '').toLowerCase().contains(query);
       }).toList();
@@ -158,7 +158,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
 
   Future<void> _deleteProducts(List<Product> products) async {
     for (var product in products) {
-      await sqldb.deleteProduct(product.code);
+      await sqldb.deleteProduct(product.code ?? '');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -416,8 +416,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                           ),
                           Expanded(
                               flex: 2,
-                              child:
-                                  Text(product.code, style: _cellTextStyle())),
+                              child: Text(product.code ?? '',
+                                  style: _cellTextStyle())),
                           Expanded(
                               flex: 3,
                               child: Text(product.designation,
@@ -472,7 +472,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                                               size: 16,
                                               color: Color(0xFF009688)),
                                           const SizedBox(width: 4),
-                                          Text('      ${product.variants.length} variantes'),
+                                          Text(
+                                              '      ${product.variants.length} variantes'),
                                         ],
                                       ),
                                     ),

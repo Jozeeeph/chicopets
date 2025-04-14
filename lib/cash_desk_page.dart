@@ -229,7 +229,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
               const SizedBox(height: 16),
               const Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
               ...order.orderLines.map((line) => ListTile(
-                title: Text(line.idProduct),
+                title: Text(line.idProduct!),
                 subtitle: Text('${line.quantite} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
                 trailing: Text('${(line.finalPrice * line.quantite).toStringAsFixed(2)} DT'),
               )).toList(),
@@ -483,8 +483,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
                 onProductSelected: (Product product, [Variant? variant]) {
                   setState(() {
                     int index = selectedProducts.indexWhere((p) {
-                      if (p.code.trim().toLowerCase() !=
-                          product.code.trim().toLowerCase()) {
+                      if (p.code?.trim().toLowerCase() !=
+                          product.code?.trim().toLowerCase()) {
                         return false;
                       }
                       if (variant != null && p.variants.isNotEmpty) {

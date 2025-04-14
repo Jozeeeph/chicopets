@@ -174,7 +174,7 @@ class Searchprod {
                                           return DataRow(
                                             cells: [
                                               DataCell(Text(product.designation)),
-                                              DataCell(Text(product.code)),
+                                              DataCell(Text(product.code ?? '')),
                                               DataCell(Text(
                                                   product.stock.toString())),
                                               DataCell(Text(

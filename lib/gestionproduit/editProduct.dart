@@ -57,7 +57,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   void initState() {
     super.initState();
     // Initialize form fields with product data
-    codeController.text = widget.product.code;
+    codeController.text = widget.product.code ?? '';
     designationController.text = widget.product.designation;
     descriptionController.text = widget.product.description ?? '';
     stockController.text = widget.product.stock.toString();
