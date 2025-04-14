@@ -30,7 +30,7 @@ environment:
 dependencies:
   sqflite: ^2.4.1
   sqflite_common_ffi: ^2.2.0
-  pdf: ^3.10.7
+  pdf: ^3.10.0
   printing: ^5.11.0
   image_picker: ^1.0.7
   google_fonts: ^6.1.0

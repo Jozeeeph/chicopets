@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:intl/intl.dart';
+import 'rapportpdf.dart';
 
 class RapportVentesPage extends StatefulWidget {
   const RapportVentesPage({super.key});
@@ -25,16 +26,16 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
     try {
       setState(() => isLoading = true);
 
-      // Format dates for SQL query if range is selected
       String? dateFilter;
       if (dateRange != null) {
-        final startDate = DateFormat('yyyy-MM-dd').format(dateRange!.start);
-        final endDate = DateFormat('yyyy-MM-dd').format(dateRange!.end);
-        dateFilter = "AND o.date BETWEEN '$startDate' AND '$endDate'";
+        // Format dates to match the ISO format stored in database
+        final startDate = dateRange!.start.toIso8601String();
+        final endDate =
+            dateRange!.end.add(const Duration(days: 1)).toIso8601String();
+        dateFilter = "AND o.date >= '$startDate' AND o.date < '$endDate'";
       }
 
-      final data =
-          await sqldb.getSalesByCategoryAndProduct(dateFilter: dateFilter);
+      final data = await sqldb.getSalesByCategoryAndProduct(dateFilter: dateFilter);
 
       setState(() {
         salesData = data;
@@ -42,6 +43,7 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
       });
     } catch (e) {
       setState(() => isLoading = false);
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors du chargement des données: $e')),
       );
@@ -230,9 +232,20 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
       margin: const EdgeInsets.only(left: 8.0),
       child: FloatingActionButton(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Fonction d\'exportation à venir !')),
+          if (salesData == null || salesData!.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Aucune donnée à exporter !')),
+            );
+            return;
+          }
+
+          final pdfGenerator = RapportPdf(
+            salesData: salesData!,
+            totalSales: _calculateTotalSales(),
+            dateRange: dateRange,
           );
+
+          pdfGenerator.generateAndPrintPdf(context);
         },
         backgroundColor: color,
         child: Icon(icon, size: 26),
