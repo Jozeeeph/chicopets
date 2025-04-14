@@ -262,7 +262,7 @@ class _ManageCommandState extends State<ManageCommand> {
                         ...order.orderLines.map((orderLine) {
                           return FutureBuilder<Product?>(
                             future:
-                                sqlDb.getDesignationByCode(orderLine.idProduct),
+                                sqlDb.getDesignationByCode(orderLine.idProduct ?? ''),
                             builder: (context, productSnapshot) {
                               if (productSnapshot.connectionState ==
                                   ConnectionState.waiting) {

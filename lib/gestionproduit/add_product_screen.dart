@@ -32,7 +32,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController margeController = TextEditingController();
   final TextEditingController remiseMaxController = TextEditingController();
   final TextEditingController profitController = TextEditingController();
-  final TextEditingController remiseValeurMaxController = TextEditingController();
+  final TextEditingController remiseValeurMaxController =
+      TextEditingController();
   final TextEditingController priceVenteHTController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
@@ -92,19 +93,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<int?> _saveProduct() async {
     if (_formKey.currentState!.validate()) {
       if (selectedCategoryId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Veuillez sélectionner une catégorie.',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Color(0xFFE53935),
-          ));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Veuillez sélectionner une catégorie.',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Color(0xFFE53935),
+        ));
         return null;
       }
 
       try {
-        final categoryName = await sqldb.getCategoryNameById(selectedCategoryId!);
+        final categoryName =
+            await sqldb.getCategoryNameById(selectedCategoryId!);
         final subCategoryName = selectedSubCategoryId != null
             ? await sqldb.getSubCategoryNameById(selectedSubCategoryId!)
             : '';
@@ -244,13 +245,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                         where: 'id = ?',
                                         whereArgs: [productId],
                                       );
-                                      
+
                                       if (productData.isNotEmpty) {
-                                        final product = Product.fromMap(productData.first);
+                                        final product =
+                                            Product.fromMap(productData.first);
                                         Navigator.pushReplacement(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => EditProductScreen(
+                                            builder: (context) =>
+                                                EditProductScreen(
                                               product: product,
                                               refreshData: widget.refreshData,
                                             ),
@@ -292,21 +295,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             ),
                           ),
                         ),
-                      
+
                       _buildTextFormField(
                         controller: codeController,
-                        label: 'Code à Barre',
+                        label: 'Code à Barre', // Ajouté (optionnel)
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Code à Barre" ne doit pas être vide.';
+                          if (value != null && value.isNotEmpty) {
+                            // Seulement valider si non vide
+                            if (int.tryParse(value) == null) {
+                              return 'Le "Code à Barre" doit être un nombre.';
+                            }
+                            if (int.parse(value) < 0) {
+                              return 'Le "Code à Barre" doit être un nombre positif.';
+                            }
                           }
-                          if (int.tryParse(value) == null) {
-                            return 'Le "Code à Barre" doit être un nombre.';
-                          }
-                          if (int.parse(value) < 0) {
-                            return 'Le "Code à Barre" doit être un nombre positif.';
-                          }
-                          return null;
+                          return null; // Accepte null ou vide
                         },
                       ),
                       _buildTextFormField(
@@ -321,11 +324,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                       _buildTextFormField(
                         controller: descriptionController,
-                        label: 'Description',
+                        label:
+                            'Description (optionnelle)', // Ajouté (optionnelle)
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Le champ "Description" ne doit pas être vide.';
-                          }
+                          // Retirer complètement la validation, car le champ est optionnel
                           return null;
                         },
                       ),

@@ -554,8 +554,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   // Remove duplicate products and filter out zero stock products
                   final uniqueProducts = snapshot.data!
                       .fold<Map<String, Product>>({}, (map, product) {
-                        if (!map.containsKey(product.code)) {
-                          map[product.code] = product;
+                        if (!map.containsKey(product.code ?? '')) {
+                          map[product.code ?? ''] = product;
                         }
                         return map;
                       })

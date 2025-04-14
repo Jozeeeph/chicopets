@@ -1,6 +1,6 @@
 class OrderLine {
   int idOrder;
-  String idProduct;
+  String? idProduct;
   int quantite;
   double prixUnitaire;
   double discount;
@@ -8,7 +8,7 @@ class OrderLine {
 
   OrderLine({
     required this.idOrder,
-    required this.idProduct,
+    this.idProduct,
     required this.quantite,
     required this.prixUnitaire,
     required this.discount,

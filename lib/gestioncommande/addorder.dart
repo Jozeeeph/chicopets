@@ -996,7 +996,7 @@ class Addorder {
         for (int i = 0; i < selectedProducts.length; i++) {
           selectedProducts[i].stock -= quantityProducts[i];
           await SqlDb().updateProductStock(
-              selectedProducts[i].code, selectedProducts[i].stock);
+              selectedProducts[i].code ?? '', selectedProducts[i].stock);
         }
 
         ScaffoldMessenger.of(context).showSnackBar(

@@ -141,10 +141,10 @@ class Getorderlist {
     final SqlDb sqldb = SqlDb();
 
     // Annuler la ligne de commande
-    await sqldb.cancelOrderLine(order.idOrder!, orderLine.idProduct);
+    await sqldb.cancelOrderLine(order.idOrder!, orderLine.idProduct ?? '');
 
     // Restocker le produit
-    await sqldb.updateProductStock(orderLine.idProduct, orderLine.quantite);
+    await sqldb.updateProductStock(orderLine.idProduct ?? '', orderLine.quantite);
 
     // Recalculer le total de la commande
     final dbClient = await sqldb.db;
@@ -267,7 +267,7 @@ class Getorderlist {
                             ...order.orderLines.map((orderLine) {
                               return FutureBuilder<Product?>(
                                 future:
-                                    sqldb.getProductByCode(orderLine.idProduct),
+                                    sqldb.getProductByCode(orderLine.idProduct ?? ''),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
@@ -653,7 +653,7 @@ class Getorderlist {
                 // Liste des produits
                 ...order.orderLines.map((orderLine) {
                   return FutureBuilder<Product?>(
-                    future: sqldb.getProductByCode(orderLine.idProduct),
+                    future: sqldb.getProductByCode(orderLine.idProduct ?? ''),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -960,7 +960,7 @@ class Getorderlist {
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    orderLine.idProduct,
+                    orderLine.idProduct ?? '',
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(

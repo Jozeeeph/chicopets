@@ -65,7 +65,8 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
     setState(() {
       _filteredProducts = _products.where((product) {
         return product.designation.toLowerCase().contains(query) ||
-            product.code.toLowerCase().contains(query);
+            (product.code?.toLowerCase() ?? '').contains(query)
+;
       }).toList();
     });
   }
@@ -156,7 +157,7 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
   Future<void> _deleteProducts(List<Product> products) async {
     try {
       for (var product in products) {
-        await sqldb.deleteProduct(product.code);
+        await sqldb.deleteProduct(product.code ?? '');
       }
       
       ScaffoldMessenger.of(context).showSnackBar(
