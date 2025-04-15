@@ -28,7 +28,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-//await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -44,7 +44,7 @@ class SqlDb {
         await db.execute('''
   CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    code TEXT NOT NULL,
+    code TEXT,
     designation TEXT,
     description TEXT,
     stock INTEGER,
@@ -247,14 +247,26 @@ class SqlDb {
     );
   }
 
-  Future<int> deleteProduct(String productCode) async {
-    final dbClient = await db;
-    return await dbClient.update(
+  Future<int> deleteProductById(int productId) async {
+    final db = await this.db;
+    return await db.delete(
       'products',
-      {'is_deleted': 1},
-      where: 'code = ?',
-      whereArgs: [productCode],
+      where: 'id = ?',
+      whereArgs: [productId],
     );
+  }
+
+  Future<Product?> getProductByDesignation(String designation) async {
+    final db = await this.db;
+    var result = await db.query(
+      'products',
+      where: 'designation = ?',
+      whereArgs: [designation],
+    );
+    if (result.isNotEmpty) {
+      return Product.fromMap(result.first);
+    }
+    return null;
   }
 
   Future<void> deleteOrderLine(int idOrder, String idProduct) async {
@@ -1020,12 +1032,12 @@ class SqlDb {
     );
   }
 
-  Future<int> deleteVariant(String variantCode) async {
-    final dbClient = await db;
-    return await dbClient.delete(
+  Future<int> deleteVariant(int variantId) async {
+    final db = await this.db;
+    return await db.delete(
       'variants',
-      where: 'code = ?',
-      whereArgs: [variantCode],
+      where: 'id = ?',
+      whereArgs: [variantId],
     );
   }
 

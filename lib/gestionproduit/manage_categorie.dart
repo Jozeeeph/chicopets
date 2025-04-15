@@ -215,7 +215,8 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => ProductsToDeleteScreen(
-                      productCodes: productCodes,
+                      productIdentifiers:
+                          productCodes, // Changed from productCodes
                       onProductsDeleted: fetchCategories,
                     ),
                   ),

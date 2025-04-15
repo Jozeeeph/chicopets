@@ -62,36 +62,40 @@ class _ImportProductPageState extends State<ImportProductPage> {
               'Invalid Excel format. Please use the correct template.');
         }
 
-        // First pass: group all rows by product code (since multiple rows can be variants of same product)
-        Map<String, List<List<Data?>>> productRows = {};
+        // First pass: group all rows by product code or designation if code is empty
+        Map<String, List<List<Data?>>> productGroups = {};
         for (var row in sheet.rows.skip(1)) {
           String productCode = row[0]?.value?.toString() ?? '';
-          if (productCode.isNotEmpty) {
-            productRows.putIfAbsent(productCode, () => []).add(row);
-          }
+          String designation = row[1]?.value?.toString() ?? '';
+
+          if (designation.isEmpty) continue;
+
+          // Use designation as group key if code is empty
+          String groupKey = productCode.isNotEmpty ? productCode : designation;
+          productGroups.putIfAbsent(groupKey, () => []).add(row);
         }
 
-        // Process each product with all its variants
-        int totalProducts = productRows.length;
+        // Process each product group
+        int totalProducts = productGroups.length;
         int processedProducts = 0;
 
-        for (var entry in productRows.entries) {
+        for (var entry in productGroups.entries) {
           if (!_isImporting) break;
 
-          String productCode = entry.key;
+          String groupKey = entry.key;
           List<List<Data?>> rows = entry.value;
 
           try {
             // Use first row for product details
             var firstRow = rows.first;
 
+            String productCode = firstRow[0]?.value?.toString() ?? '';
             String designation = firstRow[1]?.value?.toString() ?? '';
             String description = firstRow[2]?.value?.toString() ?? '';
             double prixHT = _parseDouble(firstRow[3]?.value?.toString() ?? '0');
             double taxe = _parseDouble(firstRow[4]?.value?.toString() ?? '0');
             int productStock =
-                int.tryParse(firstRow[5]?.value?.toString() ?? '0') ??
-                    0; // NEW STOCK COLUMN
+                int.tryParse(firstRow[5]?.value?.toString() ?? '0') ?? 0;
             String categoryName = (firstRow[6]?.value?.toString() ?? '').trim();
             String subCategoryName =
                 (firstRow[7]?.value?.toString() ?? '').trim();
@@ -108,7 +112,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
             // Validate required fields
             if (designation.isEmpty) {
-              throw Exception('Missing designation for product $productCode');
+              throw Exception(
+                  'Missing designation for product group $groupKey');
             }
 
             // Handle empty category names
@@ -124,13 +129,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
             // Calculate prixTTC
             double prixTTC = prixHT * (1 + taxe / 100);
 
-            // Create product
+            // Create product - make code nullable if hasVariants is true
             final product = Product(
-              code: productCode,
+              code: hasVariants ? null : productCode, // Null if has variants
               designation: designation,
               description: description,
-              stock:
-                  productStock, // Initialize with the product stock from Excel
+              stock: hasVariants ? 0 : productStock, // 0 if has variants
               prixHT: prixHT,
               taxe: taxe,
               prixTTC: prixTTC,
@@ -148,11 +152,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
             // Handle variants if exists
             if (hasVariants) {
               List<Variant> allVariants = [];
-              int totalVariantStock =
-                  0; // To calculate the sum of variant stocks
 
               for (var row in rows) {
-                // Note: Column indexes increased by 1 because we added the Stock column at position 5
                 String variantCode = row[13]?.value?.toString() ?? '';
                 bool defaultVariant =
                     (row[14]?.value?.toString() ?? 'FALSE').toUpperCase() ==
@@ -165,15 +166,16 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 int variantStock =
                     int.tryParse(row[18]?.value?.toString() ?? '0') ?? 0;
 
+                // If variant code is empty but product has variants, generate one
                 if (variantCode.isEmpty) {
-                  throw Exception(
-                      'Missing variant code for product $productCode');
+                  variantCode =
+                      '${designation.replaceAll(' ', '_')}_${allVariants.length + 1}';
                 }
 
                 // Parse variant attributes
                 Map<String, String> attributes = {};
-                if (attributesStr.contains('/')) {
-                  List<String> attributePairs = attributesStr.split('/');
+                if (attributesStr.contains(',')) {
+                  List<String> attributePairs = attributesStr.split(',');
                   for (String pair in attributePairs) {
                     List<String> parts = pair.split(':');
                     if (parts.length == 2) {
@@ -185,7 +187,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 // Create variant
                 final variant = Variant(
                   code: variantCode,
-                  combinationName: attributesStr.replaceAll('/', ' - '),
+                  combinationName: attributesStr.replaceAll(',', ' - '),
                   price: variantPrice,
                   priceImpact: priceImpact,
                   stock: variantStock,
@@ -194,10 +196,9 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   productId: product.id ?? 0,
                 );
                 allVariants.add(variant);
-                totalVariantStock += variantStock; // Add to total stock
               }
 
-              // Insert product first (with initial stock from the Stock column)
+              // Insert product first
               product.id = await _sqlDb.addProduct(product);
 
               // Then insert all variants
@@ -209,14 +210,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   _importedVariantsCount++;
                 });
               }
-
-              // Update product stock with sum of variant stocks (overriding the initial stock value)
-              product.stock = totalVariantStock;
-              print("product imported $product");
-              await _sqlDb.updateProductWithoutId(product); 
             } else {
-              // For products without variants - take stock from the Stock column (position 5)
-              product.stock =int.tryParse(firstRow[5]?.value?.toString() ?? '0') ?? 0;
+              // For products without variants
               product.id = await _sqlDb.addProduct(product);
             }
 
@@ -227,7 +222,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
             });
           } catch (e) {
             debugPrint(
-                'Error processing product $productCode: ${e.toString()}');
+                'Error processing product group $groupKey: ${e.toString()}');
             processedProducts++;
             continue;
           }

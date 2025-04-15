@@ -9,8 +9,9 @@ import 'package:image_picker/image_picker.dart';
 
 class AddCategory extends StatefulWidget {
   final Future<void> Function() onCategoryAdded;
-  
-  const AddCategory({Key? key, required this.onCategoryAdded}) : super(key: key);
+
+  const AddCategory({Key? key, required this.onCategoryAdded})
+      : super(key: key);
 
   @override
   _AddCategoryState createState() => _AddCategoryState();
@@ -27,9 +28,11 @@ class _AddCategoryState extends State<AddCategory> {
 
   // Controllers and state
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _subCategoryNameController = TextEditingController();
-  final TextEditingController _editSubCategoryController = TextEditingController();
-  
+  final TextEditingController _subCategoryNameController =
+      TextEditingController();
+  final TextEditingController _editSubCategoryController =
+      TextEditingController();
+
   File? _selectedImage;
   final SqlDb _sqldb = SqlDb();
   bool _isVisible = false;
@@ -84,8 +87,9 @@ class _AddCategoryState extends State<AddCategory> {
 
   Future<void> _fetchSubCategories(int categoryId) async {
     try {
-      final fetchedSubCategories = await _sqldb.getSubCategoriesByCategory(categoryId);
-      
+      final fetchedSubCategories =
+          await _sqldb.getSubCategoriesByCategory(categoryId);
+
       setState(() {
         _subCategories = fetchedSubCategories.map((map) {
           return SubCategory(
@@ -103,7 +107,8 @@ class _AddCategoryState extends State<AddCategory> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -132,7 +137,8 @@ class _AddCategoryState extends State<AddCategory> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Choisir la source de l'image"),
-          content: const Text("Voulez-vous choisir une image depuis la galerie ou depuis votre appareil ?"),
+          content: const Text(
+              "Voulez-vous choisir une image depuis la galerie ou depuis votre appareil ?"),
           actions: [
             TextButton(
               onPressed: () {
@@ -161,13 +167,15 @@ class _AddCategoryState extends State<AddCategory> {
     }
 
     try {
-      final categoryId = await _sqldb.addCategory(_nameController.text, _selectedImage!.path);
+      final categoryId =
+          await _sqldb.addCategory(_nameController.text, _selectedImage!.path);
       if (categoryId > 0) {
         final sortedSubCategories = _sortSubCategoriesByParent(_subCategories);
         final tempIdToRealId = <int, int>{};
 
         // Add parent subcategories first
-        for (final subCategory in sortedSubCategories.where((sc) => sc.parentId == null)) {
+        for (final subCategory
+            in sortedSubCategories.where((sc) => sc.parentId == null)) {
           final subCategoryId = await _sqldb.addSubCategory(
             SubCategory(
               name: subCategory.name,
@@ -179,7 +187,8 @@ class _AddCategoryState extends State<AddCategory> {
         }
 
         // Then add child subcategories
-        for (final subCategory in sortedSubCategories.where((sc) => sc.parentId != null)) {
+        for (final subCategory
+            in sortedSubCategories.where((sc) => sc.parentId != null)) {
           final realParentId = tempIdToRealId[subCategory.parentId] ?? -1;
           if (realParentId != -1) {
             await _sqldb.addSubCategory(
@@ -205,13 +214,14 @@ class _AddCategoryState extends State<AddCategory> {
     }
   }
 
-  List<SubCategory> _sortSubCategoriesByParent(List<SubCategory> subCategories) {
+  List<SubCategory> _sortSubCategoriesByParent(
+      List<SubCategory> subCategories) {
     final sortedSubCategories = <SubCategory>[];
     final remainingSubCategories = List<SubCategory>.from(subCategories);
 
     while (remainingSubCategories.isNotEmpty) {
       for (final subCategory in remainingSubCategories.toList()) {
-        if (subCategory.parentId == null || 
+        if (subCategory.parentId == null ||
             sortedSubCategories.any((sc) => sc.id == subCategory.parentId)) {
           sortedSubCategories.add(subCategory);
           remainingSubCategories.remove(subCategory);
@@ -248,7 +258,8 @@ class _AddCategoryState extends State<AddCategory> {
           } else {
             final updateResult = await _sqldb.updateSubCategory(subCategory);
             if (updateResult <= 0) {
-              _showMessage("Échec de la mise à jour de la sous-catégorie: ${subCategory.name}");
+              _showMessage(
+                  "Échec de la mise à jour de la sous-catégorie: ${subCategory.name}");
             }
           }
         }
@@ -315,9 +326,10 @@ class _AddCategoryState extends State<AddCategory> {
     }
 
     final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => _buildConfirmDeleteDialog(context),
-    ) ?? false;
+          context: context,
+          builder: (context) => _buildConfirmDeleteDialog(context),
+        ) ??
+        false;
 
     if (confirm) {
       final result = await _sqldb.deleteSubCategory(subCategoryId);
@@ -334,7 +346,8 @@ class _AddCategoryState extends State<AddCategory> {
     }
   }
 
-  Widget _buildDeleteBlockedDialog(BuildContext context, List<String> productCodes) {
+  Widget _buildDeleteBlockedDialog(
+      BuildContext context, List<String> productCodes) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Column(
@@ -360,7 +373,8 @@ class _AddCategoryState extends State<AddCategory> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
-              Icon(Icons.subdirectory_arrow_right, size: 16, color: Colors.blueGrey),
+              Icon(Icons.subdirectory_arrow_right,
+                  size: 16, color: Colors.blueGrey),
               SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -385,7 +399,8 @@ class _AddCategoryState extends State<AddCategory> {
                 const SizedBox(width: 6),
                 Text(
                   "${productCodes.length} produit(s) concerné(s)",
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -408,7 +423,7 @@ class _AddCategoryState extends State<AddCategory> {
               context,
               MaterialPageRoute(
                 builder: (context) => ProductsToDeleteScreen(
-                  productCodes: productCodes,
+                  productIdentifiers: productCodes, // Changed from productCodes
                   onProductsDeleted: () {
                     if (_selectedCategoryId != null) {
                       _fetchSubCategories(_selectedCategoryId!);
@@ -444,7 +459,8 @@ class _AddCategoryState extends State<AddCategory> {
         TextButton(
           onPressed: () => Navigator.pop(context, true),
           style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text("Supprimer", style: TextStyle(fontWeight: FontWeight.bold)),
+          child: const Text("Supprimer",
+              style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -454,31 +470,33 @@ class _AddCategoryState extends State<AddCategory> {
     _editSubCategoryController.text = subCategory.name;
 
     final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Modifier la sous-catégorie"),
-        content: TextFormField(
-          controller: _editSubCategoryController,
-          decoration: const InputDecoration(labelText: 'Nom de la sous-catégorie'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Annuler"),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Modifier la sous-catégorie"),
+            content: TextFormField(
+              controller: _editSubCategoryController,
+              decoration:
+                  const InputDecoration(labelText: 'Nom de la sous-catégorie'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Annuler"),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (_editSubCategoryController.text.isEmpty) {
+                    _showMessage("Veuillez entrer un nom valide");
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
+                child: const Text("Enregistrer"),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              if (_editSubCategoryController.text.isEmpty) {
-                _showMessage("Veuillez entrer un nom valide");
-                return;
-              }
-              Navigator.pop(context, true);
-            },
-            child: const Text("Enregistrer"),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     if (result && mounted) {
       setState(() {
@@ -522,7 +540,9 @@ class _AddCategoryState extends State<AddCategory> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _categoryToEdit == null ? 'Ajouter une catégorie' : 'Modifier la catégorie',
+          _categoryToEdit == null
+              ? 'Ajouter une catégorie'
+              : 'Modifier la catégorie',
           style: const TextStyle(color: white),
         ),
         backgroundColor: deepBlue,
@@ -695,7 +715,8 @@ class _AddCategoryState extends State<AddCategory> {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: DropdownButton<int>(
                     value: _selectedParentSubCategoryId,
-                    hint: const Text('Parent', style: TextStyle(color: darkBlue)),
+                    hint:
+                        const Text('Parent', style: TextStyle(color: darkBlue)),
                     icon: const Icon(Icons.arrow_drop_down, color: deepBlue),
                     underline: const SizedBox(),
                     items: [
@@ -703,7 +724,8 @@ class _AddCategoryState extends State<AddCategory> {
                         value: null,
                         child: Row(
                           children: [
-                            Icon(Icons.horizontal_rule, size: 20, color: darkBlue),
+                            Icon(Icons.horizontal_rule,
+                                size: 20, color: darkBlue),
                             SizedBox(width: 4),
                             Text('Aucun parent'),
                           ],
@@ -813,7 +835,8 @@ class _AddCategoryState extends State<AddCategory> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: deepBlue),
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       ),
     );
   }
@@ -840,7 +863,8 @@ class SubCategoryTree extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final children = subCategories.where((sc) => sc.parentId == parentId).toList();
+    final children =
+        subCategories.where((sc) => sc.parentId == parentId).toList();
     if (children.isEmpty) return const SizedBox.shrink();
 
     return ListView.builder(
@@ -861,7 +885,9 @@ class SubCategoryTree extends StatelessWidget {
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 leading: Icon(
-                  parentId == null ? Icons.folder : Icons.subdirectory_arrow_right,
+                  parentId == null
+                      ? Icons.folder
+                      : Icons.subdirectory_arrow_right,
                   color: deepBlue,
                 ),
                 title: Text(
