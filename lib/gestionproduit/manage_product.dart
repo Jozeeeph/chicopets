@@ -158,7 +158,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
 
   Future<void> _deleteProducts(List<Product> products) async {
     for (var product in products) {
-      await sqldb.deleteProduct(product.code ?? '');
+      await sqldb.deleteProductById(product.id ?? 0);
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
