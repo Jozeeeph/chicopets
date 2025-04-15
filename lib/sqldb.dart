@@ -1412,4 +1412,78 @@ class SqlDb {
       print('Associated client: ${client.isNotEmpty ? client.first : 'None'}');
     }
   }
+
+  Future<List<Order>> getClientOrders(int clientId) async {
+    final dbClient = await db;
+    final List<Map<String, dynamic>> orderMaps = await dbClient.query(
+      'orders',
+      where: 'id_client = ?',
+      whereArgs: [clientId],
+      orderBy: 'date DESC',
+    );
+
+    List<Order> orders = [];
+    for (var orderMap in orderMaps) {
+      int orderId = orderMap['id_order'];
+      List<Map<String, dynamic>> itemMaps = await dbClient.query(
+        'order_items',
+        where: 'id_order = ?',
+        whereArgs: [orderId],
+      );
+
+      List<OrderLine> orderLines = itemMaps.map((itemMap) {
+        return OrderLine(
+          idOrder: orderId,
+          idProduct: itemMap['product_code'],
+          quantite: itemMap['quantity'],
+          prixUnitaire: itemMap['prix_unitaire'],
+          discount: itemMap['discount'],
+          isPercentage: itemMap['isPercentage'] == 1,
+        );
+      }).toList();
+
+      orders.add(Order(
+        idOrder: orderId,
+        date: orderMap['date'],
+        orderLines: orderLines,
+        total: orderMap['total'],
+        modePaiement: orderMap['mode_paiement'],
+        status: orderMap['status'],
+        remainingAmount: orderMap['remaining_amount'],
+        globalDiscount: orderMap['global_discount'],
+        isPercentageDiscount: orderMap['is_percentage_discount'] == 1,
+        idClient: clientId,
+      ));
+    }
+
+    return orders;
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsPurchasedByClient(
+      int clientId) async {
+    final dbClient = await db;
+    return await dbClient.rawQuery('''
+    SELECT 
+      p.designation,
+      SUM(oi.quantity) as total_quantity,
+      SUM(
+        CASE 
+          WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
+          ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
+        END
+      ) as total_spent
+    FROM 
+      order_items oi
+    JOIN 
+      products p ON oi.product_code = p.code
+    JOIN 
+      orders o ON oi.id_order = o.id_order
+    WHERE 
+      o.id_client = ?
+    GROUP BY 
+      p.designation
+    ORDER BY 
+      total_quantity DESC
+  ''', [clientId]);
+  }
 }

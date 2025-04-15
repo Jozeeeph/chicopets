@@ -3,6 +3,7 @@ import 'package:caissechicopets/client.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/client_form.dart';
 import 'package:flutter/animation.dart';
+import 'package:caissechicopets/order.dart';
 
 class ClientManagementWidget extends StatefulWidget {
   final Function(Client)? onClientSelected;
@@ -14,13 +15,15 @@ class ClientManagementWidget extends StatefulWidget {
   final Color softOrange = const Color(0xFFFF9800);
   final Color warmRed = const Color(0xFFE53935);
 
-  const ClientManagementWidget({Key? key, this.onClientSelected}) : super(key: key);
+  const ClientManagementWidget({Key? key, this.onClientSelected})
+      : super(key: key);
 
   @override
   _ClientManagementWidgetState createState() => _ClientManagementWidgetState();
 }
 
-class _ClientManagementWidgetState extends State<ClientManagementWidget> with SingleTickerProviderStateMixin {
+class _ClientManagementWidgetState extends State<ClientManagementWidget>
+    with SingleTickerProviderStateMixin {
   final SqlDb _sqlDb = SqlDb();
   List<Client> _clients = [];
   List<Client> _filteredClients = [];
@@ -75,6 +78,136 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
             client.phoneNumber.contains(query);
       }).toList();
     });
+  }
+
+  void _showClientOrders(BuildContext context, Client client) async {
+    final orders = await _sqlDb.getClientOrders(client.id!);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Commandes de ${client.name} ${client.firstName}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: orders.isEmpty
+              ? Center(child: Text('Aucune commande pour ce client'))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: Icon(Icons.receipt, color: widget.deepBlue),
+                        title: Text('Commande #${order.idOrder}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${order.total.toStringAsFixed(2)} DT'),
+                            Text('${order.status}'),
+                            Text('${order.date}'),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: Icon(Icons.info, color: widget.softOrange),
+                          onPressed: () => _showOrderDetails(context, order),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrderDetails(BuildContext context, Order order) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Détails de la commande #${order.idOrder}'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Date: ${order.date}'),
+              Text('Total: ${order.total.toStringAsFixed(2)} DT'),
+              Text('Statut: ${order.status}'),
+              Text('Mode de paiement: ${order.modePaiement}'),
+              if (order.remainingAmount > 0)
+                Text(
+                    'Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT'),
+              SizedBox(height: 16),
+              Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
+              ...order.orderLines.map((line) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text('- ${line.idProduct} x${line.quantite}'),
+                  )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClientProducts(BuildContext context, Client client) async {
+    final products = await _sqlDb.getProductsPurchasedByClient(client.id!);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Produits achetés par ${client.name} ${client.firstName}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: products.isEmpty
+              ? Center(child: Text('Aucun produit acheté'))
+              : SingleChildScrollView(
+                  child: DataTable(
+                    columns: [
+                      DataColumn(label: Text('Produit')),
+                      DataColumn(
+                          label: Text('Quantité', textAlign: TextAlign.end)),
+                      DataColumn(
+                          label:
+                              Text('Total dépensé', textAlign: TextAlign.end)),
+                    ],
+                    rows: products.map((product) {
+                      return DataRow(cells: [
+                        DataCell(Text(product['designation'] ?? 'Inconnu')),
+                        DataCell(Text(
+                          product['total_quantity'].toString(),
+                          textAlign: TextAlign.end,
+                        )),
+                        DataCell(Text(
+                          '${product['total_spent']?.toStringAsFixed(2) ?? '0.00'} DT',
+                          textAlign: TextAlign.end,
+                        )),
+                      ]);
+                    }).toList(),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showClientForm([Client? client]) {
@@ -136,7 +269,8 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: Text('Confirmer la suppression', style: TextStyle(color: widget.darkBlue)),
+        title: Text('Confirmer la suppression',
+            style: TextStyle(color: widget.darkBlue)),
         content: Text('Voulez-vous vraiment supprimer ce client ?'),
         actions: [
           TextButton(
@@ -186,7 +320,8 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
               controller: _searchController,
               decoration: InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                contentPadding:
+                    EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                 hintText: 'Rechercher un client...',
                 prefixIcon: Icon(Icons.search, color: widget.deepBlue),
                 suffixIcon: _searchController.text.isNotEmpty
@@ -223,9 +358,11 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.people_outline, size: 60, color: widget.lightGray),
+                        Icon(Icons.people_outline,
+                            size: 60, color: widget.lightGray),
                         SizedBox(height: 16),
-                        Text('Aucun client trouvé', style: TextStyle(color: widget.darkBlue)),
+                        Text('Aucun client trouvé',
+                            style: TextStyle(color: widget.darkBlue)),
                       ],
                     ),
                   )
@@ -249,21 +386,26 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
                               content: Text('Supprimer ce client ?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(false),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
                                   child: Text('Non'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.of(context).pop(true),
-                                  child: Text('Oui', style: TextStyle(color: widget.warmRed)),
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: Text('Oui',
+                                      style: TextStyle(color: widget.warmRed)),
                                 ),
                               ],
                             ),
                           );
                         },
                         onDismissed: (direction) => _deleteClient(client.id!),
-                        child: Card(
+                        child: // Dans la méthode build, remplacez le Card actuel par :
+                            Card(
                           elevation: 4,
-                          margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                          margin:
+                              EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -288,20 +430,48 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
                                   SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          '${client.name} ${client.firstName}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: widget.darkBlue,
-                                            fontSize: 16,
-                                          ),
+                                        Row(
+                                          children: [
+                                            // Icône pour afficher les commandes
+                                            GestureDetector(
+                                              onTap: () => _showClientOrders(
+                                                  context, client),
+                                              child: Icon(
+                                                Icons.receipt,
+                                                color: widget.deepBlue,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            // Icône pour afficher les produits achetés
+                                            GestureDetector(
+                                              onTap: () => _showClientProducts(
+                                                  context, client),
+                                              child: Icon(
+                                                Icons.shopping_basket,
+                                                color: widget.softOrange,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              '${client.name} ${client.firstName}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: widget.darkBlue,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         SizedBox(height: 4),
                                         Text(
                                           client.phoneNumber,
-                                          style: TextStyle(color: Colors.grey[600]),
+                                          style: TextStyle(
+                                              color: Colors.grey[600]),
                                         ),
                                       ],
                                     ),
@@ -311,14 +481,18 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> with Si
                                     children: [
                                       if (widget.onClientSelected != null)
                                         IconButton(
-                                          icon: Icon(Icons.check_circle, color: widget.tealGreen),
+                                          icon: Icon(Icons.check_circle,
+                                              color: widget.tealGreen),
                                           onPressed: () {
-                                            widget.onClientSelected?.call(client);
+                                            widget.onClientSelected
+                                                ?.call(client);
                                           },
                                         ),
                                       IconButton(
-                                        icon: Icon(Icons.edit, color: widget.softOrange),
-                                        onPressed: () => _showClientForm(client),
+                                        icon: Icon(Icons.edit,
+                                            color: widget.softOrange),
+                                        onPressed: () =>
+                                            _showClientForm(client),
                                       ),
                                     ],
                                   ),
