@@ -5,6 +5,7 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/client.dart';
 import 'package:caissechicopets/client_management.dart';
+import 'package:caissechicopets/gestioncommande/getorderlist.dart'; // Add this import
 
 class Addorder {
   static void _showClientSelection(
@@ -41,6 +42,7 @@ class Addorder {
     List<bool> typeDiscounts,
   ) async {
     Client? selectedClient;
+    int numberOfTickets = 1;
 
     print("seee ${selectedProducts.length}");
 
@@ -516,282 +518,315 @@ class Addorder {
                       // Colonne de droite - Options de paiement
                       Expanded(
                         flex: 5, // 40% de l'espace
-                        child: Column(
-                          children: [
-                            // Sélection du client
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.person,
-                                      color: Colors.blue, size: 24),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Client',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                        Text(
-                                          selectedClient != null
-                                              ? '${selectedClient!.name} ${selectedClient!.firstName}'
-                                              : 'Non spécifié',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                        selectedClient != null
-                                            ? Icons.edit
-                                            : Icons.add_circle_outline,
-                                        color: Colors.blue),
-                                    onPressed: () {
-                                      _showClientSelection(context, (client) {
-                                        setState(() {
-                                          selectedClient = client;
-                                        });
-                                      });
-                                    },
-                                    tooltip: 'Sélectionner un client',
-                                  ),
-                                ],
-                              ),
+                        child: Column(children: [
+                          // Sélection du client
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
                             ),
-
-                            SizedBox(height: 16),
-
-                            // Remise Globale (si aucune remise produit)
-                            if (!discounts.any((discount) => discount > 0))
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("Remise Globale:",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  SizedBox(height: 8),
-                                  Text("Type de Remise:",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  Row(
+                            child: Row(
+                              children: [
+                                Icon(Icons.person,
+                                    color: Colors.blue, size: 24),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Radio(
-                                        value: true,
-                                        groupValue: isPercentageDiscount,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            isPercentageDiscount =
-                                                value as bool;
-                                            globalDiscountController.text = '';
-                                            globalDiscountValueController.text =
-                                                '';
-                                            updateTotalAndChange();
-                                          });
-                                        },
+                                      Text(
+                                        'Client',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
                                       ),
-                                      Text("Pourcentage"),
-                                      Radio(
-                                        value: false,
-                                        groupValue: isPercentageDiscount,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            isPercentageDiscount =
-                                                value as bool;
-                                            globalDiscountController.text = '';
-                                            globalDiscountValueController.text =
-                                                '';
-                                            updateTotalAndChange();
-                                          });
-                                        },
+                                      Text(
+                                        selectedClient != null
+                                            ? '${selectedClient!.name} ${selectedClient!.firstName}'
+                                            : 'Non spécifié',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      Text("Valeur (DT)"),
                                     ],
                                   ),
-                                  SizedBox(height: 16),
-                                  if (isPercentageDiscount)
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        TextField(
-                                          controller: globalDiscountController,
-                                          keyboardType: TextInputType.number,
-                                          decoration: InputDecoration(
-                                            labelText: "Remise Globale (%)",
-                                            border: OutlineInputBorder(),
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              globalDiscount =
-                                                  double.tryParse(value) ?? 0.0;
-                                              updateTotalAndChange();
-                                            });
-                                          },
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  if (!isPercentageDiscount)
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        TextField(
-                                          controller:
-                                              globalDiscountValueController,
-                                          keyboardType: TextInputType.number,
-                                          decoration: InputDecoration(
-                                            labelText: "Remise Globale (DT)",
-                                            border: OutlineInputBorder(),
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              globalDiscountValue =
-                                                  double.tryParse(value) ?? 0.0;
-                                              updateTotalAndChange();
-                                            });
-                                          },
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                ],
-                              ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                      selectedClient != null
+                                          ? Icons.edit
+                                          : Icons.add_circle_outline,
+                                      color: Colors.blue),
+                                  onPressed: () {
+                                    _showClientSelection(context, (client) {
+                                      setState(() {
+                                        selectedClient = client;
+                                      });
+                                    });
+                                  },
+                                  tooltip: 'Sélectionner un client',
+                                ),
+                              ],
+                            ),
+                          ),
 
-                            SizedBox(height: 16),
+                          SizedBox(height: 16),
 
-                            // Mode de paiement
+                          // Remise Globale (si aucune remise produit)
+                          if (!discounts.any((discount) => discount > 0))
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Mode de Paiement:",
+                                Text("Remise Globale:",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                SizedBox(height: 8),
+                                Text("Type de Remise:",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
                                 Row(
                                   children: [
-                                    Radio<String>(
-                                      value: "Espèce",
-                                      groupValue: selectedPaymentMethod,
+                                    Radio(
+                                      value: true,
+                                      groupValue: isPercentageDiscount,
                                       onChanged: (value) {
                                         setState(() {
-                                          selectedPaymentMethod = value!;
+                                          isPercentageDiscount = value as bool;
+                                          globalDiscountController.text = '';
+                                          globalDiscountValueController.text =
+                                              '';
+                                          updateTotalAndChange();
                                         });
                                       },
                                     ),
-                                    Text("Espèce"),
-                                    Radio<String>(
-                                      value: "TPE",
-                                      groupValue: selectedPaymentMethod,
+                                    Text("Pourcentage"),
+                                    Radio(
+                                      value: false,
+                                      groupValue: isPercentageDiscount,
                                       onChanged: (value) {
                                         setState(() {
-                                          selectedPaymentMethod = value!;
+                                          isPercentageDiscount = value as bool;
+                                          globalDiscountController.text = '';
+                                          globalDiscountValueController.text =
+                                              '';
+                                          updateTotalAndChange();
                                         });
                                       },
                                     ),
-                                    Text("TPE"),
-                                    Radio<String>(
-                                      value: "Chèque",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Chèque"),
+                                    Text("Valeur (DT)"),
                                   ],
                                 ),
+                                SizedBox(height: 16),
+                                if (isPercentageDiscount)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      TextField(
+                                        controller: globalDiscountController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Remise Globale (%)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            globalDiscount =
+                                                double.tryParse(value) ?? 0.0;
+                                            updateTotalAndChange();
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                if (!isPercentageDiscount)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      TextField(
+                                        controller:
+                                            globalDiscountValueController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Remise Globale (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            globalDiscountValue =
+                                                double.tryParse(value) ?? 0.0;
+                                            updateTotalAndChange();
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                               ],
                             ),
 
-                            SizedBox(height: 16),
+                          SizedBox(height: 16),
 
-                            // Montant donné et rendu
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextField(
-                                  controller: amountGivenController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    labelText: "Montant donné (DT)",
-                                    border: OutlineInputBorder(),
+                          // Mode de paiement
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("Mode de Paiement:",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  Radio<String>(
+                                    value: "Espèce",
+                                    groupValue: selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPaymentMethod = value!;
+                                      });
+                                    },
                                   ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      String cleanedValue = cleanInput(value);
-                                      if (cleanedValue == 'NEGATIVE') {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              "Veuillez entrer un nombre positif.",
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                            backgroundColor: Colors.red,
+                                  Text("Espèce"),
+                                  Radio<String>(
+                                    value: "TPE",
+                                    groupValue: selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPaymentMethod = value!;
+                                      });
+                                    },
+                                  ),
+                                  Text("TPE"),
+                                  Radio<String>(
+                                    value: "Chèque",
+                                    groupValue: selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPaymentMethod = value!;
+                                      });
+                                    },
+                                  ),
+                                  Text("Chèque"),
+                                ],
+                              ),
+                            ],
+                          ),
+
+                          SizedBox(height: 16),
+
+                          // Montant donné et rendu
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TextField(
+                                controller: amountGivenController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Montant donné (DT)",
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    String cleanedValue = cleanInput(value);
+                                    if (cleanedValue == 'NEGATIVE') {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            "Veuillez entrer un nombre positif.",
+                                            style:
+                                                TextStyle(color: Colors.white),
                                           ),
-                                        );
-                                        amountGivenController.text = '';
-                                        return;
-                                      }
-                                      amountGivenController.text = cleanedValue;
-                                      amountGivenController.selection =
-                                          TextSelection.fromPosition(
-                                        TextPosition(
-                                            offset: cleanedValue.length),
+                                          backgroundColor: Colors.red,
+                                        ),
                                       );
-                                      amountGiven =
-                                          double.tryParse(cleanedValue) ?? 0.0;
-                                      changeReturned = amountGiven - total;
-                                      changeReturnedController.text =
-                                          changeReturned.toStringAsFixed(2);
-                                    });
-                                  },
+                                      amountGivenController.text = '';
+                                      return;
+                                    }
+                                    amountGivenController.text = cleanedValue;
+                                    amountGivenController.selection =
+                                        TextSelection.fromPosition(
+                                      TextPosition(offset: cleanedValue.length),
+                                    );
+                                    amountGiven =
+                                        double.tryParse(cleanedValue) ?? 0.0;
+                                    changeReturned = amountGiven - total;
+                                    changeReturnedController.text =
+                                        changeReturned.toStringAsFixed(2);
+                                  });
+                                },
+                              ),
+                              SizedBox(height: 10),
+                              TextField(
+                                controller: changeReturnedController,
+                                readOnly: true,
+                                decoration: InputDecoration(
+                                  labelText: "Monnaie rendue (DT)",
+                                  border: OutlineInputBorder(),
                                 ),
-                                SizedBox(height: 10),
-                                TextField(
-                                  controller: changeReturnedController,
-                                  readOnly: true,
-                                  decoration: InputDecoration(
-                                    labelText: "Monnaie rendue (DT)",
-                                    border: OutlineInputBorder(),
+                              ),
+                              SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Text("Nombre de tickets à imprimer:",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 10),
+                                  Container(
+                                    width: 40, // réduit la largeur
+                                    height: 35,
+                                    child: TextField(
+                                      controller: TextEditingController(
+                                          text: numberOfTickets.toString()),
+                                      keyboardType: TextInputType.number,
+                                      style: TextStyle(
+                                          fontSize:
+                                              14), // réduit la taille du texte
+                                      decoration: InputDecoration(
+                                        isDense:
+                                            true, // rend le champ plus compact
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical:
+                                                6), // réduit les marges internes
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          numberOfTickets =
+                                              int.tryParse(value) ?? 1;
+                                          if (numberOfTickets < 1)
+                                            numberOfTickets = 1;
+                                        });
+                                      },
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ]),
+                      )
                     ],
                   ),
                 ),
@@ -800,7 +835,7 @@ class Addorder {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(
-                    "Annuler",
+                    "Fermer",
                     style: TextStyle(color: Color(0xFFE53935)),
                   ),
                 ),
@@ -819,7 +854,8 @@ class Addorder {
                           ? globalDiscount
                           : globalDiscountValue,
                       isPercentageDiscount,
-                      selectedClient
+                      selectedClient,
+                      numberOfTickets, // Ajout du paramètre
                     );
                   },
                   child: Text(
@@ -868,6 +904,7 @@ class Addorder {
     double globalDiscount,
     bool isPercentageDiscount,
     Client? selectedClient,
+    int numberOfTickets, // Nouveau paramètre
   ) async {
     if (!isPercentageDiscount &&
         globalDiscount >
@@ -966,6 +1003,47 @@ class Addorder {
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
 
+        // Créer la commande complète avec son ID
+        Order completeOrder = Order(
+          idOrder: orderId,
+          date: order.date,
+          orderLines: order.orderLines,
+          total: order.total,
+          modePaiement: order.modePaiement,
+          status: order.status,
+          remainingAmount: order.remainingAmount,
+          globalDiscount: order.globalDiscount,
+          isPercentageDiscount: order.isPercentageDiscount,
+          idClient: order.idClient,
+        );
+
+        // Générer les tickets PDF
+        for (int i = 0; i < numberOfTickets; i++) {
+          await Getorderlist.generateAndSavePDF(context, completeOrder);
+        }
+
+        // Afficher notification de succès
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                "Commande #$orderId confirmée et ${numberOfTickets > 1 ? '$numberOfTickets tickets' : '1 ticket'} généré(s)"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+
+        // Vérification du stock
         bool isValidOrder = true;
         for (int i = 0; i < selectedProducts.length; i++) {
           if (selectedProducts[i].stock == 0) {
@@ -981,7 +1059,7 @@ class Addorder {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                    "Stock insuffisant ! Il ne reste que ${selectedProducts[i].stock} de ${selectedProducts[i].designation}."),
+                    "Stock insuffisant pour ${selectedProducts[i].designation} (reste: ${selectedProducts[i].stock})"),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -989,33 +1067,26 @@ class Addorder {
           }
         }
 
-        if (!isValidOrder) {
-          return;
+        if (isValidOrder) {
+          // Mettre à jour les stocks
+          for (int i = 0; i < selectedProducts.length; i++) {
+            selectedProducts[i].stock -= quantityProducts[i];
+            await SqlDb().updateProductStock(
+                selectedProducts[i].code ?? '', selectedProducts[i].stock);
+          }
         }
 
-        for (int i = 0; i < selectedProducts.length; i++) {
-          selectedProducts[i].stock -= quantityProducts[i];
-          await SqlDb().updateProductStock(
-              selectedProducts[i].code ?? '', selectedProducts[i].stock);
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Commande passée avec succès !"),
-            backgroundColor: Colors.green,
-          ),
-        );
-
+        // Vider les listes
         selectedProducts.clear();
         quantityProducts.clear();
         discounts.clear();
         typeDiscounts.clear();
       } else {
-        print("Failed to save order.");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Erreur lors de l'enregistrement de la commande."),
+            content: Text("Échec de l'enregistrement de la commande"),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -1023,8 +1094,9 @@ class Addorder {
       print("Error saving order: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Erreur lors de l'enregistrement de la commande: $e"),
+          content: Text("Erreur: ${e.toString()}"),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
         ),
       );
     }
