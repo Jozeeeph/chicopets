@@ -111,7 +111,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
             : '';
 
         final product = Product(
-          code: codeController.text.trim(),
+          code: codeController.text.trim().isNotEmpty
+              ? codeController.text.trim()
+              : null,
           designation: designationController.text.trim(),
           description: descriptionController.text.trim(),
           stock: int.parse(stockController.text),
@@ -168,38 +170,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
     });
   }
 
-  void calculateValues() {
+  void calculateValues({String? changedField}) {
     double prixAchatHT = double.tryParse(priceHTController.text) ?? 0.0;
     double marge = double.tryParse(margeController.text) ?? 0.0;
+    double prixVenteHT = double.tryParse(priceVenteHTController.text) ?? 0.0;
     double taxe = double.tryParse(taxController.text) ?? 0.0;
-    double profit = double.tryParse(profitController.text) ?? 0.0;
 
-    if (priceHTController.text.isNotEmpty) {
-      if (margeController.text.isNotEmpty) {
-        double prixVenteHT = prixAchatHT * (1 + marge / 100);
-        priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
+    if (prixAchatHT <= 0)
+      return; // On a besoin du prix d'achat pour tous les calculs
 
-        profitController.text = (prixVenteHT - prixAchatHT).toStringAsFixed(2);
-
-        double prixTTC = prixVenteHT * (1 + taxe / 100);
-        priceTTCController.text = prixTTC.toStringAsFixed(2);
-      } else if (profitController.text.isNotEmpty) {
-        double prixVenteHT = prixAchatHT + profit;
-        priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
-
-        margeController.text =
-            ((profit / prixAchatHT) * 100).toStringAsFixed(2);
-
-        double prixTTC = prixVenteHT * (1 + taxe / 100);
-        priceTTCController.text = prixTTC.toStringAsFixed(2);
-      }
+    if (changedField == 'marge') {
+      // Calcul basé sur la marge (%)
+      prixVenteHT = prixAchatHT * (1 + marge / 100);
+      priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
+    } else if (changedField == 'prixVenteHT') {
+      // Calcul basé sur le prix de vente HT
+      marge = ((prixVenteHT - prixAchatHT) / prixAchatHT) * 100;
+      margeController.text = marge.toStringAsFixed(2);
     }
-    if (taxController.text.isNotEmpty &&
-        priceVenteHTController.text.isNotEmpty) {
-      double prixVenteHT = double.tryParse(priceVenteHTController.text) ?? 0.0;
-      double prixTTC = prixVenteHT * (1 + taxe / 100);
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
-    }
+
+    // Calcul du profit (identique dans les deux cas)
+    double profit = prixVenteHT - prixAchatHT;
+    profitController.text = profit.toStringAsFixed(2);
+
+    // Calcul du prix TTC
+    double prixTTC = prixVenteHT * (1 + taxe / 100);
+    priceTTCController.text = prixTTC.toStringAsFixed(2);
   }
 
   @override
@@ -299,18 +295,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       _buildTextFormField(
                         controller: codeController,
                         label: 'Code à Barre', // Ajouté (optionnel)
-                        validator: (value) {
-                          if (value != null && value.isNotEmpty) {
-                            // Seulement valider si non vide
-                            if (int.tryParse(value) == null) {
-                              return 'Le "Code à Barre" doit être un nombre.';
-                            }
-                            if (int.parse(value) < 0) {
-                              return 'Le "Code à Barre" doit être un nombre positif.';
-                            }
-                          }
-                          return null; // Accepte null ou vide
-                        },
+                        // validator: (value) {
+                        //   if (value != null && value.isNotEmpty) {
+                        //     // Seulement valider si non vide
+                        //     if (int.tryParse(value) == null) {
+                        //       return 'Le "Code à Barre" doit être un nombre.';
+                        //     }
+                        //     if (int.parse(value) < 0) {
+                        //       return 'Le "Code à Barre" doit être un nombre positif.';
+                        //     }
+                        //   }
+                        //   return null; // Accepte null ou vide
+                        // },
                       ),
                       _buildTextFormField(
                         controller: designationController,
@@ -369,13 +365,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                           SizedBox(width: 10),
                           Expanded(
-                            child: TextFormField(
+                            child: _buildTextFormField(
                               controller: priceVenteHTController,
-                              decoration: _inputDecoration('Prix Vente HT'),
+                              label: 'Prix Vente HT',
                               keyboardType: TextInputType.numberWithOptions(
                                   decimal: true),
-                              enabled: false,
-                              style: TextStyle(color: Colors.grey[800]),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Ce champ est obligatoire';
+                                }
+                                if (double.tryParse(value) == null) {
+                                  return 'Nombre invalide';
+                                }
+                                return null;
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty &&
+                                    double.tryParse(value) != null) {
+                                  calculateValues(changedField: 'prixVenteHT');
+                                }
+                              },
                             ),
                           ),
                           SizedBox(width: 10),
@@ -400,13 +409,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               keyboardType: TextInputType.number,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Le champ "Marge (%)" ne doit pas être vide.';
+                                  return 'Ce champ est obligatoire';
                                 }
-                                if (double.tryParse(value) == null ||
-                                    double.parse(value) <= 0) {
-                                  return 'La marge doit être un nombre positif.';
+                                if (double.tryParse(value) == null) {
+                                  return 'Nombre invalide';
                                 }
                                 return null;
+                              },
+                              onChanged: (value) {
+                                if (value.isNotEmpty &&
+                                    double.tryParse(value) != null) {
+                                  calculateValues(changedField: 'marge');
+                                }
                               },
                             ),
                           ),
@@ -416,17 +430,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               controller: profitController,
                               label: 'Profit',
                               keyboardType: TextInputType.number,
-                              enabled: false,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Le champ "Profit" ne doit pas être vide.';
-                                }
-                                if (double.tryParse(value) == null ||
-                                    double.parse(value) <= 0) {
-                                  return 'Le profit doit être un nombre positif.';
-                                }
-                                return null;
-                              },
+                              enabled:
+                                  false, // Champ désactivé car calculé automatiquement
                             ),
                           ),
                         ],

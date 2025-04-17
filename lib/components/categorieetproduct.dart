@@ -364,23 +364,25 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   Widget _buildProductCard(Product product) {
-    // Find default variant or use first variant if none marked as default
-    Variant? defaultVariant;
+    // Calculate total stock
     int totalStock = product.stock;
-
     if (product.hasVariants && product.variants.isNotEmpty) {
-      defaultVariant = product.variants.firstWhere(
-        (v) => v.defaultVariant,
-        orElse: () => product.variants.first,
-      );
-      // Calculate total stock from variants
-      totalStock =
-          product.variants.fold(0, (sum, variant) => sum + variant.stock);
+      totalStock = product.variants.fold(0, (sum, variant) => sum + variant.stock);
+    } else {
+      totalStock = product.stock;
     }
 
     // Don't show product if stock is zero
     if (totalStock <= 0) {
       return const SizedBox.shrink();
+    }
+
+    Variant? defaultVariant;
+    if (product.hasVariants && product.variants.isNotEmpty) {
+      defaultVariant = product.variants.firstWhere(
+        (v) => v.defaultVariant,
+        orElse: () => product.variants.first,
+      );
     }
 
     final displayPrice = defaultVariant?.price ?? product.prixTTC;
@@ -503,10 +505,10 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
                     return Center(
-                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                        child: Text('Error: ${snapshot.error}'));
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return const Center(
-                        child: Text('Aucune catégorie disponible'));
+                        child: Text('No categories available'));
                   }
 
                   return GridView.builder(
@@ -544,59 +546,64 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return Center(
-                        child: Text('Erreur de chargement: ${snapshot.error}'));
+                    return Center(child: Text('Error: ${snapshot.error}'));
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                        child: Text('Aucun produit disponible'));
+                    return const Center(child: Text('No products available'));
                   }
 
-                  // Remove duplicate products and filter out zero stock products
-                  final uniqueProducts = snapshot.data!
-                      .fold<Map<String, Product>>({}, (map, product) {
-                        if (!map.containsKey(product.code ?? '')) {
-                          map[product.code ?? ''] = product;
-                        }
-                        return map;
-                      })
-                      .values
-                      .where((product) {
-                        // Calculate total stock
-                        int totalStock = product.stock;
-                        if (product.hasVariants &&
-                            product.variants.isNotEmpty) {
-                          totalStock = product.variants
-                              .fold(0, (sum, variant) => sum + variant.stock);
-                        }
-                        return totalStock >
-                            0; // Only keep products with stock > 0
-                      })
-                      .toList();
+                  // Debug print
+                  print('Total products from DB: ${snapshot.data!.length}');
+
+                  // Process products
+                  final productMap = <int, Product>{};
+                  for (final product in snapshot.data!) {
+                    if (product.id != null) {
+                      // Calculate total stock
+                      int totalStock = product.stock;
+                      if (product.hasVariants && product.variants.isNotEmpty) {
+                        totalStock = product.variants.fold(0, (sum, v) => sum + v.stock);
+                      }
+                      
+                      // Only add if in stock and not already added
+                      if (totalStock > 0 && !productMap.containsKey(product.id!)) {
+                        productMap[product.id!] = product;
+                      }
+                    }
+                  }
+
+                  final uniqueProducts = productMap.values.toList();
+                  print('Unique in-stock products: ${uniqueProducts.length}');
 
                   // Filter by category if selected
                   final filteredProducts = selectedCategoryId == null
                       ? uniqueProducts
-                      : uniqueProducts
-                          .where((p) => p.categoryId == selectedCategoryId)
-                          .toList();
+                      : uniqueProducts.where((p) => p.categoryId == selectedCategoryId).toList();
+
+                  print('After category filter: ${filteredProducts.length}');
 
                   if (filteredProducts.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
-                        'Aucun produit disponible dans cette catégorie',
+                        selectedCategoryId == null 
+                          ? 'No available products' 
+                          : 'No products in this category',
                         style: TextStyle(color: Colors.white),
                       ),
                     );
                   }
 
-                  return GridView.count(
-                    crossAxisCount: 6,
-                    childAspectRatio: 1.2,
-                    mainAxisSpacing: 6.0,
-                    crossAxisSpacing: 6.0,
-                    children: filteredProducts.map((product) {
-                      return _buildProductCard(product);
-                    }).toList(),
+                  return GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: MediaQuery.of(context).size.width > 1000 ? 6 : 4,
+                      childAspectRatio: 1.2,
+                      mainAxisSpacing: 6.0,
+                      crossAxisSpacing: 6.0,
+                    ),
+                    padding: const EdgeInsets.all(8.0),
+                    itemCount: filteredProducts.length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(filteredProducts[index]);
+                    },
                   );
                 },
               ),

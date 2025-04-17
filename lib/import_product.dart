@@ -268,7 +268,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
       "DESCRIPTION",
       "PrixHT",
       "Taxe",
-      "Stock", // NEW COLUMN
+      "Stock",
       "Category",
       "SubCategory",
       "ImagePath",

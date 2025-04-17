@@ -365,78 +365,83 @@ class SqlDb {
 
     try {
       String query = '''
-    SELECT 
-      COALESCE(p.category_name, c.category_name, 'Uncategorized') AS category_name,
-      p.designation AS product_name,
-      SUM(oi.quantity) AS total_quantity,
-      SUM(
-        CASE 
-          WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
-          ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
-        END
-      ) AS total_sales,
-      AVG(oi.discount) AS avg_discount,
-      AVG(CASE WHEN oi.isPercentage = 1 THEN 1 ELSE 0 END) AS is_percentage_discount
-    FROM 
-      order_items oi
-    JOIN 
-      products p ON oi.product_code = p.code
-    LEFT JOIN
-      categories c ON p.category_id = c.id_category
-    JOIN 
-      orders o ON oi.id_order = o.id_order
-    WHERE 
-      o.status IN ('completed', 'paid', 'semi-payée')
-      AND p.is_deleted = 0
+      SELECT 
+        COALESCE(c.category_name, 'Uncategorized') AS category_name,
+        p.designation AS product_name,
+        SUM(oi.quantity) AS total_quantity,
+        SUM(
+          CASE 
+            WHEN oi.isPercentage = 1 THEN 
+              oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
+            ELSE 
+              oi.quantity * (oi.prix_unitaire - oi.discount)
+          END
+        ) AS total_sales,
+        MAX(oi.discount) AS discount,
+        MAX(oi.isPercentage) AS is_percentage,
+        MAX(oi.prix_unitaire) AS unit_price
+      FROM 
+        order_items oi
+      JOIN 
+        products p ON oi.product_code = p.code
+      LEFT JOIN
+        categories c ON p.category_id = c.id_category
+      JOIN 
+        orders o ON oi.id_order = o.id_order
+      WHERE 
+        o.status IN ('completed', 'paid', 'semi-payée')
+        AND p.is_deleted = 0
     ''';
 
-      // Add date filter if provided
       if (dateFilter != null && dateFilter.isNotEmpty) {
         query += ' $dateFilter';
       }
 
       query += '''
-    GROUP BY 
-      COALESCE(p.category_name, c.category_name, 'Uncategorized'), p.designation
-    ORDER BY 
-      category_name, total_sales DESC
+      GROUP BY 
+        COALESCE(c.category_name, 'Uncategorized'), 
+        p.designation
+      ORDER BY 
+        category_name, total_sales DESC
     ''';
 
       final result = await db.rawQuery(query);
-      print('Query result: $result');
+      print('Query executed. Result count: ${result.length}');
 
-      // Process the results
       for (final row in result) {
         final category = row['category_name']?.toString() ?? 'Uncategorized';
         final productName =
             row['product_name']?.toString() ?? 'Unknown Product';
         final quantity = row['total_quantity'] as int? ?? 0;
         final total = row['total_sales'] as double? ?? 0.0;
-        final discount = row['avg_discount'] as double? ?? 0.0;
-        final isPercentage =
-            (row['is_percentage_discount'] as num?)?.toDouble() ?? 0.0 > 0.5;
+        final discount = row['discount'] as double? ?? 0.0;
+        final isPercentage = (row['is_percentage'] as int?) == 1;
+        final unitPrice = row['unit_price'] as double? ?? 0.0;
 
-        // Initialize category if not exists
+        print(
+            'Processing: $category - $productName (Qty: $quantity, Total: $total)');
+
         salesData.putIfAbsent(
-            category,
-            () => {
-                  'products': <String, dynamic>{},
-                  'total': 0.0,
-                });
+          category,
+          () => {
+            'products': <String, dynamic>{},
+            'total': 0.0,
+          },
+        );
 
-        // Add product to category
         salesData[category]!['products'][productName] = {
           'quantity': quantity,
           'total': total,
           'discount': discount,
           'isPercentage': isPercentage,
+          'unitPrice': unitPrice,
         };
 
-        // Update category total
         salesData[category]!['total'] =
             (salesData[category]!['total'] as double) + total;
       }
 
+      print('Final sales data: ${salesData.keys.toList()}');
       return salesData;
     } catch (e) {
       print('Error getting sales by category and product: $e');
@@ -505,25 +510,18 @@ class SqlDb {
     );
   }
 
-  Future<Product?> getProductByCode(String productCode) async {
-    try {
-      var dbC = await db;
-
-      List<Map<String, dynamic>> result = await dbC.query(
-        'products',
-        where: 'code = ?',
-        whereArgs: [productCode],
-      );
-
-      if (result.isNotEmpty) {
-        return Product.fromMap(result.first);
-      } else {
-        return null;
-      }
-    } catch (e) {
-      print('Error fetching product by code: $e');
-      return null;
+  Future<Product?> getProductByCode(String? code) async {
+    if (code == null) return null;
+    final db = await this.db;
+    var result = await db.query(
+      'products',
+      where: 'code = ?',
+      whereArgs: [code],
+    );
+    if (result.isNotEmpty) {
+      return Product.fromMap(result.first);
     }
+    return null;
   }
 
   Future<List<Order>> getOrders() async {
@@ -713,10 +711,14 @@ class SqlDb {
     );
   }
 
-  Future<List<Product>> searchProducts(
-      {String? category, required String query}) async {
+  Future<List<Product>> searchProducts({
+    String? category,
+    String query = '',
+    bool lowStock = false,
+  }) async {
     final dbClient = await db;
-    print("Exécution de la recherche: catégorie=$category, query=$query");
+    print(
+        "Exécution de la recherche: catégorie=$category, query=$query, lowStock=$lowStock");
 
     // Début de la requête SQL
     String sqlQuery = '''
@@ -737,6 +739,11 @@ class SqlDb {
       sqlQuery += " AND (code LIKE ? OR designation LIKE ?)";
       args.add('%$query%');
       args.add('%$query%');
+    }
+
+    // Filtrer par stock faible si demandé
+    if (lowStock) {
+      sqlQuery += " AND stock < 10";
     }
 
     final List<Map<String, dynamic>> results =
