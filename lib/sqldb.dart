@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
+import 'package:caissechicopets/controllers/productController.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/user.dart';
@@ -183,21 +183,91 @@ class SqlDb {
     );
   }
 
+  //PRODUCT
   Future<List<Product>> getProducts() async {
     final dbClient = await db;
-    final List<Map<String, dynamic>> result = await dbClient.rawQuery('''
-    SELECT 
-      p.*, 
-      c.category_name,
-      sc.sub_category_name
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id_category
-    LEFT JOIN sub_categories sc ON p.sub_category_id = sc.id_sub_category
-    WHERE p.is_deleted = 0
-    ORDER BY p.designation ASC
-  ''');
+    return await ProductController().getProducts(dbClient);
+  }
 
-    return result.map((e) => Product.fromMap(e)).toList();
+  Future<int> updateProductWithoutId(Product product) async {
+    final db = await this.db;
+    return await ProductController().updateProductWithoutId(product, db);
+  }
+
+  Future<int> updateProduct(Product product) async {
+    final dbClient = await db;
+    return await ProductController().updateProduct(product, dbClient);
+  }
+
+  Future<int> deleteProductById(int productId) async {
+    final db = await this.db;
+    return await ProductController().deleteProductById(productId, db);
+  }
+
+  Future<Product?> getProductByDesignation(String designation) async {
+    final db = await this.db;
+    return await ProductController().getProductByDesignation(designation, db);
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
+    final dbClient = await db;
+    return await ProductController().getProductsWithCategory(dbClient);
+  }
+
+  Future<int> addProduct(Product product) async {
+    final dbClient = await db;
+    return await ProductController().addProduct(product, dbClient);
+  }
+
+  Future<int> updateProductStock(String productCode, int newStock) async {
+    final db1 = await db;
+    return await ProductController()
+        .updateProductStock(productCode, newStock, db1);
+  }
+
+  Future<List<Product>> searchProducts({
+    String? category,
+    String query = '',
+    bool lowStock = false,
+  }) async {
+    final dbClient = await db;
+    return await ProductController().searchProducts(
+      category: category,
+      query: query,
+      lowStock: lowStock,
+      dbClient: dbClient,
+    );
+  }
+
+  Future<Product> getProductWithVariants(int productId) async {
+    final dbClient = await db;
+    return await ProductController()
+        .getProductWithVariants(productId, dbClient);
+  }
+
+  Future<int> updateProductWithVariants(Product product) async {
+    final dbClient = await db;
+    return await ProductController()
+        .updateProductWithVariants(product, dbClient);
+  }
+
+  Future<List<String>> getProductsInCategory(int categoryId) async {
+    final dbClient = await db;
+    return await ProductController()
+        .getProductsInCategory(categoryId, dbClient);
+  }
+
+  Future<List<String>> getProductsInSubCategory(int subCategoryId) async {
+    final dbClient = await db;
+    return await ProductController()
+        .getProductsInSubCategory(subCategoryId, dbClient);
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsPurchasedByClient(
+      int clientId) async {
+    final dbClient = await db;
+    return await ProductController()
+        .getProductsPurchasedByClient(clientId, dbClient);
   }
 
   Future<void> updateOrderStatus(int idOrder, String status) async {
@@ -210,64 +280,6 @@ class SqlDb {
     );
   }
 
-  Future<int> updateProductWithoutId(Product product) async {
-    final db = await this.db;
-    return await db.update(
-      'products',
-      {
-        'code': product.code,
-        'designation': product.designation,
-        'description': product.description,
-        'stock': product.stock,
-        'prix_ht': product.prixHT,
-        'taxe': product.taxe,
-        'prix_ttc': product.prixTTC,
-        'date_expiration': product.dateExpiration,
-        'category_id': product.categoryId,
-        'sub_category_id': product.subCategoryId,
-        'is_deleted': product.isDeleted,
-        'marge': product.marge,
-        'remise_max': product.remiseMax,
-        'remise_valeur_max': product.remiseValeurMax,
-        'has_variants': product.hasVariants ? 1 : 0,
-        'sellable': product.sellable ? 1 : 0,
-      },
-      where: 'id = ?',
-      whereArgs: [product.id],
-    );
-  }
-
-  Future<int> updateProduct(Product product) async {
-    final dbClient = await db;
-    return await dbClient.update(
-      'products',
-      product.toMap(),
-      where: 'code = ?', // Assuming 'code' is unique for the product
-      whereArgs: [product.code], // Using 'code' to identify the product
-    );
-  }
-
-  Future<int> deleteProductById(int productId) async {
-    final db = await this.db;
-    return await db.delete(
-      'products',
-      where: 'id = ?',
-      whereArgs: [productId],
-    );
-  }
-
-  Future<Product?> getProductByDesignation(String designation) async {
-    final db = await this.db;
-    var result = await db.query(
-      'products',
-      where: 'designation = ?',
-      whereArgs: [designation],
-    );
-    if (result.isNotEmpty) {
-      return Product.fromMap(result.first);
-    }
-    return null;
-  }
 
   Future<void> deleteOrderLine(int idOrder, String idProduct) async {
     final dbClient = await db;
@@ -276,47 +288,6 @@ class SqlDb {
       where: 'id_order = ? AND product_code = ?',
       whereArgs: [idOrder, idProduct],
     );
-  }
-
-  Future<List<Map<String, dynamic>>> getProductsWithCategory() async {
-    final dbClient = await db;
-    return await dbClient.rawQuery('''
-    SELECT p.*, c.category_name 
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id_category
-  ''');
-  }
-
-  Future<int> addProduct(Product product) async {
-    final dbClient = await db;
-    return await dbClient.transaction((txn) async {
-      // Insert product
-      final productId = await txn.insert(
-        'products',
-        product.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      // Insert variants if they exist
-      if (product.variants.isNotEmpty) {
-        for (final variant in product.variants) {
-          await txn.insert(
-            'variants',
-            variant.copyWith(productId: productId).toMap(),
-          );
-        }
-
-        // Update has_variants flag
-        await txn.update(
-          'products',
-          {'has_variants': 1},
-          where: 'id = ?',
-          whereArgs: [productId],
-        );
-      }
-
-      return productId;
-    });
   }
 
   Future<int> addOrder(Order order) async {
@@ -498,16 +469,6 @@ class SqlDb {
     }
 
     return orders;
-  }
-
-  Future<int> updateProductStock(String productCode, int newStock) async {
-    final db1 = await db;
-    return await db1.update(
-      'products', // Table name
-      {'stock': newStock}, // Update stock column
-      where: 'code = ?', // Condition
-      whereArgs: [productCode], // Pass product code
-    );
   }
 
   Future<Product?> getProductByCode(String? code) async {
@@ -709,48 +670,6 @@ class SqlDb {
       where: 'id_category = ?',
       whereArgs: [id],
     );
-  }
-
-  Future<List<Product>> searchProducts({
-    String? category,
-    String query = '',
-    bool lowStock = false,
-  }) async {
-    final dbClient = await db;
-    print(
-        "Exécution de la recherche: catégorie=$category, query=$query, lowStock=$lowStock");
-
-    // Début de la requête SQL
-    String sqlQuery = '''
-    SELECT * FROM products 
-    WHERE 1 = 1 
-  ''';
-
-    List<dynamic> args = [];
-
-    // Filtrer par catégorie si elle est sélectionnée
-    if (category != null && category.isNotEmpty) {
-      sqlQuery += " AND category_id = ?";
-      args.add(category);
-    }
-
-    // Filtrer par code ou désignation (si une recherche est effectuée)
-    if (query.isNotEmpty) {
-      sqlQuery += " AND (code LIKE ? OR designation LIKE ?)";
-      args.add('%$query%');
-      args.add('%$query%');
-    }
-
-    // Filtrer par stock faible si demandé
-    if (lowStock) {
-      sqlQuery += " AND stock < 10";
-    }
-
-    final List<Map<String, dynamic>> results =
-        await dbClient.rawQuery(sqlQuery, args);
-    print("Résultats SQL: ${results.length}");
-
-    return results.map((map) => Product.fromMap(map)).toList();
   }
 
   Future<List<Category>> getCategories() async {
@@ -1149,104 +1068,7 @@ class SqlDb {
     return false;
   }
 
-  Future<Product> getProductWithVariants(int productId) async {
-    final dbClient = await db;
-    final product = await dbClient.query(
-      'products',
-      where: 'id = ? AND is_deleted = 0',
-      whereArgs: [productId],
-      limit: 1,
-    );
-
-    if (product.isEmpty) {
-      throw Exception('Produit non trouvé');
-    }
-
-    final variants = await getVariantsByProductId(productId);
-    return Product.fromMap(product.first)..variants = variants;
-  }
-
-  Future<int> updateProductWithVariants(Product product) async {
-    final dbClient = await db;
-    return await dbClient.transaction((txn) async {
-      // Update product
-      await txn.update(
-        'products',
-        product.toMap(),
-        where: 'id = ?',
-        whereArgs: [product.id],
-      );
-
-      // Delete existing variants
-      await txn.delete(
-        'variants',
-        where: 'product_id = ?',
-        whereArgs: [product.id],
-      );
-
-      // Insert new variants if they exist
-      if (product.variants.isNotEmpty) {
-        for (final variant in product.variants) {
-          await txn.insert(
-            'variants',
-            variant.copyWith(productId: product.id!).toMap(),
-          );
-        }
-      }
-
-      // Update has_variants flag
-      await txn.update(
-        'products',
-        {'has_variants': product.variants.isNotEmpty ? 1 : 0},
-        where: 'id = ?',
-        whereArgs: [product.id],
-      );
-
-      return 1;
-    });
-  }
-
-// Récupère les IDs des produits associés à une catégorie
-  Future<List<String>> getProductsInCategory(int categoryId) async {
-    final dbClient = await db;
-    final result = await dbClient.query(
-      'products',
-      where: 'category_id = ? AND is_deleted = 0',
-      whereArgs: [categoryId],
-      columns: ['code'],
-    );
-    return result.map((e) => e['code'] as String).toList();
-  }
-
 // Récupère les IDs des produits associés à une sous-catégorie (récursivement)
-  Future<List<String>> getProductsInSubCategory(int subCategoryId) async {
-    final dbClient = await db;
-    List<String> productCodes = [];
-
-    // Produits directs
-    final directProducts = await dbClient.query(
-      'products',
-      where: 'sub_category_id = ? AND is_deleted = 0',
-      whereArgs: [subCategoryId],
-      columns: ['code'],
-    );
-    productCodes.addAll(directProducts.map((e) => e['code'] as String));
-
-    // Sous-catégories enfants
-    final childSubCategories = await dbClient.query(
-      'sub_categories',
-      where: 'parent_id = ?',
-      whereArgs: [subCategoryId],
-    );
-
-    // Produits des enfants (récursivement)
-    for (var child in childSubCategories) {
-      productCodes.addAll(
-          await getProductsInSubCategory(child['id_sub_category'] as int));
-    }
-
-    return productCodes;
-  }
 
   // Méthodes pour gérer les utilisateurs
   Future<int> addUser(User user) async {
@@ -1476,33 +1298,5 @@ class SqlDb {
     }
 
     return orders;
-  }
-
-  Future<List<Map<String, dynamic>>> getProductsPurchasedByClient(
-      int clientId) async {
-    final dbClient = await db;
-    return await dbClient.rawQuery('''
-    SELECT 
-      p.designation,
-      SUM(oi.quantity) as total_quantity,
-      SUM(
-        CASE 
-          WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
-          ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
-        END
-      ) as total_spent
-    FROM 
-      order_items oi
-    JOIN 
-      products p ON oi.product_code = p.code
-    JOIN 
-      orders o ON oi.id_order = o.id_order
-    WHERE 
-      o.id_client = ?
-    GROUP BY 
-      p.designation
-    ORDER BY 
-      total_quantity DESC
-  ''', [clientId]);
   }
 }
