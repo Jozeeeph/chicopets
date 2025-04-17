@@ -4,8 +4,8 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:caissechicopets/product.dart';
-import 'package:caissechicopets/variant.dart';
+import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ImportProductPage extends StatefulWidget {

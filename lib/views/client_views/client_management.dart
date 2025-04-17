@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/client.dart';
+import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/client_form.dart';
+import 'package:caissechicopets/views/client_views/client_form.dart';
 import 'package:flutter/animation.dart';
-import 'package:caissechicopets/order.dart';
+import 'package:caissechicopets/models/order.dart';
 
 class ClientManagementWidget extends StatefulWidget {
   final Function(Client)? onClientSelected;

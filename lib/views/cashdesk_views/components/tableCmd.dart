@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/user.dart';
+import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:caissechicopets/client_management.dart'; // Add this import
+import 'package:caissechicopets/views/client_views/client_management.dart'; // Add this import
 
 typedef RefreshCallback = void Function();
 

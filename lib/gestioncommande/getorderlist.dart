@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'package:caissechicopets/client.dart';
-import 'package:caissechicopets/orderline.dart';
+import 'package:caissechicopets/models/client.dart';
+import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:caissechicopets/order.dart';
+import 'package:caissechicopets/models/order.dart';
 import 'package:pdf/pdf.dart'; // Import the PdfPageFormat class
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';

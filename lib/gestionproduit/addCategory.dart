@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/gestionproduit/products_to_delete_screen.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/subcategory.dart';
+import 'package:caissechicopets/models/subcategory.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddCategory extends StatefulWidget {

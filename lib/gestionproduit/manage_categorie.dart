@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/gestionproduit/products_to_delete_screen.dart';
 

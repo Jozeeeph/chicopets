@@ -1,8 +1,8 @@
 import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/gestionproduit/editProduct.dart'; // Make sure to import your EditProductScreen
-import 'package:caissechicopets/product.dart';
-import 'package:caissechicopets/subcategory.dart';
-import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/subcategory.dart';
+import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

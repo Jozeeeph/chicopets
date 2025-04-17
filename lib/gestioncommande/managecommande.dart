@@ -1,6 +1,6 @@
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/product.dart';
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/order.dart';
+import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:intl/intl.dart';
 

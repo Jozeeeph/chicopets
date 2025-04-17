@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:caissechicopets/user.dart';
+import 'package:caissechicopets/models/user.dart';
 
 class SessionManager {
   static const String _keyUser = 'current_user';
