@@ -9,19 +9,17 @@ class Searchprod {
     final categories = await sqldb.getCategories();
     final TextEditingController searchController = TextEditingController();
     ValueNotifier<List<Product>> filteredProducts = ValueNotifier([]);
-    bool isLoading = false;
 
-    Future<void> searchProducts(String? selectedCategory) async {
-      isLoading = true;
+    Future<void> searchProducts(String? selectedCategory, {bool lowStock = false}) async {
       filteredProducts.notifyListeners(); // Met à jour l'état du chargement
 
       List<Product> results = await sqldb.searchProducts(
         category: selectedCategory,
         query: searchController.text,
+        lowStock: lowStock,
       );
       filteredProducts.value = results;
 
-      isLoading = false;
       filteredProducts.notifyListeners();
     }
 
@@ -41,6 +39,7 @@ class Searchprod {
         return StatefulBuilder(
           builder: (context, setState) {
             String? selectedCategory;
+            bool showLowStock = false;
 
             return AlertDialog(
               shape: RoundedRectangleBorder(
@@ -89,34 +88,61 @@ class Searchprod {
                     ),
                     const SizedBox(height: 10),
 
-                    // Sélecteur de catégorie
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                                color: Color(0xFF0056A6), width: 1)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                                color: Color(0xFF0056A6), width: 2)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                      ),
-                      hint: const Text("Sélectionner une catégorie"),
-                      value: selectedCategory,
-                      items: categories.map((category) {
-                        return DropdownMenuItem(
-                          value: category.id.toString(),
-                          child: Text(category.name),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedCategory = value;
-                        });
-                        searchProducts(selectedCategory);
-                      },
+                    // Filtres de recherche (catégorie + stock faible)
+                    Row(
+                      children: [
+                        // Sélecteur de catégorie
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF0056A6), width: 1)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF0056A6), width: 2)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                            ),
+                            hint: const Text("Sélectionner une catégorie"),
+                            value: selectedCategory,
+                            items: categories.map((category) {
+                              return DropdownMenuItem(
+                                value: category.id.toString(),
+                                child: Text(category.name),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedCategory = value;
+                              });
+                              searchProducts(selectedCategory, lowStock: showLowStock);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        
+                        // Bouton pour les produits en rupture de stock
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.warning, color: Colors.white),
+                          label: const Text('Stock < 10'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: showLowStock ? Colors.orange : Colors.grey,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                          ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              showLowStock = !showLowStock;
+                            });
+                            searchProducts(selectedCategory, lowStock: showLowStock);
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 15),
                     
@@ -176,7 +202,15 @@ class Searchprod {
                                               DataCell(Text(product.designation)),
                                               DataCell(Text(product.code ?? '')),
                                               DataCell(Text(
-                                                  product.stock.toString())),
+                                                  product.stock.toString(),
+                                                  style: TextStyle(
+                                                    color: product.stock < 10 
+                                                        ? Colors.red 
+                                                        : Colors.black,
+                                                    fontWeight: product.stock < 10
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                  ))),
                                               DataCell(Text(
                                                   "${product.prixTTC.toStringAsFixed(2)} TND")),
                                               DataCell(Text(
@@ -210,6 +244,7 @@ class Searchprod {
                     searchController.clear();
                     setState(() {
                       selectedCategory = null; // Reset selected category
+                      showLowStock = false; // Reset low stock filter
                     });
                     filteredProducts.value = [];
                   },

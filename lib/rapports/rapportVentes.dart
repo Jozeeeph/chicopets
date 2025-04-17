@@ -28,14 +28,14 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
 
       String? dateFilter;
       if (dateRange != null) {
-        // Format dates to match the ISO format stored in database
-        final startDate = dateRange!.start.toIso8601String();
-        final endDate =
-            dateRange!.end.add(const Duration(days: 1)).toIso8601String();
+        final startDate = DateFormat('yyyy-MM-dd').format(dateRange!.start);
+        final endDate = DateFormat('yyyy-MM-dd')
+            .format(dateRange!.end.add(const Duration(days: 1)));
         dateFilter = "AND o.date >= '$startDate' AND o.date < '$endDate'";
       }
 
-      final data = await sqldb.getSalesByCategoryAndProduct(dateFilter: dateFilter);
+      final data =
+          await sqldb.getSalesByCategoryAndProduct(dateFilter: dateFilter);
 
       setState(() {
         salesData = data;
@@ -76,7 +76,6 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
                   const BorderRadius.vertical(top: Radius.circular(10.0)),
             ),
             child: Row(
-              // This is the correct way to provide a child
               children: [
                 Expanded(
                   child: Text(
@@ -156,8 +155,18 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
             const Divider(height: 1, thickness: 1, color: Colors.grey),
             ...products.entries.map((entry) {
               final productData = entry.value as Map<String, dynamic>;
-              final unitPrice = (productData['total'] as double) /
-                  (productData['quantity'] as int);
+              final quantity = productData['quantity'] as int;
+              final total = productData['total'] as double;
+              final discount = productData['discount'] as double;
+              final isPercentage = productData['isPercentage'] as bool;
+              
+              // Calculate unit price based on discount type
+              double unitPrice;
+              if (isPercentage) {
+                unitPrice = total / (quantity * (1 - discount/100));
+              } else {
+                unitPrice = (total / quantity) + discount;
+              }
 
               return Container(
                 decoration: BoxDecoration(
@@ -177,7 +186,7 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
                       ),
                       Expanded(
                         child: Text(
-                          productData['quantity'].toString(),
+                          quantity.toString(),
                           style: const TextStyle(fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
@@ -191,16 +200,16 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
                       ),
                       Expanded(
                         child: Text(
-                          productData.containsKey('discount')
-                              ? '${productData['discount'].toStringAsFixed(2)}%'
-                              : '0.00%',
+                          isPercentage 
+                              ? '${discount.toStringAsFixed(2)}%'
+                              : '${discount.toStringAsFixed(2)} DT',
                           style: const TextStyle(fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
                       ),
                       Expanded(
                         child: Text(
-                          '${productData['total'].toStringAsFixed(2)} DT',
+                          '${total.toStringAsFixed(2)} DT',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
