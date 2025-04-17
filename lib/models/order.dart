@@ -1,4 +1,4 @@
-import 'package:caissechicopets/orderline.dart';
+import 'package:caissechicopets/models/orderline.dart';
 
 class Order {
   int? idOrder;

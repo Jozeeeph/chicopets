@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/product.dart';
 
 class Applydiscount {
   static void showDiscountInput(

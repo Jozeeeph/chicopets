@@ -1,8 +1,8 @@
-import 'package:caissechicopets/product.dart';
-import 'package:caissechicopets/subcategory.dart';
-import 'package:caissechicopets/category.dart';
+import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/subcategory.dart';
+import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/variant.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

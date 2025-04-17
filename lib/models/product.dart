@@ -1,4 +1,4 @@
-import 'package:caissechicopets/variant.dart';
+import 'package:caissechicopets/models/variant.dart';
 
 class Product {
   int? id; // Changed from int id = 0 to nullable

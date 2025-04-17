@@ -1,4 +1,4 @@
-import 'package:caissechicopets/subcategory.dart';
+import 'package:caissechicopets/models/subcategory.dart';
 
 class Category {
   final int? id;

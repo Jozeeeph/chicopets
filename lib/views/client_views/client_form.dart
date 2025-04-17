@@ -1,4 +1,4 @@
-import 'package:caissechicopets/client.dart';
+import 'package:caissechicopets/models/client.dart';
 import 'package:flutter/material.dart';
 
 class ClientForm extends StatefulWidget {

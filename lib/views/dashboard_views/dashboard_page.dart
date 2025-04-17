@@ -1,16 +1,16 @@
 import 'dart:convert';
 
-import 'package:caissechicopets/accounts_page.dart';
-import 'package:caissechicopets/cash_desk_page.dart';
+import 'package:caissechicopets/views/user_views/accounts_page.dart';
+import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
 import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:caissechicopets/home_page.dart';
-import 'package:caissechicopets/import_product.dart';
+import 'package:caissechicopets/gestionproduit/import_product.dart';
 import 'package:caissechicopets/rapports/rapportVentes.dart';
 import 'package:caissechicopets/sqldb.dart';
-import 'package:caissechicopets/user.dart';
+import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';

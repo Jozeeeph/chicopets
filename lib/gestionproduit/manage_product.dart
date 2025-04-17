@@ -1,9 +1,9 @@
 import 'package:caissechicopets/gestionproduit/editProduct.dart';
-import 'package:caissechicopets/variant.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/gestionproduit/add_product_screen.dart';
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/product.dart';
 
 class ManageProductPage extends StatefulWidget {
   const ManageProductPage({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:caissechicopets/sqldb.dart';
-import '../product.dart';
+import '../models/product.dart';
 
 class Searchprod {
   static void showProductSearchPopup(BuildContext context) async {

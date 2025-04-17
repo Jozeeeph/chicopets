@@ -1,10 +1,10 @@
-import 'package:caissechicopets/order.dart';
-import 'package:caissechicopets/orderline.dart';
-import 'package:caissechicopets/product.dart';
+import 'package:caissechicopets/models/order.dart';
+import 'package:caissechicopets/models/orderline.dart';
+import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/client.dart';
-import 'package:caissechicopets/client_management.dart';
+import 'package:caissechicopets/models/client.dart';
+import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart'; // Add this import
 
 class Addorder {
