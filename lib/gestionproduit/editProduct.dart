@@ -60,7 +60,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
     codeController.text = widget.product.code ?? '';
     designationController.text = widget.product.designation;
     descriptionController.text = widget.product.description ?? '';
-    stockController.text = widget.product.stock.toString();
+    stockController.text = widget.product.hasVariants 
+      ? widget.product.variants.fold(0, (sum, variant) => sum + variant.stock).toString()
+      : widget.product.stock.toString();
     priceHTController.text = widget.product.prixHT.toString();
     taxController.text = widget.product.taxe.toString();
     priceTTCController.text = widget.product.prixTTC.toString();
@@ -124,55 +126,58 @@ class _EditProductScreenState extends State<EditProductScreen> {
     });
   }
 
-  Future<void> _loadVariants() async {
-    if (widget.product.id == null) return;
+Future<void> _loadVariants() async {
+  if (widget.product.id == null) return;
 
-    setState(() => isLoadingVariants = true);
-    try {
-      final variantsFromDb =
-          await sqldb.getVariantsByProductId(widget.product.id!);
+  setState(() => isLoadingVariants = true);
+  try {
+    final variantsFromDb = await sqldb.getVariantsByProductId(widget.product.id!);
 
-      setState(() {
-        variants = variantsFromDb;
-        hasVariants = variants.isNotEmpty;
+    setState(() {
+      variants = variantsFromDb;
+      hasVariants = variants.isNotEmpty;
 
-        if (hasVariants) {
-          // Find and set the default variant
-          final defaultVariant = variants.firstWhere(
-            (v) => v.defaultVariant,
-            orElse: () => variants.first,
-          );
-          selectedDefaultVariant = defaultVariant.combinationName;
+      if (hasVariants) {
+        // Calculer le stock total
+        final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
+        stockController.text = totalStock.toString();
+        
+        // Find and set the default variant
+        final defaultVariant = variants.firstWhere(
+          (v) => v.defaultVariant,
+          orElse: () => variants.first,
+        );
+        selectedDefaultVariant = defaultVariant.combinationName;
 
-          // Extract attributes from variants
-          attributes.clear();
-          for (final variant in variants) {
-            for (final entry in variant.attributes.entries) {
-              attributes.update(
-                entry.key,
-                (values) => values..add(entry.value),
-                ifAbsent: () => [entry.value],
-              );
-            }
+        // Extract attributes from variants
+        attributes.clear();
+        for (final variant in variants) {
+          for (final entry in variant.attributes.entries) {
+            attributes.update(
+              entry.key,
+              (values) => values..add(entry.value),
+              ifAbsent: () => [entry.value],
+            );
           }
         }
-      });
-    } catch (e) {
-      debugPrint('Error loading variants: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load variants: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
-    } finally {
-      if (mounted) {
-        setState(() => isLoadingVariants = false);
-      }
+    });
+  } catch (e) {
+    debugPrint('Error loading variants: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load variants: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => isLoadingVariants = false);
     }
   }
+}
 
   void calculerRemiseValeurMax() {
     double profit = double.tryParse(profitController.text) ?? 0;
@@ -250,39 +255,44 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-  void generateVariants() {
-    if (widget.product.id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      variants = _generateCombinations(attributes).map((combination) {
-        final basePrice = double.parse(priceHTController.text);
-        return Variant(
-          code: '',
-          combinationName: combination.values.join('-'),
-          price: basePrice,
-          priceImpact: 0.0,
-          stock: 0,
-          defaultVariant: variants.isEmpty, // First variant is default
-          attributes: combination,
-          productId: widget.product.id!,
-        );
-      }).toList();
-
-      // Set the first variant as default if none exists
-      if (variants.isNotEmpty && selectedDefaultVariant == null) {
-        selectedDefaultVariant = variants.first.combinationName;
-        variants.first.defaultVariant = true;
-      }
-    });
+// Dans la méthode qui génère les variantes
+void generateVariants() {
+  if (widget.product.id == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+            'Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
+      ),
+    );
+    return;
   }
+
+  setState(() {
+    variants = _generateCombinations(attributes).map((combination) {
+      final basePrice = double.parse(priceHTController.text);
+      return Variant(
+        code: '',
+        combinationName: combination.values.join('-'),
+        price: basePrice,
+        priceImpact: 0.0,
+        stock: 0,
+        defaultVariant: variants.isEmpty, // First variant is default
+        attributes: combination,
+        productId: widget.product.id!,
+      );
+    }).toList();
+
+    // Mettre à jour le stock total
+    final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
+    stockController.text = totalStock.toString();
+
+    // Set the first variant as default if none exists
+    if (variants.isNotEmpty && selectedDefaultVariant == null) {
+      selectedDefaultVariant = variants.first.combinationName;
+      variants.first.defaultVariant = true;
+    }
+  });
+}
 
   List<Map<String, String>> _generateCombinations(
       Map<String, List<String>> attributes) {
