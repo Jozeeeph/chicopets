@@ -1,6 +1,5 @@
 import 'package:caissechicopets/controllers/variantController.dart';
 import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/models/variant.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ProductController {
@@ -18,6 +17,35 @@ class ProductController {
   ''');
 
     return result.map((e) => Product.fromMap(e)).toList();
+  }
+
+  Future<Product?> getProductByCode(String code, Database dbClient) async {
+    final result = await dbClient.query(
+      'products',
+      where:
+          'code = ? AND is_deleted = 0', // Ajout de la vérification is_deleted
+      whereArgs: [code],
+      limit: 1, // Optimisation pour ne retourner qu'un seul résultat
+    );
+
+    return result.isNotEmpty ? Product.fromMap(result.first) : null;
+  }
+
+  Future<Product?> getDesignationByCode(String code,dbClient) async {
+    final List<Map<String, Object?>> result = await dbClient.query(
+      'products',
+      where: 'code = ?',
+      whereArgs: [code],
+      limit: 1, // Limit the result to 1 row
+    );
+
+    if (result.isNotEmpty) {
+      // Convert the first row to a Product object
+      return Product.fromMap(result.first);
+    } else {
+      // No product found with the given code
+      return null;
+    }
   }
 
   Future<int> updateProductWithoutId(Product product, db) async {

@@ -8,6 +8,7 @@ class ManageCategoriePage extends StatefulWidget {
   const ManageCategoriePage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _ManageCategoriePageState createState() => _ManageCategoriePageState();
 }
 
@@ -84,6 +85,8 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   Future<bool> _checkProductsBeforeDelete(List<Category> categories) async {
     try {
       for (var category in categories) {
+        if (category.id == null) continue;
+
         bool hasProducts = await sqldb.hasProductsInCategory(category.id!);
         if (hasProducts) {
           return true;
@@ -92,7 +95,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       return false;
     } catch (e) {
       debugPrint('Error checking products: $e');
-      return true; // Assume there are products to be safe
+      return true; // Fail-safe - assume there are products
     }
   }
 
@@ -153,111 +156,126 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
     List<Category> categoriesToDelete =
         singleCategory != null ? [singleCategory] : _selectedCategories;
 
-    bool hasProducts = await _checkProductsBeforeDelete(categoriesToDelete);
+    try {
+      bool hasProducts = await _checkProductsBeforeDelete(categoriesToDelete);
 
-    if (hasProducts) {
-      List<String> productCodes = [];
-      for (var category in categoriesToDelete) {
-        productCodes.addAll(await sqldb.getProductsInCategory(category.id!));
+      if (hasProducts) {
+        List<String> productCodes = [];
+        for (var category in categoriesToDelete) {
+          if (category.id != null) {
+            final codes = await sqldb.getProductsInCategory(category.id!);
+            productCodes.addAll(codes);
+          }
+        }
+
+        if (productCodes.isEmpty) {
+          // This shouldn't happen but handle it gracefully
+          await _deleteCategories(categoriesToDelete);
+          return;
+        }
+
+        await _showProductsDeleteDialog(productCodes);
+        return;
       }
 
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Column(
-            children: [
-              const Icon(Icons.warning, size: 40, color: Colors.orange),
-              const SizedBox(height: 8),
-              Text(
-                "Cannot Delete Category",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
+      bool confirmed = await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Confirm Delete"),
+              content: Text(
+                  "Are you sure you want to delete ${categoriesToDelete.length} category(ies)?"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Cancel"),
                 ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "This category contains ${productCodes.length} product(s). "
-                "You must delete these products first.",
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child:
+                      const Text("Delete", style: TextStyle(color: Colors.red)),
                 ),
-                child: Text(
-                  "Products: ${productCodes.join(', ')}",
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ProductsToDeleteScreen(
-                      productIdentifiers:
-                          productCodes, // Changed from productCodes
-                      onProductsDeleted: fetchCategories,
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
+          ) ??
+          false;
+
+      if (confirmed) {
+        await _deleteCategories(categoriesToDelete);
+      }
+    } catch (e) {
+      _showMessage("Error during deletion process: ${e.toString()}");
+    }
+  }
+
+  Future<void> _showProductsDeleteDialog(List<String> productCodes) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Column(
+          children: [
+            const Icon(Icons.warning, size: 40, color: Colors.orange),
+            const SizedBox(height: 8),
+            Text(
+              "Cannot Delete Category",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).primaryColor,
               ),
-              child: const Text("View Products",
-                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-      );
-      return;
-    }
-
-    bool confirmed = await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Confirm Delete"),
-            content:
-                const Text("Are you sure you want to delete these categories?"),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "This category contains ${productCodes.length} product(s). "
+              "You must delete these products first.",
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child:
-                    const Text("Delete", style: TextStyle(color: Colors.red)),
+              child: Text(
+                "Products: ${productCodes.take(5).join(', ')}${productCodes.length > 5 ? '...' : ''}",
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
           ),
-        ) ??
-        false;
-
-    if (confirmed) {
-      await _deleteCategories(categoriesToDelete);
-    }
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductsToDeleteScreen(
+                    productIdentifiers: productCodes,
+                    onProductsDeleted: fetchCategories,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+            ),
+            child: const Text("View Products",
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _deleteCategories(List<Category> categories) async {

@@ -46,9 +46,16 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   void _loadData() {
+    debugPrint('Loading data...');
     setState(() {
-      categories = _fetchCategories();
-      products = _fetchProductsWithVariants();
+      categories = _fetchCategories().then((value) {
+        debugPrint('Categories loaded: ${value.length}');
+        return value;
+      });
+      products = _fetchProductsWithVariants().then((value) {
+        debugPrint('Products loaded: ${value.length}');
+        return value;
+      });
     });
   }
 
@@ -367,7 +374,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     // Calculate total stock
     int totalStock = product.stock;
     if (product.hasVariants && product.variants.isNotEmpty) {
-      totalStock = product.variants.fold(0, (sum, variant) => sum + variant.stock);
+      totalStock =
+          product.variants.fold(0, (sum, variant) => sum + variant.stock);
     } else {
       totalStock = product.stock;
     }
@@ -504,11 +512,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   } else if (snapshot.hasError) {
-                    return Center(
-                        child: Text('Error: ${snapshot.error}'));
+                    return Center(child: Text('Error: ${snapshot.error}'));
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                        child: Text('No categories available'));
+                    return const Center(child: Text('No categories available'));
                   }
 
                   return GridView.builder(
@@ -561,11 +567,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       // Calculate total stock
                       int totalStock = product.stock;
                       if (product.hasVariants && product.variants.isNotEmpty) {
-                        totalStock = product.variants.fold(0, (sum, v) => sum + v.stock);
+                        totalStock =
+                            product.variants.fold(0, (sum, v) => sum + v.stock);
                       }
-                      
+
                       // Only add if in stock and not already added
-                      if (totalStock > 0 && !productMap.containsKey(product.id!)) {
+                      if (totalStock > 0 &&
+                          !productMap.containsKey(product.id!)) {
                         productMap[product.id!] = product;
                       }
                     }
@@ -577,16 +585,18 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   // Filter by category if selected
                   final filteredProducts = selectedCategoryId == null
                       ? uniqueProducts
-                      : uniqueProducts.where((p) => p.categoryId == selectedCategoryId).toList();
+                      : uniqueProducts
+                          .where((p) => p.categoryId == selectedCategoryId)
+                          .toList();
 
                   print('After category filter: ${filteredProducts.length}');
 
                   if (filteredProducts.isEmpty) {
                     return Center(
                       child: Text(
-                        selectedCategoryId == null 
-                          ? 'No available products' 
-                          : 'No products in this category',
+                        selectedCategoryId == null
+                            ? 'No available products'
+                            : 'No products in this category',
                         style: TextStyle(color: Colors.white),
                       ),
                     );
@@ -594,7 +604,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
                   return GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: MediaQuery.of(context).size.width > 1000 ? 6 : 4,
+                      crossAxisCount:
+                          MediaQuery.of(context).size.width > 1000 ? 6 : 4,
                       childAspectRatio: 1.2,
                       mainAxisSpacing: 6.0,
                       crossAxisSpacing: 6.0,

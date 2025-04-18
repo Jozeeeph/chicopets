@@ -30,4 +30,14 @@ class Category {
       subCategories: subCategories ?? [],
     );
   }
+
+  @override
+  String toString() {
+    return 'Category{'
+        'id: $id, '
+        'name: "$name", '
+        'imagePath: ${imagePath != null ? '"$imagePath"' : 'null'}, '
+        'subCategories: ${subCategories.length} items'
+        '}';
+  }
 }
