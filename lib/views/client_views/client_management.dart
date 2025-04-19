@@ -148,7 +148,7 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
               Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
               ...order.orderLines.map((line) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text('- ${line.idProduct} x${line.quantite}'),
+                    child: Text('- ${line.productCode} x${line.quantity}'),
                   )),
             ],
           ),

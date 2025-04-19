@@ -229,9 +229,9 @@ class _CashDeskPageState extends State<CashDeskPage> {
               const SizedBox(height: 16),
               const Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
               ...order.orderLines.map((line) => ListTile(
-                title: Text(line.idProduct!),
-                subtitle: Text('${line.quantite} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
-                trailing: Text('${(line.finalPrice * line.quantite).toStringAsFixed(2)} DT'),
+                title: Text(line.productCode!),
+                subtitle: Text('${line.quantity} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
+                trailing: Text('${(line.finalPrice * line.quantity).toStringAsFixed(2)} DT'),
               )).toList(),
               const Divider(),
               Text('Total: ${order.total.toStringAsFixed(2)} DT', 

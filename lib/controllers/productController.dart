@@ -31,7 +31,18 @@ class ProductController {
     return result.isNotEmpty ? Product.fromMap(result.first) : null;
   }
 
-  Future<Product?> getDesignationByCode(String code,dbClient) async {
+  Future<Product?> getProductById(int id, Database dbClient) async {
+    final result = await dbClient.query(
+      'products',
+      where: 'id = ? AND is_deleted = 0', // Ajout de la vérification is_deleted
+      whereArgs: [id],
+      limit: 1, // Optimisation pour ne retourner qu'un seul résultat
+    );
+
+    return result.isNotEmpty ? Product.fromMap(result.first) : null;
+  }
+
+  Future<Product?> getDesignationByCode(String code, dbClient) async {
     final List<Map<String, Object?>> result = await dbClient.query(
       'products',
       where: 'code = ?',
