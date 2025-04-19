@@ -1,6 +1,7 @@
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
@@ -240,7 +241,6 @@ class Addorder {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Colonne de gauche - Ticket de commande
-                      // Colonne de gauche - Ticket de commande
                       Expanded(
                         flex: 5,
                         child: Container(
@@ -260,6 +260,7 @@ class Addorder {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Header
                               Center(
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -277,6 +278,8 @@ class Addorder {
                                 ),
                               ),
                               Divider(thickness: 1, color: Colors.black),
+
+                              // Column Headers
                               Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -295,7 +298,7 @@ class Addorder {
                                       ),
                                     ),
                                     Expanded(
-                                      flex: 2,
+                                      flex: 3,
                                       child: Text(
                                         "Article",
                                         style: TextStyle(
@@ -305,7 +308,7 @@ class Addorder {
                                       ),
                                     ),
                                     Expanded(
-                                      flex: 1,
+                                      flex: 2,
                                       child: Text(
                                         "Prix U",
                                         style: TextStyle(
@@ -316,7 +319,7 @@ class Addorder {
                                       ),
                                     ),
                                     Expanded(
-                                      flex: 1,
+                                      flex: 2,
                                       child: Text(
                                         "Montant",
                                         style: TextStyle(
@@ -330,13 +333,34 @@ class Addorder {
                                 ),
                               ),
                               Divider(thickness: 1, color: Colors.black),
+
                               if (selectedProducts.isNotEmpty)
                                 ...selectedProducts.map((product) {
                                   int index = selectedProducts.indexOf(product);
+
+                                  // Get default or first variant
+                                  Variant? selectedVariant = product
+                                              .hasVariants &&
+                                          product.variants.isNotEmpty
+                                      ? product.variants.firstWhere(
+                                          (v) => v.defaultVariant,
+                                          orElse: () => product.variants.first,
+                                        )
+                                      : null;
+
+                                  double basePrice =
+                                      selectedVariant?.finalPrice ??
+                                          product.prixTTC;
                                   double discountedPrice = typeDiscounts[index]
-                                      ? product.prixTTC *
-                                          (1 - discounts[index] / 100)
-                                      : product.prixTTC - discounts[index];
+                                      ? basePrice * (1 - discounts[index] / 100)
+                                      : basePrice - discounts[index];
+
+                                  String productName = product.designation;
+                                  if (selectedVariant != null) {
+                                    productName +=
+                                        " (${selectedVariant.combinationName.isNotEmpty ? selectedVariant.combinationName : selectedVariant.code})";
+                                  }
+
                                   return Padding(
                                     padding:
                                         const EdgeInsets.symmetric(vertical: 4),
@@ -347,41 +371,27 @@ class Addorder {
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            "${quantityProducts[index]}X",
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                            ),
+                                              "${quantityProducts[index]}X"),
+                                        ),
+                                        Expanded(
+                                          flex: 3,
+                                          child: Text(productName,
+                                              overflow: TextOverflow.ellipsis),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            "${discountedPrice.toStringAsFixed(2)} DT",
+                                            textAlign: TextAlign.center,
                                           ),
                                         ),
                                         Expanded(
                                           flex: 2,
                                           child: Text(
-                                            product.designation,
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            "${discountedPrice.toStringAsFixed(2)} DT",
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
                                             "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
                                             textAlign: TextAlign.end,
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                       ],
@@ -391,6 +401,8 @@ class Addorder {
                               else
                                 Center(
                                     child: Text("Aucun produit sélectionné.")),
+
+                              // Summary Section
                               Divider(thickness: 1, color: Colors.black),
                               Row(
                                 mainAxisAlignment:
@@ -412,7 +424,8 @@ class Addorder {
                                   ),
                                 ],
                               ),
-                              // Section Client ajoutée ici
+
+                              // Client Section
                               Divider(thickness: 1, color: Colors.black),
                               Row(
                                 mainAxisAlignment:
@@ -438,6 +451,8 @@ class Addorder {
                                   ),
                                 ],
                               ),
+
+                              // Final Total Section
                               Divider(thickness: 1, color: Colors.black),
                               Row(
                                 mainAxisAlignment:
@@ -1113,29 +1128,47 @@ class Addorder {
     bool isPercentageDiscount,
   ) {
     double total = 0.0;
+
     for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+      final product = selectedProducts[i];
+      final quantity = quantityProducts[i];
+      final discount = discounts[i];
+      final isPercentage = typeDiscounts[i];
 
-      if (typeDiscounts[i]) {
-        productTotal *= (1 - discounts[i] / 100);
+      // Get base price (variant price if exists)
+      double basePrice = product.hasVariants && product.variants.isNotEmpty
+          ? product.variants
+              .firstWhere(
+                (v) => v.defaultVariant,
+                orElse: () => product.variants.first,
+              )
+              .finalPrice
+          : product.prixTTC;
+
+      // Calculate product total with individual discount
+      double productTotal = basePrice * quantity;
+
+      if (isPercentage) {
+        productTotal *= (1 - discount / 100);
       } else {
-        productTotal -= discounts[i];
+        productTotal -= discount;
       }
 
-      if (productTotal < 0) {
-        productTotal = 0.0;
-      }
+      // Ensure price doesn't go negative
+      if (productTotal < 0) productTotal = 0.0;
 
       total += productTotal;
     }
 
+    // Apply global discount
     if (isPercentageDiscount) {
       total *= (1 - globalDiscount / 100);
     } else {
       total -= globalDiscount;
     }
 
-    return total;
+    // Ensure final total doesn't go negative
+    return total < 0 ? 0.0 : total;
   }
 
   static double calculateTotalBeforeDiscount(
@@ -1145,10 +1178,29 @@ class Addorder {
     List<bool> typeDiscounts,
   ) {
     double total = 0.0;
+
     for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
-      total += productTotal;
+      final product = selectedProducts[i];
+      final quantity = quantityProducts[i];
+
+      // Determine the base price (variant price if exists, otherwise product price)
+      double basePrice;
+
+      if (product.hasVariants && product.variants.isNotEmpty) {
+        // Try to find selected variant first, then default variant, then first variant
+        final selectedVariant = product.variants.firstWhere(
+          (v) => v.defaultVariant,
+          orElse: () => product.variants.first,
+        );
+        basePrice = selectedVariant.finalPrice;
+      } else {
+        basePrice = product.prixTTC;
+      }
+
+      // Add to total without applying discounts (this is BEFORE discount calculation)
+      total += basePrice * quantity;
     }
+
     return total;
   }
 }
