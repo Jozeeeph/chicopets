@@ -815,8 +815,9 @@ class Addorder {
                                         setState(() {
                                           numberOfTickets =
                                               int.tryParse(value) ?? 1;
-                                          if (numberOfTickets < 1)
+                                          if (numberOfTickets < 1) {
                                             numberOfTickets = 1;
+                                          }
                                         });
                                       },
                                     ),
@@ -972,8 +973,9 @@ class Addorder {
       int productIndex = selectedProducts.indexOf(product);
       return OrderLine(
         idOrder: 0,
-        idProduct: product.code,
-        quantite: quantityProducts[productIndex],
+        productCode: product.code,
+        productId: product.id,
+        quantity: quantityProducts[productIndex],
         prixUnitaire: product.prixTTC,
         discount: discounts[productIndex],
         isPercentage: typeDiscounts[productIndex],

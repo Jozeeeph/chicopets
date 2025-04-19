@@ -15,8 +15,7 @@ class OrderController {
         'remaining_amount': order.remainingAmount,
         'id_client': order.idClient,
         'global_discount': order.globalDiscount,
-        'is_percentage_discount':
-            order.isPercentageDiscount ? 1 : 0, // Added field
+        'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
       },
     );
 
@@ -26,12 +25,12 @@ class OrderController {
         'order_items',
         {
           'id_order': orderId,
-          'product_code': orderLine.idProduct,
-          'quantity': orderLine.quantite,
+          'product_code': orderLine.productCode,
+          'product_id': orderLine.productId,
+          'quantity': orderLine.quantity,
           'prix_unitaire': orderLine.prixUnitaire,
           'discount': orderLine.discount,
-          'isPercentage':
-              orderLine.isPercentage ? 1 : 0, // Convert bool to int (1 or 0)
+          'isPercentage': orderLine.isPercentage ? 1 : 0,
         },
       );
     }
@@ -48,52 +47,80 @@ class OrderController {
     );
   }
 
-  Future<List<Order>> getOrdersWithOrderLines(db1) async {
-    // Fetch all orders
-    List<Map<String, dynamic>> ordersData = await db1.query("orders");
-    List<Order> orders = [];
+  Future<List<Order>> getOrdersWithOrderLines(dbClient) async {
+    final ordersData = await dbClient.query("orders");
+    final orders = <Order>[];
 
-    for (var orderMap in ordersData) {
-      int orderId = orderMap['id_order'];
-      double total = (orderMap['total'] ?? 0.0) as double;
-      double remaining = (orderMap['remaining_amount'] ?? 0.0) as double;
-      double globalDiscount = (orderMap['global_discount'] ?? 0.0) as double;
-      bool isPercentageDiscount =
-          (orderMap['is_percentage_discount'] as int?) == 1;
-      int? idClient = orderMap['id_client'] as int?; // Récupérez l'ID client
-
-      List<Map<String, dynamic>> orderLinesData = await db1.query(
+    for (final orderMap in ordersData) {
+      final orderId = orderMap['id_order'] as int;
+      
+      // Fetch order lines
+      final orderLinesData = await dbClient.query(
         "order_items",
         where: "id_order = ?",
         whereArgs: [orderId],
       );
 
-      List<OrderLine> orderLines = orderLinesData.map((line) {
-        return OrderLine(
-          idOrder: orderId,
-          idProduct: line['product_code'].toString(),
-          quantite: (line['quantity'] ?? 1) as int,
-          prixUnitaire: (line['prix_unitaire'] ?? 0.0) as double,
-          discount: (line['discount'] ?? 0.0) as double,
-          isPercentage: (line['isPercentage'] as int?) == 1,
-        );
-      }).toList();
+      final orderLines = await _buildOrderLines(dbClient, orderLinesData);
 
       orders.add(Order(
         idOrder: orderId,
         date: orderMap['date'],
-        total: total,
-        modePaiement: orderMap['mode_paiement'] ?? "N/A",
-        status: orderMap['status'],
+        total: (orderMap['total'] as num).toDouble(),
+        modePaiement: orderMap['mode_paiement'] as String,
+        status: orderMap['status'] as String,
         orderLines: orderLines,
-        remainingAmount: remaining,
-        globalDiscount: globalDiscount,
-        isPercentageDiscount: isPercentageDiscount,
-        idClient: idClient, // Passez l'ID client ici
+        remainingAmount: (orderMap['remaining_amount'] as num).toDouble(),
+        globalDiscount: (orderMap['global_discount'] as num).toDouble(),
+        isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
+        idClient: orderMap['id_client'] as int?,
       ));
     }
 
     return orders;
+  }
+
+  Future<List<OrderLine>> _buildOrderLines(dbClient, List<Map<String, dynamic>> orderLinesData) async {
+    final orderLines = <OrderLine>[];
+
+    for (final line in orderLinesData) {
+      Product? product;
+      
+      // Try to fetch product by ID first, then by code
+      if (line['product_id'] != null) {
+        final productMaps = await dbClient.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [line['product_id']],
+        );
+        if (productMaps.isNotEmpty) {
+          product = Product.fromMap(productMaps.first);
+        }
+      }
+
+      if (product == null && line['product_code'] != null) {
+        final productMaps = await dbClient.query(
+          'products',
+          where: 'code = ?',
+          whereArgs: [line['product_code']],
+        );
+        if (productMaps.isNotEmpty) {
+          product = Product.fromMap(productMaps.first);
+        }
+      }
+
+      orderLines.add(OrderLine(
+        idOrder: line['id_order'] as int,
+        productCode: line['product_code']?.toString(),
+        productId: line['product_id'] as int?,
+        quantity: line['quantity'] as int,
+        prixUnitaire: product?.prixTTC ?? (line['prix_unitaire'] as num).toDouble(),
+        discount: (line['discount'] as num).toDouble(),
+        isPercentage: (line['isPercentage'] as int) == 1,
+      ));
+    }
+
+    return orderLines;
   }
 
   Future<void> deleteOrder(int idOrder, dbClient) async {
@@ -105,7 +132,6 @@ class OrderController {
   }
 
   Future<int> cancelOrder(int idOrder, dbClient) async {
-    // Update the status of the order to "Annulée"
     return await dbClient.update(
       'orders',
       {'status': 'Annulée'},
@@ -116,85 +142,93 @@ class OrderController {
 
   Future<void> updateOrderInDatabase(Order order, dbClient) async {
     try {
-      // Update the order with the new remaining amount and status
       await dbClient.update(
-        'orders', // Table name
+        'orders',
         {
           'remaining_amount': order.remainingAmount,
           'status': order.status,
+          'global_discount': order.globalDiscount,
+          'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
         },
         where: 'id_order = ?',
-        whereArgs: [order.idOrder], // The ID of the order to update
+        whereArgs: [order.idOrder],
       );
+
+      // Update order lines if needed
+      await _updateOrderLines(order, dbClient);
     } catch (e) {
-      // Handle any errors during the update
       print('Error updating order: $e');
       throw Exception('Error updating order');
     }
   }
 
+  Future<void> _updateOrderLines(Order order, dbClient) async {
+    // First delete existing order lines
+    await dbClient.delete(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
+
+    // Then insert the updated ones
+    for (final orderLine in order.orderLines) {
+      await dbClient.insert(
+        'order_items',
+        {
+          'id_order': order.idOrder,
+          'product_code': orderLine.productCode,
+          'product_id': orderLine.productId,
+          'quantity': orderLine.quantity,
+          'prix_unitaire': orderLine.prixUnitaire,
+          'discount': orderLine.discount,
+          'isPercentage': orderLine.isPercentage ? 1 : 0,
+        },
+      );
+    }
+  }
+
   Future<List<Order>> getOrders(dbClient) async {
-    List<Map<String, dynamic>> orderMaps = await dbClient.query('orders');
+    final orderMaps = await dbClient.query('orders');
+    final orders = <Order>[];
 
-    List<Order> orders = [];
-    for (var orderMap in orderMaps) {
-      int orderId = orderMap['id_order'];
-
-      // Fetch order lines from order_items
-      List<Map<String, dynamic>> itemMaps = await dbClient.query(
+    for (final orderMap in orderMaps) {
+      final orderId = orderMap['id_order'] as int;
+      final orderLinesData = await dbClient.query(
         'order_items',
         where: 'id_order = ?',
         whereArgs: [orderId],
       );
 
-      List<OrderLine> orderLines = [];
+      final orderLines = await _buildOrderLines(dbClient, orderLinesData);
 
-      for (var itemMap in itemMaps) {
-        // Fetch the product details
-        List<Map<String, dynamic>> productMaps = await dbClient.query(
-          'products',
-          where: 'code = ?',
-          whereArgs: [itemMap['product_code']],
-        );
-
-        if (productMaps.isNotEmpty) {
-          Product product = Product.fromMap(productMaps.first);
-
-          // Create an OrderLine for each item, including isPercentage
-          orderLines.add(OrderLine(
-            idOrder: orderId,
-            idProduct: itemMap['product_code'],
-            quantite: itemMap['quantity'] ?? 1, // Default to 1 if null
-            prixUnitaire: product.prixTTC, // TTC price from product
-            discount: (itemMap['discount'] ?? 0.0).toDouble(), // Ensure double
-            isPercentage:
-                (itemMap['isPercentage'] ?? 1) == 1, // Convert 0/1 to bool
-          ));
-        }
-      }
-
-      // Create the Order object with the list of OrderLines
       orders.add(Order(
-          idOrder: orderId,
-          date: orderMap['date'],
-          orderLines: orderLines,
-          total: (orderMap['total'] ?? 0.0).toDouble(), // Ensure double
-          modePaiement: orderMap['mode_paiement'] ?? "N/A",
-          status: orderMap['status'] ?? "Pending",
-          idClient: orderMap['id_client'],
-          globalDiscount: orderMap['global_discount'].toDouble(),
-          isPercentageDiscount: orderMap['is_percentage_discount']));
+        date: orderMap['date'],
+        total: (orderMap['total'] as num).toDouble(),
+        modePaiement: orderMap['mode_paiement'] as String,
+        status: orderMap['status'] as String,
+        orderLines: orderLines,
+        remainingAmount: (orderMap['remaining_amount'] as num).toDouble(),
+        globalDiscount: (orderMap['global_discount'] as num).toDouble(),
+        isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
+        idClient: orderMap['id_client'] as int?,
+      ));
     }
 
     return orders;
   }
 
-  Future<void> debugCheckOrder(int orderId,dbClient) async {
+  Future<void> debugCheckOrder(int orderId, dbClient) async {
     final order = await dbClient.query(
       'orders',
       where: 'id_order = ?',
       whereArgs: [orderId],
     );
+    
+    if (order.isEmpty) {
+      print('Order not found');
+      return;
+    }
+
     print('Order from DB: ${order.first}');
 
     if (order.first['id_client'] != null) {
@@ -205,5 +239,13 @@ class OrderController {
       );
       print('Associated client: ${client.isNotEmpty ? client.first : 'None'}');
     }
+
+    // Print order lines
+    final orderLines = await dbClient.query(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
+    print('Order lines: $orderLines');
   }
 }

@@ -131,7 +131,7 @@ class Getorderlist {
   static double calculateTotalBeforeDiscount(Order order) {
     double total = 0.0;
     for (var orderLine in order.orderLines) {
-      total += orderLine.prixUnitaire * orderLine.quantite;
+      total += orderLine.prixUnitaire * orderLine.quantity;
     }
     return total;
   }
@@ -141,10 +141,10 @@ class Getorderlist {
     final SqlDb sqldb = SqlDb();
 
     // Annuler la ligne de commande
-    await sqldb.cancelOrderLine(order.idOrder!, orderLine.idProduct ?? '');
+    await sqldb.cancelOrderLine(order.idOrder!, orderLine.productCode ?? '');
 
     // Restocker le produit
-    await sqldb.updateProductStock(orderLine.idProduct ?? '', orderLine.quantite);
+    await sqldb.updateProductStock(orderLine.productCode ?? '', orderLine.quantity);
 
     // Recalculer le total de la commande
     final dbClient = await sqldb.db;
@@ -157,8 +157,8 @@ class Getorderlist {
     double newTotal = 0.0;
     for (var line in remainingOrderLines) {
       double prixUnitaire = line['prix_unitaire'] as double;
-      int quantite = line['quantity'] as int;
-      newTotal += prixUnitaire * quantite;
+      int quantity = line['quantity'] as int;
+      newTotal += prixUnitaire * quantity;
     }
 
     // Mettre à jour le total de la commande dans la base de données
@@ -172,7 +172,7 @@ class Getorderlist {
     // Mettre à jour l'objet Order localement
     order.total = newTotal;
     order.orderLines
-        .removeWhere((line) => line.idProduct == orderLine.idProduct);
+        .removeWhere((line) => line.productCode == orderLine.productCode);
 
     // Rafraîchir la liste des commandes
     Navigator.pop(context); // Fermer la boîte de dialogue
@@ -267,7 +267,7 @@ class Getorderlist {
                             ...order.orderLines.map((orderLine) {
                               return FutureBuilder<Product?>(
                                 future:
-                                    sqldb.getProductByCode(orderLine.idProduct ?? ''),
+                                    sqldb.getProductById(orderLine.productId!),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState ==
                                       ConnectionState.waiting) {
@@ -298,7 +298,7 @@ class Getorderlist {
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            "x${orderLine.quantite}",
+                                            "x${orderLine.quantity}",
                                             style: const TextStyle(
                                                 fontSize: 16,
                                                 color: Color(0xFF000000)),
@@ -345,7 +345,7 @@ class Getorderlist {
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            "${(orderLine.finalPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                                            "${(orderLine.finalPrice * orderLine.quantity).toStringAsFixed(2)} DT",
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
@@ -653,7 +653,7 @@ class Getorderlist {
                 // Liste des produits
                 ...order.orderLines.map((orderLine) {
                   return FutureBuilder<Product?>(
-                    future: sqldb.getProductByCode(orderLine.idProduct ?? ''),
+                    future: sqldb.getProductByCode(orderLine.productCode ?? ''),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
@@ -681,7 +681,7 @@ class Getorderlist {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                "x${orderLine.quantite}",
+                                "x${orderLine.quantity}",
                                 style: TextStyle(
                                     fontSize: 16, color: Color(0xFF000000)),
                               ),
@@ -707,7 +707,7 @@ class Getorderlist {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                                "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -956,11 +956,11 @@ class Getorderlist {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    "x${orderLine.quantite}",
+                    "x${orderLine.quantity}",
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    orderLine.idProduct ?? '',
+                    orderLine.productCode ?? '',
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
@@ -968,7 +968,7 @@ class Getorderlist {
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    "${(discountedPrice * orderLine.quantite).toStringAsFixed(2)} DT",
+                    "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
                     style: pw.TextStyle(fontSize: 8),
                   ),
                 ],

@@ -16,7 +16,6 @@ import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/subcategory.dart';
-import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -36,7 +35,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -90,17 +89,20 @@ class SqlDb {
         print("Orders table created");
 
         await db.execute('''
-  CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Clé primaire auto-incrémentée
+ CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_order INTEGER NOT NULL,
-    product_code TEXT NOT NULL,
+    product_code TEXT,
+    product_id INTEGER,
     quantity INTEGER NOT NULL,
     prix_unitaire REAL DEFAULT 0 NOT NULL,
     discount REAL NOT NULL,
-    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)), -- Booléen sécurisé
+    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)),
     FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
-    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE
-  )
+    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CHECK (product_code IS NOT NULL OR product_id IS NOT NULL) -- Ensure at least one reference exists
+);
 ''');
 
         print("Order items table created");
@@ -203,6 +205,11 @@ class SqlDb {
     if (code == null) return null;
     final dbClient = await db;
     return await ProductController().getProductByCode(code, dbClient);
+  }
+
+  Future<Product?> getProductById(int id) async {
+    final dbClient = await db;
+    return await ProductController().getProductById(id, dbClient);
   }
 
   Future<int> updateProductWithoutId(Product product) async {

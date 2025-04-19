@@ -262,7 +262,7 @@ class _ManageCommandState extends State<ManageCommand> {
                         ...order.orderLines.map((orderLine) {
                           return FutureBuilder<Product?>(
                             future:
-                                sqlDb.getDesignationByCode(orderLine.idProduct ?? ''),
+                                sqlDb.getProductById(orderLine.productId!),
                             builder: (context, productSnapshot) {
                               if (productSnapshot.connectionState ==
                                   ConnectionState.waiting) {
@@ -299,7 +299,7 @@ class _ManageCommandState extends State<ManageCommand> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    'Quantité: ${orderLine.quantite} - Prix: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantite * (1 - orderLine.discount / 100)).toStringAsFixed(2) : (orderLine.prixUnitaire * orderLine.quantite - orderLine.discount).toStringAsFixed(2)} DT',
+                                    'Quantité: ${orderLine.quantity} - Prix: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantity * (1 - orderLine.discount / 100)).toStringAsFixed(2) : (orderLine.prixUnitaire * orderLine.quantity - orderLine.discount).toStringAsFixed(2)} DT',
                                     style:
                                         const TextStyle(color: Colors.black87),
                                   ),

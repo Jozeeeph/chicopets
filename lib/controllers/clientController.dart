@@ -81,8 +81,9 @@ class Clientcontroller {
       List<OrderLine> orderLines = itemMaps.map((itemMap) {
         return OrderLine(
           idOrder: orderId,
-          idProduct: itemMap['product_code'],
-          quantite: itemMap['quantity'],
+          productCode: itemMap['product_code'],
+          productId: itemMap['product_id'],
+          quantity: itemMap['quantity'],
           prixUnitaire: itemMap['prix_unitaire'],
           discount: itemMap['discount'],
           isPercentage: itemMap['isPercentage'] == 1,

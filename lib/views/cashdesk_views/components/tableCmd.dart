@@ -392,7 +392,7 @@ class _TableCmdState extends State<TableCmd> {
                                           Expanded(
                                             child: Text(
                                               hasVariants
-                                                  ? '${variant!.price.toStringAsFixed(2)} DT'
+                                                  ? '${variant!.finalPrice.toStringAsFixed(2)} DT'
                                                   : '${product.prixTTC.toStringAsFixed(2)} DT',
                                             ),
                                           ),
