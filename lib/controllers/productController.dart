@@ -300,8 +300,10 @@ class ProductController {
   }
 
   Future<List<Map<String, dynamic>>> getProductsPurchasedByClient(
-      int clientId, Database dbClient) async {
-    return await dbClient.rawQuery('''
+    int clientId, Database dbClient) async {
+  print('Recherche des produits pour client ID: $clientId');
+  
+  final results = await dbClient.rawQuery('''
     SELECT 
       p.designation,
       p.code,
@@ -326,12 +328,17 @@ class ProductController {
       orders o ON oi.id_order = o.id_order
     WHERE 
       o.id_client = ?
-      AND o.status != 'cancelled'  // Exclure les commandes annulées
-      AND p.is_deleted = 0         // Exclure les produits supprimés
+      AND o.status != 'cancelled'
+      AND p.is_deleted = 0
     GROUP BY 
       p.designation, p.code
     ORDER BY 
       total_quantity DESC
   ''', [clientId]);
-  }
+
+  print('Résultats trouvés: ${results.length}');
+  results.forEach(print); // Affiche chaque résultat
+  
+  return results;
+}
 }

@@ -164,50 +164,74 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
   }
 
   void _showClientProducts(BuildContext context, Client client) async {
-    final products = await _sqlDb.getProductsPurchasedByClient(client.id!);
+    try {
+      // Afficher un indicateur de chargement
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(child: CircularProgressIndicator()),
+      );
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Produits achetés par ${client.name} ${client.firstName}'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: products.isEmpty
-              ? Center(child: Text('Aucun produit acheté'))
-              : SingleChildScrollView(
-                  child: DataTable(
-                    columns: [
-                      DataColumn(label: Text('Produit')),
-                      DataColumn(
-                          label: Text('Quantité', textAlign: TextAlign.end)),
-                      DataColumn(
-                          label:
-                              Text('Total dépensé', textAlign: TextAlign.end)),
-                    ],
-                    rows: products.map((product) {
-                      return DataRow(cells: [
-                        DataCell(Text(product['designation'] ?? 'Inconnu')),
-                        DataCell(Text(
-                          product['total_quantity'].toString(),
-                          textAlign: TextAlign.end,
-                        )),
-                        DataCell(Text(
-                          '${product['total_spent']?.toStringAsFixed(2) ?? '0.00'} DT',
-                          textAlign: TextAlign.end,
-                        )),
-                      ]);
-                    }).toList(),
+      final products = await _sqlDb.getProductsPurchasedByClient(client.id!);
+
+      // Fermer l'indicateur de chargement
+      Navigator.of(context).pop();
+
+      if (products.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ce client n\'a acheté aucun produit')),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Historique d\'achats'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: products.length,
+              itemBuilder: (context, index) {
+                final product = products[index];
+                return Card(
+                  margin: EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading:
+                        Icon(Icons.shopping_basket, color: widget.tealGreen),
+                    title: Text(product['designation'] ?? 'Produit inconnu'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Quantité: ${product['total_quantity']}'),
+                        Text(
+                            'Total dépensé: ${product['total_spent']?.toStringAsFixed(2) ?? '0.00'} DT'),
+                      ],
+                    ),
                   ),
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Fermer'),
+                );
+              },
+            ),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Fermer', style: TextStyle(color: widget.deepBlue)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      Navigator.of(context)
+          .pop(); // Fermer l'indicateur de chargement en cas d'erreur
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: ${e.toString()}'),
+          backgroundColor: widget.warmRed,
+        ),
+      );
+    }
   }
 
   void _showClientForm([Client? client]) {
@@ -436,27 +460,7 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                                         Row(
                                           children: [
                                             // Icône pour afficher les commandes
-                                            GestureDetector(
-                                              onTap: () => _showClientOrders(
-                                                  context, client),
-                                              child: Icon(
-                                                Icons.receipt,
-                                                color: widget.deepBlue,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            SizedBox(width: 8),
-                                            // Icône pour afficher les produits achetés
-                                            GestureDetector(
-                                              onTap: () => _showClientProducts(
-                                                  context, client),
-                                              child: Icon(
-                                                Icons.shopping_basket,
-                                                color: widget.softOrange,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            SizedBox(width: 8),
+
                                             Text(
                                               '${client.name} ${client.firstName}',
                                               style: TextStyle(
@@ -480,14 +484,59 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       if (widget.onClientSelected != null)
-                                        IconButton(
-                                          icon: Icon(Icons.check_circle,
-                                              color: widget.tealGreen),
-                                          onPressed: () {
-                                            widget.onClientSelected
-                                                ?.call(client);
-                                          },
+                                        InkWell(
+                                          onTap: () => _showClientOrders(
+                                              context, client),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: widget.lightGray,
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.receipt,
+                                                    size: 16,
+                                                    color: widget.deepBlue),
+                                                SizedBox(width: 4),
+                                                Text('Commandes',
+                                                    style: TextStyle(
+                                                        fontSize: 12)),
+                                              ],
+                                            ),
+                                          ),
                                         ),
+                                      SizedBox(width: 8),
+                                      // Bouton Produits
+                                      InkWell(
+                                        onTap: () => _showClientProducts(
+                                            context, client),
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: widget.lightGray,
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.shopping_basket,
+                                                  size: 16,
+                                                  color: widget.softOrange),
+                                              SizedBox(width: 4),
+                                              Text('Produits',
+                                                  style:
+                                                      TextStyle(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
                                       IconButton(
                                         icon: Icon(Icons.edit,
                                             color: widget.softOrange),
