@@ -5,12 +5,21 @@ class Order {
   String date;
   List<OrderLine> orderLines;
   double total;
-  String modePaiement;
+  String modePaiement; // Peut être "Espèce", "TPE", "Chèque", "Mixte"
   String status;
   double remainingAmount;
   int? idClient;
-  double globalDiscount; 
-  bool isPercentageDiscount; 
+  double globalDiscount;
+  bool isPercentageDiscount;
+
+  // Nouveaux champs pour les paiements mixtes
+  double? cashAmount;
+  double? cardAmount;
+  double? checkAmount;
+  String? checkNumber; // Numéro du chèque
+  String? cardTransactionId; // ID de transaction TPE
+  DateTime? checkDate; // Date du chèque
+  String? bankName; // Nom de la banque pour les chèques
 
   Order({
     this.idOrder,
@@ -21,11 +30,17 @@ class Order {
     this.status = "non payée",
     this.remainingAmount = 0.0,
     this.idClient,
-    required this.globalDiscount, // Added field
-    required this.isPercentageDiscount, // Added field
+    required this.globalDiscount,
+    required this.isPercentageDiscount,
+    this.cashAmount,
+    this.cardAmount,
+    this.checkAmount,
+    this.checkNumber,
+    this.cardTransactionId,
+    this.checkDate,
+    this.bankName,
   });
 
-  // Convert Order object to a Map
   Map<String, dynamic> toMap() {
     return {
       'id_order': idOrder,
@@ -35,12 +50,18 @@ class Order {
       'status': status,
       'remaining_amount': remainingAmount,
       'id_client': idClient,
-      'global_discount': globalDiscount, // Added field
-      'is_percentage_discount': isPercentageDiscount ? 1 : 0, // Added field
+      'global_discount': globalDiscount,
+      'is_percentage_discount': isPercentageDiscount ? 1 : 0,
+      'cash_amount': cashAmount,
+      'card_amount': cardAmount,
+      'check_amount': checkAmount,
+      'check_number': checkNumber,
+      'card_transaction_id': cardTransactionId,
+      'check_date': checkDate?.toIso8601String(),
+      'bank_name': bankName,
     };
   }
 
-  // Create an Order object from a Map
   factory Order.fromMap(Map<String, dynamic> map, List<OrderLine> orderLines) {
     return Order(
       idOrder: map['id_order'],
@@ -51,8 +72,17 @@ class Order {
       status: map['status'] ?? "non payée",
       remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0,
       idClient: map['id_client'],
-      globalDiscount: map['global_discount'], // Added field
-      isPercentageDiscount: map['is_percentage_discount'] == 1, // Added field
+      globalDiscount: map['global_discount'],
+      isPercentageDiscount: map['is_percentage_discount'] == 1,
+      cashAmount: map['cash_amount']?.toDouble(),
+      cardAmount: map['card_amount']?.toDouble(),
+      checkAmount: map['check_amount']?.toDouble(),
+      checkNumber: map['check_number'],
+      cardTransactionId: map['card_transaction_id'],
+      checkDate: map['check_date'] != null 
+          ? DateTime.parse(map['check_date']) 
+          : null,
+      bankName: map['bank_name'],
     );
   }
 

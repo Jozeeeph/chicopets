@@ -35,7 +35,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     if (!Directory(appSupportDir.path).existsSync()) {
@@ -74,18 +74,25 @@ class SqlDb {
         print("Products table created");
 
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
-  id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-  date TEXT,
-  total REAL,
-  mode_paiement TEXT,
-  status TEXT,
-  remaining_amount REAL,
-  id_client INTEGER,
-  global_discount REAL DEFAULT 0.0,
-  is_percentage_discount INTEGER DEFAULT 1 -- 1 for true (percentage), 0 for false (fixed value)
-);
-      ''');
+   CREATE TABLE IF NOT EXISTS orders(
+    id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    total REAL,
+    mode_paiement TEXT,
+    status TEXT,
+    remaining_amount REAL,
+    id_client INTEGER,
+    global_discount REAL DEFAULT 0.0,
+    is_percentage_discount INTEGER DEFAULT 1,
+    cash_amount REAL,
+    card_amount REAL,
+    check_amount REAL,
+    check_number TEXT,
+    card_transaction_id TEXT,
+    check_date TEXT,
+    bank_name TEXT
+  );
+''');
         print("Orders table created");
 
         await db.execute('''

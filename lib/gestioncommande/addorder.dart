@@ -6,9 +6,57 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/views/client_views/client_management.dart';
-import 'package:caissechicopets/gestioncommande/getorderlist.dart'; // Add this import
+import 'package:caissechicopets/gestioncommande/getorderlist.dart';
+import 'package:intl/intl.dart'; // Add this import
 
 class Addorder {
+  Future<bool> processCardPayment(double amount, String currency) async {
+    try {
+      // Ici vous devrez utiliser l'API de votre terminal de paiement
+      // Ceci est un exemple générique
+
+      // Simuler une connexion au terminal
+      bool connected = await _connectToPaymentTerminal();
+      if (!connected) {
+        throw Exception("Impossible de se connecter au terminal de paiement");
+      }
+
+      // Envoyer la demande de paiement
+      final transactionResult = await _sendPaymentRequest(amount, currency);
+
+      // Vérifier si le paiement a été accepté
+      if (transactionResult['status'] == 'approved') {
+        return true;
+      } else {
+        throw Exception(transactionResult['message'] ?? "Paiement refusé");
+      }
+    } catch (e) {
+      print("Erreur lors du paiement par carte: $e");
+      rethrow;
+    }
+  }
+
+  Future<bool> _connectToPaymentTerminal() async {
+    // Implémentez la connexion au terminal
+    return true; // Simuler une connexion réussie
+  }
+
+  Future<Map<String, dynamic>> _sendPaymentRequest(
+      double amount, String currency) async {
+    // Implémentez l'envoi de la demande de paiement
+    await Future.delayed(
+        Duration(seconds: 2)); // Simuler un délai de traitement
+
+    // Simuler une réponse réussie
+    return {
+      'status': 'approved',
+      'transaction_id': 'TRX-${DateTime.now().millisecondsSinceEpoch}',
+      'amount': amount,
+      'currency': currency,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+  }
+
   static void _showClientSelection(
       BuildContext context, Function(Client) onClientSelected) {
     showDialog(
@@ -98,7 +146,15 @@ class Addorder {
     double amountGiven = 0.0;
     double changeReturned = 0.0;
     TextEditingController amountGivenController = TextEditingController();
+    TextEditingController amountGivenTPEController = TextEditingController();
+    TextEditingController amountGivenChequeController = TextEditingController();
+
     TextEditingController changeReturnedController = TextEditingController();
+
+    String? checkNumber; // For cheque number
+    String? cardTransactionId; // For TPE transaction ID
+    DateTime? checkDate; // For cheque date
+    String? bankName;
 
     double globalDiscount = order.globalDiscount;
     double globalDiscountValue = 0.0;
@@ -113,6 +169,9 @@ class Addorder {
         isPercentageDiscount ? globalDiscount : globalDiscountValue,
         isPercentageDiscount);
     String selectedPaymentMethod = "Espèce";
+    double cashAmount = 0.0;
+    double cardAmount = 0.0;
+    double checkAmount = 0.0;
 
     TextEditingController globalDiscountController =
         TextEditingController(text: globalDiscount.toString());
@@ -244,276 +303,260 @@ class Addorder {
                       Expanded(
                         flex: 5,
                         child: Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.black, width: 1),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(2, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Header
-                              Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.receipt, size: 24),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "Ticket de Commande",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    ),
-                                  ],
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.black, width: 1),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(2, 2),
                                 ),
-                              ),
-                              Divider(thickness: 1, color: Colors.black),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.receipt, size: 24),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        "Ticket de Commande",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Divider(thickness: 1, color: Colors.black),
 
-                              // Column Headers
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4),
-                                child: Row(
+                                // Column Headers
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        flex: 1,
+                                        child: Text(
+                                          "Qt",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 3,
+                                        child: Text(
+                                          "Article",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          "Prix U",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          "Montant",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.end,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Divider(thickness: 1, color: Colors.black),
+
+                                if (selectedProducts.isNotEmpty)
+                                  ...selectedProducts.map((product) {
+                                    int index =
+                                        selectedProducts.indexOf(product);
+
+                                    // Get default or first variant
+                                    Variant? selectedVariant =
+                                        product.hasVariants &&
+                                                product.variants.isNotEmpty
+                                            ? product.variants.firstWhere(
+                                                (v) => v.defaultVariant,
+                                                orElse: () =>
+                                                    product.variants.first,
+                                              )
+                                            : null;
+
+                                    double basePrice =
+                                        selectedVariant?.finalPrice ??
+                                            product.prixTTC;
+                                    double discountedPrice =
+                                        typeDiscounts[index]
+                                            ? basePrice *
+                                                (1 - discounts[index] / 100)
+                                            : basePrice - discounts[index];
+
+                                    String productName = product.designation;
+                                    if (selectedVariant != null) {
+                                      productName +=
+                                          " (${selectedVariant.combinationName.isNotEmpty ? selectedVariant.combinationName : selectedVariant.code})";
+                                    }
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text(
+                                                "${quantityProducts[index]}X"),
+                                          ),
+                                          Expanded(
+                                            flex: 3,
+                                            child: Text(productName,
+                                                overflow:
+                                                    TextOverflow.ellipsis),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              "${discountedPrice.toStringAsFixed(2)} DT",
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
+                                              textAlign: TextAlign.end,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList()
+                                else
+                                  Center(
+                                      child:
+                                          Text("Aucun produit sélectionné.")),
+
+                                // Client Section
+                                Divider(thickness: 1, color: Colors.black),
+                                Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Expanded(
-                                      flex: 1,
-                                      child: Text(
-                                        "Qt",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    Text(
+                                      "Client:",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    Expanded(
-                                      flex: 3,
-                                      child: Text(
-                                        "Article",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text(
-                                        "Prix U",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text(
-                                        "Montant",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        textAlign: TextAlign.end,
+                                    Text(
+                                      selectedClient != null
+                                          ? "${selectedClient!.name} ${selectedClient!.firstName}"
+                                          : "Non spécifié",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontStyle: selectedClient == null
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              Divider(thickness: 1, color: Colors.black),
 
-                              if (selectedProducts.isNotEmpty)
-                                ...selectedProducts.map((product) {
-                                  int index = selectedProducts.indexOf(product);
+                                // Section Totaux
+                                Divider(thickness: 1, color: Colors.black),
 
-                                  // Get default or first variant
-                                  Variant? selectedVariant = product
-                                              .hasVariants &&
-                                          product.variants.isNotEmpty
-                                      ? product.variants.firstWhere(
-                                          (v) => v.defaultVariant,
-                                          orElse: () => product.variants.first,
-                                        )
-                                      : null;
-
-                                  double basePrice =
-                                      selectedVariant?.finalPrice ??
-                                          product.prixTTC;
-                                  double discountedPrice = typeDiscounts[index]
-                                      ? basePrice * (1 - discounts[index] / 100)
-                                      : basePrice - discounts[index];
-
-                                  String productName = product.designation;
-                                  if (selectedVariant != null) {
-                                    productName +=
-                                        " (${selectedVariant.combinationName.isNotEmpty ? selectedVariant.combinationName : selectedVariant.code})";
-                                  }
-
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                              "${quantityProducts[index]}X"),
+                                // Afficher différemment selon la présence de remise
+                                if (globalDiscount > 0 ||
+                                    discounts.any((d) => d > 0)) ...[
+                                  // CAS AVEC REMISE - Afficher les deux totaux
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "Total avant remise:",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        Expanded(
-                                          flex: 3,
-                                          child: Text(productName,
-                                              overflow: TextOverflow.ellipsis),
+                                      ),
+                                      Text(
+                                        "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Text(
-                                            "${discountedPrice.toStringAsFixed(2)} DT",
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Text(
-                                            "${(discountedPrice * quantityProducts[index]).toStringAsFixed(2)} DT",
-                                            textAlign: TextAlign.end,
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList()
-                              else
-                                Center(
-                                    child: Text("Aucun produit sélectionné.")),
-
-                              // Summary Section
-                              Divider(thickness: 1, color: Colors.black),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Total avant remise:",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    "${totalBeforeDiscount.toStringAsFixed(2)} DT",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "Remise:",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                      Text(
+                                        isPercentageDiscount
+                                            ? "${globalDiscount.toStringAsFixed(2)}%"
+                                            : "${globalDiscount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
-                              ),
 
-                              // Client Section
-                              Divider(thickness: 1, color: Colors.black),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Client:",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                // Total après remise (toujours affiché)
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Total:",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    selectedClient != null
-                                        ? "${selectedClient!.name} ${selectedClient!.firstName}"
-                                        : "Non spécifié",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontStyle: selectedClient == null
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              // Final Total Section
-                              Divider(thickness: 1, color: Colors.black),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Total après remise:",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  if (isPercentageDiscount &&
-                                      globalDiscount > 0)
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          "Remise: ${globalDiscount.toStringAsFixed(2)} %",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        Text(
-                                          "${total.toStringAsFixed(2)} DT",
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  else if (!isPercentageDiscount &&
-                                      globalDiscountValue > 0)
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          "Remise: ${globalDiscountValue.toStringAsFixed(2)} DT",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                        SizedBox(height: 4),
-                                        Text(
-                                          "${total.toStringAsFixed(2)} DT",
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  else
                                     Text(
                                       "${total.toStringAsFixed(2)} DT",
                                       style: TextStyle(
@@ -521,11 +564,120 @@ class Addorder {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
+                                  ],
+                                ),
+
+                                // Section Paiement (toujours affichée)
+                                Divider(thickness: 1, color: Colors.black),
+                                Text("Détails de paiement:",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                SizedBox(height: 4),
+
+                                // Détails selon le mode de paiement
+                                if (selectedPaymentMethod == "Espèce") ...[
+                                  Text("Mode: Espèces"),
+                                  Text(
+                                      "Montant donné: ${cashAmount.toStringAsFixed(2)} DT"),
+                                  if (changeReturned > 0)
+                                    Text(
+                                        "Monnaie rendue: ${changeReturned.toStringAsFixed(2)} DT"),
                                 ],
-                              ),
-                            ],
-                          ),
-                        ),
+
+                                if (selectedPaymentMethod == "TPE") ...[
+                                  Text("Mode: Carte"),
+                                  Text(
+                                      "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
+                                  if (cardTransactionId != null)
+                                    Text("Transaction: $cardTransactionId"),
+                                ],
+
+                                if (selectedPaymentMethod == "Chèque") ...[
+                                  Text("Mode: Chèque"),
+                                  Text(
+                                      "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
+                                  if (checkNumber != null)
+                                    Text("N°: $checkNumber"),
+                                  if (bankName != null)
+                                    Text("Banque: $bankName"),
+                                  if (checkDate != null)
+                                    Text(
+                                        "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                                ],
+
+                                if (selectedPaymentMethod == "Mixte") ...[
+                                  Text("Mode: Paiement mixte"),
+                                  if (cashAmount > 0)
+                                    Text(
+                                        "- Espèces: ${cashAmount.toStringAsFixed(2)} DT"),
+                                  if (cardAmount > 0) ...[
+                                    Text(
+                                        "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
+                                    if (cardTransactionId != null)
+                                      Text("  Transaction: $cardTransactionId"),
+                                  ],
+                                  if (checkAmount > 0) ...[
+                                    Text(
+                                        "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
+                                    if (checkNumber != null)
+                                      Text("  N°: $checkNumber"),
+                                    if (bankName != null)
+                                      Text("  Banque: $bankName"),
+                                    if (checkDate != null)
+                                      Text(
+                                          "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                                  ],
+                                ],
+
+                                Divider(thickness: 1, color: Colors.black),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Total payé:",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      "${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                if ((cashAmount + cardAmount + checkAmount) <
+                                    total) ...[
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "Reste à payer:",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                      Text(
+                                        "${(total - (cashAmount + cardAmount + checkAmount)).toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            )),
                       ),
 
                       SizedBox(width: 16),
@@ -704,6 +856,10 @@ class Addorder {
                           SizedBox(height: 16),
 
                           // Mode de paiement
+
+                          SizedBox(height: 16),
+
+                          // Montant donné et rendu
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -742,64 +898,378 @@ class Addorder {
                                     },
                                   ),
                                   Text("Chèque"),
+                                  Radio<String>(
+                                    value: "Mixte",
+                                    groupValue: selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPaymentMethod = value!;
+                                      });
+                                    },
+                                  ),
+                                  Text("Mixte"),
                                 ],
                               ),
-                            ],
-                          ),
 
-                          SizedBox(height: 16),
-
-                          // Montant donné et rendu
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              TextField(
-                                controller: amountGivenController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: "Montant donné (DT)",
-                                  border: OutlineInputBorder(),
-                                ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    String cleanedValue = cleanInput(value);
-                                    if (cleanedValue == 'NEGATIVE') {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            "Veuillez entrer un nombre positif.",
-                                            style:
-                                                TextStyle(color: Colors.white),
+                              // Ajoutez ces champs conditionnels
+                              if (selectedPaymentMethod == "Espèce")
+                                TextField(
+                                  controller: amountGivenController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: "Montant donné (DT)",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      String cleanedValue = cleanInput(value);
+                                      if (cleanedValue == 'NEGATIVE') {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                                "Veuillez entrer un nombre positif."),
+                                            backgroundColor: Colors.red,
                                           ),
-                                          backgroundColor: Colors.red,
-                                        ),
+                                        );
+                                        amountGivenController.text = '';
+                                        return;
+                                      }
+                                      amountGivenController.text = cleanedValue;
+                                      amountGivenController.selection =
+                                          TextSelection.fromPosition(
+                                        TextPosition(
+                                            offset: cleanedValue.length),
                                       );
-                                      amountGivenController.text = '';
-                                      return;
-                                    }
-                                    amountGivenController.text = cleanedValue;
-                                    amountGivenController.selection =
-                                        TextSelection.fromPosition(
-                                      TextPosition(offset: cleanedValue.length),
-                                    );
-                                    amountGiven =
-                                        double.tryParse(cleanedValue) ?? 0.0;
-                                    changeReturned = amountGiven - total;
-                                    changeReturnedController.text =
-                                        changeReturned.toStringAsFixed(2);
-                                  });
-                                },
-                              ),
-                              SizedBox(height: 10),
-                              TextField(
-                                controller: changeReturnedController,
-                                readOnly: true,
-                                decoration: InputDecoration(
-                                  labelText: "Monnaie rendue (DT)",
-                                  border: OutlineInputBorder(),
+                                      cashAmount =
+                                          double.tryParse(cleanedValue) ?? 0.0;
+                                      changeReturned = cashAmount - total;
+                                      changeReturnedController.text =
+                                          changeReturned.toStringAsFixed(2);
+                                    });
+                                  },
                                 ),
-                              ),
+                              if (selectedPaymentMethod == "TPE")
+                                Column(
+                                  children: [
+                                    TextField(
+                                      controller:
+                                          amountGivenTPEController, // Vide au début
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Montant par carte (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          String cleanedValue =
+                                              cleanInput(value);
+                                          if (cleanedValue == 'NEGATIVE') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif.")),
+                                            );
+                                            return;
+                                          }
+                                          cardAmount =
+                                              double.tryParse(cleanedValue) ??
+                                                  0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      onChanged: (value) => cardTransactionId =
+                                          value, // Add this line
+                                      decoration: InputDecoration(
+                                        labelText: "ID de transaction TPE",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              if (selectedPaymentMethod == "Chèque")
+                                Column(
+                                  children: [
+                                    TextField(
+                                      controller: amountGivenChequeController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Montant par chèque (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          String cleanedValue =
+                                              cleanInput(value);
+                                          if (cleanedValue == 'NEGATIVE') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif.")),
+                                            );
+                                            return;
+                                          }
+                                          checkAmount =
+                                              double.tryParse(cleanedValue) ??
+                                                  0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      onChanged: (value) =>
+                                          checkNumber = value, // Add this line
+                                      decoration: InputDecoration(
+                                        labelText: "Numéro du chèque",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      onChanged: (value) =>
+                                          bankName = value, // Add this line
+                                      decoration: InputDecoration(
+                                        labelText: "Banque émettrice",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                    SizedBox(height: 10),
+                                    InkWell(
+                                      onTap: () async {
+                                        final selectedDate =
+                                            await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now(),
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime.now()
+                                              .add(Duration(days: 365)),
+                                        );
+                                        if (selectedDate != null) {
+                                          setState(() {
+                                            checkDate =
+                                                selectedDate; // Add this line
+                                          });
+                                        }
+                                      },
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: "Date du chèque",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(checkDate != null
+                                                ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
+                                                : "Sélectionner une date"),
+                                            Icon(Icons.calendar_today),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                              if (selectedPaymentMethod == "Mixte")
+                                Column(
+                                  children: [
+                                    // Section Espèces
+                                    Text("Espèces:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    TextField(
+                                      controller: amountGivenController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Montant en espèces (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          String cleanedValue =
+                                              cleanInput(value);
+                                          if (cleanedValue == 'NEGATIVE') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif.")),
+                                            );
+                                            return;
+                                          }
+                                          cashAmount =
+                                              double.tryParse(cleanedValue) ??
+                                                  0.0;
+                                        });
+                                      },
+                                    ),
+
+                                    // Section TPE
+                                    SizedBox(height: 10),
+                                    Text("TPE:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    TextField(
+                                      controller: amountGivenTPEController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Montant par carte (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          String cleanedValue =
+                                              cleanInput(value);
+                                          if (cleanedValue == 'NEGATIVE') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif.")),
+                                            );
+                                            return;
+                                          }
+                                          cardAmount =
+                                              double.tryParse(cleanedValue) ??
+                                                  0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: TextEditingController(
+                                          text: cardTransactionId ?? ''),
+                                      decoration: InputDecoration(
+                                        labelText: "ID de transaction TPE",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          cardTransactionId = value;
+                                        });
+                                      },
+                                    ),
+
+                                    // Section Chèque
+                                    SizedBox(height: 10),
+                                    Text("Chèque:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    TextField(
+                                      controller: amountGivenChequeController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Montant par chèque (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          String cleanedValue =
+                                              cleanInput(value);
+                                          if (cleanedValue == 'NEGATIVE') {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif.")),
+                                            );
+                                            return;
+                                          }
+                                          checkAmount =
+                                              double.tryParse(cleanedValue) ??
+                                                  0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: TextEditingController(
+                                          text: checkNumber ?? ''),
+                                      decoration: InputDecoration(
+                                        labelText: "Numéro du chèque",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          checkNumber = value;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: TextEditingController(
+                                          text: bankName ?? ''),
+                                      decoration: InputDecoration(
+                                        labelText: "Banque émettrice",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          bankName = value;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    InkWell(
+                                      onTap: () async {
+                                        final selectedDate =
+                                            await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now(),
+                                          firstDate: DateTime.now(),
+                                          lastDate: DateTime.now()
+                                              .add(Duration(days: 365)),
+                                        );
+                                        if (selectedDate != null) {
+                                          setState(() {
+                                            checkDate = selectedDate;
+                                          });
+                                        }
+                                      },
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: "Date du chèque",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(checkDate != null
+                                                ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
+                                                : "Sélectionner une date"),
+                                            Icon(Icons.calendar_today),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Total saisi
+                                    SizedBox(height: 10),
+                                    Text(
+                                      "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+
+                              SizedBox(height: 10),
+                              if (selectedPaymentMethod == "Espèce")
+                                TextField(
+                                  controller: changeReturnedController,
+                                  readOnly: true,
+                                  decoration: InputDecoration(
+                                    labelText: "Monnaie rendue (DT)",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
                               SizedBox(height: 16),
                               Row(
                                 children: [
@@ -871,7 +1341,15 @@ class Addorder {
                           : globalDiscountValue,
                       isPercentageDiscount,
                       selectedClient,
-                      numberOfTickets, // Ajout du paramètre
+                      numberOfTickets,
+                      selectedPaymentMethod, // Nouveau paramètre
+                      cashAmount, // Nouveau paramètre
+                      cardAmount, // Nouveau paramètre
+                      checkAmount,
+                      checkNumber, // For cheque number
+                      cardTransactionId, // For TPE transaction ID
+                      checkDate, // For cheque date
+                      bankName, // Ajout du paramètre
                     );
                   },
                   child: Text(
@@ -920,7 +1398,15 @@ class Addorder {
     double globalDiscount,
     bool isPercentageDiscount,
     Client? selectedClient,
-    int numberOfTickets, // Nouveau paramètre
+    int numberOfTickets,
+    String selectedPaymentMethod,
+    double cashAmount,
+    double cardAmount,
+    double checkAmount,
+    String? checkNumber, // For cheque number
+    String? cardTransactionId, // For TPE transaction ID
+    DateTime? checkDate, // For cheque date
+    String? bankName,
   ) async {
     if (!isPercentageDiscount &&
         globalDiscount >
@@ -967,15 +1453,81 @@ class Addorder {
       isPercentageDiscount,
     );
 
+    double totalAmountPaid = 0.0;
     String status;
     double remainingAmount;
 
-    if (amountGiven >= total) {
-      status = "payée";
-      remainingAmount = 0.0;
-    } else {
-      status = "semi-payée";
-      remainingAmount = total - amountGiven;
+    switch (selectedPaymentMethod) {
+      case "Espèce":
+        totalAmountPaid = cashAmount;
+        if (cashAmount >= total) {
+          status = "payée";
+          remainingAmount = 0.0;
+        } else {
+          status = "semi-payée";
+          remainingAmount = total - cashAmount;
+        }
+        break;
+      case "TPE":
+        totalAmountPaid = cardAmount;
+        status = cardAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = cardAmount >= total ? 0.0 : total - cardAmount;
+        break;
+      case "Chèque":
+        totalAmountPaid = checkAmount;
+        status = checkAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = checkAmount >= total ? 0.0 : total - checkAmount;
+        break;
+      case "Mixte":
+        totalAmountPaid = cashAmount + cardAmount + checkAmount;
+        status = totalAmountPaid >= total ? "payée" : "semi-payée";
+        remainingAmount =
+            totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
+        break;
+      default:
+        status = "non payée";
+        remainingAmount = total;
+    }
+
+    switch (selectedPaymentMethod) {
+      case "Espèce":
+        totalAmountPaid = cashAmount;
+        status = cashAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = cashAmount >= total ? 0.0 : total - cashAmount;
+        break;
+      case "TPE":
+        totalAmountPaid = cardAmount;
+        status = cardAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = cardAmount >= total ? 0.0 : total - cardAmount;
+        break;
+      case "Chèque":
+        totalAmountPaid = checkAmount;
+        status = checkAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = checkAmount >= total ? 0.0 : total - checkAmount;
+        break;
+      case "Mixte":
+        totalAmountPaid = cashAmount + cardAmount + checkAmount;
+        status = (totalAmountPaid >= total) ? "payée" : "semi-payée";
+        remainingAmount =
+            (totalAmountPaid >= total) ? 0.0 : total - totalAmountPaid;
+        break;
+      default:
+        status = "non payée";
+        remainingAmount = total;
+    }
+
+    if ((selectedPaymentMethod == "TPE" && cardAmount <= 0) ||
+        (selectedPaymentMethod == "Chèque" && checkAmount <= 0) ||
+        (selectedPaymentMethod == "Espèce" && cashAmount <= 0) ||
+        (selectedPaymentMethod == "Mixte" &&
+            (cashAmount + cardAmount + checkAmount) <= 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Veuillez entrer un montant valide pour le paiement."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
     }
 
     print("Total avant remise: $totalBeforeDiscount");
@@ -1001,12 +1553,40 @@ class Addorder {
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
       total: total,
-      modePaiement: "Espèces",
+      modePaiement: selectedPaymentMethod,
       status: status,
       remainingAmount: remainingAmount,
       globalDiscount: globalDiscount,
       isPercentageDiscount: isPercentageDiscount,
-      idClient: selectedClient?.id, // Ajout du client associé
+      idClient: selectedClient?.id,
+      cashAmount:
+          selectedPaymentMethod == "Espèce" || selectedPaymentMethod == "Mixte"
+              ? cashAmount
+              : null,
+      cardAmount:
+          selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
+              ? cardAmount
+              : null,
+      checkAmount:
+          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
+              ? checkAmount
+              : null,
+      checkNumber:
+          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
+              ? checkNumber
+              : null,
+      cardTransactionId:
+          selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
+              ? cardTransactionId
+              : null,
+      checkDate:
+          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
+              ? checkDate
+              : null,
+      bankName:
+          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
+              ? bankName
+              : null,
     );
 
     print("Order to be saved: ${order.toMap()}");
