@@ -144,7 +144,8 @@ class Getorderlist {
     await sqldb.cancelOrderLine(order.idOrder!, orderLine.productCode ?? '');
 
     // Restocker le produit
-    await sqldb.updateProductStock(orderLine.productCode ?? '', orderLine.quantity);
+    await sqldb.updateProductStock(
+        orderLine.productCode ?? '', orderLine.quantity);
 
     // Recalculer le total de la commande
     final dbClient = await sqldb.db;
@@ -531,19 +532,10 @@ class Getorderlist {
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 
     // Récupérer les informations du client
-    print('Showing ticket for order ID: ${order.idOrder}'); // Debug
-    print('Order client ID: ${order.idClient}'); // Debug
-
     Client? client;
-
     if (order.idClient != null) {
-      print('Fetching client with ID: ${order.idClient}'); // Debug
       client = await sqldb.getClientById(order.idClient!);
-      print('Fetched client: ${client?.name} ${client?.firstName}'); // Debug
-    } else {
-      print('No client ID associated with this order'); // Debug
     }
-    await SqlDb().debugCheckOrder(order.idOrder!);
 
     showDialog(
       context: context,
@@ -561,263 +553,376 @@ class Getorderlist {
                 Text(
                   "Ticket de Commande",
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Color(0xFF000000),
-                  ),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Color(0xFF000000)),
                 ),
               ],
             ),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+          content: Container(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Divider(thickness: 1, color: Color(0xFFE0E0E0)),
 
-                // Numéro de commande et date
-                Text(
-                  "Commande #${order.idOrder}\nDate: ${formatDate(order.date)}",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)),
-                ),
-
-                // Affichage du client
-                if (client != null) ...[
-                  SizedBox(height: 8),
+                  // Numéro de commande et date
                   Text(
-                    "Client: ${client.name} ${client.firstName}",
+                    "Commande #${order.idOrder}\nDate: ${formatDate(order.date)}",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Color(0xFF000000)),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF000000)),
                   ),
+
+                  // Affichage du client
+                  if (client != null) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      "Client: ${client.name} ${client.firstName}",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Color(0xFF000000)),
+                    ),
+                  ],
+                  Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+
+                  // Header Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            "Qt",
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF000000)),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            "Article",
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF000000)),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            "Prix U",
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF000000)),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            "Montant",
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF000000)),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+
+                  // Liste des produits
+                  ...order.orderLines.map((orderLine) {
+                    return FutureBuilder<Product?>(
+                      future:
+                          sqldb.getProductByCode(orderLine.productCode ?? ''),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator(
+                            color: Color(0xFF26A9E0),
+                          ));
+                        }
+
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data == null) {
+                          return const ListTile(
+                              title: Text("Produit introuvable",
+                                  style: TextStyle(color: Color(0xFFE53935))));
+                        }
+
+                        Product product = snapshot.data!;
+                        double discountedPrice = orderLine.prixUnitaire *
+                            (1 - orderLine.discount / 100);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "x${orderLine.quantity}",
+                                  style: TextStyle(
+                                      fontSize: 16, color: Color(0xFF000000)),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  product.designation,
+                                  style: TextStyle(
+                                      fontSize: 16, color: Color(0xFF000000)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                  style: TextStyle(
+                                      fontSize: 16, color: Color(0xFF000000)),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                  "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF000000)),
+                                  textAlign: TextAlign.end,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+
+                  Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+
+                  // Total avant remise (seulement si remise existe)
+                  if (order.globalDiscount > 0 ||
+                      order.orderLines.any((ol) => ol.discount > 0))
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Total avant remise:",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000)),
+                        ),
+                        Text(
+                          "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000)),
+                        ),
+                      ],
+                    ),
+
+                  // Remise globale (seulement si elle existe)
+                  if (isPercentageDiscount && order.globalDiscount > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Remise Globale:",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000)),
+                        ),
+                        Text(
+                          "${order.globalDiscount.toStringAsFixed(2)} %",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red),
+                        ),
+                      ],
+                    )
+                  else if (!isPercentageDiscount && order.globalDiscount > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Remise Globale:",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000)),
+                        ),
+                        Text(
+                          "${order.globalDiscount.toStringAsFixed(2)} DT",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red),
+                        ),
+                      ],
+                    ),
+
+                  // Total et Mode de paiement (toujours affichés)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Total:",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)),
+                      ),
+                      Text(
+                        "${order.total.toStringAsFixed(2)} DT",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000)),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 10),
+
+                  // Détails de paiement
+                  Text(
+                    "Mode de Paiement: ${order.modePaiement}",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF000000)),
+                  ),
+
+                  // Détails spécifiques selon le mode de paiement
+                  if (order.modePaiement == "Espèce" &&
+                      order.cashAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if ((order.cashAmount! - order.total) > 0)
+                      Text(
+                        "Monnaie rendue: ${(order.cashAmount! - order.total).toStringAsFixed(2)} DT",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
+
+                  if (order.modePaiement == "TPE" &&
+                      order.cardAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if (order.cardTransactionId != null)
+                      Text(
+                        "Transaction: ${order.cardTransactionId}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
+
+                  if (order.modePaiement == "Chèque" &&
+                      order.checkAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if (order.checkNumber != null)
+                      Text(
+                        "N° chèque: ${order.checkNumber}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    if (order.bankName != null)
+                      Text(
+                        "Banque: ${order.bankName}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    if (order.checkDate != null)
+                      Text(
+                        "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
+
+                  if (order.modePaiement == "Mixte") ...[
+                    SizedBox(height: 5),
+                    if (order.cashAmount != null && order.cashAmount! > 0)
+                      Text(
+                        "Espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    if (order.cardAmount != null && order.cardAmount! > 0) ...[
+                      Text(
+                        "Carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      if (order.cardTransactionId != null)
+                        Text(
+                          "Transaction: ${order.cardTransactionId}",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                    ],
+                    if (order.checkAmount != null &&
+                        order.checkAmount! > 0) ...[
+                      Text(
+                        "Chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      if (order.checkNumber != null)
+                        Text(
+                          "N°: ${order.checkNumber}",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      if (order.bankName != null)
+                        Text(
+                          "Banque: ${order.bankName}",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      if (order.checkDate != null)
+                        Text(
+                          "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                    ],
+                  ],
+
+                  // Reste à payer si commande semi-payée
+                  if (order.remainingAmount > 0) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ],
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                // Header Row
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          "Qt",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          "Article",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          "Prix U",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          "Montant",
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF000000)),
-                          textAlign: TextAlign.end,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                // Liste des produits
-                ...order.orderLines.map((orderLine) {
-                  return FutureBuilder<Product?>(
-                    future: sqldb.getProductByCode(orderLine.productCode ?? ''),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                            child: CircularProgressIndicator(
-                          color: Color(0xFF26A9E0),
-                        ));
-                      }
-
-                      if (snapshot.hasError ||
-                          !snapshot.hasData ||
-                          snapshot.data == null) {
-                        return const ListTile(
-                            title: Text("Produit introuvable",
-                                style: TextStyle(color: Color(0xFFE53935))));
-                      }
-
-                      Product product = snapshot.data!;
-                      double discountedPrice = orderLine.prixUnitaire *
-                          (1 - orderLine.discount / 100);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                "x${orderLine.quantity}",
-                                style: TextStyle(
-                                    fontSize: 16, color: Color(0xFF000000)),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Text(
-                                product.designation,
-                                style: TextStyle(
-                                    fontSize: 16, color: Color(0xFF000000)),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
-                                style: TextStyle(
-                                    fontSize: 16, color: Color(0xFF000000)),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF000000)),
-                                textAlign: TextAlign.end,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                }).toList(),
-
-                Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                // Total avant remise
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Total avant remise:",
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)),
-                    ),
-                    Text(
-                      "${totalBeforeDiscount.toStringAsFixed(2)} DT",
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)),
-                    ),
-                  ],
-                ),
-
-                // Global Discount
-                if (isPercentageDiscount && order.globalDiscount > 0)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Remise Globale:",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF000000)),
-                      ),
-                      Text(
-                        "${order.globalDiscount.toStringAsFixed(2)} %",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red),
-                      ),
-                    ],
-                  )
-                else if (!isPercentageDiscount && order.globalDiscount > 0)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Remise Globale:",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF000000)),
-                      ),
-                      Text(
-                        "${order.globalDiscount.toStringAsFixed(2)} DT",
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red),
-                      ),
-                    ],
-                  ),
-
-                // Total et Mode de paiement
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      "Total après remise:",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)),
-                    ),
-                    Text(
-                      "${order.total.toStringAsFixed(2)} DT",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000)),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 10),
-
-                Text(
-                  "Mode de Paiement: ${order.modePaiement}",
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF000000)),
-                ),
-              ],
+              ),
             ),
           ),
           actions: [
@@ -825,14 +930,19 @@ class Getorderlist {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text("Fermer", style: TextStyle(color: Color(0xFF000000))),
+              child: Text(
+                "Fermer",
+                style: TextStyle(color: Color(0xFF000000)),
+              ),
             ),
             TextButton(
               onPressed: () {
                 generateAndSavePDF(context, order);
               },
-              child:
-                  Text("Imprimer", style: TextStyle(color: Color(0xFF000000))),
+              child: Text(
+                "Imprimer",
+                style: TextStyle(color: Color(0xFF000000)),
+              ),
             ),
           ],
         );
@@ -964,7 +1074,7 @@ class Getorderlist {
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    "${discountedPrice.toStringAsFixed(2)} DT",
+                    "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                     style: pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
@@ -977,28 +1087,30 @@ class Getorderlist {
 
             pw.Divider(),
 
-            // Total avant remise
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  "Total avant remise:",
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 8,
+            // Total avant remise (seulement si remise existe)
+            if (order.globalDiscount > 0 ||
+                order.orderLines.any((ol) => ol.discount > 0))
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    "Total avant remise:",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
                   ),
-                ),
-                pw.Text(
-                  "${totalBeforeDiscount.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 8,
+                  pw.Text(
+                    "${totalBeforeDiscount.toStringAsFixed(2)} DT",
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 8,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            // Global Discount
+            // Global Discount (seulement si remise existe)
             if (isPercentageDiscount && order.globalDiscount > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1040,12 +1152,12 @@ class Getorderlist {
                 ],
               ),
 
-            // Total et Mode de paiement
+            // Total et Mode de paiement (toujours affichés)
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  "Total après remise:",
+                  "Total:",
                   style: pw.TextStyle(
                     fontWeight: pw.FontWeight.bold,
                     fontSize: 8,
@@ -1065,6 +1177,111 @@ class Getorderlist {
               "Mode de Paiement: ${order.modePaiement}",
               style: pw.TextStyle(fontSize: 8),
             ),
+
+            // Détails spécifiques selon le mode de paiement
+            if (order.modePaiement == "Espèce" && order.cashAmount != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Montant espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(fontSize: 8),
+              ),
+              if ((order.cashAmount! - order.total) > 0)
+                pw.Text(
+                  "Monnaie rendue: ${(order.cashAmount! - order.total).toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+            ],
+
+            if (order.modePaiement == "TPE" && order.cardAmount != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Montant carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(fontSize: 8),
+              ),
+              if (order.cardTransactionId != null)
+                pw.Text(
+                  "Transaction: ${order.cardTransactionId}",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+            ],
+
+            if (order.modePaiement == "Chèque" &&
+                order.checkAmount != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Montant chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(fontSize: 8),
+              ),
+              if (order.checkNumber != null)
+                pw.Text(
+                  "N° chèque: ${order.checkNumber}",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+              if (order.bankName != null)
+                pw.Text(
+                  "Banque: ${order.bankName}",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+              if (order.checkDate != null)
+                pw.Text(
+                  "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+            ],
+
+            if (order.modePaiement == "Mixte") ...[
+              pw.SizedBox(height: 5),
+              if (order.cashAmount != null && order.cashAmount! > 0)
+                pw.Text(
+                  "Espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+              if (order.cardAmount != null && order.cardAmount! > 0) ...[
+                pw.Text(
+                  "Carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+                if (order.cardTransactionId != null)
+                  pw.Text(
+                    "Transaction: ${order.cardTransactionId}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+              ],
+              if (order.checkAmount != null && order.checkAmount! > 0) ...[
+                pw.Text(
+                  "Chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+                if (order.checkNumber != null)
+                  pw.Text(
+                    "N°: ${order.checkNumber}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                if (order.bankName != null)
+                  pw.Text(
+                    "Banque: ${order.bankName}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                if (order.checkDate != null)
+                  pw.Text(
+                    "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+              ],
+            ],
+
+            // Reste à payer si commande semi-payée
+            if (order.remainingAmount > 0) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.red,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
 
             // Footer with thank you message
             pw.Center(
