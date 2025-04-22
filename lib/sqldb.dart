@@ -615,11 +615,9 @@ class SqlDb {
     String? dateFilter,
   }) async {
     final dbClient = await db;
-    return await Rapportcontroller().getSalesByCategoryAndProduct(
+    return await rapportController().getSalesByCategoryAndProduct(
       dateFilter: dateFilter,
       db: dbClient,
     );
   }
-
-  
 }

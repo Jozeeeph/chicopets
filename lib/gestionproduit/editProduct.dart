@@ -60,9 +60,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
     codeController.text = widget.product.code ?? '';
     designationController.text = widget.product.designation;
     descriptionController.text = widget.product.description ?? '';
-    stockController.text = widget.product.hasVariants 
-      ? widget.product.variants.fold(0, (sum, variant) => sum + variant.stock).toString()
-      : widget.product.stock.toString();
+    stockController.text = widget.product.hasVariants
+        ? widget.product.variants
+            .fold(0, (sum, variant) => sum + variant.stock)
+            .toString()
+        : widget.product.stock.toString();
     priceHTController.text = widget.product.prixHT.toString();
     taxController.text = widget.product.taxe.toString();
     priceTTCController.text = widget.product.prixTTC.toString();
@@ -100,7 +102,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     if (widget.product.variants.isNotEmpty) {
       variants = widget.product.variants;
       hasVariants = true;
-      
+
       // Find and set the default variant
       final defaultVariant = variants.firstWhere(
         (v) => v.defaultVariant,
@@ -126,58 +128,60 @@ class _EditProductScreenState extends State<EditProductScreen> {
     });
   }
 
-Future<void> _loadVariants() async {
-  if (widget.product.id == null) return;
+  Future<void> _loadVariants() async {
+    if (widget.product.id == null) return;
 
-  setState(() => isLoadingVariants = true);
-  try {
-    final variantsFromDb = await sqldb.getVariantsByProductId(widget.product.id!);
+    setState(() => isLoadingVariants = true);
+    try {
+      final variantsFromDb =
+          await sqldb.getVariantsByProductId(widget.product.id!);
 
-    setState(() {
-      variants = variantsFromDb;
-      hasVariants = variants.isNotEmpty;
+      setState(() {
+        variants = variantsFromDb;
+        hasVariants = variants.isNotEmpty;
 
-      if (hasVariants) {
-        // Calculer le stock total
-        final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
-        stockController.text = totalStock.toString();
-        
-        // Find and set the default variant
-        final defaultVariant = variants.firstWhere(
-          (v) => v.defaultVariant,
-          orElse: () => variants.first,
-        );
-        selectedDefaultVariant = defaultVariant.combinationName;
+        if (hasVariants) {
+          // Calculer le stock total
+          final totalStock =
+              variants.fold(0, (sum, variant) => sum + variant.stock);
+          stockController.text = totalStock.toString();
 
-        // Extract attributes from variants
-        attributes.clear();
-        for (final variant in variants) {
-          for (final entry in variant.attributes.entries) {
-            attributes.update(
-              entry.key,
-              (values) => values..add(entry.value),
-              ifAbsent: () => [entry.value],
-            );
+          // Find and set the default variant
+          final defaultVariant = variants.firstWhere(
+            (v) => v.defaultVariant,
+            orElse: () => variants.first,
+          );
+          selectedDefaultVariant = defaultVariant.combinationName;
+
+          // Extract attributes from variants
+          attributes.clear();
+          for (final variant in variants) {
+            for (final entry in variant.attributes.entries) {
+              attributes.update(
+                entry.key,
+                (values) => values..add(entry.value),
+                ifAbsent: () => [entry.value],
+              );
+            }
           }
         }
+      });
+    } catch (e) {
+      debugPrint('Error loading variants: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load variants: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
-  } catch (e) {
-    debugPrint('Error loading variants: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load variants: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() => isLoadingVariants = false);
+    } finally {
+      if (mounted) {
+        setState(() => isLoadingVariants = false);
+      }
     }
   }
-}
 
   void calculerRemiseValeurMax() {
     double profit = double.tryParse(profitController.text) ?? 0;
@@ -256,43 +260,44 @@ Future<void> _loadVariants() async {
   }
 
 // Dans la méthode qui génère les variantes
-void generateVariants() {
-  if (widget.product.id == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-            'Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
-      ),
-    );
-    return;
-  }
-
-  setState(() {
-    variants = _generateCombinations(attributes).map((combination) {
-      final basePrice = double.parse(priceHTController.text);
-      return Variant(
-        code: '',
-        combinationName: combination.values.join('-'),
-        price: basePrice,
-        priceImpact: 0.0,
-        stock: 0,
-        defaultVariant: variants.isEmpty, // First variant is default
-        attributes: combination,
-        productId: widget.product.id!,
+  void generateVariants() {
+    if (widget.product.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Veuillez sauvegarder le produit avant d\'ajouter des variantes'),
+        ),
       );
-    }).toList();
-
-    // Mettre à jour le stock total
-    final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
-    stockController.text = totalStock.toString();
-
-    // Set the first variant as default if none exists
-    if (variants.isNotEmpty && selectedDefaultVariant == null) {
-      selectedDefaultVariant = variants.first.combinationName;
-      variants.first.defaultVariant = true;
+      return;
     }
-  });
-}
+
+    setState(() {
+      variants = _generateCombinations(attributes).map((combination) {
+        final basePrice = double.parse(priceHTController.text);
+        return Variant(
+          code: '',
+          combinationName: combination.values.join('-'),
+          price: basePrice,
+          priceImpact: 0.0,
+          stock: 0,
+          defaultVariant: variants.isEmpty, // First variant is default
+          attributes: combination,
+          productId: widget.product.id!,
+        );
+      }).toList();
+
+      // Mettre à jour le stock total
+      final totalStock =
+          variants.fold(0, (sum, variant) => sum + variant.stock);
+      stockController.text = totalStock.toString();
+
+      // Set the first variant as default if none exists
+      if (variants.isNotEmpty && selectedDefaultVariant == null) {
+        selectedDefaultVariant = variants.first.combinationName;
+        variants.first.defaultVariant = true;
+      }
+    });
+  }
 
   List<Map<String, String>> _generateCombinations(
       Map<String, List<String>> attributes) {
@@ -689,21 +694,72 @@ void generateVariants() {
                           scrollDirection: Axis.horizontal,
                           child: Container(
                             width: totalWidth,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
                             child: DataTable(
                               columnSpacing: columnSpacing,
+                              horizontalMargin: 12,
+                              dividerThickness: 1,
+                              dataRowHeight: 60,
+                              headingRowHeight: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              headingTextStyle: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                                fontSize: 14,
+                              ),
+                              dataTextStyle: TextStyle(
+                                color: Colors.grey.shade800,
+                                fontSize: 13,
+                              ),
                               columns: const [
-                                DataColumn(label: Text('Défaut')),
-                                DataColumn(label: Text('Combinaison')),
-                                DataColumn(label: Text('Prix'), numeric: true),
                                 DataColumn(
-                                    label: Text('Impact Prix'), numeric: true),
+                                    label: Center(child: Text('Défaut'))),
                                 DataColumn(
-                                    label: Text('Prix Final'), numeric: true),
-                                DataColumn(label: Text('Stock'), numeric: true),
-                                DataColumn(label: Text('Code-barres')),
+                                    label: Center(child: Text('Combinaison'))),
+                                DataColumn(
+                                  label: Center(child: Text('Prix')),
+                                  numeric: true,
+                                ),
+                                DataColumn(
+                                  label: Center(child: Text('Impact Prix')),
+                                  numeric: true,
+                                ),
+                                DataColumn(
+                                  label: Center(child: Text('Prix Final')),
+                                  numeric: true,
+                                ),
+                                DataColumn(
+                                  label: Center(child: Text('Stock')),
+                                  numeric: true,
+                                ),
+                                DataColumn(
+                                  label: Center(child: Text('Code-barres')),
+                                ),
                               ],
                               rows: variants.map((variant) {
                                 return DataRow(
+                                  color:
+                                      MaterialStateProperty.resolveWith<Color>(
+                                    (Set<MaterialState> states) {
+                                      if (variant.defaultVariant) {
+                                        return Colors.blue
+                                            .shade50; // Highlight default variant
+                                      }
+                                      return states
+                                              .contains(MaterialState.selected)
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withOpacity(0.08)
+                                          : Colors.transparent;
+                                    },
+                                  ),
                                   cells: [
                                     DataCell(
                                       Row(
@@ -722,32 +778,55 @@ void generateVariants() {
                                                 }
                                               });
                                             },
+                                            fillColor: MaterialStateProperty
+                                                .resolveWith<Color>(
+                                              (Set<MaterialState> states) {
+                                                if (states.contains(
+                                                    MaterialState.selected)) {
+                                                  return Colors.blue.shade700;
+                                                }
+                                                return Colors.grey;
+                                              },
+                                            ),
                                           ),
                                           const Text('Par défaut'),
                                         ],
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
+                                      Container(
                                         width: columnWidth,
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 8),
                                         child: Text(
                                           variant.combinationName,
                                           overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: variant.defaultVariant
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
                                         ),
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
+                                      Container(
                                         width: columnWidth,
                                         child: TextFormField(
                                           initialValue:
                                               variant.price.toString(),
                                           keyboardType: TextInputType.number,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                            ),
                                             contentPadding:
                                                 EdgeInsets.symmetric(
                                                     horizontal: 8),
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
                                           ),
                                           onChanged: (value) {
                                             setState(() {
@@ -762,17 +841,23 @@ void generateVariants() {
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
+                                      Container(
                                         width: columnWidth,
                                         child: TextFormField(
                                           initialValue:
                                               variant.priceImpact.toString(),
                                           keyboardType: TextInputType.number,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                            ),
                                             contentPadding:
                                                 EdgeInsets.symmetric(
                                                     horizontal: 8),
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
                                           ),
                                           onChanged: (value) {
                                             setState(() {
@@ -787,26 +872,36 @@ void generateVariants() {
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
-                                        width: columnWidth,
+                                      Center(
                                         child: Text(
                                           variant.finalPrice.toStringAsFixed(2),
-                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green.shade700,
+                                          ),
                                         ),
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
+                                      Container(
                                         width: columnWidth,
                                         child: TextFormField(
                                           initialValue:
                                               variant.stock.toString(),
                                           keyboardType: TextInputType.number,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                            ),
                                             contentPadding:
                                                 EdgeInsets.symmetric(
                                                     horizontal: 8),
+                                            filled: true,
+                                            fillColor: variant.stock <= 0
+                                                ? Colors.red.shade50
+                                                : Colors.grey.shade50,
                                           ),
                                           onChanged: (value) {
                                             setState(() {
@@ -818,15 +913,21 @@ void generateVariants() {
                                       ),
                                     ),
                                     DataCell(
-                                      SizedBox(
+                                      Container(
                                         width: columnWidth,
                                         child: TextFormField(
                                           initialValue: variant.code,
-                                          decoration: const InputDecoration(
-                                            border: OutlineInputBorder(),
+                                          style: TextStyle(fontSize: 13),
+                                          decoration: InputDecoration(
+                                            border: OutlineInputBorder(
+                                              borderSide: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                            ),
                                             contentPadding:
                                                 EdgeInsets.symmetric(
                                                     horizontal: 8),
+                                            filled: true,
+                                            fillColor: Colors.grey.shade50,
                                           ),
                                           onChanged: (value) {
                                             setState(() {
