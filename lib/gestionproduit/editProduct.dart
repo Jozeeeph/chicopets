@@ -1,3 +1,4 @@
+import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/subcategory.dart';
 import 'package:caissechicopets/models/category.dart';
@@ -5,7 +6,6 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:sqflite/sqflite.dart';
 
 class EditProductScreen extends StatefulWidget {
   final Product product;
@@ -53,11 +53,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
   Map<String, List<String>> attributes = {};
   bool isLoadingVariants = false;
   String? selectedDefaultVariant;
-  
-  // New variables for attribute selection
+
   List<Map<String, dynamic>> availableAttributes = [];
   String? selectedAttributeName;
-  List<String> selectedAttributeValues = [];
+  Map<String, Set<String>> selectedAttributeValues = {}; // Changed to Set
+  Set<String> selectedValues = Set();
 
   @override
   void initState() {
@@ -131,21 +131,34 @@ class _EditProductScreenState extends State<EditProductScreen> {
     // Load variants after UI is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadVariants();
-      _loadAvailableAttributes(); // Load available attributes
+      _loadAvailableAttributes();
     });
   }
 
   Future<void> _loadAvailableAttributes() async {
-    final db = await sqldb.db;
-    final results = await db.query('attributes');
-    setState(() {
-      availableAttributes = results.map((attr) {
-        return {
-          'name': attr['name'],
-          'values': (attr['attribute_values'] as String).split(',').map((v) => v.trim()).toList(),
-        };
-      }).toList();
-    });
+    try {
+      final List<Attribut> attributs = await sqldb.getAllAttributes();
+      debugPrint("Loaded attributes: $attributs");
+
+      setState(() {
+        availableAttributes = attributs.map((attr) {
+          return {
+            'name': attr.name,
+            'attribute_values': attr.values.toList(), // Convert Set to List
+          };
+        }).toList();
+      });
+    } catch (e) {
+      debugPrint('Error loading attributes: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load attributes: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadVariants() async {
@@ -161,7 +174,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         hasVariants = variants.isNotEmpty;
 
         if (hasVariants) {
-          // Calculate total stock
+          // Calculer le stock total
           final totalStock =
               variants.fold(0, (sum, variant) => sum + variant.stock);
           stockController.text = totalStock.toString();
@@ -265,42 +278,21 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-  void addAttribute() async {
+  void addAttribute() {
     String attributeName = attributeNameController.text.trim();
     String attributeValues = attributeValuesController.text.trim();
 
     if (attributeName.isNotEmpty && attributeValues.isNotEmpty) {
-      try {
-        final db = await sqldb.db;
-        await db.insert(
-          'attributes',
-          {
-            'name': attributeName,
-            'attribute_values': attributeValues,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-
-        setState(() {
-          attributes[attributeName] = 
-              attributeValues.split(',').map((v) => v.trim()).toList();
-          attributeNameController.clear();
-          attributeValuesController.clear();
-          _loadAvailableAttributes(); // Refresh the available attributes list
-        });
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur lors de l\'ajout de l\'attribut: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+      setState(() {
+        attributes[attributeName] =
+            attributeValues.split(',').map((v) => v.trim()).toList();
+        attributeNameController.clear();
+        attributeValuesController.clear();
+      });
     }
   }
 
+// Dans la méthode qui génère les variantes
   void generateVariants() {
     if (widget.product.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -321,7 +313,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
           price: basePrice,
           priceImpact: 0.0,
           stock: 0,
-          defaultVariant: variants.isEmpty, // First variant is default
+          defaultVariant: variants.isEmpty,
           attributes: combination,
           productId: widget.product.id!,
         );
@@ -332,7 +324,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
           variants.fold(0, (sum, variant) => sum + variant.stock);
       stockController.text = totalStock.toString();
 
-      // Set the first variant as default if none exists
       if (variants.isNotEmpty && selectedDefaultVariant == null) {
         selectedDefaultVariant = variants.first.combinationName;
         variants.first.defaultVariant = true;
@@ -364,8 +355,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
     String currentAttribute = attributeNames[currentIndex];
     for (String value in attributes[currentAttribute]!) {
       currentCombination[currentAttribute] = value;
-      _generateCombinationHelper(attributes, attributeNames, currentIndex + 1,
-          currentCombination, combinations);
+      _generateCombinationHelper(
+        attributes,
+        attributeNames,
+        currentIndex + 1,
+        currentCombination,
+        combinations,
+      );
     }
   }
 
@@ -657,76 +653,148 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   ),
                 ),
                 if (hasVariants) ...[
-                  const SizedBox(height: 20),
+                  // Add these variables to your state class
+
+// Replace your current attributes section with this:
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Attributs existants:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        decoration: _inputDecoration('Sélectionner un attribut'),
-                        value: selectedAttributeName,
-                        items: availableAttributes
-                            .map<DropdownMenuItem<String>>((attr) {
-                          return DropdownMenuItem<String>(
-                            value: attr['name'],
-                            child: Text(attr['name']),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedAttributeName = value;
-                            if (value != null) {
-                              selectedAttributeValues = availableAttributes
-                                  .firstWhere((attr) => attr['name'] == value)['attributs_values'];
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      if (selectedAttributeName != null) ...[
-                        const Text(
-                          'Valeurs disponibles:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: selectedAttributeValues.map((value) {
-                            return FilterChip(
-                              label: Text(value),
-                              selected: attributes[selectedAttributeName]?.contains(value) ?? false,
-                              onSelected: (selected) {
+                      // Attribute selection section
+                      Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Sélection des attributs:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+
+                          const SizedBox(height: 8),
+                          Card(
+                            child: ExpansionTile(
+                              title: const Text('Choisir des attributs'),
+                              children: availableAttributes.map((attr) {
+                                final attributeName = attr['name'] as String;
+                                final values =
+                                    (attr['attribute_values'] as List)
+                                        .cast<String>();
+
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  child: ExpansionTile(
+                                    title: Text(attributeName),
+                                    children: values.map((value) {
+                                      final fullValue = '$attributeName:$value';
+                                      return CheckboxListTile(
+                                        title: Text(value),
+                                        value:
+                                            selectedValues.contains(fullValue),
+                                        onChanged: (bool? selected) {
+                                          setState(() {
+                                            if (selected == true) {
+                                              selectedValues.add(fullValue);
+                                              selectedAttributeValues.update(
+                                                attributeName,
+                                                (set) => set..add(value),
+                                                ifAbsent: () => {value},
+                                              );
+                                            } else {
+                                              selectedValues.remove(fullValue);
+                                              selectedAttributeValues[
+                                                      attributeName]
+                                                  ?.remove(value);
+                                              if (selectedAttributeValues[
+                                                          attributeName]
+                                                      ?.isEmpty ??
+                                                  false) {
+                                                selectedAttributeValues
+                                                    .remove(attributeName);
+                                              }
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Selected attributes preview
+                          if (selectedAttributeValues.isNotEmpty) ...[
+                            const Text(
+                              'Attributs sélectionnés:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              constraints: const BoxConstraints(maxHeight: 100),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: selectedAttributeValues.entries
+                                      .expand((entry) {
+                                    return entry.value.map((value) {
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 8.0),
+                                        child: Chip(
+                                          label: Text('${entry.key}: $value'),
+                                          onDeleted: () {
+                                            setState(() {
+                                              selectedValues.remove(
+                                                  '${entry.key}:$value');
+                                              selectedAttributeValues[entry.key]
+                                                  ?.remove(value);
+                                              if (selectedAttributeValues[
+                                                          entry.key]
+                                                      ?.isEmpty ??
+                                                  false) {
+                                                selectedAttributeValues
+                                                    .remove(entry.key);
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      );
+                                    }).toList();
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
                                 setState(() {
-                                  attributes.update(
-                                    selectedAttributeName!,
-                                    (values) => selected
-                                        ? [...values, value]
-                                        : values..remove(value),
-                                    ifAbsent: () => [value],
-                                  );
+                                  selectedAttributeValues
+                                      .forEach((name, values) {
+                                    attributes.update(
+                                      name,
+                                      (existing) =>
+                                          [...existing, ...values.toList()],
+                                      ifAbsent: () => values.toList(),
+                                    );
+                                  });
+                                  selectedValues.clear();
+                                  selectedAttributeValues.clear();
                                 });
                               },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      const Text(
-                        'Ou créer un nouvel attribut:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                              child: const Text('Ajouter aux combinaisons'),
+                            ),
+                          ],
+                        ],
                       ),
+
+                      // Manual attribute addition
+                      const SizedBox(height: 20),
                       _buildTextFormField(
                         controller: attributeNameController,
-                        label: 'Nom du nouvel attribut',
+                        label: 'Nom de l\'attribut (ex: Taille)',
                       ),
                       _buildTextFormField(
                         controller: attributeValuesController,
-                        label: 'Valeurs (séparées par virgules)',
+                        label: 'Valeurs (séparées par virgule, ex: S,M,L)',
                       ),
                       ElevatedButton(
                         onPressed: addAttribute,
@@ -738,46 +806,51 @@ class _EditProductScreenState extends State<EditProductScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                       ),
+
+                      // Combined attributes display (single source of truth)
+                      if (attributes.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Attributs combinés:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 4.0,
+                          children: attributes.entries.expand((entry) {
+                            return entry.value.map((value) {
+                              return Chip(
+                                label: Text('${entry.key}: $value'),
+                                onDeleted: () {
+                                  setState(() {
+                                    entry.value.remove(value);
+                                    if (entry.value.isEmpty) {
+                                      attributes.remove(entry.key);
+                                    }
+                                  });
+                                },
+                              );
+                            }).toList();
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Generate variants button
+                      if (attributes.isNotEmpty)
+                        ElevatedButton(
+                          onPressed: generateVariants,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF009688),
+                          ),
+                          child: const Text(
+                            'Générer Variantes',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  ...attributes.entries.map((entry) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Wrap(
-                        spacing: 8.0,
-                        children: entry.value
-                            .map((value) => Chip(
-                                  label: Text(value),
-                                  onDeleted: () {
-                                    setState(() {
-                                      entry.value.remove(value);
-                                      if (entry.value.isEmpty) {
-                                        attributes.remove(entry.key);
-                                      }
-                                    });
-                                  },
-                                ))
-                            .toList(),
-                      ),
-                    ],
-                  )),
-                  const SizedBox(height: 10),
-                  if (attributes.isNotEmpty)
-                    ElevatedButton(
-                      onPressed: generateVariants,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF009688),
-                      ),
-                      child: const Text(
-                        'Générer Variantes',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
                   if (variants.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     const Text(
@@ -792,8 +865,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
                       builder: (context, constraints) {
                         final double columnSpacing = 8.0;
                         final double totalWidth = constraints.maxWidth;
-                        final double columnWidth =
-                            (totalWidth - (6 * columnSpacing)) / 7;
 
                         return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
