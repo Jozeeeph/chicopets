@@ -5,6 +5,7 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:sqflite/sqflite.dart';
 
 class EditProductScreen extends StatefulWidget {
   final Product product;
@@ -52,6 +53,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
   Map<String, List<String>> attributes = {};
   bool isLoadingVariants = false;
   String? selectedDefaultVariant;
+  
+  // New variables for attribute selection
+  List<Map<String, dynamic>> availableAttributes = [];
+  String? selectedAttributeName;
+  List<String> selectedAttributeValues = [];
 
   @override
   void initState() {
@@ -125,6 +131,20 @@ class _EditProductScreenState extends State<EditProductScreen> {
     // Load variants after UI is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadVariants();
+      _loadAvailableAttributes(); // Load available attributes
+    });
+  }
+
+  Future<void> _loadAvailableAttributes() async {
+    final db = await sqldb.db;
+    final results = await db.query('attributes');
+    setState(() {
+      availableAttributes = results.map((attr) {
+        return {
+          'name': attr['name'],
+          'values': (attr['attribute_values'] as String).split(',').map((v) => v.trim()).toList(),
+        };
+      }).toList();
     });
   }
 
@@ -141,7 +161,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         hasVariants = variants.isNotEmpty;
 
         if (hasVariants) {
-          // Calculer le stock total
+          // Calculate total stock
           final totalStock =
               variants.fold(0, (sum, variant) => sum + variant.stock);
           stockController.text = totalStock.toString();
@@ -245,21 +265,42 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-  void addAttribute() {
+  void addAttribute() async {
     String attributeName = attributeNameController.text.trim();
     String attributeValues = attributeValuesController.text.trim();
 
     if (attributeName.isNotEmpty && attributeValues.isNotEmpty) {
-      setState(() {
-        attributes[attributeName] =
-            attributeValues.split(',').map((v) => v.trim()).toList();
-        attributeNameController.clear();
-        attributeValuesController.clear();
-      });
+      try {
+        final db = await sqldb.db;
+        await db.insert(
+          'attributes',
+          {
+            'name': attributeName,
+            'attribute_values': attributeValues,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        setState(() {
+          attributes[attributeName] = 
+              attributeValues.split(',').map((v) => v.trim()).toList();
+          attributeNameController.clear();
+          attributeValuesController.clear();
+          _loadAvailableAttributes(); // Refresh the available attributes list
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de l\'ajout de l\'attribut: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
-// Dans la méthode qui génère les variantes
   void generateVariants() {
     if (widget.product.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -286,7 +327,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         );
       }).toList();
 
-      // Mettre à jour le stock total
+      // Update total stock
       final totalStock =
           variants.fold(0, (sum, variant) => sum + variant.stock);
       stockController.text = totalStock.toString();
@@ -617,50 +658,114 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 ),
                 if (hasVariants) ...[
                   const SizedBox(height: 20),
-                  _buildTextFormField(
-                    controller: attributeNameController,
-                    label: 'Nom de l\'attribut (ex: Taille)',
-                  ),
-                  _buildTextFormField(
-                    controller: attributeValuesController,
-                    label: 'Valeurs (séparées par virgule, ex: S,M,L)',
-                  ),
-                  ElevatedButton(
-                    onPressed: addAttribute,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0056A6),
-                    ),
-                    child: const Text(
-                      'Ajouter Attribut',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Attributs existants:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        decoration: _inputDecoration('Sélectionner un attribut'),
+                        value: selectedAttributeName,
+                        items: availableAttributes
+                            .map<DropdownMenuItem<String>>((attr) {
+                          return DropdownMenuItem<String>(
+                            value: attr['name'],
+                            child: Text(attr['name']),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedAttributeName = value;
+                            if (value != null) {
+                              selectedAttributeValues = availableAttributes
+                                  .firstWhere((attr) => attr['name'] == value)['attributs_values'];
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedAttributeName != null) ...[
+                        const Text(
+                          'Valeurs disponibles:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 8.0,
+                          children: selectedAttributeValues.map((value) {
+                            return FilterChip(
+                              label: Text(value),
+                              selected: attributes[selectedAttributeName]?.contains(value) ?? false,
+                              onSelected: (selected) {
+                                setState(() {
+                                  attributes.update(
+                                    selectedAttributeName!,
+                                    (values) => selected
+                                        ? [...values, value]
+                                        : values..remove(value),
+                                    ifAbsent: () => [value],
+                                  );
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const Text(
+                        'Ou créer un nouvel attribut:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      _buildTextFormField(
+                        controller: attributeNameController,
+                        label: 'Nom du nouvel attribut',
+                      ),
+                      _buildTextFormField(
+                        controller: attributeValuesController,
+                        label: 'Valeurs (séparées par virgules)',
+                      ),
+                      ElevatedButton(
+                        onPressed: addAttribute,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0056A6),
+                        ),
+                        child: const Text(
+                          'Ajouter Attribut',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   ...attributes.entries.map((entry) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.key,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Wrap(
-                            spacing: 8.0,
-                            children: entry.value
-                                .map((value) => Chip(
-                                      label: Text(value),
-                                      onDeleted: () {
-                                        setState(() {
-                                          entry.value.remove(value);
-                                          if (entry.value.isEmpty) {
-                                            attributes.remove(entry.key);
-                                          }
-                                        });
-                                      },
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      )),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Wrap(
+                        spacing: 8.0,
+                        children: entry.value
+                            .map((value) => Chip(
+                                  label: Text(value),
+                                  onDeleted: () {
+                                    setState(() {
+                                      entry.value.remove(value);
+                                      if (entry.value.isEmpty) {
+                                        attributes.remove(entry.key);
+                                      }
+                                    });
+                                  },
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  )),
                   const SizedBox(height: 10),
                   if (attributes.isNotEmpty)
                     ElevatedButton(
@@ -696,7 +801,18 @@ class _EditProductScreenState extends State<EditProductScreen> {
                             width: totalWidth,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(
+                                color: Colors.grey.shade400,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 3,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
                             ),
                             child: DataTable(
                               columnSpacing: columnSpacing,
@@ -706,7 +822,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                               headingRowHeight: 50,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               headingTextStyle: TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -717,29 +833,87 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                 color: Colors.grey.shade800,
                                 fontSize: 13,
                               ),
-                              columns: const [
+                              columns: [
                                 DataColumn(
-                                    label: Center(child: Text('Défaut'))),
+                                  label: SizedBox(
+                                    width: 120,
+                                    child: Center(
+                                      child: Text(
+                                        'Défaut',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 DataColumn(
-                                    label: Center(child: Text('Combinaison'))),
+                                  label: SizedBox(
+                                    width: 150,
+                                    child: Center(
+                                      child: Text(
+                                        'Combinaison',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 DataColumn(
-                                  label: Center(child: Text('Prix')),
+                                  label: SizedBox(
+                                    width: 100,
+                                    child: Center(
+                                      child: Text(
+                                        'Prix',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                                   numeric: true,
                                 ),
                                 DataColumn(
-                                  label: Center(child: Text('Impact Prix')),
+                                  label: SizedBox(
+                                    width: 100,
+                                    child: Center(
+                                      child: Text(
+                                        'Impact Prix',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                                   numeric: true,
                                 ),
                                 DataColumn(
-                                  label: Center(child: Text('Prix Final')),
+                                  label: SizedBox(
+                                    width: 100,
+                                    child: Center(
+                                      child: Text(
+                                        'Prix Final',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                                   numeric: true,
                                 ),
                                 DataColumn(
-                                  label: Center(child: Text('Stock')),
+                                  label: SizedBox(
+                                    width: 100,
+                                    child: Center(
+                                      child: Text(
+                                        'Stock',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                                   numeric: true,
                                 ),
                                 DataColumn(
-                                  label: Center(child: Text('Code-barres')),
+                                  label: SizedBox(
+                                    width: 150,
+                                    child: Center(
+                                      child: Text(
+                                        'Code-barres',
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                               rows: variants.map((variant) {
@@ -748,8 +922,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       MaterialStateProperty.resolveWith<Color>(
                                     (Set<MaterialState> states) {
                                       if (variant.defaultVariant) {
-                                        return Colors.blue
-                                            .shade50; // Highlight default variant
+                                        return Colors.blue.shade50;
                                       }
                                       return states
                                               .contains(MaterialState.selected)
@@ -763,7 +936,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                   cells: [
                                     DataCell(
                                       Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Radio<String>(
                                             value: variant.combinationName,
@@ -789,18 +963,15 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                               },
                                             ),
                                           ),
-                                          const Text('Par défaut'),
+                                          SizedBox(width: 4),
+                                          Text('Par défaut'),
                                         ],
                                       ),
                                     ),
                                     DataCell(
-                                      Container(
-                                        width: columnWidth,
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 8),
+                                      Center(
                                         child: Text(
                                           variant.combinationName,
-                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             fontWeight: variant.defaultVariant
                                                 ? FontWeight.bold
@@ -810,13 +981,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       ),
                                     ),
                                     DataCell(
-                                      Container(
-                                        width: columnWidth,
+                                      Center(
                                         child: TextFormField(
                                           initialValue:
                                               variant.price.toString(),
                                           keyboardType: TextInputType.number,
-                                          style: TextStyle(fontSize: 13),
+                                          textAlign: TextAlign.center,
                                           decoration: InputDecoration(
                                             border: OutlineInputBorder(
                                               borderSide: BorderSide(
@@ -841,13 +1011,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       ),
                                     ),
                                     DataCell(
-                                      Container(
-                                        width: columnWidth,
+                                      Center(
                                         child: TextFormField(
                                           initialValue:
                                               variant.priceImpact.toString(),
                                           keyboardType: TextInputType.number,
-                                          style: TextStyle(fontSize: 13),
+                                          textAlign: TextAlign.center,
                                           decoration: InputDecoration(
                                             border: OutlineInputBorder(
                                               borderSide: BorderSide(
@@ -883,13 +1052,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       ),
                                     ),
                                     DataCell(
-                                      Container(
-                                        width: columnWidth,
+                                      Center(
                                         child: TextFormField(
                                           initialValue:
                                               variant.stock.toString(),
                                           keyboardType: TextInputType.number,
-                                          style: TextStyle(fontSize: 13),
+                                          textAlign: TextAlign.center,
                                           decoration: InputDecoration(
                                             border: OutlineInputBorder(
                                               borderSide: BorderSide(
@@ -913,11 +1081,10 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       ),
                                     ),
                                     DataCell(
-                                      Container(
-                                        width: columnWidth,
+                                      Center(
                                         child: TextFormField(
                                           initialValue: variant.code,
-                                          style: TextStyle(fontSize: 13),
+                                          textAlign: TextAlign.center,
                                           decoration: InputDecoration(
                                             border: OutlineInputBorder(
                                               borderSide: BorderSide(

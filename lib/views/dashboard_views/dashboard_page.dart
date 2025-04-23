@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
@@ -165,7 +166,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Gestion des Attributs',
                         icon: Icons.tune,
-                        page: null,
+                        page: const ListAttributs(),
                         color: const Color(0xFF9C27B0),
                       ),
                       _buildCard(

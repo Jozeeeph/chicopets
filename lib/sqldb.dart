@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:caissechicopets/controllers/attributController.dart';
 import 'package:caissechicopets/controllers/categoryController.dart';
 import 'package:caissechicopets/controllers/clientController.dart';
 import 'package:caissechicopets/controllers/galleryImagesController.dart';
@@ -9,6 +10,7 @@ import 'package:caissechicopets/controllers/rapportController.dart';
 import 'package:caissechicopets/controllers/subCategoryController.dart';
 import 'package:caissechicopets/controllers/userController.dart';
 import 'package:caissechicopets/controllers/variantController.dart';
+import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/user.dart';
@@ -24,6 +26,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Added to get the correc
 
 class SqlDb {
   static Database? _db;
+  Attributcontroller get attributController => Attributcontroller();
 
   Future<Database> get db async {
     if (_db != null) return _db!;
@@ -35,20 +38,27 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+
+    // Check if database exists before deleting
+    // if (await databaseExists(dbPath)) {
+    //   await deleteDatabase(dbPath);
+    // }
 
     // Ensure the directory exists
-    if (!Directory(appSupportDir.path).existsSync()) {
-      Directory(appSupportDir.path).createSync(recursive: true);
+    final directory = Directory(appSupportDir.path);
+    if (!directory.existsSync()) {
+      directory.createSync(recursive: true);
     }
 
-    // Open the databases
-    return openDatabase(
+    // Open the database
+    return await openDatabase(
       dbPath,
       version: 1,
       onCreate: (Database db, int version) async {
-        print("Creating tables...");
-        await db.execute('''
+        try {
+          print("Creating tables...");
+
+          await db.execute('''
           CREATE TABLE products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT,
@@ -65,126 +75,140 @@ class SqlDb {
             sub_category_name TEXT,
             is_deleted INTEGER DEFAULT 0,
             marge REAL,
-            remise_max REAL DEFAULT 0.0, -- Nouvel attribut pour la remise maximale en pourcentage
-            remise_valeur_max REAL DEFAULT 0.0, -- Nouvel attribut pour la valeur maximale de la remise
+            remise_max REAL DEFAULT 0.0,
+            remise_valeur_max REAL DEFAULT 0.0,
             has_variants INTEGER DEFAULT 0,
             sellable INTEGER DEFAULT 1
           );
         ''');
-        print("Products table created");
+          print("Products table created");
 
-        await db.execute('''
-   CREATE TABLE IF NOT EXISTS orders(
-    id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT,
-    total REAL,
-    mode_paiement TEXT,
-    status TEXT,
-    remaining_amount REAL,
-    id_client INTEGER,
-    global_discount REAL DEFAULT 0.0,
-    is_percentage_discount INTEGER DEFAULT 1,
-    cash_amount REAL,
-    card_amount REAL,
-    check_amount REAL,
-    check_number TEXT,
-    card_transaction_id TEXT,
-    check_date TEXT,
-    bank_name TEXT
-  );
-''');
-        print("Orders table created");
+          await db.execute('''
+          CREATE TABLE orders (
+            id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            total REAL,
+            mode_paiement TEXT,
+            status TEXT,
+            remaining_amount REAL,
+            id_client INTEGER,
+            global_discount REAL DEFAULT 0.0,
+            is_percentage_discount INTEGER DEFAULT 1,
+            cash_amount REAL,
+            card_amount REAL,
+            check_amount REAL,
+            check_number TEXT,
+            card_transaction_id TEXT,
+            check_date TEXT,
+            bank_name TEXT
+          );
+        ''');
+          print("Orders table created");
 
-        await db.execute('''
- CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_order INTEGER NOT NULL,
-    product_code TEXT,
-    product_id INTEGER,
-    quantity INTEGER NOT NULL,
-    prix_unitaire REAL DEFAULT 0 NOT NULL,
-    discount REAL NOT NULL,
-    isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)),
-    FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
-    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    CHECK (product_code IS NOT NULL OR product_id IS NOT NULL) -- Ensure at least one reference exists
-);
-''');
+          await db.execute('''
+          CREATE TABLE order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_order INTEGER NOT NULL,
+            product_code TEXT,
+            product_id INTEGER,
+            quantity INTEGER NOT NULL,
+            prix_unitaire REAL DEFAULT 0 NOT NULL,
+            discount REAL NOT NULL,
+            isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)),
+            FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
+            FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            CHECK (product_code IS NOT NULL OR product_id IS NOT NULL)
+          );
+        ''');
+          print("Order items table created");
 
-        print("Order items table created");
+          await db.execute('''
+          CREATE TABLE categories (
+            id_category INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_name TEXT NOT NULL,
+            image_path TEXT,
+            is_deleted INTEGER DEFAULT 0 CHECK (is_deleted IN (0, 1))
+          );
+        ''');
+          print("Categories table created");
 
-        await db.execute('''
-  CREATE TABLE IF NOT EXISTS categories (
-    id_category INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_name TEXT NOT NULL,
-    image_path TEXT,
-    is_deleted INTEGER DEFAULT 0 CHECK (is_deleted IN (0, 1))
-  )
-''');
-        print("Categories table created/verified");
+          await db.execute('''
+          CREATE TABLE sub_categories (
+            id_sub_category INTEGER PRIMARY KEY AUTOINCREMENT,
+            sub_category_name TEXT NOT NULL,
+            parent_id INTEGER,
+            category_id INTEGER NOT NULL,
+            is_deleted INTEGER DEFAULT 0 CHECK (is_deleted IN (0, 1)),
+            FOREIGN KEY (parent_id) REFERENCES sub_categories (id_sub_category) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES categories (id_category) ON DELETE CASCADE
+          );
+        ''');
+          print("Sub-categories table created");
 
-        await db.execute('''
-  CREATE TABLE IF NOT EXISTS sub_categories (
-    id_sub_category INTEGER PRIMARY KEY AUTOINCREMENT,
-    sub_category_name TEXT NOT NULL,
-    parent_id INTEGER,
-    category_id INTEGER NOT NULL,
-    is_deleted INTEGER DEFAULT 0 CHECK (is_deleted IN (0, 1)),
-    FOREIGN KEY (parent_id) REFERENCES sub_categories (id_sub_category) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories (id_category) ON DELETE CASCADE
-  )
-''');
-        print("Sub-categories table created/verified");
+          await db.execute('''
+          CREATE TABLE variants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            combination_name TEXT NOT NULL,
+            price REAL NOT NULL,
+            price_impact REAL NOT NULL,
+            final_price REAL NOT NULL,
+            stock INTEGER NOT NULL,
+            default_variant INTEGER DEFAULT 0,
+            attributes TEXT NOT NULL,
+            product_id INTEGER NOT NULL,
+            FOREIGN KEY (product_id) REFERENCES products(id)
+          );
+        ''');
+          print("Variants table created");
 
-        await db.execute('''
-  CREATE TABLE variants (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL,
-  combination_name TEXT NOT NULL,
-  price REAL NOT NULL,
-  price_impact REAL NOT NULL,
-  final_price REAL NOT NULL,
-  stock INTEGER NOT NULL,
-  default_variant INTEGER DEFAULT 0,
-  attributes TEXT NOT NULL,
-  product_id INTEGER NOT NULL,
-  FOREIGN KEY (product_id) REFERENCES products(id)
-);
-''');
-        print("Variants table created");
+          await db.execute('''
+          CREATE TABLE gallery_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_path TEXT NOT NULL,
+            name TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          );
+        ''');
+          print("Gallery images table created");
 
-        await db.execute('''
-  CREATE TABLE IF NOT EXISTS gallery_images (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    image_path TEXT NOT NULL,
-    name TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-''');
-        print("Gallery images table created");
+          await db.execute('''
+          CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            code TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1
+          );
+        ''');
+          print("Users table created");
 
-        await db.execute('''
-  CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    code TEXT NOT NULL,
-    role TEXT NOT NULL, -- 'admin' ou 'cashier'
-    is_active INTEGER DEFAULT 1
-  )
-''');
-        print("Users table created");
-        await db.execute('''
-  CREATE TABLE IF NOT EXISTS clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    first_name TEXT NOT NULL,
-    phone_number TEXT NOT NULL UNIQUE,
-    loyalty_points INTEGER DEFAULT 0,
-    id_orders TEXT DEFAULT '' -- Stocke les IDs de commandes séparés par des virgules
-  )
-''');
-        print("Clients table created");
+          await db.execute('''
+          CREATE TABLE clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            first_name TEXT NOT NULL,
+            phone_number TEXT NOT NULL UNIQUE,
+            loyalty_points INTEGER DEFAULT 0,
+            id_orders TEXT DEFAULT ''
+          );
+        ''');
+          print("Clients table created");
+
+          await db.execute('''
+          CREATE TABLE attributes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            attributs_values TEXT NOT NULL,
+            UNIQUE(name) ON CONFLICT REPLACE
+          );
+        ''');
+          print("Attributes table created");
+        } catch (e) {
+          print("Error creating tables: $e");
+          rethrow;
+        }
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -195,7 +219,7 @@ class SqlDb {
             total REAL,
             mode_paiement TEXT,
             id_client INTEGER
-          )
+          );
         ''');
         }
       },
@@ -619,5 +643,26 @@ class SqlDb {
       dateFilter: dateFilter,
       db: dbClient,
     );
+  }
+
+  //Attributs Repository
+  Future<int> addAttribute(Attribut attribut) async {
+    final dbClient = await db;
+    return await Attributcontroller().addAttribute(attribut, dbClient);
+  }
+
+  Future<List<Attribut>> getAllAttributes() async {
+    final dbClient = await db;
+    return await Attributcontroller().getAllAttributes(dbClient);
+  }
+
+  Future<int> updateAttribute(Attribut attribut) async {
+    final dbClient = await db;
+    return await Attributcontroller().updateAttribute(attribut, dbClient);
+  }
+
+  Future<int> deleteAttribute(int attributId) async {
+    final db = await this.db;
+    return await Attributcontroller().deleteAttribute(attributId, db);
   }
 }
