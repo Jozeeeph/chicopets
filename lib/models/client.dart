@@ -5,6 +5,7 @@ class Client {
   String phoneNumber;
   int loyaltyPoints;
   List<int> idOrders;
+  DateTime? lastPurchaseDate; // Nouveau champ pour suivre la dernière date d'achat
 
   Client({
     this.id,
@@ -13,6 +14,7 @@ class Client {
     required this.phoneNumber,
     this.loyaltyPoints = 0,
     this.idOrders = const [],
+    this.lastPurchaseDate,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,11 +25,11 @@ class Client {
       'phone_number': phoneNumber,
       'loyalty_points': loyaltyPoints,
       'id_orders': idOrders.isEmpty ? null : idOrders.join(','),
+      'last_purchase_date': lastPurchaseDate?.toIso8601String(),
     };
   }
 
   factory Client.fromMap(Map<String, dynamic> map) {
-    // Gestion des id_orders
     List<int> orders = [];
     if (map['id_orders'] != null && map['id_orders'].toString().isNotEmpty) {
       orders = (map['id_orders'] as String)
@@ -44,6 +46,9 @@ class Client {
       phoneNumber: map['phone_number'],
       loyaltyPoints: map['loyalty_points'] ?? 0,
       idOrders: orders,
+      lastPurchaseDate: map['last_purchase_date'] != null 
+          ? DateTime.parse(map['last_purchase_date']) 
+          : null,
     );
   }
 }

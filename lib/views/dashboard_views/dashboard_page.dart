@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
 import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
@@ -190,6 +191,13 @@ class _DashboardPageState extends State<DashboardPage> {
                       icon: Icons.photo_library,
                       page: const GalleryPage(),
                       color: const Color(0xFFE91E63),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Programme de fidélité',
+                      icon: Icons.loyalty,
+                      page: FidelityRulesPage(),
+                      color: Color(0xFF9C27B0),
                     ),
                   ],
                 ),

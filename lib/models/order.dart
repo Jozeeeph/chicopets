@@ -20,26 +20,29 @@ class Order {
   String? cardTransactionId; // ID de transaction TPE
   DateTime? checkDate; // Date du chèque
   String? bankName; // Nom de la banque pour les chèques
+  int? pointsUsed;
+  double? pointsDiscount;
 
-  Order({
-    this.idOrder,
-    required this.date,
-    required this.orderLines,
-    required this.total,
-    required this.modePaiement,
-    this.status = "non payée",
-    this.remainingAmount = 0.0,
-    this.idClient,
-    required this.globalDiscount,
-    required this.isPercentageDiscount,
-    this.cashAmount,
-    this.cardAmount,
-    this.checkAmount,
-    this.checkNumber,
-    this.cardTransactionId,
-    this.checkDate,
-    this.bankName,
-  });
+  Order(
+      {this.idOrder,
+      required this.date,
+      required this.orderLines,
+      required this.total,
+      required this.modePaiement,
+      this.status = "non payée",
+      this.remainingAmount = 0.0,
+      this.idClient,
+      required this.globalDiscount,
+      required this.isPercentageDiscount,
+      this.cashAmount,
+      this.cardAmount,
+      this.checkAmount,
+      this.checkNumber,
+      this.cardTransactionId,
+      this.checkDate,
+      this.bankName,
+      this.pointsUsed,
+      this.pointsDiscount});
 
   Map<String, dynamic> toMap() {
     return {
@@ -59,6 +62,8 @@ class Order {
       'card_transaction_id': cardTransactionId,
       'check_date': checkDate?.toIso8601String(),
       'bank_name': bankName,
+      'points_used': pointsUsed,
+      'points_discount': pointsDiscount,
     };
   }
 
@@ -79,10 +84,11 @@ class Order {
       checkAmount: map['check_amount']?.toDouble(),
       checkNumber: map['check_number'],
       cardTransactionId: map['card_transaction_id'],
-      checkDate: map['check_date'] != null 
-          ? DateTime.parse(map['check_date']) 
-          : null,
+      checkDate:
+          map['check_date'] != null ? DateTime.parse(map['check_date']) : null,
       bankName: map['bank_name'],
+      pointsUsed: map['points_used'],
+      pointsDiscount: map['points_discount'],
     );
   }
 

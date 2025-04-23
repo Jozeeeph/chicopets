@@ -1,3 +1,4 @@
+import 'package:caissechicopets/controllers/fidelity_controller.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
@@ -132,4 +133,24 @@ class Clientcontroller {
     );
     print('Updated order with client ID'); // Debug
   }
+  Future<List<Client>> getClientsWithExpiringPoints(Database db, int daysBeforeExpiration) async {
+  final rules = await FidelityController().getFidelityRules(db);
+  if (rules.pointsValidityMonths == 0) return [];
+  
+  final expirationThreshold = DateTime.now().add(Duration(days: daysBeforeExpiration));
+  final minDate = DateTime.now().subtract(
+    Duration(days: 30 * rules.pointsValidityMonths),
+  );
+  
+  final clients = await db.query(
+    'clients',
+    where: 'last_purchase_date BETWEEN ? AND ? AND loyalty_points > 0',
+    whereArgs: [
+      minDate.toIso8601String(),
+      expirationThreshold.toIso8601String(),
+    ],
+  );
+  
+  return clients.map((c) => Client.fromMap(c)).toList();
+}
 }

@@ -1,3 +1,7 @@
+import 'dart:math';
+
+import 'package:caissechicopets/controllers/fidelity_controller.dart';
+import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
@@ -92,6 +96,9 @@ class Addorder {
   ) async {
     Client? selectedClient;
     int numberOfTickets = 1;
+    bool useLoyaltyPoints = false;
+    int pointsToUse = 0;
+    double pointsDiscount = 0.0;
 
     print("seee ${selectedProducts.length}");
 
@@ -494,87 +501,70 @@ class Addorder {
                                   ],
                                 ),
 
-                                // Section Totaux
-                                Divider(thickness: 1, color: Colors.black),
-
-                                // Afficher différemment selon la présence de remise
-                                if (globalDiscount > 0 ||
-                                    discounts.any((d) => d > 0)) ...[
-                                  // CAS AVEC REMISE - Afficher les deux totaux
+                                if (pointsDiscount > 0)
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
+                                      Text("Réduction points:",
+                                          style:
+                                              TextStyle(color: Colors.green)),
                                       Text(
-                                        "Total avant remise:",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(
-                                        "${totalBeforeDiscount.toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                          "-${pointsDiscount.toStringAsFixed(2)} DT",
+                                          style:
+                                              TextStyle(color: Colors.green)),
                                     ],
                                   ),
+
+                                if (globalDiscount > 0 ||
+                                    discounts.any((d) => d > 0))
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
+                                      Text("Total avant remise:"),
                                       Text(
-                                        "Remise:",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.red,
-                                        ),
-                                      ),
+                                          "${totalBeforeDiscount.toStringAsFixed(2)} DT"),
+                                    ],
+                                  ),
+
+                                if (globalDiscount > 0)
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text("Remise:",
+                                          style: TextStyle(color: Colors.red)),
                                       Text(
                                         isPercentageDiscount
-                                            ? "${globalDiscount.toStringAsFixed(2)}%"
-                                            : "${globalDiscount.toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.red,
-                                        ),
+                                            ? "-${globalDiscount.toStringAsFixed(2)}%"
+                                            : "-${globalDiscount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(color: Colors.red),
                                       ),
                                     ],
                                   ),
-                                ],
 
-                                // Total après remise (toujours affiché)
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      "Total:",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      "${total.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    Text("Total:",
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
+                                    Text("${total.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
                                   ],
                                 ),
 
-                                // Section Paiement (toujours affichée)
                                 Divider(thickness: 1, color: Colors.black),
                                 Text("Détails de paiement:",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
                                 SizedBox(height: 4),
 
-                                // Détails selon le mode de paiement
                                 if (selectedPaymentMethod == "Espèce") ...[
                                   Text("Mode: Espèces"),
                                   Text(
@@ -634,25 +624,21 @@ class Addorder {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      "Total payé:",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    Text("Total payé:",
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
                                     Text(
                                       "${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT",
                                       style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
 
                                 if ((cashAmount + cardAmount + checkAmount) <
-                                    total) ...[
+                                    total)
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -660,22 +646,19 @@ class Addorder {
                                       Text(
                                         "Reste à payer:",
                                         style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red,
-                                        ),
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red),
                                       ),
                                       Text(
                                         "${(total - (cashAmount + cardAmount + checkAmount)).toStringAsFixed(2)} DT",
                                         style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red,
-                                        ),
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red),
                                       ),
                                     ],
                                   ),
-                                ],
                               ],
                             )),
                       ),
@@ -741,6 +724,149 @@ class Addorder {
                               ],
                             ),
                           ),
+
+                          SizedBox(height: 16),
+                          SizedBox(height: 16),
+
+                          // --- AJOUTEZ ICI LE WIDGET DE POINTS DE FIDÉLITÉ ---
+                          if (selectedClient != null)
+                            FutureBuilder<FidelityRules>(
+                              future: SqlDb().db.then((db) =>
+                                  FidelityController().getFidelityRules(db)),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) return SizedBox();
+                                final rules = snapshot.data!;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: useLoyaltyPoints,
+                                          onChanged: (value) async {
+                                            if (value == true) {
+                                              final db = await SqlDb().db;
+                                              final canUse =
+                                                  await FidelityController()
+                                                      .canUsePoints(
+                                                selectedClient!,
+                                                total,
+                                                db,
+                                              );
+
+                                              if (!canUse) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Points insuffisants ou expirés (min: ${rules.minPointsToUse})',
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
+                                            }
+                                            setState(() => useLoyaltyPoints =
+                                                value ?? false);
+                                          },
+                                        ),
+                                        Text('Utiliser les points de fidélité'),
+                                        IconButton(
+                                          icon: Icon(Icons.info_outline),
+                                          onPressed: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title:
+                                                    Text('Points de fidélité'),
+                                                content: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                        'Solde: ${selectedClient!.loyaltyPoints} points'),
+                                                    Text(
+                                                        '1 point = ${rules.dinarPerPoint} DT'),
+                                                    Text(
+                                                        '${rules.pointsPerDinar} point(s) par dinar dépensé'),
+                                                    Text(
+                                                        'Minimum ${rules.minPointsToUse} points pour utiliser'),
+                                                    if (rules
+                                                            .pointsValidityMonths >
+                                                        0)
+                                                      Text(
+                                                          'Validité: ${rules.pointsValidityMonths} mois'),
+                                                  ],
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(context),
+                                                    child: Text('OK'),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                    if (useLoyaltyPoints) ...[
+                                      Slider(
+                                        min: 0,
+                                        max: selectedClient!.loyaltyPoints
+                                            .toDouble(),
+                                        divisions:
+                                            selectedClient!.loyaltyPoints,
+                                        value: pointsToUse.toDouble(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            pointsToUse = value.toInt();
+                                            pointsDiscount = pointsToUse *
+                                                rules.dinarPerPoint;
+
+                                            // Ne pas dépasser le pourcentage maximum
+                                            final maxDiscount =
+                                                totalBeforeDiscount *
+                                                    (rules.maxPercentageUse /
+                                                        100);
+                                            if (pointsDiscount > maxDiscount) {
+                                              pointsDiscount = maxDiscount;
+                                              pointsToUse = (pointsDiscount /
+                                                      rules.dinarPerPoint)
+                                                  .round();
+                                            }
+
+                                            // Mettre à jour le total affiché
+                                            total = calculateTotal(
+                                                  selectedProducts,
+                                                  quantityProducts,
+                                                  discounts,
+                                                  typeDiscounts,
+                                                  isPercentageDiscount
+                                                      ? globalDiscount
+                                                      : globalDiscountValue,
+                                                  isPercentageDiscount,
+                                                ) -
+                                                pointsDiscount;
+
+                                            if (total < 0) total = 0;
+                                          });
+                                        },
+                                      ),
+                                      Text(
+                                          'Utiliser $pointsToUse points (${pointsDiscount.toStringAsFixed(2)} DT)'),
+                                      Text(
+                                          'Nouveau solde: ${selectedClient!.loyaltyPoints - pointsToUse} points'),
+                                    ],
+                                  ],
+                                );
+                              },
+                            ),
+                          // ---------------------------------------------------
 
                           SizedBox(height: 16),
 
@@ -1330,27 +1456,30 @@ class Addorder {
                     if (!validateDiscounts()) return;
                     Navigator.of(context).pop();
                     _confirmPlaceOrder(
-                      context,
-                      selectedProducts,
-                      quantityProducts,
-                      amountGiven,
-                      discounts,
-                      typeDiscounts,
-                      isPercentageDiscount
-                          ? globalDiscount
-                          : globalDiscountValue,
-                      isPercentageDiscount,
-                      selectedClient,
-                      numberOfTickets,
-                      selectedPaymentMethod, // Nouveau paramètre
-                      cashAmount, // Nouveau paramètre
-                      cardAmount, // Nouveau paramètre
-                      checkAmount,
-                      checkNumber, // For cheque number
-                      cardTransactionId, // For TPE transaction ID
-                      checkDate, // For cheque date
-                      bankName, // Ajout du paramètre
-                    );
+                        context,
+                        selectedProducts,
+                        quantityProducts,
+                        amountGiven,
+                        discounts,
+                        typeDiscounts,
+                        isPercentageDiscount
+                            ? globalDiscount
+                            : globalDiscountValue,
+                        isPercentageDiscount,
+                        selectedClient,
+                        numberOfTickets,
+                        selectedPaymentMethod, // Nouveau paramètre
+                        cashAmount, // Nouveau paramètre
+                        cardAmount, // Nouveau paramètre
+                        checkAmount,
+                        checkNumber, // For cheque number
+                        cardTransactionId, // For TPE transaction ID
+                        checkDate, // For cheque date
+                        bankName,
+                        useLoyaltyPoints,
+                        pointsToUse,
+                        pointsDiscount // Ajout du paramètre
+                        );
                   },
                   child: Text(
                     "Confirmer",
@@ -1407,6 +1536,9 @@ class Addorder {
     String? cardTransactionId, // For TPE transaction ID
     DateTime? checkDate, // For cheque date
     String? bankName,
+    bool useLoyaltyPoints,
+    int pointsToUse,
+    double pointsDiscount,
   ) async {
     if (!isPercentageDiscount &&
         globalDiscount >
@@ -1453,9 +1585,62 @@ class Addorder {
       isPercentageDiscount,
     );
 
+    if (useLoyaltyPoints && pointsToUse > 0) {
+      total = max(0, total - pointsDiscount);
+    }
+
     double totalAmountPaid = 0.0;
     String status;
     double remainingAmount;
+    switch (selectedPaymentMethod) {
+      case "Espèce":
+        totalAmountPaid = cashAmount;
+        status = (cashAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+            ? "payée"
+            : "semi-payée";
+        remainingAmount =
+            (cashAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? 0.0
+                : total - cashAmount - (useLoyaltyPoints ? pointsDiscount : 0);
+        break;
+      case "TPE":
+        totalAmountPaid = cardAmount;
+        status = (cardAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+            ? "payée"
+            : "semi-payée";
+        remainingAmount =
+            (cardAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? 0.0
+                : total - cardAmount - (useLoyaltyPoints ? pointsDiscount : 0);
+        break;
+      case "Chèque":
+        totalAmountPaid = checkAmount;
+        status =
+            (checkAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? "payée"
+                : "semi-payée";
+        remainingAmount =
+            (checkAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? 0.0
+                : total - checkAmount - (useLoyaltyPoints ? pointsDiscount : 0);
+        break;
+      case "Mixte":
+        totalAmountPaid = cashAmount + cardAmount + checkAmount;
+        status =
+            (totalAmountPaid + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? "payée"
+                : "semi-payée";
+        remainingAmount =
+            (totalAmountPaid + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
+                ? 0.0
+                : total -
+                    totalAmountPaid -
+                    (useLoyaltyPoints ? pointsDiscount : 0);
+        break;
+      default:
+        status = "non payée";
+        remainingAmount = total;
+    }
 
     switch (selectedPaymentMethod) {
       case "Espèce":
@@ -1592,10 +1777,34 @@ class Addorder {
     print("Order to be saved: ${order.toMap()}");
 
     try {
+      double totalBeforePoints = calculateTotal(
+        selectedProducts,
+        quantityProducts,
+        discounts,
+        typeDiscounts,
+        globalDiscount,
+        isPercentageDiscount,
+      );
+
+      // Appliquer la réduction des points
+      if (useLoyaltyPoints && pointsToUse > 0) {
+        totalBeforePoints -= pointsDiscount;
+        if (totalBeforePoints < 0) totalBeforePoints = 0;
+      }
       int orderId = await SqlDb().addOrder(order);
-      // Associer la commande au client si un client est sélectionné
+
       if (selectedClient != null && orderId > 0) {
-        await SqlDb().addOrderToClient(selectedClient.id!, orderId);
+        final db = await SqlDb().db;
+        final fidelityController = FidelityController();
+
+        // 1. Appliquer la réduction des points si utilisés
+        if (useLoyaltyPoints && pointsToUse > 0) {
+          await fidelityController.applyPointsToOrder(
+              order, selectedClient!, pointsToUse, db);
+        }
+
+        // 2. Ajouter les points gagnés (même si on a utilisé des points)
+        await fidelityController.addPointsFromOrder(order, db);
       }
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
@@ -1613,6 +1822,21 @@ class Addorder {
           isPercentageDiscount: order.isPercentageDiscount,
           idClient: order.idClient,
         );
+
+        if (useLoyaltyPoints && pointsToUse > 0) {
+          final db = await SqlDb().db;
+          final fidelityController = FidelityController();
+
+          // Déduire les points
+          await fidelityController.usePoints(selectedClient!, pointsToUse, db);
+
+          // Appliquer la réduction au total
+          total -= pointsDiscount;
+          if (total < 0) total = 0;
+
+          // Ajouter les points gagnés sur cette commande
+          await fidelityController.addPointsFromOrder(order, db);
+        }
 
         // Générer les tickets PDF
         for (int i = 0; i < numberOfTickets; i++) {
