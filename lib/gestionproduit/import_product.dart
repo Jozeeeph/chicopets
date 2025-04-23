@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:caissechicopets/models/attribut.dart';
 import 'package:flutter/material.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -152,6 +153,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
             // Handle variants if exists
             if (hasVariants) {
               List<Variant> allVariants = [];
+              final attributesMap =
+                  <String, Set<String>>{}; // To track all attributes
 
               for (var row in rows) {
                 String variantCode = row[13]?.value?.toString() ?? '';
@@ -166,12 +169,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 int variantStock =
                     int.tryParse(row[18]?.value?.toString() ?? '0') ?? 0;
 
-                // If variant code is empty but product has variants, generate one
-                if (variantCode.isEmpty) {
-                  variantCode =
-                      '${designation.replaceAll(' ', '_')}_${allVariants.length + 1}';
-                }
-
                 // Parse variant attributes
                 Map<String, String> attributes = {};
                 if (attributesStr.contains(',')) {
@@ -179,7 +176,14 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   for (String pair in attributePairs) {
                     List<String> parts = pair.split(':');
                     if (parts.length == 2) {
-                      attributes[parts[0].trim()] = parts[1].trim();
+                      final attrName = parts[0].trim();
+                      final attrValue = parts[1].trim();
+
+                      attributes[attrName] = attrValue;
+
+                      // Track all attribute values
+                      attributesMap.putIfAbsent(attrName, () => <String>{});
+                      attributesMap[attrName]!.add(attrValue);
                     }
                   }
                 }
@@ -200,6 +204,15 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
               // Insert product first
               product.id = await _sqlDb.addProduct(product);
+
+              // Store all attributes in database
+              for (final entry in attributesMap.entries) {
+                final attribut = Attribut(
+                  name: entry.key,
+                  values: entry.value,
+                );
+                await _sqlDb.addAttribute(attribut);
+              }
 
               // Then insert all variants
               for (var variant in allVariants) {
