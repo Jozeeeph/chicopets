@@ -4,6 +4,7 @@ import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/views/client_views/client_form.dart';
 import 'package:flutter/animation.dart';
 import 'package:caissechicopets/models/order.dart';
+import 'package:intl/intl.dart';
 
 class ClientManagementWidget extends StatefulWidget {
   final Function(Client)? onClientSelected;
@@ -78,6 +79,32 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
             client.phoneNumber.contains(query);
       }).toList();
     });
+  }
+
+  void _showPointsInfo(BuildContext context, Client client) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Points de fidélité'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Solde: ${client.loyaltyPoints} points'),
+            if (client.lastPurchaseDate != null)
+              Text(
+                  'Dernier achat: ${DateFormat('dd/MM/yyyy').format(client.lastPurchaseDate!)}'),
+            // Vous pouvez ajouter plus d'infos ici
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showClientOrders(BuildContext context, Client client) async {
@@ -442,50 +469,81 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                             },
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
-                              child: Row(
+                              child: Column(
                                 children: [
-                                  CircleAvatar(
-                                    backgroundColor: widget.tealGreen,
-                                    child: Text(
-                                      client.name.substring(0, 1).toUpperCase(),
-                                      style: TextStyle(color: widget.white),
+                                  ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: widget.tealGreen,
+                                      child: Text(
+                                        client.name
+                                            .substring(0, 1)
+                                            .toUpperCase(),
+                                        style: TextStyle(color: widget.white),
+                                      ),
                                     ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
+                                    title: Text(
+                                      '${client.name} ${client.firstName}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: widget.darkBlue,
+                                      ),
+                                    ),
+                                    subtitle: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            // Icône pour afficher les commandes
-
-                                            Text(
-                                              '${client.name} ${client.firstName}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: widget.darkBlue,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 4),
+                                        Text(client.phoneNumber),
                                         Text(
-                                          client.phoneNumber,
+                                          '${client.loyaltyPoints} points',
                                           style: TextStyle(
-                                              color: Colors.grey[600]),
+                                            color: widget.deepBlue,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                     ),
+                                    trailing: IconButton(
+                                      icon: Icon(Icons.info_outline),
+                                      onPressed: () {
+                                        _showPointsInfo(context, client);
+                                      },
+                                    ),
                                   ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (widget.onClientSelected != null)
+                                  // Boutons supplémentaires en dessous du ListTile
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (widget.onClientSelected != null)
+                                          InkWell(
+                                            onTap: () => _showClientOrders(
+                                                context, client),
+                                            child: Container(
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 12, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: widget.lightGray,
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.receipt,
+                                                      size: 16,
+                                                      color: widget.deepBlue),
+                                                  SizedBox(width: 4),
+                                                  Text('Commandes',
+                                                      style: TextStyle(
+                                                          fontSize: 12)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        SizedBox(width: 8),
                                         InkWell(
-                                          onTap: () => _showClientOrders(
+                                          onTap: () => _showClientProducts(
                                               context, client),
                                           child: Container(
                                             padding: EdgeInsets.symmetric(
@@ -498,52 +556,26 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(Icons.receipt,
+                                                Icon(Icons.shopping_basket,
                                                     size: 16,
-                                                    color: widget.deepBlue),
+                                                    color: widget.softOrange),
                                                 SizedBox(width: 4),
-                                                Text('Commandes',
+                                                Text('Produits',
                                                     style: TextStyle(
                                                         fontSize: 12)),
                                               ],
                                             ),
                                           ),
                                         ),
-                                      SizedBox(width: 8),
-                                      // Bouton Produits
-                                      InkWell(
-                                        onTap: () => _showClientProducts(
-                                            context, client),
-                                        child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: widget.lightGray,
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.shopping_basket,
-                                                  size: 16,
-                                                  color: widget.softOrange),
-                                              SizedBox(width: 4),
-                                              Text('Produits',
-                                                  style:
-                                                      TextStyle(fontSize: 12)),
-                                            ],
-                                          ),
+                                        SizedBox(width: 8),
+                                        IconButton(
+                                          icon: Icon(Icons.edit,
+                                              color: widget.softOrange),
+                                          onPressed: () =>
+                                              _showClientForm(client),
                                         ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      IconButton(
-                                        icon: Icon(Icons.edit,
-                                            color: widget.softOrange),
-                                        onPressed: () =>
-                                            _showClientForm(client),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
