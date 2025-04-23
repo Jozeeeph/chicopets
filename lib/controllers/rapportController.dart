@@ -22,8 +22,7 @@ class rapportController {
       FROM 
         orders o
       WHERE 
-        o.status IN ('completed', 'paid', 'semi-payée', 'payée')
-        AND o.total > 0
+        o.total > 0
       ''';
 
       if (dateFilter != null && dateFilter.isNotEmpty) {
