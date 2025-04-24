@@ -1,7 +1,10 @@
 class OrderLine {
   final int idOrder;
-  final String? productCode; // Renamed from idProduct for clarity
-  final int? productId; // New field
+  final String? productCode;
+  final int? productId;
+  final int? variantId;
+  final String? variantCode;
+  final String? variantName;
   final int quantity;
   final double prixUnitaire;
   final double discount;
@@ -11,6 +14,9 @@ class OrderLine {
     required this.idOrder,
     this.productCode,
     this.productId,
+    this.variantId,
+    this.variantCode,
+    this.variantName,
     required this.quantity,
     required this.prixUnitaire,
     required this.discount,
@@ -33,6 +39,9 @@ class OrderLine {
       'id_order': idOrder,
       'product_code': productCode,
       'product_id': productId,
+      'variant_id': variantId,
+      'variant_code': variantCode,
+      'variant_name': variantName,
       'quantity': quantity,
       'prix_unitaire': prixUnitaire,
       'discount': discount,
@@ -42,12 +51,15 @@ class OrderLine {
 
   factory OrderLine.fromMap(Map<String, dynamic> map) {
     return OrderLine(
-      idOrder: map['id_order'],
-      productCode: map['product_code'],
-      productId: map['product_id'],
-      quantity: map['quantity'],
-      prixUnitaire: map['prix_unitaire'],
-      discount: map['discount'],
+      idOrder: map['id_order'] as int,
+      productCode: map['product_code'] as String?,
+      productId: map['product_id'] as int?,
+      variantId: map['variant_id'] as int?,
+      variantCode: map['variant_code'] as String?,
+      variantName: map['variant_name'] as String?,
+      quantity: map['quantity'] as int,
+      prixUnitaire: (map['prix_unitaire'] as num).toDouble(),
+      discount: (map['discount'] as num).toDouble(),
       isPercentage: map['isPercentage'] == 1,
     );
   }

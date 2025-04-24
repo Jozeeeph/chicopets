@@ -144,8 +144,7 @@ class Getorderlist {
     await sqldb.cancelOrderLine(order.idOrder!, orderLine.productCode ?? '');
 
     // Restocker le produit
-    await sqldb.updateProductStock(
-        orderLine.productCode ?? '', orderLine.quantity);
+    await sqldb.updateProductStock(orderLine.productId!, orderLine.quantity);
 
     // Recalculer le total de la commande
     final dbClient = await sqldb.db;

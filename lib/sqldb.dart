@@ -39,7 +39,7 @@ class SqlDb {
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
 
-    //Check if database exists before deleting
+    // Check if database exists before deleting
     // if (await databaseExists(dbPath)) {
     //   await deleteDatabase(dbPath);
     // }
@@ -100,28 +100,31 @@ class SqlDb {
             check_number TEXT,
             card_transaction_id TEXT,
             check_date TEXT,
-            bank_name TEXT,
-            points_used INTEGER DEFAULT 0,
-            points_discount REAL DEFAULT 0.0
+            bank_name TEXT
           );
         ''');
           print("Orders table created");
 
           await db.execute('''
           CREATE TABLE order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_order INTEGER NOT NULL,
-            product_code TEXT,
-            product_id INTEGER,
-            quantity INTEGER NOT NULL,
-            prix_unitaire REAL DEFAULT 0 NOT NULL,
-            discount REAL NOT NULL,
-            isPercentage INTEGER NOT NULL CHECK(isPercentage IN (0,1)),
-            FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
-            FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-            CHECK (product_code IS NOT NULL OR product_id IS NOT NULL)
-          );
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_order INTEGER NOT NULL,
+    product_code TEXT,
+    product_id INTEGER,
+    variant_id INTEGER,
+    variant_code TEXT,
+    variant_name TEXT,
+    quantity INTEGER NOT NULL,
+    prix_unitaire REAL NOT NULL DEFAULT 0,
+    discount REAL NOT NULL DEFAULT 0,
+    isPercentage INTEGER NOT NULL CHECK (isPercentage IN (0, 1)),
+    FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
+    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE CASCADE,
+    CHECK (product_code IS NOT NULL OR product_id IS NOT NULL)
+);
+
         ''');
           print("Order items table created");
 
@@ -187,37 +190,16 @@ class SqlDb {
           print("Users table created");
 
           await db.execute('''
-  CREATE TABLE clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    first_name TEXT NOT NULL,
-    phone_number TEXT NOT NULL UNIQUE,
-    loyalty_points INTEGER DEFAULT 0,
-    id_orders TEXT DEFAULT '',
-    last_purchase_date TEXT
-  );
-''');
-
+          CREATE TABLE clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            first_name TEXT NOT NULL,
+            phone_number TEXT NOT NULL UNIQUE,
+            loyalty_points INTEGER DEFAULT 0,
+            id_orders TEXT DEFAULT ''
+          );
+        ''');
           print("Clients table created");
-          await db.execute('''
-  CREATE TABLE fidelity_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    points_per_dinar REAL DEFAULT 0.1,
-    dinar_per_point REAL DEFAULT 1.0,
-    min_points_to_use INTEGER DEFAULT 10,
-    max_percentage_use REAL DEFAULT 50.0,
-    points_validity_months INTEGER DEFAULT 12
-  );
-''');
-
-// Insérer les valeurs par défaut
-          await db.insert('fidelity_rules', {
-            'points_per_dinar': 0.1,
-            'dinar_per_point': 1.0,
-            'min_points_to_use': 10,
-            'max_percentage_use': 50.0,
-            'points_validity_months': 12,
-          });
 
           await db.execute('''
           CREATE TABLE attributes (
@@ -301,10 +283,10 @@ class SqlDb {
     return await ProductController().addProduct(product, dbClient);
   }
 
-  Future<int> updateProductStock(String productCode, int newStock) async {
+  Future<int> updateProductStock(int productId, int newStock) async {
     final db1 = await db;
     return await ProductController()
-        .updateProductStock(productCode, newStock, db1);
+        .updateProductStock(productId, newStock, db1);
   }
 
   Future<List<Product>> searchProducts({
@@ -531,6 +513,12 @@ class SqlDb {
   Future<int> updateVariant(Variant variant) async {
     final dbClient = await db;
     return await Variantcontroller().updateVariant(variant, dbClient);
+  }
+
+  Future<int> updateVariantStock(int variantId, int newStock) async {
+    final db1 = await db;
+    return await Variantcontroller()
+        .updateVariantStock(variantId, newStock, db1);
   }
 
   Future<int> deleteVariant(int variantId) async {

@@ -153,12 +153,12 @@ class ProductController {
     });
   }
 
-  Future<int> updateProductStock(String productCode, int newStock, db1) async {
+  Future<int> updateProductStock(int productId, int newStock, db1) async {
     return await db1.update(
       'products',
       {'stock': newStock},
-      where: 'code = ?',
-      whereArgs: [productCode],
+      where: 'id = ?',
+      whereArgs: [productId],
     );
   }
 
