@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:caissechicopets/models/subcategory.dart';
 import 'package:flutter/material.dart';
@@ -39,23 +40,22 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   final Color softOrange = const Color(0xFFFF9800);
   final Color warmRed = const Color(0xFFE53935);
 
+  Timer? _refreshDebouncer;
+
   @override
-  void initState() {
-    super.initState();
-    _loadData();
+  void dispose() {
+    _refreshDebouncer?.cancel();
+    super.dispose();
   }
 
   void _loadData() {
-    debugPrint('Loading data...');
-    setState(() {
-      categories = _fetchCategories().then((value) {
-        debugPrint('Categories loaded: ${value.length}');
-        return value;
-      });
-      products = _fetchProductsWithVariants().then((value) {
-        debugPrint('Products loaded: ${value.length}');
-        return value;
-      });
+    _refreshDebouncer?.cancel();
+    _refreshDebouncer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          products = _fetchProductsWithVariants();
+        });
+      }
     });
   }
 

@@ -1786,30 +1786,94 @@ class Addorder {
         isPercentageDiscount,
       );
 
-      // Appliquer la réduction des points
+      // Apply points discount if used
       if (useLoyaltyPoints && pointsToUse > 0) {
         totalBeforePoints -= pointsDiscount;
         if (totalBeforePoints < 0) totalBeforePoints = 0;
       }
+
+      // Create order lines with variant information
+      List<OrderLine> orderLines = selectedProducts.map((product) {
+        int productIndex = selectedProducts.indexOf(product);
+        Variant? variant = product.hasVariants && product.variants.isNotEmpty
+            ? product.variants.first
+            : null;
+
+        return OrderLine(
+          idOrder: 0,
+          productCode: product.code,
+          productId: product.id,
+          variantId: variant?.id,
+          variantCode: variant?.code,
+          variantName: variant?.combinationName,
+          quantity: quantityProducts[productIndex],
+          prixUnitaire: variant?.finalPrice ?? product.prixTTC,
+          discount: discounts[productIndex],
+          isPercentage: typeDiscounts[productIndex],
+        );
+      }).toList();
+
+      Order order = Order(
+        date: DateTime.now().toIso8601String(),
+        orderLines: orderLines,
+        total: totalBeforePoints, // Use the total after points discount
+        modePaiement: selectedPaymentMethod,
+        status: status,
+        remainingAmount: remainingAmount,
+        globalDiscount: globalDiscount,
+        isPercentageDiscount: isPercentageDiscount,
+        idClient: selectedClient?.id,
+        cashAmount: selectedPaymentMethod == "Espèce" ||
+                selectedPaymentMethod == "Mixte"
+            ? cashAmount
+            : null,
+        cardAmount:
+            selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
+                ? cardAmount
+                : null,
+        checkAmount: selectedPaymentMethod == "Chèque" ||
+                selectedPaymentMethod == "Mixte"
+            ? checkAmount
+            : null,
+        checkNumber: selectedPaymentMethod == "Chèque" ||
+                selectedPaymentMethod == "Mixte"
+            ? checkNumber
+            : null,
+        cardTransactionId:
+            selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
+                ? cardTransactionId
+                : null,
+        checkDate: selectedPaymentMethod == "Chèque" ||
+                selectedPaymentMethod == "Mixte"
+            ? checkDate
+            : null,
+        bankName: selectedPaymentMethod == "Chèque" ||
+                selectedPaymentMethod == "Mixte"
+            ? bankName
+            : null,
+        pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
+        pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
+      );
+
       int orderId = await SqlDb().addOrder(order);
 
       if (selectedClient != null && orderId > 0) {
         final db = await SqlDb().db;
         final fidelityController = FidelityController();
 
-        // 1. Appliquer la réduction des points si utilisés
+        // 1. Apply points discount if used
         if (useLoyaltyPoints && pointsToUse > 0) {
           await fidelityController.applyPointsToOrder(
               order, selectedClient!, pointsToUse, db);
         }
 
-        // 2. Ajouter les points gagnés (même si on a utilisé des points)
+        // 2. Add earned points (even if we used points)
         await fidelityController.addPointsFromOrder(order, db);
       }
+
       if (orderId > 0) {
         print("Order saved successfully with ID: $orderId");
 
-        // Créer la commande complète avec son ID
         Order completeOrder = Order(
           idOrder: orderId,
           date: order.date,
@@ -1823,81 +1887,98 @@ class Addorder {
           idClient: order.idClient,
         );
 
-        if (useLoyaltyPoints && pointsToUse > 0) {
-          final db = await SqlDb().db;
-          final fidelityController = FidelityController();
-
-          // Déduire les points
-          await fidelityController.usePoints(selectedClient!, pointsToUse, db);
-
-          // Appliquer la réduction au total
-          total -= pointsDiscount;
-          if (total < 0) total = 0;
-
-          // Ajouter les points gagnés sur cette commande
-          await fidelityController.addPointsFromOrder(order, db);
-        }
-
-        // Générer les tickets PDF
+        // Generate PDF tickets
         for (int i = 0; i < numberOfTickets; i++) {
           await Getorderlist.generateAndSavePDF(context, completeOrder);
         }
 
-        // Afficher notification de succès
+        // Show success notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
                 "Commande #$orderId confirmée et ${numberOfTickets > 1 ? '$numberOfTickets tickets' : '1 ticket'} généré(s)"),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
           ),
         );
 
-        // Vérification du stock
+        // Stock validation and update
         bool isValidOrder = true;
         for (int i = 0; i < selectedProducts.length; i++) {
-          if (selectedProducts[i].stock == 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    "${selectedProducts[i].designation} est en rupture de stock !"),
-                backgroundColor: Colors.red,
-              ),
-            );
-            isValidOrder = false;
-          } else if (selectedProducts[i].stock - quantityProducts[i] < 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    "Stock insuffisant pour ${selectedProducts[i].designation} (reste: ${selectedProducts[i].stock})"),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            isValidOrder = false;
+          final product = selectedProducts[i];
+          final quantity = quantityProducts[i];
+
+          if (product.hasVariants && product.variants.isNotEmpty) {
+            // Handle variant stock
+            final variant = product.variants.first;
+            if (variant.stock == 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      "${product.designation} (${variant.combinationName}) est en rupture de stock !"),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              isValidOrder = false;
+            } else if (variant.stock - quantity < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      "Stock insuffisant pour ${product.designation} (${variant.combinationName}) (reste: ${variant.stock})"),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              isValidOrder = false;
+            }
+          } else {
+            // Handle regular product stock
+            if (product.stock == 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content:
+                      Text("${product.designation} est en rupture de stock !"),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              isValidOrder = false;
+            } else if (product.stock - quantity < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      "Stock insuffisant pour ${product.designation} (reste: ${product.stock})"),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              isValidOrder = false;
+            }
           }
         }
 
         if (isValidOrder) {
-          // Mettre à jour les stocks
+          // Update stocks
           for (int i = 0; i < selectedProducts.length; i++) {
-            selectedProducts[i].stock -= quantityProducts[i];
-            await SqlDb().updateProductStock(
-                selectedProducts[i].code ?? '', selectedProducts[i].stock);
+            final product = selectedProducts[i];
+            final quantity = quantityProducts[i];
+
+            final newStock = product.stock - quantity;
+
+            if (product.hasVariants && product.variants.isNotEmpty) {
+              // Update variant stock
+              final variant = product.variants.first;
+              final newStockV = variant.stock - quantity;
+
+              await SqlDb().updateVariantStock(variant.id!, newStockV);
+              print("new stock variant $newStockV");
+
+              // Also update the product's total stock if needed
+              await SqlDb().updateProductStock(product.id!, newStock);
+            } else {
+              // Update regular product stock
+              await SqlDb().updateProductStock(product.id!, newStock);
+            }
           }
         }
 
-        // Vider les listes
+        // Clear the order
         selectedProducts.clear();
         quantityProducts.clear();
         discounts.clear();
@@ -1907,7 +1988,6 @@ class Addorder {
           SnackBar(
             content: Text("Échec de l'enregistrement de la commande"),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -1917,7 +1997,6 @@ class Addorder {
         SnackBar(
           content: Text("Erreur: ${e.toString()}"),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
         ),
       );
     }

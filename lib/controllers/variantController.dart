@@ -60,7 +60,8 @@ class Variantcontroller {
     });
   }
 
-  Future<List<Variant>> getVariantsByProductCode(String productCode,dbClient) async {
+  Future<List<Variant>> getVariantsByProductCode(
+      String productCode, dbClient) async {
     // D'abord trouver l'ID du produit
     final product = await dbClient.query('products',
         where: 'code = ?', whereArgs: [productCode], limit: 1);
@@ -80,7 +81,7 @@ class Variantcontroller {
     return maps.map((map) => Variant.fromMap(map)).toList();
   }
 
-  Future<int> updateVariant(Variant variant,dbClient) async {
+  Future<int> updateVariant(Variant variant, dbClient) async {
     // Vérifier l'unicité du code-barres
     if (variant.code.isNotEmpty) {
       final existing = await dbClient.query('variants',
@@ -109,7 +110,16 @@ class Variantcontroller {
     );
   }
 
-  Future<int> deleteVariant(int variantId,db) async {
+  Future<int> updateVariantStock(int variantId,int newStock, db1) async {
+    return await db1.update(
+      'variants',
+      {'stock': newStock},
+      where: 'id = ?',
+      whereArgs: [variantId],
+    );
+  }
+
+  Future<int> deleteVariant(int variantId, db) async {
     return await db.delete(
       'variants',
       where: 'id = ?',
@@ -118,7 +128,7 @@ class Variantcontroller {
   }
 
   Future<int> deleteVariantsByProductReferenceId(
-      String productReferenceId,dbClient) async {
+      String productReferenceId, dbClient) async {
     return await dbClient.delete(
       'variants',
       where: 'product_reference_id = ?',
