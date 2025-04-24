@@ -43,6 +43,13 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   Timer? _refreshDebouncer;
 
   @override
+  void initState() {
+    super.initState();
+    categories = _fetchCategories();
+    products = _fetchProductsWithVariants();
+  }
+
+  @override
   void dispose() {
     _refreshDebouncer?.cancel();
     super.dispose();
@@ -54,6 +61,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       if (mounted) {
         setState(() {
           products = _fetchProductsWithVariants();
+          categories = _fetchCategories();
         });
       }
     });
@@ -371,7 +379,6 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   Widget _buildProductCard(Product product) {
-    // Calculate total stock
     int totalStock = product.stock;
     if (product.hasVariants && product.variants.isNotEmpty) {
       totalStock =
@@ -380,7 +387,6 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       totalStock = product.stock;
     }
 
-    // Don't show product if stock is zero
     if (totalStock <= 0) {
       return const SizedBox.shrink();
     }
@@ -517,19 +523,21 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     return const Center(child: Text('No categories available'));
                   }
 
-                  return GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 1,
-                      mainAxisSpacing: 28.0,
-                      crossAxisSpacing: 40.0,
+                  return Scrollbar(
+                    child: GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        childAspectRatio: 1,
+                        mainAxisSpacing: 28.0,
+                        crossAxisSpacing: 40.0,
+                      ),
+                      padding: const EdgeInsets.all(8.0),
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        return _buildCategoryButton(snapshot.data![index]);
+                      },
                     ),
-                    padding: const EdgeInsets.all(8.0),
-                    itemCount: snapshot.data!.length,
-                    itemBuilder: (context, index) {
-                      return _buildCategoryButton(snapshot.data![index]);
-                    },
                   );
                 },
               ),
@@ -557,39 +565,27 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     return const Center(child: Text('No products available'));
                   }
 
-                  // Debug print
-                  print('Total products from DB: ${snapshot.data!.length}');
-
-                  // Process products
                   final productMap = <int, Product>{};
                   for (final product in snapshot.data!) {
                     if (product.id != null) {
-                      // Calculate total stock
                       int totalStock = product.stock;
                       if (product.hasVariants && product.variants.isNotEmpty) {
                         totalStock =
                             product.variants.fold(0, (sum, v) => sum + v.stock);
                       }
 
-                      // Only add if in stock and not already added
-                      if (totalStock > 0 &&
-                          !productMap.containsKey(product.id!)) {
+                      if (totalStock > 0 && !productMap.containsKey(product.id!)) {
                         productMap[product.id!] = product;
                       }
                     }
                   }
 
                   final uniqueProducts = productMap.values.toList();
-                  print('Unique in-stock products: ${uniqueProducts.length}');
-
-                  // Filter by category if selected
                   final filteredProducts = selectedCategoryId == null
                       ? uniqueProducts
                       : uniqueProducts
                           .where((p) => p.categoryId == selectedCategoryId)
                           .toList();
-
-                  print('After category filter: ${filteredProducts.length}');
 
                   if (filteredProducts.isEmpty) {
                     return Center(
@@ -597,24 +593,26 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         selectedCategoryId == null
                             ? 'No available products'
                             : 'No products in this category',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: darkBlue),
                       ),
                     );
                   }
 
-                  return GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          MediaQuery.of(context).size.width > 1000 ? 6 : 4,
-                      childAspectRatio: 1.2,
-                      mainAxisSpacing: 6.0,
-                      crossAxisSpacing: 6.0,
+                  return Scrollbar(
+                    child: GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount:
+                            MediaQuery.of(context).size.width > 1000 ? 6 : 4,
+                        childAspectRatio: 1.2,
+                        mainAxisSpacing: 6.0,
+                        crossAxisSpacing: 6.0,
+                      ),
+                      padding: const EdgeInsets.all(8.0),
+                      itemCount: filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        return _buildProductCard(filteredProducts[index]);
+                      },
                     ),
-                    padding: const EdgeInsets.all(8.0),
-                    itemCount: filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(filteredProducts[index]);
-                    },
                   );
                 },
               ),

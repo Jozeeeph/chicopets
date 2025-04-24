@@ -733,27 +733,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const VerticalDivider(
                   width: 20, thickness: 2, color: Color(0xFFE0E0E0)),
-              Expanded(
-                flex: 1,
-                child: isCategoryFormVisible
-                    ? AddCategory(
-                        onCategoryAdded: () async {
-                          // Refresh categories after adding a new one
-                          setState(() async {
-                            categories = await sqldb.getCategories();
-                            isCategoryFormVisible = false;
-                          });
-                        },
-                      )
-                    : Center(
-                        child: Text(
-                          "Cliquez sur '+' pour ajouter une catégorie",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ),
-              ),
-            ],
+           Expanded(
+  flex: 1,
+  child: isCategoryFormVisible
+      ? AddCategory(
+          onCategoryAdded: () async {
+            // Récupérer les catégories d'abord
+            final updatedCategories = await sqldb.getCategories();
+            // Puis mettre à jour l'état
+            setState(() {
+              categories = updatedCategories;
+              isCategoryFormVisible = false;
+            });
+          },
+          hideAppBar: true,
+        )
+      : Center(
+          child: Text(
+            "Cliquez sur '+' pour ajouter une catégorie",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ),
+          )],
           ),
         ),
       ),

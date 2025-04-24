@@ -38,11 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-
-    // Check if database exists before deleting
-    // if (await databaseExists(dbPath)) {
-    //   await deleteDatabase(dbPath);
-    // }
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -196,7 +192,8 @@ class SqlDb {
             first_name TEXT NOT NULL,
             phone_number TEXT NOT NULL UNIQUE,
             loyalty_points INTEGER DEFAULT 0,
-            id_orders TEXT DEFAULT ''
+            id_orders TEXT DEFAULT '',
+            last_purchase_date TEXT
           );
         ''');
           print("Clients table created");
@@ -210,6 +207,17 @@ class SqlDb {
           );
         ''');
           print("Attributes table created");
+          await db.execute('''
+  CREATE TABLE fidelity_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    points_per_dinar REAL NOT NULL DEFAULT 0.1,
+    dinar_per_point REAL NOT NULL DEFAULT 1.0,
+    min_points_to_use INTEGER NOT NULL DEFAULT 10,
+    max_percentage_use REAL NOT NULL DEFAULT 50.0,
+    points_validity_months INTEGER NOT NULL DEFAULT 12
+  );
+''');
+          print("Fidelity rules table created");
         } catch (e) {
           print("Error creating tables: $e");
           rethrow;

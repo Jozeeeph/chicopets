@@ -9,8 +9,11 @@ import 'package:image_picker/image_picker.dart';
 
 class AddCategory extends StatefulWidget {
   final Future<void> Function() onCategoryAdded;
+  final bool hideAppBar; 
 
-  const AddCategory({Key? key, required this.onCategoryAdded})
+  const AddCategory({Key? key, required this.onCategoryAdded,
+      this.hideAppBar = false, // Valeur par défaut
+})
       : super(key: key);
 
   @override
@@ -203,9 +206,7 @@ class _AddCategoryState extends State<AddCategory> {
 
         _showMessageSuccess("Catégorie ajoutée avec succès");
         await widget.onCategoryAdded();
-        if (mounted) {
-          Navigator.pop(context);
-        }
+       
       } else {
         _showMessage("Échec de l'ajout de la catégorie");
       }
@@ -537,6 +538,17 @@ class _AddCategoryState extends State<AddCategory> {
 
   @override
   Widget build(BuildContext context) {
+       if (widget.hideAppBar) {
+      return Column(
+        children: [
+          _buildCategoryCard(),
+          const SizedBox(height: 20),
+          _buildSubCategoryCard(),
+          _buildActionButton(),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
