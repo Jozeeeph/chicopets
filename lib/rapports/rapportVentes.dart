@@ -15,11 +15,18 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
   Map<String, Map<String, dynamic>>? salesData;
   bool isLoading = true;
   DateTimeRange? dateRange;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _loadSalesData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSalesData() async {
@@ -31,11 +38,10 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
         final startDate = DateFormat('yyyy-MM-dd').format(dateRange!.start);
         final endDate = DateFormat('yyyy-MM-dd')
             .format(dateRange!.end.add(const Duration(days: 1)));
-        dateFilter = "AND o.date >= '$startDate' AND o.date < '$endDate'";
+        dateFilter = "date >= '$startDate' AND date < '$endDate'";
       }
 
-      final data =
-          await sqldb.getSalesByCategoryAndProduct(dateFilter: dateFilter);
+      final data = await sqldb.getSalesReport(dateRange: dateFilter);
 
       setState(() {
         salesData = data;
@@ -43,9 +49,11 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
       });
     } catch (e) {
       setState(() => isLoading = false);
-      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors du chargement des données: $e')),
+        SnackBar(
+          content: Text('Erreur lors du chargement des données: $e'),
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -159,11 +167,10 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
               final total = productData['total'] as double;
               final discount = productData['discount'] as double;
               final isPercentage = productData['isPercentage'] as bool;
-              
-              // Calculate unit price based on discount type
+
               double unitPrice;
               if (isPercentage) {
-                unitPrice = total / (quantity * (1 - discount/100));
+                unitPrice = total / (quantity * (1 - discount / 100));
               } else {
                 unitPrice = (total / quantity) + discount;
               }
@@ -200,7 +207,7 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
                       ),
                       Expanded(
                         child: Text(
-                          isPercentage 
+                          isPercentage
                               ? '${discount.toStringAsFixed(2)}%'
                               : '${discount.toStringAsFixed(2)} DT',
                           style: const TextStyle(fontSize: 14),
@@ -240,6 +247,7 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
     return Container(
       margin: const EdgeInsets.only(left: 8.0),
       child: FloatingActionButton(
+        heroTag: UniqueKey().toString(), // Unique hero tag
         onPressed: () {
           if (salesData == null || salesData!.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -316,77 +324,80 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (dateRange != null)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                border: Border(
-                  bottom: BorderSide(color: Colors.blue[100]!),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.calendar_today,
-                      size: 16, color: Colors.blue),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Période du ${dateRange!.start.day}/${dateRange!.start.month}/${dateRange!.start.year} au ${dateRange!.end.day}/${dateRange!.end.month}/${dateRange!.end.year}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue[800],
+      body: Scrollbar(
+        controller: _scrollController,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          child: Column(
+            children: [
+              if (dateRange != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    border: Border(
+                      bottom: BorderSide(color: Colors.blue[100]!),
                     ),
                   ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: isLoading
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Chargement des données en cours...',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  )
-                : salesData == null || salesData!.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.receipt_long,
-                                size: 48, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text('Aucune donnée de vente disponible',
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey)),
-                            Text('Veuillez sélectionner une autre période',
-                                style: TextStyle(color: Colors.grey)),
-                          ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.calendar_today,
+                          size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Période du ${dateRange!.start.day}/${dateRange!.start.month}/${dateRange!.start.year} au ${dateRange!.end.day}/${dateRange!.end.month}/${dateRange!.end.year}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: Colors.blue[800],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.only(bottom: 80),
-                        children: [
-                          const SizedBox(height: 8),
-                          ...salesData!.entries
-                              .map((entry) =>
-                                  _buildCategoryTable(entry.key, entry.value))
-                              .toList(),
-                          const SizedBox(height: 16),
-                        ],
                       ),
+                    ],
+                  ),
+                ),
+              if (isLoading)
+                const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Chargement des données en cours...',
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              else if (salesData == null || salesData!.isEmpty)
+                const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.receipt_long, size: 48, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('Aucune donnée de vente disponible',
+                          style: TextStyle(fontSize: 16, color: Colors.grey)),
+                      Text('Veuillez sélectionner une autre période',
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: salesData!.entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = salesData!.entries.elementAt(index);
+                    return _buildCategoryTable(entry.key, entry.value);
+                  },
+                ),
+            ],
           ),
-        ],
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Container(
         height: 70,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -405,12 +416,15 @@ class _RapportVentesPageState extends State<RapportVentesPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'TOTAL GÉNÉRAL: ${_calculateTotalSales().toStringAsFixed(2)} DT',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFF0056A6),
+            Flexible(
+              child: Text(
+                'TOTAL GÉNÉRAL: ${_calculateTotalSales().toStringAsFixed(2)} DT',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF0056A6),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Row(

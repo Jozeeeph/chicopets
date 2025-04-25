@@ -426,11 +426,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
         title: const Text('Caisse de vente'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.receipt),
-            tooltip: 'Rapport des ventes',
-            onPressed: _showSalesReport,
-          ),
-          IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.black),
             onPressed: _showSessionInfo,
           ),
