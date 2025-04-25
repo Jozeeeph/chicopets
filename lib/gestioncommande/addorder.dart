@@ -14,6 +14,8 @@ import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:intl/intl.dart'; // Add this import
 
 class Addorder {
+  static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   Future<bool> processCardPayment(double amount, String currency) async {
     try {
       bool connected = await _connectToPaymentTerminal();
@@ -74,7 +76,8 @@ class Addorder {
           orderId: orderId,
           productCode: line.productCode,
           productName: product.first['designation'] as String,
-          category:product.first['category_name'] as String? ?? 'Uncategorized',
+          category:
+              product.first['category_name'] as String? ?? 'Uncategorized',
           date: DateTime.parse(order.date),
           quantity: line.quantity,
           unitPrice: line.prixUnitaire,
@@ -137,7 +140,7 @@ class Addorder {
     print("seee ${selectedProducts.length}");
 
     if (selectedProducts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
             "Aucun produit sélectionné.",
@@ -267,7 +270,7 @@ class Addorder {
                 double remiseValeurMax = selectedProducts[i].remiseValeurMax;
 
                 if (isPercentage && discount > remiseMax) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                     SnackBar(
                       content: Text(
                           "La remise sur ${selectedProducts[i].designation} ne peut pas dépasser ${remiseMax}%."),
@@ -276,7 +279,7 @@ class Addorder {
                   );
                   return false;
                 } else if (!isPercentage && discount > remiseValeurMax) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                     SnackBar(
                       content: Text(
                           "La remise sur ${selectedProducts[i].designation} ne peut pas dépasser ${remiseValeurMax} DT."),
@@ -296,7 +299,7 @@ class Addorder {
                     globalDiscount >
                         _calculateMaxGlobalDiscountPercentage(
                             selectedProducts, quantityProducts)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                     SnackBar(
                       content: Text(
                           "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts)}%."),
@@ -308,7 +311,7 @@ class Addorder {
                     globalDiscountValue >
                         _calculateMaxGlobalDiscountValue(
                             selectedProducts, quantityProducts)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                     SnackBar(
                       content: Text(
                           "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts)} DT."),
@@ -1486,15 +1489,13 @@ class Addorder {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (!validateDiscounts()) return;
                     Navigator.of(context).pop();
-                    _confirmPlaceOrder(
-                        context,
+                    await _confirmPlaceOrder(
                         selectedProducts,
                         quantityProducts,
-                        amountGiven,
-                        discounts,
+                        discounts, // Changed from amountGiven to discounts
                         typeDiscounts,
                         isPercentageDiscount
                             ? globalDiscount
@@ -1502,24 +1503,23 @@ class Addorder {
                         isPercentageDiscount,
                         selectedClient,
                         numberOfTickets,
-                        selectedPaymentMethod, // Nouveau paramètre
-                        cashAmount, // Nouveau paramètre
-                        cardAmount, // Nouveau paramètre
+                        selectedPaymentMethod,
+                        cashAmount,
+                        cardAmount,
                         checkAmount,
-                        checkNumber, // For cheque number
-                        cardTransactionId, // For TPE transaction ID
-                        checkDate, // For cheque date
+                        checkNumber,
+                        cardTransactionId,
+                        checkDate,
                         bankName,
                         useLoyaltyPoints,
                         pointsToUse,
-                        pointsDiscount // Ajout du paramètre
-                        );
+                        pointsDiscount);
                   },
                   child: Text(
                     "Confirmer",
                     style: TextStyle(color: Color(0xFF009688)),
                   ),
-                ),
+                )
               ],
             );
           },
@@ -1551,11 +1551,9 @@ class Addorder {
     return maxDiscountValue;
   }
 
-  static void _confirmPlaceOrder(
-    BuildContext context,
+  static Future<void> _confirmPlaceOrder(
     List<Product> selectedProducts,
     List<int> quantityProducts,
-    double amountGiven,
     List<double> discounts,
     List<bool> typeDiscounts,
     double globalDiscount,
@@ -1566,9 +1564,9 @@ class Addorder {
     double cashAmount,
     double cardAmount,
     double checkAmount,
-    String? checkNumber, // For cheque number
-    String? cardTransactionId, // For TPE transaction ID
-    DateTime? checkDate, // For cheque date
+    String? checkNumber,
+    String? cardTransactionId,
+    DateTime? checkDate,
     String? bankName,
     bool useLoyaltyPoints,
     int pointsToUse,
@@ -1578,7 +1576,7 @@ class Addorder {
         globalDiscount >
             _calculateMaxGlobalDiscountValue(
                 selectedProducts, quantityProducts)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
               "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts)} DT."),
@@ -1592,7 +1590,7 @@ class Addorder {
         globalDiscount >
             _calculateMaxGlobalDiscountPercentage(
                 selectedProducts, quantityProducts)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
               "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts)}%."),
@@ -1602,7 +1600,7 @@ class Addorder {
       return;
     }
     if (selectedProducts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(content: Text("Aucun produit sélectionné.")),
       );
       return;
@@ -1740,7 +1738,7 @@ class Addorder {
         (selectedPaymentMethod == "Espèce" && cashAmount <= 0) ||
         (selectedPaymentMethod == "Mixte" &&
             (cashAmount + cardAmount + checkAmount) <= 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text("Veuillez entrer un montant valide pour le paiement."),
           backgroundColor: Colors.red,
@@ -1751,7 +1749,6 @@ class Addorder {
 
     print("Total avant remise: $totalBeforeDiscount");
     print("Total après remise: $total");
-    print("Montant donné: $amountGiven");
     print("Statut de la commande: $status");
     print("Montant restant: $remainingAmount");
 
@@ -1925,11 +1922,11 @@ class Addorder {
 
         // Generate PDF tickets
         for (int i = 0; i < numberOfTickets; i++) {
-          await Getorderlist.generateAndSavePDF(context, completeOrder);
+          await Getorderlist.generateAndSavePDF(completeOrder);
         }
 
         // Show success notification
-        ScaffoldMessenger.of(context).showSnackBar(
+        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
           SnackBar(
             content: Text(
                 "Commande #$orderId confirmée et ${numberOfTickets > 1 ? '$numberOfTickets tickets' : '1 ticket'} généré(s)"),
@@ -1947,7 +1944,7 @@ class Addorder {
             // Handle variant stock
             final variant = product.variants.first;
             if (variant.stock == 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                 SnackBar(
                   content: Text(
                       "${product.designation} (${variant.combinationName}) est en rupture de stock !"),
@@ -1956,7 +1953,7 @@ class Addorder {
               );
               isValidOrder = false;
             } else if (variant.stock - quantity < 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                 SnackBar(
                   content: Text(
                       "Stock insuffisant pour ${product.designation} (${variant.combinationName}) (reste: ${variant.stock})"),
@@ -1968,7 +1965,7 @@ class Addorder {
           } else {
             // Handle regular product stock
             if (product.stock == 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                 SnackBar(
                   content:
                       Text("${product.designation} est en rupture de stock !"),
@@ -1977,7 +1974,7 @@ class Addorder {
               );
               isValidOrder = false;
             } else if (product.stock - quantity < 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
                 SnackBar(
                   content: Text(
                       "Stock insuffisant pour ${product.designation} (reste: ${product.stock})"),
@@ -2020,7 +2017,7 @@ class Addorder {
         discounts.clear();
         typeDiscounts.clear();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
           SnackBar(
             content: Text("Échec de l'enregistrement de la commande"),
             backgroundColor: Colors.red,
@@ -2029,7 +2026,7 @@ class Addorder {
       }
     } catch (e) {
       print("Error saving order: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
+      Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text("Erreur: ${e.toString()}"),
           backgroundColor: Colors.red,
