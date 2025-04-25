@@ -304,25 +304,34 @@ class _EditProductScreenState extends State<EditProductScreen> {
       return;
     }
 
+    final totalStock = int.tryParse(stockController.text) ?? 0;
+    final baseStock =
+        (totalStock / _generateCombinations(attributes).length).floor();
+    final remainder = totalStock % _generateCombinations(attributes).length;
+
     setState(() {
-      variants = _generateCombinations(attributes).map((combination) {
+      variants = _generateCombinations(attributes).asMap().entries.map((entry) {
+        final index = entry.key;
+        final combination = entry.value;
+
+        // Distribute stock evenly, with remainder added to first variant
+        final variantStock = index == 0 ? baseStock + remainder : baseStock;
+
         final basePrice = double.parse(priceHTController.text);
         return Variant(
           code: '',
           combinationName: combination.values.join('-'),
           price: basePrice,
           priceImpact: 0.0,
-          stock: 0,
-          defaultVariant: variants.isEmpty,
+          stock: variantStock,
+          defaultVariant: variants.isEmpty && index == 0,
           attributes: combination,
           productId: widget.product.id!,
         );
       }).toList();
 
-      // Update total stock
-      final totalStock =
-          variants.fold(0, (sum, variant) => sum + variant.stock);
-      stockController.text = totalStock.toString();
+      // Update total stock (should match exactly)
+      updateTotalStock();
 
       if (variants.isNotEmpty && selectedDefaultVariant == null) {
         selectedDefaultVariant = variants.first.combinationName;
@@ -928,16 +937,23 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                   ),
                                 ),
                                 DataColumn(
-                                  label: SizedBox(
-                                    width: 100,
-                                    child: Center(
-                                      child: Text(
-                                        'Prix',
-                                        textAlign: TextAlign.center,
+                                  label: IgnorePointer(
+                                    child: SizedBox(
+                                      width: 100,
+                                      child: Center(
+                                        child: Text(
+                                          'Prix',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors
+                                                .grey, // Gray color for disabled look
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   numeric: true,
+                                  onSort: null, // Disable sorting
                                 ),
                                 DataColumn(
                                   label: SizedBox(
@@ -1146,6 +1162,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                             setState(() {
                                               variant.stock =
                                                   int.tryParse(value) ?? 0;
+                                              updateTotalStock(); // Add this line
                                             });
                                           },
                                         ),
@@ -1268,6 +1285,23 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   defaultVariants[i].defaultVariant = false;
                 }
               }
+
+              // NEW VALIDATION: Check if sum of variant stocks matches product stock
+              final totalVariantStock =
+                  variants.fold(0, (sum, v) => sum + v.stock);
+              final productStock = int.tryParse(stockController.text) ?? 0;
+
+              if (totalVariantStock != productStock) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Le stock total des variantes ($totalVariantStock) doit correspondre au stock du produit ($productStock)',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
             }
 
             try {
@@ -1297,7 +1331,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 designation: designationController.text.trim(),
                 description: descriptionController.text.trim(),
                 stock: hasVariants
-                    ? updatedVariants.fold(0, (sum, v) => sum + v.stock)
+                    ? variants.fold(0, (sum, v) => sum + v.stock) // Calculate from variants
                     : int.parse(stockController.text),
                 prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
@@ -1360,6 +1394,14 @@ class _EditProductScreenState extends State<EditProductScreen> {
         child: const Icon(Icons.save, color: Colors.white),
       ),
     );
+  }
+
+  void updateTotalStock() {
+    if (hasVariants) {
+      final totalStock =
+          variants.fold(0, (sum, variant) => sum + variant.stock);
+      stockController.text = totalStock.toString();
+    }
   }
 
   Widget _buildTextFormField({
