@@ -38,7 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -103,23 +103,23 @@ class SqlDb {
 
           await db.execute('''
           CREATE TABLE order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_order INTEGER NOT NULL,
-    product_code TEXT,
-    product_id INTEGER,
-    variant_id INTEGER,
-    variant_code TEXT,
-    variant_name TEXT,
-    quantity INTEGER NOT NULL,
-    prix_unitaire REAL NOT NULL DEFAULT 0,
-    discount REAL NOT NULL DEFAULT 0,
-    isPercentage INTEGER NOT NULL CHECK (isPercentage IN (0, 1)),
-    FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
-    FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE CASCADE,
-    CHECK (product_code IS NOT NULL OR product_id IS NOT NULL)
-);
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_order INTEGER NOT NULL,
+            product_code TEXT,
+            product_id INTEGER,
+            variant_id INTEGER,
+            variant_code TEXT,
+            variant_name TEXT,
+            quantity INTEGER NOT NULL,
+            prix_unitaire REAL NOT NULL DEFAULT 0,
+            discount REAL NOT NULL DEFAULT 0,
+            isPercentage INTEGER NOT NULL CHECK (isPercentage IN (0, 1)),
+            FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
+            FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE CASCADE,
+            CHECK (product_code IS NOT NULL OR product_id IS NOT NULL)
+          );
 
         ''');
           print("Order items table created");
@@ -208,15 +208,40 @@ class SqlDb {
         ''');
           print("Attributes table created");
           await db.execute('''
-  CREATE TABLE fidelity_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    points_per_dinar REAL NOT NULL DEFAULT 0.1,
-    dinar_per_point REAL NOT NULL DEFAULT 1.0,
-    min_points_to_use INTEGER NOT NULL DEFAULT 10,
-    max_percentage_use REAL NOT NULL DEFAULT 50.0,
-    points_validity_months INTEGER NOT NULL DEFAULT 12
-  );
-''');
+            CREATE TABLE IF NOT EXISTS rapports (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              order_id INTEGER NOT NULL,
+              product_code TEXT NOT NULL,
+              product_name TEXT NOT NULL,
+              category TEXT NOT NULL,
+              date TEXT NOT NULL,
+              quantity INTEGER NOT NULL,
+              unit_price REAL NOT NULL,
+              discount REAL NOT NULL,
+              is_percentage_discount INTEGER NOT NULL,
+              total REAL NOT NULL,
+              payment_method TEXT NOT NULL,
+              status TEXT NOT NULL,
+              client_id INTEGER,
+              variant_id INTEGER,
+              user_id INTEGER NOT NULL,
+              FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+              FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+              FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE SET NULL,
+              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+          ''');
+          print("Attributes table created");
+          await db.execute('''
+            CREATE TABLE fidelity_rules (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              points_per_dinar REAL NOT NULL DEFAULT 0.1,
+              dinar_per_point REAL NOT NULL DEFAULT 1.0,
+              min_points_to_use INTEGER NOT NULL DEFAULT 10,
+              max_percentage_use REAL NOT NULL DEFAULT 50.0,
+              points_validity_months INTEGER NOT NULL DEFAULT 12
+            );
+        ''');
           print("Fidelity rules table created");
         } catch (e) {
           print("Error creating tables: $e");
@@ -654,6 +679,92 @@ class SqlDb {
   }
 
   //Rapport Repository
+
+  Future<Map<String, Map<String, dynamic>>> getSalesReport({
+    String? dateRange,
+    int? userId,
+    int? clientId,
+  }) async {
+    final db = await this.db;
+    final salesData = <String, Map<String, dynamic>>{};
+
+    try {
+      // Base query to get sales data
+      String query = '''
+      SELECT 
+        category,
+        product_name,
+        SUM(quantity) as total_quantity,
+        SUM(total) as total_sales,
+        AVG(unit_price) as avg_unit_price,
+        AVG(discount) as avg_discount,
+        MAX(is_percentage_discount) as is_percentage
+      FROM rapports
+      WHERE status IN ('completed', 'paid', 'semi-payée')
+    ''';
+
+      // Add filters if provided
+      final List<dynamic> whereArgs = [];
+      if (dateRange != null && dateRange.isNotEmpty) {
+        query += ' AND $dateRange';
+      }
+      if (userId != null) {
+        query += ' AND user_id = ?';
+        whereArgs.add(userId);
+      }
+      if (clientId != null) {
+        query += ' AND client_id = ?';
+        whereArgs.add(clientId);
+      }
+
+      // Group and order results
+      query += '''
+      GROUP BY category, product_name
+      ORDER BY category, total_sales DESC
+    ''';
+
+      // Execute the query
+      final results = await db.rawQuery(query, whereArgs);
+
+      // Process the results
+      for (final row in results) {
+        final category = row['category'] as String? ?? 'Uncategorized';
+        final productName = row['product_name'] as String? ?? 'Unknown Product';
+        final quantity = row['total_quantity'] as int? ?? 0;
+        final total = row['total_sales'] as double? ?? 0.0;
+        final discount = row['avg_discount'] as double? ?? 0.0;
+        final isPercentage = (row['is_percentage'] as int?) == 1;
+
+        // Initialize category if not exists
+        salesData.putIfAbsent(
+          category,
+          () => {
+            'products': <String, dynamic>{},
+            'total': 0.0,
+          },
+        );
+
+        // Add product to category
+        salesData[category]!['products'][productName] = {
+          'quantity': quantity,
+          'total': total,
+          'discount': discount,
+          'isPercentage': isPercentage,
+          'unitPrice': row['avg_unit_price'],
+        };
+
+        // Update category total
+        salesData[category]!['total'] =
+            (salesData[category]!['total'] as double) + total;
+      }
+
+      return salesData;
+    } catch (e) {
+      print('Error in getSalesReport: $e');
+      return {};
+    }
+  }
+
   Future<Map<String, Map<String, dynamic>>> getSalesByCategoryAndProduct({
     String? dateFilter,
   }) async {

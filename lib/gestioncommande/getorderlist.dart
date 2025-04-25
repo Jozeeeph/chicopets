@@ -4,11 +4,12 @@ import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/models/order.dart';
-import 'package:pdf/pdf.dart'; // Import the PdfPageFormat class
+import 'package:pdf/pdf.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart'; // Added for font loading
 
 class Getorderlist {
   static Future<void> cancelOrder(
@@ -92,7 +93,7 @@ class Getorderlist {
     if (confirmCancel == true) {
       await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
 
-      // Restocker les produits de la commande annulée
+      // Restock products from canceled order
       final dbClient = await sqlDb.db;
       final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
         'order_items',
@@ -123,7 +124,7 @@ class Getorderlist {
         }
       }
 
-      // Appeler le callback pour mettre à jour l'interface utilisateur
+      // Call callback to update UI
       onOrderCanceled();
     }
   }
@@ -140,13 +141,13 @@ class Getorderlist {
       BuildContext context, Order order, OrderLine orderLine) async {
     final SqlDb sqldb = SqlDb();
 
-    // Annuler la ligne de commande
+    // Cancel order line
     await sqldb.cancelOrderLine(order.idOrder!, orderLine.productCode ?? '');
 
-    // Restocker le produit
+    // Restock product
     await sqldb.updateProductStock(orderLine.productId!, orderLine.quantity);
 
-    // Recalculer le total de la commande
+    // Recalculate order total
     final dbClient = await sqldb.db;
     final List<Map<String, dynamic>> remainingOrderLines = await dbClient.query(
       'order_items',
@@ -161,7 +162,7 @@ class Getorderlist {
       newTotal += prixUnitaire * quantity;
     }
 
-    // Mettre à jour le total de la commande dans la base de données
+    // Update order total in database
     await dbClient.update(
       'orders',
       {'total': newTotal},
@@ -169,39 +170,34 @@ class Getorderlist {
       whereArgs: [order.idOrder],
     );
 
-    // Mettre à jour l'objet Order localement
+    // Update local Order object
     order.total = newTotal;
     order.orderLines
         .removeWhere((line) => line.productCode == orderLine.productCode);
 
-    // Rafraîchir la liste des commandes
-    Navigator.pop(context); // Fermer la boîte de dialogue
-    showListOrdersPopUp(
-        context); // Rouvrir la boîte de dialogue avec les données mises à jour
+    // Refresh order list
+    Navigator.pop(context);
+    showListOrdersPopUp(context);
   }
 
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
-    List<Order> orders =
-        await sqldb.getOrdersWithOrderLines(); // Récupération des commandes
-
-    // Filtrer les commandes non annulées
+    List<Order> orders = await sqldb.getOrdersWithOrderLines();
     orders = orders.where((order) => order.status != 'annulée').toList();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.white, // White background for clarity
+          backgroundColor: Colors.white,
           title: const Text(
             "Liste des Commandes",
             style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0056A6)), // Deep Blue
+                fontWeight: FontWeight.bold, color: Color(0xFF0056A6)),
           ),
           content: orders.isEmpty
               ? const Text("Aucune commande disponible.",
-                  style: TextStyle(color: Color(0xFF000000))) // Deep Blue
+                  style: TextStyle(color: Color(0xFF000000)))
               : SizedBox(
                   width: double.maxFinite,
                   child: ListView.builder(
@@ -210,8 +206,7 @@ class Getorderlist {
                     itemBuilder: (context, index) {
                       Order order = orders[index];
                       bool isCancelled = order.status == 'annulée';
-                      bool isSemiPaid = order.remainingAmount >
-                          0; // Check if the order is semi-paid
+                      bool isSemiPaid = order.remainingAmount > 0;
 
                       return Card(
                         margin: const EdgeInsets.all(8.0),
@@ -221,11 +216,9 @@ class Getorderlist {
                         color: isCancelled
                             ? Colors.red.shade100
                             : isSemiPaid
-                                ? Colors.orange
-                                    .shade100 // Orange background for semi-paid orders
+                                ? Colors.orange.shade100
                                 : order.status == "payée"
-                                    ? Colors.green
-                                        .shade100 // Green background for fully paid orders
+                                    ? Colors.green.shade100
                                     : Colors.white,
                         child: ExpansionTile(
                           title: Text(
@@ -234,11 +227,9 @@ class Getorderlist {
                               color: isCancelled
                                   ? Colors.red
                                   : isSemiPaid
-                                      ? Colors
-                                          .orange // Orange text for semi-paid orders
+                                      ? Colors.orange
                                       : order.status == "payée"
-                                          ? Colors
-                                              .green // Green text for fully paid orders
+                                          ? Colors.green
                                           : const Color(0xFF0056A6),
                               fontWeight: FontWeight.bold,
                             ),
@@ -247,21 +238,19 @@ class Getorderlist {
                             isCancelled
                                 ? 'Commande annulée'
                                 : isSemiPaid
-                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' // Display remaining amount
+                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
                                     : order.status == "payée"
                                         ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
                                         : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
                             style: TextStyle(
-                                color: isCancelled
-                                    ? Colors.red
-                                    : isSemiPaid
-                                        ? Colors
-                                            .orange // Orange text for semi-paid orders
-                                        : order.status == "payée"
-                                            ? Colors
-                                                .green // Green text for fully paid orders
-                                            : const Color(0xFF009688),
-                                fontSize: 14),
+                              color: isCancelled
+                                  ? Colors.red
+                                  : isSemiPaid
+                                      ? Colors.orange
+                                      : order.status == "payée"
+                                          ? Colors.green
+                                          : const Color(0xFF009688),
+                            ),
                           ),
                           children: [
                             ...order.orderLines.map((orderLine) {
@@ -325,14 +314,12 @@ class Getorderlist {
                                                 style: const TextStyle(
                                                     fontSize: 16,
                                                     color: Color(0xFF000000)),
-                                                textAlign: TextAlign.center,
                                               ),
-                                              if (orderLine.discount >
-                                                  0) // Show discount only if applicable
+                                              if (orderLine.discount > 0)
                                                 Text(
                                                   orderLine.isPercentage
-                                                      ? "-${orderLine.discount.toStringAsFixed(2)}%" // Show percentage
-                                                      : "-${orderLine.discount.toStringAsFixed(2)} DT", // Show DT
+                                                      ? "-${orderLine.discount.toStringAsFixed(2)}%"
+                                                      : "-${orderLine.discount.toStringAsFixed(2)} DT",
                                                   style: const TextStyle(
                                                     fontSize: 14,
                                                     color: Colors.red,
@@ -351,7 +338,6 @@ class Getorderlist {
                                               fontWeight: FontWeight.bold,
                                               color: Color(0xFF000000),
                                             ),
-                                            textAlign: TextAlign.end,
                                           ),
                                         ),
                                       ],
@@ -360,16 +346,13 @@ class Getorderlist {
                                 },
                               );
                             }).toList(),
-
-                            // 🔹 Boutons alignés horizontalement
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(vertical: 8.0),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment
-                                    .spaceEvenly, // Align buttons evenly
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
                                 children: [
-                                  // Bouton "Imprimer Ticket"
                                   ElevatedButton.icon(
                                     onPressed: () {
                                       _showOrderTicketPopup(context, order);
@@ -379,18 +362,12 @@ class Getorderlist {
                                     label: Text("Imprimer Ticket",
                                         style: TextStyle(color: Colors.white)),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          Color(0xFF26A9E0), // Deep Blue
-                                      foregroundColor: Colors.white,
+                                      backgroundColor: Color(0xFF26A9E0),
                                     ),
                                   ),
-
-                                  // Bouton "Annuler Commande"
                                   ElevatedButton.icon(
                                     onPressed: () async {
-                                      // Annuler la commande
                                       await cancelOrder(context, order, () {
-                                        // Fermer la boîte de dialogue et mettre à jour la liste
                                         Navigator.pop(context);
                                         showListOrdersPopUp(context);
                                       });
@@ -400,18 +377,14 @@ class Getorderlist {
                                     label: Text("Annuler Commande",
                                         style: TextStyle(color: Colors.white)),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors
-                                          .red, // Red color for cancellation
-                                      foregroundColor: Colors.white,
+                                      backgroundColor: Colors.red,
                                     ),
                                   ),
-                                  // Bouton "Mettre à jour" pour les commandes semi-payées
                                   if (isSemiPaid)
                                     IconButton(
                                       icon: Icon(Icons.update,
                                           color: Colors.blue),
                                       onPressed: () {
-                                        // Trigger an update action for semi-paid orders
                                         _updateSemiPaidOrder(context, order);
                                       },
                                     ),
@@ -429,7 +402,7 @@ class Getorderlist {
               onPressed: () => Navigator.pop(context),
               child: const Text(
                 "Fermer",
-                style: TextStyle(color: Color(0xFF000000)), // Deep Blue
+                style: TextStyle(color: Color(0xFF000000)),
               ),
             ),
           ],
@@ -439,7 +412,6 @@ class Getorderlist {
   }
 
   static void _updateSemiPaidOrder(BuildContext context, Order order) {
-    // Calculate the remaining amount
     double remainingAmount = order.remainingAmount;
 
     showDialog(
@@ -469,7 +441,7 @@ class Getorderlist {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context), // Close the dialog
+              onPressed: () => Navigator.pop(context),
               child: const Text('Annuler'),
             ),
             TextButton(
@@ -478,9 +450,8 @@ class Getorderlist {
                     double.tryParse(amountController.text) ?? 0;
 
                 if (amountToAdd > 0) {
-                  // Call your method to update the order with the added amount
                   _addAmountToOrder(context, order, amountToAdd);
-                  Navigator.pop(context); // Close the dialog after action
+                  Navigator.pop(context);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -499,19 +470,15 @@ class Getorderlist {
 
   static void _addAmountToOrder(
       BuildContext context, Order order, double amount) async {
-    // Update the order with the additional amount
     final SqlDb sqldb = SqlDb();
     order.remainingAmount -= amount;
 
-    // Check if the remaining amount is zero or less to mark the order as paid
     if (order.remainingAmount <= 0) {
-      order.status = 'payée'; // Mark order as fully paid
+      order.status = 'payée';
     }
 
-    // Update the order in the database
     await sqldb.updateOrderInDatabase(order);
 
-    // Show a success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -520,9 +487,8 @@ class Getorderlist {
       ),
     );
 
-    // Auto-reload orders after updating
-    Navigator.pop(context); // Close the dialog
-    showListOrdersPopUp(context); // Reload the orders
+    Navigator.pop(context);
+    showListOrdersPopUp(context);
   }
 
   static void _showOrderTicketPopup(BuildContext context, Order order) async {
@@ -530,7 +496,6 @@ class Getorderlist {
     bool isPercentageDiscount = order.isPercentageDiscount;
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 
-    // Récupérer les informations du client
     Client? client;
     if (order.idClient != null) {
       client = await sqldb.getClientById(order.idClient!);
@@ -545,7 +510,6 @@ class Getorderlist {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Center(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.receipt, color: Color(0xFF000000)),
                 SizedBox(width: 8),
@@ -565,8 +529,6 @@ class Getorderlist {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                  // Numéro de commande et date
                   Text(
                     "Commande #${order.idOrder}\nDate: ${formatDate(order.date)}",
                     textAlign: TextAlign.center,
@@ -575,8 +537,6 @@ class Getorderlist {
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF000000)),
                   ),
-
-                  // Affichage du client
                   if (client != null) ...[
                     SizedBox(height: 8),
                     Text(
@@ -586,8 +546,6 @@ class Getorderlist {
                     ),
                   ],
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                  // Header Row
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
@@ -621,7 +579,6 @@ class Getorderlist {
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF000000)),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                         Expanded(
@@ -632,15 +589,12 @@ class Getorderlist {
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF000000)),
-                            textAlign: TextAlign.end,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                  // Liste des produits
                   ...order.orderLines.map((orderLine) {
                     return FutureBuilder<Product?>(
                       future:
@@ -684,7 +638,6 @@ class Getorderlist {
                                   product.designation,
                                   style: TextStyle(
                                       fontSize: 16, color: Color(0xFF000000)),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               Expanded(
@@ -693,7 +646,6 @@ class Getorderlist {
                                   "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
                                   style: TextStyle(
                                       fontSize: 16, color: Color(0xFF000000)),
-                                  textAlign: TextAlign.center,
                                 ),
                               ),
                               Expanded(
@@ -704,7 +656,6 @@ class Getorderlist {
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF000000)),
-                                  textAlign: TextAlign.end,
                                 ),
                               ),
                             ],
@@ -713,10 +664,7 @@ class Getorderlist {
                       },
                     );
                   }).toList(),
-
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
-
-                  // Total avant remise (seulement si remise existe)
                   if (order.globalDiscount > 0 ||
                       order.orderLines.any((ol) => ol.discount > 0))
                     Row(
@@ -738,8 +686,6 @@ class Getorderlist {
                         ),
                       ],
                     ),
-
-                  // Remise globale (seulement si elle existe)
                   if (isPercentageDiscount && order.globalDiscount > 0)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -780,8 +726,6 @@ class Getorderlist {
                         ),
                       ],
                     ),
-
-                  // Total et Mode de paiement (toujours affichés)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -801,10 +745,7 @@ class Getorderlist {
                       ),
                     ],
                   ),
-
                   SizedBox(height: 10),
-
-                  // Détails de paiement
                   Text(
                     "Mode de Paiement: ${order.modePaiement}",
                     style: TextStyle(
@@ -812,8 +753,6 @@ class Getorderlist {
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF000000)),
                   ),
-
-                  // Détails spécifiques selon le mode de paiement
                   if (order.modePaiement == "Espèce" &&
                       order.cashAmount != null) ...[
                     SizedBox(height: 5),
@@ -827,7 +766,6 @@ class Getorderlist {
                         style: TextStyle(fontSize: 14),
                       ),
                   ],
-
                   if (order.modePaiement == "TPE" &&
                       order.cardAmount != null) ...[
                     SizedBox(height: 5),
@@ -841,7 +779,6 @@ class Getorderlist {
                         style: TextStyle(fontSize: 14),
                       ),
                   ],
-
                   if (order.modePaiement == "Chèque" &&
                       order.checkAmount != null) ...[
                     SizedBox(height: 5),
@@ -865,7 +802,6 @@ class Getorderlist {
                         style: TextStyle(fontSize: 14),
                       ),
                   ],
-
                   if (order.modePaiement == "Mixte") ...[
                     SizedBox(height: 5),
                     if (order.cashAmount != null && order.cashAmount! > 0)
@@ -907,8 +843,6 @@ class Getorderlist {
                         ),
                     ],
                   ],
-
-                  // Reste à payer si commande semi-payée
                   if (order.remainingAmount > 0) ...[
                     SizedBox(height: 5),
                     Text(
@@ -954,21 +888,27 @@ class Getorderlist {
     return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
   }
 
-  //Convert to PDF
   static Future<void> generateAndSavePDF(
       BuildContext context, Order order) async {
+    // Load the custom font
+    final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+    final boldFontData = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+
+    final ttf = pw.Font.ttf(fontData);
+    final boldTtf = pw.Font.ttf(boldFontData);
+
     final SqlDb sqldb = SqlDb();
     final pdf = pw.Document();
     bool isPercentageDiscount = order.isPercentageDiscount;
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 
-    // Récupérer les informations du client
+    // Get client information
     Client? client;
     if (order.idClient != null) {
       client = await sqldb.getClientById(order.idClient!);
     }
 
-    // Define the page format for a standard receipt (80mm width, auto height)
+    // Define the page format for a standard receipt
     const double pageWidth = 70 * PdfPageFormat.mm;
     const double pageHeight = double.infinity;
 
@@ -979,14 +919,14 @@ class Getorderlist {
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header with welcome message
+            // Header
             pw.Center(
               child: pw.Column(
                 children: [
                   pw.Text(
                     "Bienvenue chez Chicopets!",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 10,
                     ),
                   ),
@@ -994,6 +934,7 @@ class Getorderlist {
                   pw.Text(
                     "Merci pour votre visite!",
                     style: pw.TextStyle(
+                      font: ttf,
                       fontSize: 8,
                     ),
                   ),
@@ -1002,54 +943,54 @@ class Getorderlist {
             ),
             pw.Divider(),
 
-            // Order number and date
+            // Order information
             pw.Text(
               "Commande #${order.idOrder}",
-              style: pw.TextStyle(fontSize: 8),
+              style: pw.TextStyle(font: ttf, fontSize: 8),
             ),
             pw.Text(
               "Date: ${formatDate(order.date)}",
-              style: pw.TextStyle(fontSize: 8),
+              style: pw.TextStyle(font: ttf, fontSize: 8),
             ),
 
             // Client information
             if (client != null)
               pw.Text(
                 "Client: ${client.name} ${client.firstName}",
-                style: pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(font: ttf, fontSize: 8),
               ),
 
             pw.Divider(),
 
-            // Header row for items
+            // Items header
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
                   "Qt",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
                 pw.Text(
                   "Article",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
                 pw.Text(
                   "Prix U",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
                 pw.Text(
                   "Montant",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
@@ -1057,7 +998,7 @@ class Getorderlist {
             ),
             pw.Divider(),
 
-            // List of products
+            // Items list
             ...order.orderLines.map((orderLine) {
               double discountedPrice =
                   orderLine.prixUnitaire * (1 - orderLine.discount / 100);
@@ -1066,19 +1007,19 @@ class Getorderlist {
                 children: [
                   pw.Text(
                     "x${orderLine.quantity}",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                   pw.Text(
                     orderLine.productCode ?? '',
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                   pw.Text(
                     "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                   pw.Text(
                     "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                 ],
               );
@@ -1086,7 +1027,7 @@ class Getorderlist {
 
             pw.Divider(),
 
-            // Total avant remise (seulement si remise existe)
+            // Totals and discounts
             if (order.globalDiscount > 0 ||
                 order.orderLines.any((ol) => ol.discount > 0))
               pw.Row(
@@ -1095,21 +1036,20 @@ class Getorderlist {
                   pw.Text(
                     "Total avant remise:",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                   pw.Text(
                     "${totalBeforeDiscount.toStringAsFixed(2)} DT",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                 ],
               ),
 
-            // Global Discount (seulement si remise existe)
             if (isPercentageDiscount && order.globalDiscount > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1117,14 +1057,14 @@ class Getorderlist {
                   pw.Text(
                     "Remise Globale:",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                   pw.Text(
                     "${order.globalDiscount.toStringAsFixed(2)} %",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
@@ -1137,35 +1077,35 @@ class Getorderlist {
                   pw.Text(
                     "Remise Globale:",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                   pw.Text(
                     "${order.globalDiscount.toStringAsFixed(2)} DT",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                 ],
               ),
 
-            // Total et Mode de paiement (toujours affichés)
+            // Final total
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
                   "Total:",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
                 pw.Text(
                   "${order.total.toStringAsFixed(2)} DT",
                   style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
+                    font: boldTtf,
                     fontSize: 8,
                   ),
                 ),
@@ -1174,20 +1114,20 @@ class Getorderlist {
             pw.SizedBox(height: 5),
             pw.Text(
               "Mode de Paiement: ${order.modePaiement}",
-              style: pw.TextStyle(fontSize: 8),
+              style: pw.TextStyle(font: ttf, fontSize: 8),
             ),
 
-            // Détails spécifiques selon le mode de paiement
+            // Payment details
             if (order.modePaiement == "Espèce" && order.cashAmount != null) ...[
               pw.SizedBox(height: 5),
               pw.Text(
                 "Montant espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(font: ttf, fontSize: 8),
               ),
               if ((order.cashAmount! - order.total) > 0)
                 pw.Text(
                   "Monnaie rendue: ${(order.cashAmount! - order.total).toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
             ],
 
@@ -1195,12 +1135,12 @@ class Getorderlist {
               pw.SizedBox(height: 5),
               pw.Text(
                 "Montant carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(font: ttf, fontSize: 8),
               ),
               if (order.cardTransactionId != null)
                 pw.Text(
                   "Transaction: ${order.cardTransactionId}",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
             ],
 
@@ -1209,22 +1149,22 @@ class Getorderlist {
               pw.SizedBox(height: 5),
               pw.Text(
                 "Montant chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(font: ttf, fontSize: 8),
               ),
               if (order.checkNumber != null)
                 pw.Text(
                   "N° chèque: ${order.checkNumber}",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
               if (order.bankName != null)
                 pw.Text(
                   "Banque: ${order.bankName}",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
               if (order.checkDate != null)
                 pw.Text(
                   "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
             ],
 
@@ -1233,56 +1173,55 @@ class Getorderlist {
               if (order.cashAmount != null && order.cashAmount! > 0)
                 pw.Text(
                   "Espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
               if (order.cardAmount != null && order.cardAmount! > 0) ...[
                 pw.Text(
                   "Carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
                 if (order.cardTransactionId != null)
                   pw.Text(
                     "Transaction: ${order.cardTransactionId}",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
               ],
               if (order.checkAmount != null && order.checkAmount! > 0) ...[
                 pw.Text(
                   "Chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(fontSize: 8),
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
                 ),
                 if (order.checkNumber != null)
                   pw.Text(
                     "N°: ${order.checkNumber}",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                 if (order.bankName != null)
                   pw.Text(
                     "Banque: ${order.bankName}",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
                 if (order.checkDate != null)
                   pw.Text(
                     "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                    style: pw.TextStyle(fontSize: 8),
+                    style: pw.TextStyle(font: ttf, fontSize: 8),
                   ),
               ],
             ],
 
-            // Reste à payer si commande semi-payée
+            // Remaining amount
             if (order.remainingAmount > 0) ...[
               pw.SizedBox(height: 5),
               pw.Text(
                 "Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT",
                 style: pw.TextStyle(
+                  font: boldTtf,
                   fontSize: 8,
-                  color: PdfColors.red,
-                  fontWeight: pw.FontWeight.bold,
                 ),
               ),
             ],
 
-            // Footer with thank you message
+            // Footer
             pw.Center(
               child: pw.Column(
                 children: [
@@ -1290,13 +1229,14 @@ class Getorderlist {
                   pw.Text(
                     "Merci pour votre confiance!",
                     style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                      font: boldTtf,
                       fontSize: 8,
                     ),
                   ),
                   pw.Text(
                     "À bientôt chez Chicopets!",
                     style: pw.TextStyle(
+                      font: ttf,
                       fontSize: 8,
                     ),
                   ),
@@ -1308,14 +1248,14 @@ class Getorderlist {
       ),
     );
 
-    // Save the PDF to the downloads directory
+    // Save the PDF
     final directory = await getDownloadsDirectory();
     final filePath = "${directory!.path}/ticket_commande_${order.idOrder}.pdf";
 
     final file = File(filePath);
     await file.writeAsBytes(await pdf.save());
 
-    // Show a success message
+    // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text("PDF enregistré dans: $filePath"),
