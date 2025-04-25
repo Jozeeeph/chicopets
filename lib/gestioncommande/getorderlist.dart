@@ -12,6 +12,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart'; // Added for font loading
 
 class Getorderlist {
+  static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   static Future<void> cancelOrder(
       BuildContext context, Order order, Function() onOrderCanceled) async {
     TextEditingController confirmController = TextEditingController();
@@ -453,7 +456,7 @@ class Getorderlist {
                   _addAmountToOrder(context, order, amountToAdd);
                   Navigator.pop(context);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  Getorderlist.scaffoldMessengerKey.currentState?.showSnackBar(
                     const SnackBar(
                       content: Text('Veuillez entrer un montant valide'),
                     ),
@@ -479,7 +482,7 @@ class Getorderlist {
 
     await sqldb.updateOrderInDatabase(order);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    Getorderlist.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(
           'Commande #${order.idOrder} mise à jour avec ${amount.toStringAsFixed(2)} DT',
@@ -870,7 +873,7 @@ class Getorderlist {
             ),
             TextButton(
               onPressed: () {
-                generateAndSavePDF(context, order);
+                generateAndSavePDF(order);
               },
               child: Text(
                 "Imprimer",
@@ -888,8 +891,7 @@ class Getorderlist {
     return DateFormat('dd/MM/yyyy HH:mm').format(parsedDate);
   }
 
-  static Future<void> generateAndSavePDF(
-      BuildContext context, Order order) async {
+  static Future<void> generateAndSavePDF(Order order) async {
     // Load the custom font
     final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
     final boldFontData = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
@@ -1256,7 +1258,7 @@ class Getorderlist {
     await file.writeAsBytes(await pdf.save());
 
     // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
+    Getorderlist.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text("PDF enregistré dans: $filePath"),
         backgroundColor: Color(0xFF009688),

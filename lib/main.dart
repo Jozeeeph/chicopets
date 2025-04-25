@@ -1,5 +1,6 @@
 import 'dart:convert';
-
+import 'package:caissechicopets/gestioncommande/addorder.dart';
+import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/views/dashboard_views/dashboard_page.dart';
 import 'package:flutter/material.dart';
@@ -41,19 +42,20 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final User? currentUser;
-  
+
   const MyApp({super.key, this.currentUser});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: Addorder.scaffoldMessengerKey, // Use Addorder's key
       theme: ThemeData(
         textTheme: GoogleFonts.poppinsTextTheme(),
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       debugShowCheckedModeBanner: false,
-      home: currentUser != null 
+      home: currentUser != null
           ? currentUser!.role == 'admin'
               ? const DashboardPage()
               : const CashDeskPage()
