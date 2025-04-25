@@ -81,6 +81,9 @@ flutter:
    - assets/images/collier.jpg
    - assets/database/cashdesk1.db
    - assets/images/categorie.png
+   - assets/fonts/Roboto-Regular.ttf
+   - assets/fonts/Roboto-Bold.ttf
+
   #  - C:\Users\user\Documents\cashdesk1.db
 
   # An image asset can refer to one or more resolution-specific "variants", see

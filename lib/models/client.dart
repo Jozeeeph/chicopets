@@ -5,7 +5,7 @@ class Client {
   String phoneNumber;
   int loyaltyPoints;
   List<int> idOrders;
-  DateTime? lastPurchaseDate; // Nouveau champ pour suivre la dernière date d'achat
+  DateTime? lastPurchaseDate; 
 
   Client({
     this.id,
