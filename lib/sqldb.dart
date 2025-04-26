@@ -6,7 +6,7 @@ import 'package:caissechicopets/controllers/galleryImagesController.dart';
 import 'package:caissechicopets/controllers/orderController.dart';
 import 'package:caissechicopets/controllers/orderLineController.dart';
 import 'package:caissechicopets/controllers/productController.dart';
-import 'package:caissechicopets/controllers/rapportController.dart';
+
 import 'package:caissechicopets/controllers/subCategoryController.dart';
 import 'package:caissechicopets/controllers/userController.dart';
 import 'package:caissechicopets/controllers/variantController.dart';
@@ -80,25 +80,26 @@ class SqlDb {
           print("Products table created");
 
           await db.execute('''
-          CREATE TABLE orders (
-            id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            total REAL,
-            mode_paiement TEXT,
-            status TEXT,
-            remaining_amount REAL,
-            id_client INTEGER,
-            global_discount REAL DEFAULT 0.0,
-            is_percentage_discount INTEGER DEFAULT 1,
-            cash_amount REAL,
-            card_amount REAL,
-            check_amount REAL,
-            check_number TEXT,
-            card_transaction_id TEXT,
-            check_date TEXT,
-            bank_name TEXT
-          );
-        ''');
+  CREATE TABLE orders (
+    id_order INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    total REAL,
+    mode_paiement TEXT,
+    status TEXT,
+    remaining_amount REAL,
+    id_client INTEGER,
+    global_discount REAL DEFAULT 0.0,
+    is_percentage_discount INTEGER DEFAULT 1,
+    cash_amount REAL,
+    card_amount REAL,
+    check_amount REAL,
+    check_number TEXT,
+    card_transaction_id TEXT,
+    check_date TEXT,
+    bank_name TEXT,
+    user_id INTEGER
+  );
+''');
           print("Orders table created");
 
           await db.execute('''
@@ -207,31 +208,30 @@ class SqlDb {
           );
         ''');
           print("Attributes table created");
-          await db.execute('''
-            CREATE TABLE IF NOT EXISTS rapports (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              order_id INTEGER NOT NULL,
-              product_code TEXT NOT NULL,
-              product_name TEXT NOT NULL,
-              category TEXT NOT NULL,
-              date TEXT NOT NULL,
-              quantity INTEGER NOT NULL,
-              unit_price REAL NOT NULL,
-              discount REAL NOT NULL,
-              is_percentage_discount INTEGER NOT NULL,
-              total REAL NOT NULL,
-              payment_method TEXT NOT NULL,
-              status TEXT NOT NULL,
-              client_id INTEGER,
-              variant_id INTEGER,
-              user_id INTEGER NOT NULL,
-              FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-              FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
-              FOREIGN KEY (variant_id) REFERENCES variants(id) ON DELETE SET NULL,
-              FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            );
-          ''');
-          print("Attributes table created");
+          // Après la création des tables
+await db.execute('''
+  CREATE VIEW IF NOT EXISTS sales_report_view AS
+  SELECT 
+    o.id_order,
+    o.date,
+    p.designation as product_name,
+    c.category_name as category,
+    oi.quantity,
+    oi.prix_unitaire as unit_price,
+    oi.discount,
+    oi.isPercentage as is_percentage_discount,
+    (oi.quantity * oi.prix_unitaire * (1 - CASE WHEN oi.isPercentage THEN oi.discount/100 ELSE oi.discount/oi.prix_unitaire END)) as total,
+    o.mode_paiement as payment_method,
+    o.status,
+    o.id_client,
+    oi.variant_id,
+    o.user_id
+  FROM orders o
+  JOIN order_items oi ON o.id_order = oi.id_order
+  LEFT JOIN products p ON oi.product_id = p.id
+  LEFT JOIN categories c ON p.category_id = c.id_category
+  WHERE o.status IN ('payée', 'semi-payée')
+''');
           await db.execute('''
             CREATE TABLE fidelity_rules (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -763,16 +763,6 @@ class SqlDb {
       print('Error in getSalesReport: $e');
       return {};
     }
-  }
-
-  Future<Map<String, Map<String, dynamic>>> getSalesByCategoryAndProduct({
-    String? dateFilter,
-  }) async {
-    final dbClient = await db;
-    return await rapportController().getSalesByCategoryAndProduct(
-      dateFilter: dateFilter,
-      db: dbClient,
-    );
   }
 
   //Attributs Repository

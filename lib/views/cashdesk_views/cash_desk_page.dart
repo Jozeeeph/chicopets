@@ -101,61 +101,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  void _showSalesReport() async {
-    final salesData = await sqldb.getSalesByCategoryAndProduct();
-    print(salesData);
-    
-    if (!mounted) return;
-    
-    await showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
-          child: Column(
-            children: [
-              AppBar(
-                title: const Text('Rapport des ventes par article'),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: _buildSalesReport(salesData),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Général: ${_calculateTotalSales(salesData).toStringAsFixed(2)} DT',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Fermer'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   List<Widget> _buildSalesReport(Map<String, Map<String, dynamic>> salesData) {
     List<Widget> widgets = [];
