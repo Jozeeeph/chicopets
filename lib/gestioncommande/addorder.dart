@@ -1,17 +1,19 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:caissechicopets/controllers/fidelity_controller.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/models/rapport.dart';
+import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
-import 'package:intl/intl.dart'; // Add this import
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add this import
 
 class Addorder {
   static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -57,45 +59,6 @@ class Addorder {
       'currency': currency,
       'timestamp': DateTime.now().toIso8601String(),
     };
-  }
-
-  static Future<void> _addRapportForOrder(
-      Order order, int orderId, Client? client) async {
-    final db = await SqlDb().db;
-
-    for (final line in order.orderLines) {
-      // Get product details
-      final product = await db.query(
-        'products',
-        where: 'id = ?',
-        whereArgs: [line.productId],
-      );
-
-      if (product.isNotEmpty) {
-        final rapport = Rapport(
-          orderId: orderId,
-          productCode: line.productCode,
-          productName: product.first['designation'] as String,
-          category:
-              product.first['category_name'] as String? ?? 'Uncategorized',
-          date: DateTime.parse(order.date),
-          quantity: line.quantity,
-          unitPrice: line.prixUnitaire,
-          discount: line.discount,
-          isPercentageDiscount: line.isPercentage,
-          total: line.prixUnitaire *
-                  line.quantity *
-                  (line.isPercentage ? (1 - line.discount / 100) : 1) -
-              (!line.isPercentage ? line.discount : 0),
-          paymentMethod: order.modePaiement,
-          status: order.status,
-          clientId: client?.id,
-          userId: 1,
-        );
-
-        await db.insert('rapports', rapport.toMap());
-      }
-    }
   }
 
   static void _showClientSelection(
@@ -1765,6 +1728,9 @@ class Addorder {
       );
     }).toList();
 
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('current_user');
+    final user = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
@@ -1774,6 +1740,7 @@ class Addorder {
       remainingAmount: remainingAmount,
       globalDiscount: globalDiscount,
       isPercentageDiscount: isPercentageDiscount,
+      userId: user?.id,
       idClient: selectedClient?.id,
       cashAmount:
           selectedPaymentMethod == "Espèce" || selectedPaymentMethod == "Mixte"
@@ -1887,8 +1854,6 @@ class Addorder {
       );
 
       int orderId = await SqlDb().addOrder(order);
-      await _addRapportForOrder(order, orderId, selectedClient);
-      print("rapport added successfully");
 
       if (selectedClient != null && orderId > 0) {
         final db = await SqlDb().db;

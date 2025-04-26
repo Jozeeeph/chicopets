@@ -11,6 +11,7 @@ class Order {
   int? idClient;
   double globalDiscount;
   bool isPercentageDiscount;
+  
 
   // Nouveaux champs pour les paiements mixtes
   double? cashAmount;
@@ -22,6 +23,7 @@ class Order {
   String? bankName; // Nom de la banque pour les chèques
   int? pointsUsed;
   double? pointsDiscount;
+  int? userId;
 
   Order(
       {this.idOrder,
@@ -42,7 +44,8 @@ class Order {
       this.checkDate,
       this.bankName,
       this.pointsUsed,
-      this.pointsDiscount});
+      this.pointsDiscount,
+      this.userId,});
 
   Map<String, dynamic> toMap() {
     return {
@@ -64,6 +67,7 @@ class Order {
       'bank_name': bankName,
       'points_used': pointsUsed,
       'points_discount': pointsDiscount,
+      'user_id': userId,
     };
   }
 
@@ -89,6 +93,7 @@ class Order {
       bankName: map['bank_name'],
       pointsUsed: map['points_used'],
       pointsDiscount: map['points_discount'],
+      userId: map['user_id'],
     );
   }
 
