@@ -26,8 +26,8 @@ class Variantcontroller {
         throw Exception('Le produit parent n\'existe pas ou a été supprimé');
       }
 
-      // Verify barcode uniqueness for this product
-      if (variant.code.isNotEmpty) {
+      // Verify barcode uniqueness for this product (only if code is not null and not empty)
+      if (variant.code != null && variant.code!.isNotEmpty) {
         final existing = await txn.query(
           'variants',
           where: 'code = ? AND product_id = ?',
@@ -82,35 +82,33 @@ class Variantcontroller {
   }
 
   Future<int> updateVariant(Variant variant, dbClient) async {
-    // Vérifier l'unicité du code-barres
-    if (variant.code.isNotEmpty) {
-      final existing = await dbClient.query('variants',
-          where: 'code = ? AND id != ?',
-          whereArgs: [variant.code, variant.id],
-          limit: 1);
+    return await dbClient.transaction((txn) async {
+      // Verify barcode uniqueness for this product (excluding current variant)
+      if (variant.code?.isNotEmpty ?? false) {
+        final existing = await txn.query(
+          'variants',
+          where: 'code = ? AND product_id = ? AND id != ?',
+          whereArgs: [variant.code, variant.productId, variant.id],
+          limit: 1,
+        );
 
-      if (existing.isNotEmpty) {
-        throw Exception('Un variant avec ce code-barres existe déjà');
+        if (existing.isNotEmpty) {
+          throw Exception(
+              'Un variant avec ce code-barres existe déjà pour ce produit');
+        }
       }
-    }
 
-    return await dbClient.update(
-      'variants',
-      {
-        'code': variant.code,
-        'combination_name': variant.combinationName,
-        'price': variant.price,
-        'price_impact': variant.priceImpact,
-        'final_price': variant.finalPrice,
-        'stock': variant.stock,
-        'attributes': variant.attributes.toString(),
-      },
-      where: 'id = ?',
-      whereArgs: [variant.id],
-    );
+      // Update variant
+      return await txn.update(
+        'variants',
+        variant.toMap(),
+        where: 'id = ?',
+        whereArgs: [variant.id],
+      );
+    });
   }
 
-  Future<int> updateVariantStock(int variantId,int newStock, db1) async {
+  Future<int> updateVariantStock(int variantId, int newStock, db1) async {
     return await db1.update(
       'variants',
       {'stock': newStock},

@@ -151,7 +151,7 @@ class SqlDb {
           await db.execute('''
           CREATE TABLE variants (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT NOT NULL,
+            code TEXT,
             combination_name TEXT NOT NULL,
             price REAL NOT NULL,
             price_impact REAL NOT NULL,

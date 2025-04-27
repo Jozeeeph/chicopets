@@ -2,7 +2,7 @@ import 'dart:convert';
 
 class Variant {
   int? id;
-  String code;
+  String? code;
   String combinationName;
   double price;
   double priceImpact;
@@ -14,7 +14,7 @@ class Variant {
 
   Variant({
     this.id,
-    required this.code,
+    this.code,
     required this.combinationName,
     required this.price,
     required this.priceImpact,
@@ -105,8 +105,7 @@ class Variant {
   }
 
   bool get isValid {
-    return code.isNotEmpty &&
-        combinationName.isNotEmpty &&
+    return combinationName.isNotEmpty &&
         price >= 0 &&
         stock >= 0;
   }
