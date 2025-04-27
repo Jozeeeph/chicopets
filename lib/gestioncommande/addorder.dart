@@ -1852,6 +1852,7 @@ class Addorder {
         pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
         pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
       );
+      print("order saveddddd $order");
 
       int orderId = await SqlDb().addOrder(order);
 
