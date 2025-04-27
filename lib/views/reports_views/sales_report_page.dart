@@ -44,34 +44,47 @@ class _SalesReportPageState extends State<SalesReportPage> {
     setState(() {});
   }
 
-Future<void> _generateReport() async {
-  if (_selectedStartDate == null) return;
+  Future<void> _generateReport() async {
+    if (_selectedStartDate == null) return;
 
-  setState(() => _isLoading = true);
-
-  try {
-    print('Loaded users: ${_users.map((u) => '${u.id}: ${u.username}').join(', ')}');
-    print('User selected: ${_selectedUser?.username} (ID: ${_selectedUser?.id})');
-    
-    if (_groupByUser && _selectedUser != null) {
-      _salesData = await _getSalesReportByUser(_selectedUser!.id!);
-    } else {
-      _salesData = await _getSalesReportByCategory();
+    if (_groupByUser && _selectedUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Veuillez sélectionner un utilisateur'),
+          backgroundColor: warmRed,
+        ),
+      );
+      return;
     }
-    
-    print('Report data length: ${_salesData.length}');
-  } catch (e) {
-    print('Error generating report: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Erreur lors de la génération du rapport: $e'),
-        backgroundColor: warmRed,
-      ),
-    );
-  } finally {
-    setState(() => _isLoading = false);
+
+    setState(() => _isLoading = true);
+
+    try {
+      print(
+          'Generating report for dates: ${_selectedStartDate} to ${_selectedEndDate}');
+
+      if (_groupByUser) {
+        print('Generating user report for user ID: ${_selectedUser!.id}');
+        _salesData = await _getSalesReportByUser(_selectedUser!.id!);
+      } else {
+        print('Generating category report');
+        _salesData = await _getSalesReportByCategory();
+      }
+
+      print('Report generated with ${_salesData.length} categories');
+    } catch (e, stack) {
+      print('Error generating report: $e');
+      print(stack);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la génération du rapport: $e'),
+          backgroundColor: warmRed,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
-}
 
   Future<List<Map<String, dynamic>>> _getSalesReportByCategory() async {
     final db = SqlDb();
@@ -79,7 +92,7 @@ Future<void> _generateReport() async {
 
     // Filtrer les commandes par période
     final filteredOrders = orders.where((order) {
-      final orderDate = DateTime.parse(order.date!).toLocal();
+      final orderDate = DateTime.parse(order.date).toLocal();
       return (_isDateInRange(
           orderDate, _selectedStartDate!, _selectedEndDate!));
     }).toList();
@@ -145,100 +158,154 @@ Future<void> _generateReport() async {
     }).toList();
   }
 
-Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
-  final db = SqlDb();
-  final orders = await db.getOrders();
+  Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
+    final db = SqlDb();
 
-  final filteredOrders = orders.where((order) {
-    // Debug print to check order data
-    print('Order ${order.idOrder} has user ID: ${order.userId}');
-    
-    // Check if order has the selected user ID
-    if (order.userId != userId) return false;
-    
-    final orderDate = DateTime.parse(order.date!).toLocal();
-    return _isDateInRange(orderDate, _selectedStartDate!, _selectedEndDate!);
-  }).toList();
+    try {
+      // 1. DATE HANDLING
+      final startDate = _selectedStartDate ?? DateTime.now();
+      final endDate = _selectedEndDate ?? DateTime.now();
 
-  print('Filtered orders count for user $userId: ${filteredOrders.length}');
-  
-  if (filteredOrders.isEmpty) {
-    return [];
-  }
+      final normalizedStart =
+          DateTime(startDate.year, startDate.month, startDate.day);
+      final normalizedEnd =
+          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
 
-    final Map<String, Map<String, dynamic>> reportData = {};
+      debugPrint(
+          'Report for user $userId from ${DateFormat('yyyy-MM-dd').format(normalizedStart)} to ${DateFormat('yyyy-MM-dd').format(normalizedEnd)}');
 
-    for (final order in filteredOrders) {
-      for (final line in order.orderLines) {
-        final product = await db.getProductById(line.productId ?? 0);
-        if (product == null) continue;
+      // 2. GET ORDERS WITH ORDER LINES
+      final allOrders = await db.getOrdersWithOrderLines();
+      print('all orders : $allOrders');
 
-        final category = await db.getCategoryNameById(product.categoryId);
-        final categoryName = category ?? 'Non catégorisé';
+      // Filter orders by user and date range
+      final filteredOrders = allOrders.where((order) {
+        if (order.userId != userId) return false;
 
-        if (!reportData.containsKey(categoryName)) {
-          reportData[categoryName] = {
-            'total': 0.0,
-            'products': <String, Map<String, dynamic>>{},
-          };
+        try {
+          if (order.date == null) return false;
+          final orderDate = DateTime.parse(order.date!).toLocal();
+          return orderDate.isAtSameMomentAs(normalizedStart) ||
+              orderDate.isAtSameMomentAs(normalizedEnd) ||
+              (orderDate.isAfter(normalizedStart) &&
+                  orderDate.isBefore(normalizedEnd));
+        } catch (e) {
+          debugPrint(
+              'Error parsing date for order ${order.idOrder}: ${order.date}');
+          return false;
         }
+      }).toList();
 
-        final productTotal = line.prixUnitaire *
-            line.quantity *
-            (1 - (line.isPercentage ? line.discount / 100 : 0));
-
-        final productsMap = reportData[categoryName]!['products']
-            as Map<String, Map<String, dynamic>>;
-
-        if (!productsMap.containsKey(product.designation)) {
-          productsMap[product.designation] = {
-            'quantity': 0,
-            'total': 0.0,
-            'discount': line.discount,
-            'isPercentage': line.isPercentage,
-            'variant': line.variantName ?? 'Standard',
-          };
-        }
-
-        productsMap[product.designation]!['quantity'] += line.quantity;
-        productsMap[product.designation]!['total'] += productTotal;
-        reportData[categoryName]!['total'] += productTotal;
+      if (filteredOrders.isEmpty) {
+        debugPrint('No orders found for user $userId in date range');
+        return [];
       }
-    }
 
-    return reportData.entries.map((entry) {
-      return <String, dynamic>{
-        'category': entry.key,
-        'total': entry.value['total'],
-        'products': (entry.value['products'] as Map<String, dynamic>)
-            .entries
-            .map((product) {
-          return <String, dynamic>{
-            'name': product.key,
-            'quantity': product.value['quantity'],
-            'total': product.value['total'],
-            'discount': product.value['discount'],
-            'isPercentage': product.value['isPercentage'],
-            'variant': product.value['variant'],
-          };
-        }).toList(),
-      };
-    }).toList();
+      // 3. PRE-FETCH PRODUCTS AND CATEGORIES
+      final productIds = filteredOrders
+          .expand(
+              (order) => order.orderLines.map((line) => line.productId ?? 0))
+          .where((id) => id > 0)
+          .toSet();
+
+      final products = <int, Product>{};
+      for (final id in productIds) {
+        final product = await db.getProductById(id);
+        if (product != null) products[id] = product;
+      }
+
+      // 4. AGGREGATE DATA
+      final reportData = <String, Map<String, dynamic>>{};
+
+      for (final order in filteredOrders) {
+        for (final line in order.orderLines) {
+          final product = products[line.productId ?? 0];
+          if (product == null) continue;
+
+          final category = await db.getCategoryNameById(product.categoryId);
+          final categoryName = category ?? 'Non catégorisé';
+
+          // Initialize category if not exists
+          reportData.putIfAbsent(
+              categoryName,
+              () => {
+                    'total': 0.0,
+                    'products': <String, Map<String, dynamic>>{},
+                  });
+
+          // Calculate line total
+          double lineTotal = line.isPercentage
+              ? line.prixUnitaire * line.quantity * (1 - line.discount / 100)
+              : (line.prixUnitaire - line.discount) * line.quantity;
+
+          // Create product key with variant
+          final variant = line.variantName?.isNotEmpty == true
+              ? line.variantName
+              : 'Standard';
+          final productKey = '${product.designation} ($variant)';
+
+          // Initialize product if not exists
+          reportData[categoryName]!['products'].putIfAbsent(
+              productKey,
+              () => {
+                    'quantity': 0,
+                    'total': 0.0,
+                    'discount': line.discount,
+                    'isPercentage': line.isPercentage,
+                    'variant': variant,
+                  });
+
+          // Update aggregates
+          reportData[categoryName]!['products'][productKey]!['quantity'] +=
+              line.quantity;
+          reportData[categoryName]!['products'][productKey]!['total'] +=
+              lineTotal;
+          reportData[categoryName]!['total'] += lineTotal;
+        }
+      }
+
+      // 5. CONVERT TO REPORT FORMAT
+      return reportData.entries.map((entry) {
+        return <String, dynamic>{
+          'category': entry.key,
+          'total': entry.value['total'],
+          'products': (entry.value['products'] as Map<String, dynamic>)
+              .entries
+              .map((product) {
+            return <String, dynamic>{
+              'name': product.key.split(' (')[0],
+              'quantity': product.value['quantity'],
+              'total': product.value['total'],
+              'discount': product.value['discount'],
+              'isPercentage': product.value['isPercentage'],
+              'variant': product.value['variant'],
+            };
+          }).toList(),
+        };
+      }).toList();
+    } catch (e, stack) {
+      debugPrint('Error generating report: $e\n$stack');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error generating report: ${e.toString()}')),
+      );
+      return [];
+    }
   }
 
- bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
-  // Normalize dates by removing time components
-  final normalizedDate = DateTime(date.year, date.month, date.day);
-  final normalizedStart = DateTime(start.year, start.month, start.day);
-  final normalizedEnd = DateTime(end.year, end.month, end.day);
-  
-  print('Checking date: $normalizedDate between $normalizedStart and $normalizedEnd');
-  
-  return normalizedDate.isAtSameMomentAs(normalizedStart) || 
-         normalizedDate.isAtSameMomentAs(normalizedEnd) ||
-         (normalizedDate.isAfter(normalizedStart) && 
-          normalizedDate.isBefore(normalizedEnd));
-}
+  bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
+    // Normalize dates by removing time components
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final normalizedStart = DateTime(start.year, start.month, start.day);
+    final normalizedEnd = DateTime(end.year, end.month, end.day);
+
+    print(
+        'Checking date: $normalizedDate between $normalizedStart and $normalizedEnd');
+
+    return normalizedDate.isAtSameMomentAs(normalizedStart) ||
+        normalizedDate.isAtSameMomentAs(normalizedEnd) ||
+        (normalizedDate.isAfter(normalizedStart) &&
+            normalizedDate.isBefore(normalizedEnd));
+  }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
@@ -413,27 +480,20 @@ Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
                       DropdownButtonFormField<User>(
                         value: _selectedUser,
                         onChanged: (user) {
-                          print(
-                              "User selected: ${user?.username} (ID: ${user?.id})"); // Debug
-                          setState(() => _selectedUser = user);
+                          setState(() {
+                            _selectedUser = user;
+                            print(
+                                'Selected user: ${user?.username} (ID: ${user?.id})');
+                          });
                         },
                         decoration: InputDecoration(
                           labelText: 'Sélectionner un utilisateur',
-                          labelStyle: TextStyle(color: darkBlue),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: deepBlue),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: deepBlue),
-                          ),
+                          border: OutlineInputBorder(),
                         ),
                         items: _users.map((user) {
                           return DropdownMenuItem<User>(
                             value: user,
-                            child: Text(user.username,
-                                style: TextStyle(color: darkBlue)),
+                            child: Text(user.username),
                           );
                         }).toList(),
                       ),

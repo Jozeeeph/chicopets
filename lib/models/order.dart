@@ -11,7 +11,6 @@ class Order {
   int? idClient;
   double globalDiscount;
   bool isPercentageDiscount;
-  
 
   // Nouveaux champs pour les paiements mixtes
   double? cashAmount;
@@ -25,27 +24,28 @@ class Order {
   double? pointsDiscount;
   int? userId;
 
-  Order(
-      {this.idOrder,
-      required this.date,
-      required this.orderLines,
-      required this.total,
-      required this.modePaiement,
-      this.status = "non payée",
-      this.remainingAmount = 0.0,
-      this.idClient,
-      required this.globalDiscount,
-      required this.isPercentageDiscount,
-      this.cashAmount,
-      this.cardAmount,
-      this.checkAmount,
-      this.checkNumber,
-      this.cardTransactionId,
-      this.checkDate,
-      this.bankName,
-      this.pointsUsed,
-      this.pointsDiscount,
-      this.userId,});
+  Order({
+    this.idOrder,
+    required this.date,
+    required this.orderLines,
+    required this.total,
+    required this.modePaiement,
+    this.status = "non payée",
+    this.remainingAmount = 0.0,
+    this.idClient,
+    required this.globalDiscount,
+    required this.isPercentageDiscount,
+    this.cashAmount,
+    this.cardAmount,
+    this.checkAmount,
+    this.checkNumber,
+    this.cardTransactionId,
+    this.checkDate,
+    this.bankName,
+    this.pointsUsed,
+    this.pointsDiscount,
+    this.userId,
+  });
 
   Map<String, dynamic> toMap() {
     return {
@@ -99,6 +99,6 @@ class Order {
 
   @override
   String toString() {
-    return 'reste: $remainingAmount';
+    return 'Order #$idOrder (User: $userId, Total: $total, Date: $date, Status: $status)';
   }
 }
