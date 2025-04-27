@@ -1243,17 +1243,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
               // Validate variants
               for (final variant in variants) {
-                if (variant.code.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Le variant "${variant.combinationName}" doit avoir un code-barres',
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
                 if (variant.stock < 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
