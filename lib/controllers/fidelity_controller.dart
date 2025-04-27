@@ -7,20 +7,38 @@ import 'package:sqflite/sqflite.dart';
 
 class FidelityController {
   Future<FidelityRules> getFidelityRules(Database db) async {
-    final List<Map<String, dynamic>> maps =
-        await db.query('fidelity_rules', limit: 1);
-    if (maps.isEmpty) return FidelityRules();
-    return FidelityRules.fromMap(maps.first);
+  final List<Map<String, dynamic>> maps = 
+      await db.query('fidelity_rules', limit: 1);
+  
+  if (maps.isEmpty) {
+    // Créer des règles par défaut si la table est vide
+    final defaultRules = FidelityRules();
+    await db.insert('fidelity_rules', defaultRules.toMap());
+    return defaultRules;
   }
+  
+  return FidelityRules.fromMap(maps.first);
+}
 
-  Future<int> updateFidelityRules(FidelityRules rules, Database db) async {
+ Future<int> updateFidelityRules(FidelityRules rules, Database db) async {
+  // Vérifier d'abord si des règles existent
+  final count = Sqflite.firstIntValue(
+    await db.rawQuery('SELECT COUNT(*) FROM fidelity_rules')
+  ) ?? 0;
+
+  if (count == 0) {
+    // Insérer si aucune règle n'existe
+    return await db.insert('fidelity_rules', rules.toMap());
+  } else {
+    // Mettre à jour si des règles existent déjà
     return await db.update(
       'fidelity_rules',
       rules.toMap(),
       where: 'id = ?',
-      whereArgs: [1], // Il n'y a qu'une seule ligne de règles
+      whereArgs: [1],
     );
   }
+}
 
   Future<void> addPointsFromOrder(Order order, Database db) async {
     if (order.idClient == null) return;
