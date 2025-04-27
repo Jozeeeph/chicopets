@@ -85,22 +85,111 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Points de fidélité'),
+        title: Text('Informations client'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Solde: ${client.loyaltyPoints} points'),
+            Text('${client.name} ${client.firstName}'),
+            SizedBox(height: 8),
+            Text('Téléphone: ${client.phoneNumber}'),
+            SizedBox(height: 16),
+            Text('Points de fidélité: ${client.loyaltyPoints} points',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Dette: ${client.debt.toStringAsFixed(2)} DT',
+                style: TextStyle(
+                    color: client.debt > 0 ? widget.warmRed : widget.tealGreen,
+                    fontWeight: FontWeight.bold)),
             if (client.lastPurchaseDate != null)
               Text(
                   'Dernier achat: ${DateFormat('dd/MM/yyyy').format(client.lastPurchaseDate!)}'),
-            // Vous pouvez ajouter plus d'infos ici
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateDebt(BuildContext context, Client client) async {
+    final amountController = TextEditingController(
+      text: client.debt.abs().toStringAsFixed(2),
+    );
+
+    final isPayment = client.debt > 0; // True if client owes money
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title:
+            Text(isPayment ? 'Enregistrer un paiement' : 'Ajouter une dette'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Client: ${client.name} ${client.firstName}'),
+            SizedBox(height: 16),
+            TextFormField(
+              controller: amountController,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Montant (DT)',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) return 'Entrez un montant';
+                if (double.tryParse(value) == null) return 'Montant invalide';
+                return null;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final amount = double.tryParse(amountController.text) ?? 0;
+              if (amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Le montant doit être positif')),
+                );
+                return;
+              }
+
+              final newDebt =
+                  isPayment ? client.debt - amount : client.debt + amount;
+
+              try {
+                await _sqlDb.updateClientDebt(client.id!, newDebt);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(isPayment
+                        ? 'Paiement enregistré avec succès'
+                        : 'Dette mise à jour'),
+                    backgroundColor: widget.tealGreen,
+                  ),
+                );
+                _loadClients();
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur: ${e.toString()}'),
+                    backgroundColor: widget.warmRed,
+                  ),
+                );
+              }
+            },
+            child: Text(isPayment ? 'Enregistrer paiement' : 'Ajouter dette'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPayment ? widget.tealGreen : widget.softOrange,
+            ),
           ),
         ],
       ),
@@ -132,8 +221,8 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('${order.total.toStringAsFixed(2)} DT'),
-                            Text('${order.status}'),
-                            Text('${order.date}'),
+                            Text(order.status),
+                            Text(order.date),
                           ],
                         ),
                         trailing: IconButton(
@@ -452,8 +541,7 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                           );
                         },
                         onDismissed: (direction) => _deleteClient(client.id!),
-                        child: // Dans la méthode build, remplacez le Card actuel par :
-                            Card(
+                        child: Card(
                           elevation: 4,
                           margin:
                               EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -493,12 +581,26 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(client.phoneNumber),
-                                        Text(
-                                          '${client.loyaltyPoints} points',
-                                          style: TextStyle(
-                                            color: widget.deepBlue,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              '${client.loyaltyPoints} pts',
+                                              style: TextStyle(
+                                                color: widget.deepBlue,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            SizedBox(width: 16),
+                                            Text(
+                                              '${client.debt.toStringAsFixed(2)} DT',
+                                              style: TextStyle(
+                                                color: client.debt > 0
+                                                    ? widget.warmRed
+                                                    : widget.tealGreen,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -509,12 +611,57 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
                                       },
                                     ),
                                   ),
-                                  // Boutons supplémentaires en dessous du ListTile
                                   Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
+                                        if (client.debt != 0)
+                                          InkWell(
+                                            onTap: () =>
+                                                _updateDebt(context, client),
+                                            child: Container(
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 12, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: client.debt > 0
+                                                    ? widget.tealGreen
+                                                        .withOpacity(0.2)
+                                                    : widget.softOrange
+                                                        .withOpacity(0.2),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    client.debt > 0
+                                                        ? Icons.payment
+                                                        : Icons.money_off,
+                                                    size: 16,
+                                                    color: client.debt > 0
+                                                        ? widget.tealGreen
+                                                        : widget.softOrange,
+                                                  ),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    client.debt > 0
+                                                        ? 'Payer'
+                                                        : 'Ajouter dette',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: client.debt > 0
+                                                          ? widget.tealGreen
+                                                          : widget.softOrange,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        if (client.debt != 0)
+                                          SizedBox(width: 8),
                                         if (widget.onClientSelected != null)
                                           InkWell(
                                             onTap: () => _showClientOrders(

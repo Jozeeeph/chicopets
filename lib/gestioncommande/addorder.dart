@@ -1586,7 +1586,7 @@ class Addorder {
 
     double totalAmountPaid = 0.0;
     String status;
-    double remainingAmount;
+    double remainingAmount = max(0, total - totalAmountPaid - pointsDiscount);
     switch (selectedPaymentMethod) {
       case "Espèce":
         totalAmountPaid = cashAmount;
@@ -1854,6 +1854,39 @@ class Addorder {
       );
 
       int orderId = await SqlDb().addOrder(order);
+
+      if (selectedClient != null && remainingAmount > 0) {
+        try {
+          final db = await SqlDb().db;
+
+          // Calculate new debt
+          double newDebt = selectedClient!.debt + remainingAmount;
+
+          // Update client debt in database
+          await db.update(
+            'clients',
+            {'debt': newDebt},
+            where: 'id = ?',
+            whereArgs: [selectedClient!.id],
+          );
+
+          // Update the selectedClient object locally
+          selectedClient = selectedClient!.copyWith(
+            debt: newDebt,
+            lastPurchaseDate: DateTime.now(),
+          );
+
+          print("La dette ajoutée au client: ${selectedClient.debt} DT");
+        } catch (e) {
+          print("Error updating client debt: $e");
+          Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text("Erreur lors de la mise à jour de la dette client"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
 
       if (selectedClient != null && orderId > 0) {
         final db = await SqlDb().db;
