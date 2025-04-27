@@ -305,12 +305,16 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
 
     final totalStock = int.tryParse(stockController.text) ?? 0;
-    final baseStock =
-        (totalStock / _generateCombinations(attributes).length).floor();
-    final remainder = totalStock % _generateCombinations(attributes).length;
+    final combinations = _generateCombinations(attributes);
+
+    if (combinations.isEmpty) return;
+
+    // Calculate base stock per variant
+    final baseStock = (totalStock / combinations.length).floor();
+    final remainder = totalStock % combinations.length;
 
     setState(() {
-      variants = _generateCombinations(attributes).asMap().entries.map((entry) {
+      variants = combinations.asMap().entries.map((entry) {
         final index = entry.key;
         final combination = entry.value;
 
@@ -1071,7 +1075,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                       Center(
                                         child: TextFormField(
                                           initialValue:
-                                              variant.price.toString(),
+                                              variant.finalPrice.toString(),
                                           keyboardType: TextInputType.number,
                                           textAlign: TextAlign.center,
                                           decoration: InputDecoration(
@@ -1331,11 +1335,17 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 designation: designationController.text.trim(),
                 description: descriptionController.text.trim(),
                 stock: hasVariants
-                    ? variants.fold(0, (sum, v) => sum + v.stock) // Calculate from variants
+                    ? variants.fold(
+                        0, (sum, v) => sum + v.stock) // Calculate from variants
                     : int.parse(stockController.text),
                 prixHT: double.parse(priceHTController.text),
                 taxe: selectedTax ?? 0.0,
-                prixTTC: double.parse(priceTTCController.text),
+                prixTTC: hasVariants
+                    ? variants
+                        .firstWhere((v) => v.defaultVariant,
+                            orElse: () => variants.first)
+                        .price
+                    : double.parse(priceTTCController.text),
                 dateExpiration:
                     hasExpirationDate ? dateController.text.trim() : '',
                 categoryId: selectedCategoryId!,
