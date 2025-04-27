@@ -38,7 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-   // await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -193,6 +193,7 @@ class SqlDb {
             first_name TEXT NOT NULL,
             phone_number TEXT NOT NULL UNIQUE,
             loyalty_points INTEGER DEFAULT 0,
+            debt REAL DEFAULT 0.0,
             id_orders TEXT DEFAULT '',
             last_purchase_date TEXT
           );
@@ -209,7 +210,7 @@ class SqlDb {
         ''');
           print("Attributes table created");
           // Après la création des tables
-await db.execute('''
+          await db.execute('''
   CREATE VIEW IF NOT EXISTS sales_report_view AS
   SELECT 
     o.id_order,
@@ -595,6 +596,12 @@ await db.execute('''
   Future<int> updateClient(Client client) async {
     final dbClient = await db;
     return await Clientcontroller().updateClient(client, dbClient);
+  }
+
+  Future<int> updateClientDebt(int clientId, double newDebt) async {
+    final dbClient = await db;
+    return await Clientcontroller()
+        .updateClientDebt(clientId, newDebt, dbClient);
   }
 
   Future<int> deleteClient(int id) async {

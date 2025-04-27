@@ -5,7 +5,7 @@ import 'package:caissechicopets/models/orderline.dart';
 import 'package:sqflite/sqflite.dart';
 
 class Clientcontroller {
-  Future<int> addClient(Client client,dbClient) async {
+  Future<int> addClient(Client client, dbClient) async {
     try {
       int id = await dbClient.insert(
         'clients',
@@ -26,7 +26,7 @@ class Clientcontroller {
     return List.generate(maps.length, (i) => Client.fromMap(maps[i]));
   }
 
-  Future<Client?> getClientById(int id,dbClient) async {
+  Future<Client?> getClientById(int id, dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query(
       'clients',
       where: 'id = ?',
@@ -36,7 +36,7 @@ class Clientcontroller {
     return result.isNotEmpty ? Client.fromMap(result.first) : null;
   }
 
-  Future<int> updateClient(Client client,dbClient) async {
+  Future<int> updateClient(Client client, dbClient) async {
     return await dbClient.update(
       'clients',
       client.toMap(),
@@ -45,7 +45,7 @@ class Clientcontroller {
     );
   }
 
-  Future<int> deleteClient(int id,dbClient) async {
+  Future<int> deleteClient(int id, dbClient) async {
     return await dbClient.delete(
       'clients',
       where: 'id = ?',
@@ -53,7 +53,7 @@ class Clientcontroller {
     );
   }
 
-  Future<List<Client>> searchClients(String query,dbClient) async {
+  Future<List<Client>> searchClients(String query, dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query(
       'clients',
       where: 'name LIKE ? OR first_name LIKE ? OR phone_number LIKE ?',
@@ -133,24 +133,36 @@ class Clientcontroller {
     );
     print('Updated order with client ID'); // Debug
   }
-  Future<List<Client>> getClientsWithExpiringPoints(Database db, int daysBeforeExpiration) async {
-  final rules = await FidelityController().getFidelityRules(db);
-  if (rules.pointsValidityMonths == 0) return [];
-  
-  final expirationThreshold = DateTime.now().add(Duration(days: daysBeforeExpiration));
-  final minDate = DateTime.now().subtract(
-    Duration(days: 30 * rules.pointsValidityMonths),
-  );
-  
-  final clients = await db.query(
+
+  Future<int> updateClientDebt(int clientId, double newDebt,db) async {
+  return await db.update(
     'clients',
-    where: 'last_purchase_date BETWEEN ? AND ? AND loyalty_points > 0',
-    whereArgs: [
-      minDate.toIso8601String(),
-      expirationThreshold.toIso8601String(),
-    ],
+    {'debt': newDebt},
+    where: 'id = ?',
+    whereArgs: [clientId],
   );
-  
-  return clients.map((c) => Client.fromMap(c)).toList();
 }
+
+  Future<List<Client>> getClientsWithExpiringPoints(
+      Database db, int daysBeforeExpiration) async {
+    final rules = await FidelityController().getFidelityRules(db);
+    if (rules.pointsValidityMonths == 0) return [];
+
+    final expirationThreshold =
+        DateTime.now().add(Duration(days: daysBeforeExpiration));
+    final minDate = DateTime.now().subtract(
+      Duration(days: 30 * rules.pointsValidityMonths),
+    );
+
+    final clients = await db.query(
+      'clients',
+      where: 'last_purchase_date BETWEEN ? AND ? AND loyalty_points > 0',
+      whereArgs: [
+        minDate.toIso8601String(),
+        expirationThreshold.toIso8601String(),
+      ],
+    );
+
+    return clients.map((c) => Client.fromMap(c)).toList();
+  }
 }
