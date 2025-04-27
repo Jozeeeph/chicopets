@@ -14,6 +14,7 @@ class OrderController {
         'status': order.status,
         'remaining_amount': order.remainingAmount,
         'id_client': order.idClient,
+        'user_id' : order.userId,
         'global_discount': order.globalDiscount,
         'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
       },
@@ -211,6 +212,7 @@ class OrderController {
         globalDiscount: (orderMap['global_discount'] as num).toDouble(),
         isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
         idClient: orderMap['id_client'] as int?,
+        userId: orderMap ['user_id'] as int?
       ));
     }
 

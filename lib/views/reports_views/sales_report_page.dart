@@ -39,31 +39,39 @@ class _SalesReportPageState extends State<SalesReportPage> {
   Future<void> _loadUsers() async {
     final db = SqlDb();
     _users = await db.getAllUsers();
+    print(
+        "Loaded users: ${_users.map((u) => '${u.id}: ${u.username}').join(', ')}"); // Debug
     setState(() {});
   }
 
-  Future<void> _generateReport() async {
-    if (_selectedStartDate == null) return;
+Future<void> _generateReport() async {
+  if (_selectedStartDate == null) return;
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      if (_groupByUser && _selectedUser != null) {
-        _salesData = await _getSalesReportByUser(_selectedUser!.id!);
-      } else {
-        _salesData = await _getSalesReportByCategory();
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la génération du rapport: $e'),
-          backgroundColor: warmRed,
-        ),
-      );
-    } finally {
-      setState(() => _isLoading = false);
+  try {
+    print('Loaded users: ${_users.map((u) => '${u.id}: ${u.username}').join(', ')}');
+    print('User selected: ${_selectedUser?.username} (ID: ${_selectedUser?.id})');
+    
+    if (_groupByUser && _selectedUser != null) {
+      _salesData = await _getSalesReportByUser(_selectedUser!.id!);
+    } else {
+      _salesData = await _getSalesReportByCategory();
     }
+    
+    print('Report data length: ${_salesData.length}');
+  } catch (e) {
+    print('Error generating report: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur lors de la génération du rapport: $e'),
+        backgroundColor: warmRed,
+      ),
+    );
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
   Future<List<Map<String, dynamic>>> _getSalesReportByCategory() async {
     final db = SqlDb();
@@ -137,19 +145,26 @@ class _SalesReportPageState extends State<SalesReportPage> {
     }).toList();
   }
 
-  Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
-    final db = SqlDb();
-    final orders = await db.getOrders();
+Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
+  final db = SqlDb();
+  final orders = await db.getOrders();
 
-    final filteredOrders = orders.where((order) {
-      if (order.userId != userId) return false;
-      final orderDate = DateTime.parse(order.date!).toLocal();
-      return _isDateInRange(orderDate, _selectedStartDate!, _selectedEndDate!);
-    }).toList();
+  final filteredOrders = orders.where((order) {
+    // Debug print to check order data
+    print('Order ${order.idOrder} has user ID: ${order.userId}');
+    
+    // Check if order has the selected user ID
+    if (order.userId != userId) return false;
+    
+    final orderDate = DateTime.parse(order.date!).toLocal();
+    return _isDateInRange(orderDate, _selectedStartDate!, _selectedEndDate!);
+  }).toList();
 
-    if (filteredOrders.isEmpty) {
-      return [];
-    }
+  print('Filtered orders count for user $userId: ${filteredOrders.length}');
+  
+  if (filteredOrders.isEmpty) {
+    return [];
+  }
 
     final Map<String, Map<String, dynamic>> reportData = {};
 
@@ -211,14 +226,19 @@ class _SalesReportPageState extends State<SalesReportPage> {
     }).toList();
   }
 
-  bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    final normalizedStart = DateTime(start.year, start.month, start.day);
-    final normalizedEnd = DateTime(end.year, end.month, end.day);
-    return normalizedDate
-            .isAfter(normalizedStart.subtract(const Duration(days: 1))) &&
-        normalizedDate.isBefore(normalizedEnd.add(const Duration(days: 1)));
-  }
+ bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
+  // Normalize dates by removing time components
+  final normalizedDate = DateTime(date.year, date.month, date.day);
+  final normalizedStart = DateTime(start.year, start.month, start.day);
+  final normalizedEnd = DateTime(end.year, end.month, end.day);
+  
+  print('Checking date: $normalizedDate between $normalizedStart and $normalizedEnd');
+  
+  return normalizedDate.isAtSameMomentAs(normalizedStart) || 
+         normalizedDate.isAtSameMomentAs(normalizedEnd) ||
+         (normalizedDate.isAfter(normalizedStart) && 
+          normalizedDate.isBefore(normalizedEnd));
+}
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
     final DateTime? picked = await showDatePicker(
@@ -392,6 +412,11 @@ class _SalesReportPageState extends State<SalesReportPage> {
                     if (_groupByUser) ...[
                       DropdownButtonFormField<User>(
                         value: _selectedUser,
+                        onChanged: (user) {
+                          print(
+                              "User selected: ${user?.username} (ID: ${user?.id})"); // Debug
+                          setState(() => _selectedUser = user);
+                        },
                         decoration: InputDecoration(
                           labelText: 'Sélectionner un utilisateur',
                           labelStyle: TextStyle(color: darkBlue),
@@ -411,9 +436,6 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                 style: TextStyle(color: darkBlue)),
                           );
                         }).toList(),
-                        onChanged: (user) =>
-                            setState(() => _selectedUser = user),
-                        icon: Icon(Icons.arrow_drop_down, color: deepBlue),
                       ),
                     ],
                   ],
