@@ -40,7 +40,8 @@ dependencies:
   uuid: ^3.0.6
   shared_preferences: ^2.2.2
   iconsax: ^0.0.8
-  syncfusion_flutter_datepicker: ^29.1.38
+  syncfusion_flutter_datepicker: ^20.4.48
+  syncfusion_flutter_charts: ^20.4.48
   flutter:
     sdk: flutter
     
