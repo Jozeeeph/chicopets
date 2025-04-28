@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
 import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
+import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
@@ -160,7 +161,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Rapports financiers',
                         icon: Icons.attach_money,
-                        page: null,
+                        page: const FinancialReportPage(),
                         color: const Color(0xFF8BC34A),
                       ),
                       _buildCard(

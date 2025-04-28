@@ -1,0 +1,763 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:caissechicopets/sqldb.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+
+class FinancialReportPage extends StatefulWidget {
+  const FinancialReportPage({super.key});
+
+  @override
+  _FinancialReportPageState createState() => _FinancialReportPageState();
+}
+
+class _FinancialReportPageState extends State<FinancialReportPage> {
+  // Couleurs
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
+
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _paymentData = [];
+  double _totalCash = 0;
+  double _totalCard = 0;
+  double _totalCheck = 0;
+  double _totalMixed = 0;
+  double _totalAll = 0;
+  double _totalDiscount = 0;
+  double _totalRemaining = 0;
+  int _clientCount = 0;
+  int _articleCount = 0;
+  double _totalPercentageDiscount = 0;
+  double _totalFixedDiscount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _debugPrintAllOrders();
+  }
+
+  void _debugPrintAllOrders() async {
+    final db = await SqlDb().db;
+    final allOrders = await db.rawQuery('''
+      SELECT id_order, date, total, mode_paiement 
+      FROM orders 
+      ORDER BY date DESC
+    ''');
+    print('Toutes les commandes dans la base:');
+    for (var order in allOrders) {
+      print(
+          'Commande ${order['id_order']}: ${order['date']} - ${order['total']} DT (${order['mode_paiement']})');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: lightGray,
+      appBar: AppBar(
+        title: const Text('Rapports Financiers'),
+        backgroundColor: deepBlue,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDateSelector(),
+            const SizedBox(height: 20),
+            if (_isLoading)
+              Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(deepBlue),
+                ),
+              )
+            else if (_paymentData.isNotEmpty)
+              Column(
+                children: [
+                  _buildFinancialSummary(),
+                  const SizedBox(height: 20),
+                  _buildExportButton(),
+                ],
+              )
+            else if (_startDate != null)
+              Center(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.receipt_long, size: 50, color: darkBlue),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Aucune donnée disponible\npour la période sélectionnée',
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: darkBlue,
+                            fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ]),
+              )
+            else
+              Center(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.calendar_today, size: 50, color: darkBlue),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Sélectionnez une période\npour générer le rapport',
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: darkBlue,
+                            fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Remplacer la méthode _buildDateSelector par ceci :
+  Widget _buildDateSelector() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.date_range, color: deepBlue),
+                const SizedBox(width: 8),
+                Text(
+                  'Sélectionner la période:',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: darkBlue),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.calendar_today, size: 18),
+                    label: Text(
+                      _startDate != null
+                          ? DateFormat('dd/MM/yyyy').format(_startDate!)
+                          : 'Début',
+                    ),
+                    onPressed: () => _pickDate(isStartDate: true),
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: darkBlue,
+                      backgroundColor: lightGray,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.calendar_today, size: 18),
+                    label: Text(
+                      _endDate != null
+                          ? DateFormat('dd/MM/yyyy').format(_endDate!)
+                          : 'Fin',
+                    ),
+                    onPressed: () => _pickDate(isStartDate: false),
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: darkBlue,
+                      backgroundColor: lightGray,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_startDate != null || _endDate != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: deepBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Période sélectionnée:',
+                      style: TextStyle(color: darkBlue),
+                    ),
+                    Text(
+                      '${_startDate != null ? DateFormat('dd/MM/yyyy').format(_startDate!) : '--'} '
+                      'à ${_endDate != null ? DateFormat('dd/MM/yyyy').format(_endDate!) : '--'}',
+                      style: TextStyle(
+                          color: darkBlue, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 10),
+            if (_startDate != null)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: Icon(Icons.bar_chart, color: white),
+                  label:
+                      Text('Générer Rapport', style: TextStyle(color: white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: deepBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: _fetchData,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Ajouter cette nouvelle méthode pour le picker de dates
+  Future<void> _pickDate({required bool isStartDate}) async {
+    final initialDate = isStartDate ? _startDate : _endDate;
+    final firstDate = DateTime(2020);
+    final lastDate = DateTime.now();
+
+    // Si on sélectionne une date de fin et qu'il n'y a pas de date de début,
+    // on force la sélection de la date de début d'abord
+    if (!isStartDate && _startDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Veuillez d\'abord sélectionner une date de début'),
+          backgroundColor: warmRed,
+        ),
+      );
+      return;
+    }
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate ?? (_endDate ?? DateTime.now()),
+      firstDate: isStartDate ? firstDate : _startDate!,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: deepBlue,
+              onPrimary: white,
+              onSurface: darkBlue,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: deepBlue,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        if (isStartDate) {
+          _startDate = pickedDate;
+          // Si la date de fin est antérieure à la nouvelle date de début, on la réinitialise
+          if (_endDate != null && _endDate!.isBefore(pickedDate)) {
+            _endDate = null;
+          }
+        } else {
+          _endDate = pickedDate;
+        }
+      });
+    }
+  }
+
+// Supprimer la méthode _onSelectionChanged qui n'est plus utilisée
+
+  Widget _buildFinancialSummary() {
+    // Calcul sécurisé des composantes des paiements mixtes
+    double mixedCash = _paymentData
+        .where((p) => p['modePaiement'] == 'Mixte')
+        .fold(0.0,
+            (sum, p) => sum + ((p['cashAmount'] as num?)?.toDouble() ?? 0.0));
+
+    double mixedCard = _paymentData
+        .where((p) => p['modePaiement'] == 'Mixte')
+        .fold(0.0,
+            (sum, p) => sum + ((p['cardAmount'] as num?)?.toDouble() ?? 0.0));
+
+    double mixedCheck = _paymentData
+        .where((p) => p['modePaiement'] == 'Mixte')
+        .fold(0.0,
+            (sum, p) => sum + ((p['checkAmount'] as num?)?.toDouble() ?? 0.0));
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // En-tête
+            Row(
+              children: [
+                Icon(Icons.assessment, color: deepBlue),
+                const SizedBox(width: 8),
+                Text(
+                  'Résumé Financier',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: darkBlue,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Divider(color: lightGray, thickness: 1),
+            const SizedBox(height: 8),
+
+            // Chiffre d'affaire total
+            _buildSummaryRow(
+              'Chiffre d\'affaire net',
+              _totalAll,
+              Icons.euro,
+              isMain: true,
+            ),
+            const SizedBox(height: 12),
+
+            // Détails des paiements avec vérification de null
+            if ((_totalCash + mixedCash) > 0)
+              _buildPaymentRow(
+                'Total Espèces',
+                _totalCash + mixedCash,
+                Icons.money,
+                hasMixed: mixedCash > 0,
+              ),
+
+            if ((_totalCard + mixedCard) > 0)
+              _buildPaymentRow(
+                'Total Carte',
+                _totalCard + mixedCard,
+                Icons.credit_card,
+                hasMixed: mixedCard > 0,
+              ),
+
+            if ((_totalCheck + mixedCheck) > 0)
+              _buildPaymentRow(
+                'Total Chèque',
+                _totalCheck + mixedCheck,
+                Icons.account_balance,
+                hasMixed: mixedCheck > 0,
+              ),
+
+            // Détail des paiements mixtes (si existants)
+            if (_totalMixed > 0) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  'Dont paiements mixtes:',
+                  style: TextStyle(
+                    color: darkBlue.withOpacity(0.8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              if (mixedCash > 0)
+                _buildPaymentSubRow('• Part espèces', mixedCash),
+              if (mixedCard > 0) _buildPaymentSubRow('• Part carte', mixedCard),
+              if (mixedCheck > 0)
+                _buildPaymentSubRow('• Part chèque', mixedCheck),
+            ],
+
+            const SizedBox(height: 12),
+            Divider(color: lightGray, thickness: 1),
+            const SizedBox(height: 8),
+
+            // Section Remises
+            if (_totalPercentageDiscount > 0)
+              _buildSummaryRow(
+                'Remise globale (%)',
+                _totalPercentageDiscount,
+                Icons.discount,
+                suffix: '%',
+                isDiscount: true,
+              ),
+
+            if (_totalFixedDiscount > 0)
+              _buildSummaryRow(
+                'Remise globale (DT)',
+                -_totalFixedDiscount,
+                Icons.discount,
+                isDiscount: true,
+              ),
+
+            const SizedBox(height: 12),
+            Divider(color: lightGray, thickness: 1),
+            const SizedBox(height: 8),
+
+            // Montant retour
+            if (_totalRemaining > 0)
+              _buildSummaryRow(
+                'Montant à recevoir',
+                _totalRemaining,
+                Icons.keyboard_return,
+                isAlert: true,
+              ),
+
+            const SizedBox(height: 12),
+            Divider(color: lightGray, thickness: 1),
+            const SizedBox(height: 8),
+
+            // Statistiques
+            _buildSummaryRow(
+              'Nombre de clients',
+              _clientCount.toDouble(),
+              Icons.people,
+              isCount: true,
+            ),
+            _buildSummaryRow(
+              'Nombre d\'articles',
+              _articleCount.toDouble(),
+              Icons.shopping_basket,
+              isCount: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Méthode pour les lignes principales de paiement
+  Widget _buildPaymentRow(String label, double value, IconData icon,
+      {bool hasMixed = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 20, color: darkBlue),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: darkBlue,
+                    ),
+                  ),
+                  if (hasMixed) ...[
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: 'Inclut les paiements mixtes',
+                      child: Icon(Icons.info_outline,
+                          size: 16, color: Colors.grey),
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                '${value.toStringAsFixed(2)} DT',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: darkBlue,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// Méthode pour les sous-lignes de détail
+  Widget _buildPaymentSubRow(String label, double value) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, top: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: darkBlue.withOpacity(0.8),
+            ),
+          ),
+          Text(
+            '${value.toStringAsFixed(2)} DT',
+            style: TextStyle(
+              fontSize: 14,
+              color: darkBlue.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Méthode pour les lignes de résumé
+  Widget _buildSummaryRow(
+    String label,
+    double value,
+    IconData icon, {
+    bool isMain = false,
+    bool isDiscount = false,
+    bool isCount = false,
+    bool isAlert = false,
+    String suffix = '',
+  }) {
+    Color textColor = darkBlue;
+    if (isDiscount) textColor = warmRed;
+    if (isAlert) textColor = softOrange;
+    if (isMain) textColor = deepBlue;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: textColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: isMain ? 16 : 15,
+                  color: textColor,
+                  fontWeight: isMain ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            isCount
+                ? '${value.toInt()}$suffix'
+                : '${value.toStringAsFixed(2)}$suffix',
+            style: TextStyle(
+              fontSize: isMain ? 18 : 16,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentDetails(Map<String, dynamic> payment) {
+    String details = '';
+
+    if (payment['modePaiement'] == 'Espèce') {
+      details =
+          'Espèces: ${payment['cashAmount']?.toStringAsFixed(2) ?? '0.00'} DT';
+    } else if (payment['modePaiement'] == 'TPE') {
+      details =
+          'Carte: ${payment['cardAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
+          'Transaction: ${payment['cardTransactionId'] ?? 'N/A'}';
+    } else if (payment['modePaiement'] == 'Chèque') {
+      details =
+          'Chèque: ${payment['checkAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
+          'N°: ${payment['checkNumber'] ?? 'N/A'}\n'
+          'Banque: ${payment['bankName'] ?? 'N/A'}\n'
+          'Date: ${payment['checkDate'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(payment['checkDate'])) : 'N/A'}';
+    } else if (payment['modePaiement'] == 'Mixte') {
+      details =
+          'Espèces: ${payment['cashAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
+          'Carte: ${payment['cardAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
+          'Chèque: ${payment['checkAmount']?.toStringAsFixed(2) ?? '0.00'} DT';
+    }
+
+    return Tooltip(
+      message: details,
+      child: Icon(Icons.info_outline, color: deepBlue),
+    );
+  }
+
+  Widget _buildExportButton() {
+    return Center(
+      child: ElevatedButton.icon(
+        icon: Icon(Icons.picture_as_pdf, color: white),
+        label: Text('Exporter en PDF', style: TextStyle(color: white)),
+        onPressed: _exportToPDF,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: deepBlue,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 2,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _fetchData() async {
+    if (_startDate == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final db = await SqlDb().db;
+      final startDateStr = DateFormat('yyyy-MM-dd').format(_startDate!);
+      final endDateStr = _endDate != null
+          ? DateFormat('yyyy-MM-dd').format(_endDate!)
+          : startDateStr;
+
+      final result = await db.rawQuery('''
+      SELECT 
+        id_order as idOrder,
+        date,
+        mode_paiement as modePaiement,
+        total as amount,
+        cash_amount as cashAmount,
+        card_amount as cardAmount,
+        check_amount as checkAmount,
+        global_discount as discount,
+        is_percentage_discount as isPercentageDiscount,
+        remaining_amount as remainingAmount,
+        id_client as idClient
+      FROM orders 
+      WHERE date(date) BETWEEN date(?) AND date(?)
+      ORDER BY date DESC
+    ''', [startDateStr, endDateStr]);
+
+      double totalCash = 0;
+      double totalCard = 0;
+      double totalCheck = 0;
+      double totalMixed = 0; // Nouvelle variable pour suivre le total mixte
+      double totalPercentageDiscount = 0;
+      double totalFixedDiscount = 0;
+      double totalRemaining = 0;
+      int clientCount = 0;
+      int articleCount = 0;
+      Set<int> uniqueClients = Set();
+
+      final articlesResult = await db.rawQuery('''
+      SELECT SUM(quantity) as total 
+      FROM order_items oi
+      JOIN orders o ON oi.id_order = o.id_order
+      WHERE date(o.date) BETWEEN date(?) AND date(?)
+    ''', [startDateStr, endDateStr]);
+
+      articleCount =
+          int.tryParse(articlesResult.first['total']?.toString() ?? '0') ?? 0;
+
+      for (var payment in result) {
+        final idClient = payment['idClient'] as int?;
+        final modePaiement = payment['modePaiement'] as String?;
+        final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
+        final cashAmount = (payment['cashAmount'] as num?)?.toDouble() ?? 0.0;
+        final cardAmount = (payment['cardAmount'] as num?)?.toDouble() ?? 0.0;
+        final checkAmount = (payment['checkAmount'] as num?)?.toDouble() ?? 0.0;
+        final discount = (payment['discount'] as num?)?.toDouble() ?? 0.0;
+        final isPercentage = payment['isPercentageDiscount'] == 1;
+        final remainingAmount =
+            (payment['remainingAmount'] as num?)?.toDouble() ?? 0.0;
+
+        if (idClient != null) {
+          uniqueClients.add(idClient);
+        }
+
+        // Calcul des totaux par mode de paiement
+        if (modePaiement == 'Espèce') {
+          totalCash += amount;
+        } else if (modePaiement == 'TPE') {
+          totalCard += amount;
+        } else if (modePaiement == 'Chèque') {
+          totalCheck += amount;
+        } else if (modePaiement == 'Mixte') {
+          // Pour les paiements mixtes, on additionne chaque composante
+          totalCash += cashAmount;
+          totalCard += cardAmount;
+          totalCheck += checkAmount;
+          // ET on garde aussi le total mixte séparément
+          totalMixed += amount;
+        }
+
+        // Calcul des remises
+        if (isPercentage) {
+          totalPercentageDiscount += discount;
+        } else {
+          totalFixedDiscount += discount;
+        }
+
+        totalRemaining += remainingAmount;
+      }
+
+      clientCount = uniqueClients.length;
+      // Le chiffre d'affaires total inclut maintenant TOUS les paiements
+      double totalAll = totalCash + totalCard + totalCheck + totalMixed;
+
+      setState(() {
+        _paymentData = result;
+        _totalCash = totalCash;
+        _totalCard = totalCard;
+        _totalCheck = totalCheck;
+        _totalMixed = totalMixed; // On garde cette information
+        _totalAll = totalAll;
+        _totalPercentageDiscount = totalPercentageDiscount;
+        _totalFixedDiscount = totalFixedDiscount;
+        _totalRemaining = totalRemaining;
+        _clientCount = clientCount;
+        _articleCount = articleCount;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: warmRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _exportToPDF() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Export PDF en développement'),
+        backgroundColor: tealGreen,
+      ),
+    );
+  }
+}
