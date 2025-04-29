@@ -388,6 +388,11 @@ class SqlDb {
     await OrderController().deleteOrder(idOrder, dbClient);
   }
 
+  Future<int> updateOrderTotal(int orderId, double newTotal) async {
+    final dbClient = await db;
+    return OrderController().updateOrderTotal(orderId, newTotal, dbClient);
+  }
+
   Future<int> cancelOrder(int idOrder) async {
     final dbClient = await db;
     // Update the status of the order to "Annulée"

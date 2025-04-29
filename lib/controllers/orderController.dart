@@ -153,11 +153,28 @@ class OrderController {
     return orderLines;
   }
 
-  Future<void> deleteOrder(int idOrder, dbClient) async {
+  Future<int> deleteOrder(int orderId, dbClient) async {
+    // First delete all order items
     await dbClient.delete(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
+
+    // Then delete the order itself
+    return await dbClient.delete(
       'orders',
       where: 'id_order = ?',
-      whereArgs: [idOrder],
+      whereArgs: [orderId],
+    );
+  }
+
+  Future<int> updateOrderTotal(int orderId, double newTotal, dbClient) async {
+    return await dbClient.update(
+      'orders',
+      {'total': newTotal},
+      where: 'id_order = ?',
+      whereArgs: [orderId],
     );
   }
 
