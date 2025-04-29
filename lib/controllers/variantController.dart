@@ -12,6 +12,17 @@ class Variantcontroller {
     return maps.map(Variant.fromMap).toList();
   }
 
+  Future<Variant?> getVariantById(int id, Database dbClient) async {
+    final result = await dbClient.query(
+      'variants',
+      where: 'id = ?', // Ajout de la vérification is_deleted
+      whereArgs: [id],
+      limit: 1, // Optimisation pour ne retourner qu'un seul résultat
+    );
+
+    return result.isNotEmpty ? Variant.fromMap(result.first) : null;
+  }
+
   Future<int> addVariant(Variant variant, dbClient) async {
     return await dbClient.transaction((txn) async {
       // Verify parent product exists

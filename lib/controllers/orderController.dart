@@ -78,6 +78,9 @@ class OrderController {
     for (final orderMap in ordersData) {
       final orderId = orderMap['id_order'] as int;
 
+      // Debug print to verify data
+      print('Order ID: $orderId, User ID: ${orderMap['user_id']}');
+
       // Fetch order lines
       final orderLinesData = await dbClient.query(
         "order_items",
@@ -98,6 +101,7 @@ class OrderController {
         globalDiscount: (orderMap['global_discount'] as num).toDouble(),
         isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
         idClient: orderMap['id_client'] as int?,
+        userId: orderMap['user_id'] as int?, // Make sure this line is included
       ));
     }
 

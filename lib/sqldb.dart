@@ -531,11 +531,15 @@ class SqlDb {
     return await Variantcontroller().addVariant(variant, dbClient);
   }
 
-// Get variants by product ID
   Future<List<Variant>> getVariantsByProductId(int productId) async {
     final dbClient = await db;
     return await Variantcontroller()
         .getVariantsByProductId(productId, dbClient);
+  }
+
+  Future<Variant?> getVariantById(int id) async {
+    final dbClient = await db;
+    return await Variantcontroller().getVariantById(id, dbClient);
   }
 
   Future<List<Variant>> getVariantsByProductCode(String productCode) async {
