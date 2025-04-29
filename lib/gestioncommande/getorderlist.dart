@@ -186,7 +186,10 @@ class Getorderlist {
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
     List<Order> orders = await sqldb.getOrdersWithOrderLines();
-    orders = orders.where((order) => order.status != 'annulée').toList();
+    orders = orders
+        .where(
+            (order) => order.status != 'annulée' && order.orderLines.isNotEmpty)
+        .toList();
 
     showDialog(
       context: context,
@@ -342,6 +345,19 @@ class Getorderlist {
                                               color: Color(0xFF000000),
                                             ),
                                           ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.delete,
+                                              color: Colors.red),
+                                          onPressed: () async {
+                                            await deleteOrderLine(
+                                                context, order, orderLine, () {
+                                              Navigator.pop(
+                                                  context); // Close current dialog
+                                              showListOrdersPopUp(
+                                                  context); // Refresh list
+                                            });
+                                          },
                                         ),
                                       ],
                                     ),
@@ -884,6 +900,106 @@ class Getorderlist {
         );
       },
     );
+  }
+
+  static Future<void> deleteOrderLine(
+    BuildContext context,
+    Order order,
+    OrderLine orderLine,
+    Function() onOrderLineDeleted,
+  ) async {
+    final SqlDb sqldb = SqlDb();
+
+    bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmer la suppression'),
+          content: const Text(
+              'Voulez-vous vraiment supprimer cet article de la commande?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child:
+                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmDelete == true) {
+      try {
+        // Delete order line from database
+        await sqldb.deleteOrderLine(order.idOrder!,
+            orderLine.productCode ?? orderLine.productId?.toString() ?? '');
+
+        // Restock the product if it exists
+        if (orderLine.productId != null) {
+          final product = await sqldb.getProductById(orderLine.productId!);
+          if (product != null) {
+            int newStock = product.stock + orderLine.quantity;
+            await sqldb.updateProductStock(orderLine.productId!, newStock);
+          }
+        }
+
+        // Update local Order object
+        order.orderLines.removeWhere((line) =>
+            (line.productCode != null &&
+                line.productCode == orderLine.productCode) ||
+            (line.productId != null && line.productId == orderLine.productId));
+
+        // Check if order is now empty
+        if (order.orderLines.isEmpty) {
+          // Delete the entire order
+          await sqldb.deleteOrder(order.idOrder!);
+
+          // Show success message
+          scaffoldMessengerKey.currentState?.showSnackBar(
+            const SnackBar(
+              content: Text('Commande vide supprimée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Call callback to update UI
+          onOrderLineDeleted();
+          return;
+        }
+
+        // Recalculate order total if not empty
+        double newTotal =
+            order.total - (orderLine.finalPrice * orderLine.quantity);
+
+        // Update order total in database
+        await sqldb.updateOrderTotal(order.idOrder!, newTotal);
+
+        // Update local Order object
+        order.total = newTotal;
+
+        // Show success message
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text('Article supprimé avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Call callback to update UI
+        onOrderLineDeleted();
+      } catch (e) {
+        scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la suppression: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   static String formatDate(String date) {

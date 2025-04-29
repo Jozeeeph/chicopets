@@ -23,7 +23,13 @@ class _ManageCommandState extends State<ManageCommand> {
 
   void refreshOrders() {
     setState(() {
-      futureOrders = sqlDb.getOrdersWithOrderLines();
+      futureOrders = sqlDb.getOrdersWithOrderLines().then((orders) {
+        // Filter out cancelled orders and empty orders
+        return orders
+            .where((order) =>
+                order.status != 'annulée' && order.orderLines.isNotEmpty)
+            .toList();
+      });
     });
   }
 
@@ -261,8 +267,7 @@ class _ManageCommandState extends State<ManageCommand> {
                         const Divider(thickness: 1, color: Colors.grey),
                         ...order.orderLines.map((orderLine) {
                           return FutureBuilder<Product?>(
-                            future:
-                                sqlDb.getProductById(orderLine.productId!),
+                            future: sqlDb.getProductById(orderLine.productId!),
                             builder: (context, productSnapshot) {
                               if (productSnapshot.connectionState ==
                                   ConnectionState.waiting) {
