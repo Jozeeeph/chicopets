@@ -1820,6 +1820,7 @@ class Addorder {
         remainingAmount: remainingAmount,
         globalDiscount: globalDiscount,
         isPercentageDiscount: isPercentageDiscount,
+        userId: user?.id,
         idClient: selectedClient?.id,
         cashAmount: selectedPaymentMethod == "Espèce" ||
                 selectedPaymentMethod == "Mixte"
@@ -1852,7 +1853,7 @@ class Addorder {
         pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
         pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
       );
-      print("order saveddddd $order");
+      print("order saveddddd ${order.toMap()}");
 
       int orderId = await SqlDb().addOrder(order);
 

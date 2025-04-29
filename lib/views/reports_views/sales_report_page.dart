@@ -1,3 +1,4 @@
+import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -90,14 +91,12 @@ class _SalesReportPageState extends State<SalesReportPage> {
     final db = SqlDb();
     final orders = await db.getOrders();
 
-    // Filtrer les commandes par période
+    // Filter orders by date range
     final filteredOrders = orders.where((order) {
       final orderDate = DateTime.parse(order.date).toLocal();
-      return (_isDateInRange(
-          orderDate, _selectedStartDate!, _selectedEndDate!));
+      return _isDateInRange(orderDate, _selectedStartDate!, _selectedEndDate!);
     }).toList();
 
-    // Grouper les produits par catégorie
     final Map<String, Map<String, dynamic>> reportData = {};
 
     for (final order in filteredOrders) {
@@ -111,30 +110,65 @@ class _SalesReportPageState extends State<SalesReportPage> {
         if (!reportData.containsKey(categoryName)) {
           reportData[categoryName] = {
             'total': 0.0,
+            'totalDiscount': 0.0,
+            'totalBeforeDiscount': 0.0,
             'products': <String, Map<String, dynamic>>{},
           };
         }
 
-        final productTotal = line.prixUnitaire *
-            line.quantity *
-            (1 - (line.isPercentage ? line.discount / 100 : 0));
+        // Get variant details if available
+        Variant? variant;
+        if (line.variantId != null) {
+          variant = await db.getVariantById(line.variantId!);
+        }
+
+        // Use variant price if available, otherwise use product price
+        final unitPrice = variant?.finalPrice ?? line.prixUnitaire;
+
+        // Calculate line total before discount
+        final lineTotalBeforeDiscount = unitPrice * line.quantity;
+
+        // Calculate discount amount
+        double discountAmount = 0;
+        if (line.isPercentage) {
+          discountAmount = lineTotalBeforeDiscount * (line.discount / 100);
+        } else {
+          discountAmount = line.discount * line.quantity;
+        }
+
+        // Calculate final line total
+        final lineTotal = lineTotalBeforeDiscount - discountAmount;
 
         final productsMap = reportData[categoryName]!['products']
             as Map<String, Map<String, dynamic>>;
 
-        if (!productsMap.containsKey(product.designation)) {
-          productsMap[product.designation] = {
+        // Create a unique key for the product with variant
+        final variantName =
+            variant?.combinationName ?? line.variantName ?? 'Standard';
+        final productKey = '${product.designation} ($variantName)';
+
+        if (!productsMap.containsKey(productKey)) {
+          productsMap[productKey] = {
             'quantity': 0,
             'total': 0.0,
-            'discount': line.discount,
+            'totalBeforeDiscount': 0.0,
+            'discount': 0.0,
             'isPercentage': line.isPercentage,
-            'variant': line.variantName ?? 'Standard',
+            'variant': variantName,
+            'unitPrice': unitPrice,
           };
         }
 
-        productsMap[product.designation]!['quantity'] += line.quantity;
-        productsMap[product.designation]!['total'] += productTotal;
-        reportData[categoryName]!['total'] += productTotal;
+        productsMap[productKey]!['quantity'] += line.quantity;
+        productsMap[productKey]!['total'] += lineTotal;
+        productsMap[productKey]!['totalBeforeDiscount'] +=
+            lineTotalBeforeDiscount;
+        productsMap[productKey]!['discount'] += discountAmount;
+
+        reportData[categoryName]!['total'] += lineTotal;
+        reportData[categoryName]!['totalDiscount'] += discountAmount;
+        reportData[categoryName]!['totalBeforeDiscount'] +=
+            lineTotalBeforeDiscount;
       }
     }
 
@@ -142,16 +176,20 @@ class _SalesReportPageState extends State<SalesReportPage> {
       return <String, dynamic>{
         'category': entry.key,
         'total': entry.value['total'],
+        'totalDiscount': entry.value['totalDiscount'],
+        'totalBeforeDiscount': entry.value['totalBeforeDiscount'],
         'products': (entry.value['products'] as Map<String, dynamic>)
             .entries
             .map((product) {
           return <String, dynamic>{
-            'name': product.key,
+            'name': product.key.split(' (')[0],
             'quantity': product.value['quantity'],
             'total': product.value['total'],
+            'totalBeforeDiscount': product.value['totalBeforeDiscount'],
             'discount': product.value['discount'],
             'isPercentage': product.value['isPercentage'],
             'variant': product.value['variant'],
+            'unitPrice': product.value['unitPrice'],
           };
         }).toList(),
       };
@@ -160,136 +198,112 @@ class _SalesReportPageState extends State<SalesReportPage> {
 
   Future<List<Map<String, dynamic>>> _getSalesReportByUser(int userId) async {
     final db = SqlDb();
+    final orders = await db.getOrders();
 
-    try {
-      // 1. DATE HANDLING
-      final startDate = _selectedStartDate ?? DateTime.now();
-      final endDate = _selectedEndDate ?? DateTime.now();
+    // Filter orders by user and date range
+    final filteredOrders = orders.where((order) {
+      if (order.userId != userId) return false;
+      final orderDate = DateTime.parse(order.date).toLocal();
+      return _isDateInRange(orderDate, _selectedStartDate!, _selectedEndDate!);
+    }).toList();
 
-      final normalizedStart =
-          DateTime(startDate.year, startDate.month, startDate.day);
-      final normalizedEnd =
-          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+    final Map<String, Map<String, dynamic>> reportData = {};
 
-      debugPrint(
-          'Report for user $userId from ${DateFormat('yyyy-MM-dd').format(normalizedStart)} to ${DateFormat('yyyy-MM-dd').format(normalizedEnd)}');
+    for (final order in filteredOrders) {
+      for (final line in order.orderLines) {
+        final product = await db.getProductById(line.productId ?? 0);
+        if (product == null) continue;
 
-      // 2. GET ORDERS WITH ORDER LINES
-      final allOrders = await db.getOrdersWithOrderLines();
-      print('all orders : $allOrders');
+        final category = await db.getCategoryNameById(product.categoryId);
+        final categoryName = category;
 
-      // Filter orders by user and date range
-      final filteredOrders = allOrders.where((order) {
-        if (order.userId != userId) return false;
-
-        try {
-          if (order.date == null) return false;
-          final orderDate = DateTime.parse(order.date!).toLocal();
-          return orderDate.isAtSameMomentAs(normalizedStart) ||
-              orderDate.isAtSameMomentAs(normalizedEnd) ||
-              (orderDate.isAfter(normalizedStart) &&
-                  orderDate.isBefore(normalizedEnd));
-        } catch (e) {
-          debugPrint(
-              'Error parsing date for order ${order.idOrder}: ${order.date}');
-          return false;
+        if (!reportData.containsKey(categoryName)) {
+          reportData[categoryName] = {
+            'total': 0.0,
+            'totalDiscount': 0.0,
+            'totalBeforeDiscount': 0.0,
+            'products': <String, Map<String, dynamic>>{},
+          };
         }
-      }).toList();
 
-      if (filteredOrders.isEmpty) {
-        debugPrint('No orders found for user $userId in date range');
-        return [];
-      }
-
-      // 3. PRE-FETCH PRODUCTS AND CATEGORIES
-      final productIds = filteredOrders
-          .expand(
-              (order) => order.orderLines.map((line) => line.productId ?? 0))
-          .where((id) => id > 0)
-          .toSet();
-
-      final products = <int, Product>{};
-      for (final id in productIds) {
-        final product = await db.getProductById(id);
-        if (product != null) products[id] = product;
-      }
-
-      // 4. AGGREGATE DATA
-      final reportData = <String, Map<String, dynamic>>{};
-
-      for (final order in filteredOrders) {
-        for (final line in order.orderLines) {
-          final product = products[line.productId ?? 0];
-          if (product == null) continue;
-
-          final category = await db.getCategoryNameById(product.categoryId);
-          final categoryName = category ?? 'Non catégorisé';
-
-          // Initialize category if not exists
-          reportData.putIfAbsent(
-              categoryName,
-              () => {
-                    'total': 0.0,
-                    'products': <String, Map<String, dynamic>>{},
-                  });
-
-          // Calculate line total
-          double lineTotal = line.isPercentage
-              ? line.prixUnitaire * line.quantity * (1 - line.discount / 100)
-              : (line.prixUnitaire - line.discount) * line.quantity;
-
-          // Create product key with variant
-          final variant = line.variantName?.isNotEmpty == true
-              ? line.variantName
-              : 'Standard';
-          final productKey = '${product.designation} ($variant)';
-
-          // Initialize product if not exists
-          reportData[categoryName]!['products'].putIfAbsent(
-              productKey,
-              () => {
-                    'quantity': 0,
-                    'total': 0.0,
-                    'discount': line.discount,
-                    'isPercentage': line.isPercentage,
-                    'variant': variant,
-                  });
-
-          // Update aggregates
-          reportData[categoryName]!['products'][productKey]!['quantity'] +=
-              line.quantity;
-          reportData[categoryName]!['products'][productKey]!['total'] +=
-              lineTotal;
-          reportData[categoryName]!['total'] += lineTotal;
+        // Get variant details if available
+        Variant? variant;
+        if (line.variantId != null) {
+          variant = await db.getVariantById(line.variantId!);
         }
-      }
 
-      // 5. CONVERT TO REPORT FORMAT
-      return reportData.entries.map((entry) {
-        return <String, dynamic>{
-          'category': entry.key,
-          'total': entry.value['total'],
-          'products': (entry.value['products'] as Map<String, dynamic>)
-              .entries
-              .map((product) {
-            return <String, dynamic>{
-              'name': product.key.split(' (')[0],
-              'quantity': product.value['quantity'],
-              'total': product.value['total'],
-              'discount': product.value['discount'],
-              'isPercentage': product.value['isPercentage'],
-              'variant': product.value['variant'],
-            };
-          }).toList(),
-        };
-      }).toList();
-    } catch (e, stack) {
-      debugPrint('Error generating report: $e\n$stack');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating report: ${e.toString()}')),
-      );
-      return [];
+        // Use variant price if available, otherwise use product price
+        final unitPrice = variant?.finalPrice ?? line.prixUnitaire;
+
+        // Calculate line total before discount
+        final lineTotalBeforeDiscount = unitPrice * line.quantity;
+
+        // Calculate discount amount
+        double discountAmount = 0;
+        if (line.isPercentage) {
+          discountAmount = lineTotalBeforeDiscount * (line.discount / 100);
+        } else {
+          discountAmount = line.discount * line.quantity;
+        }
+
+        // Calculate final line total
+        final lineTotal = lineTotalBeforeDiscount - discountAmount;
+
+        final productsMap = reportData[categoryName]!['products']
+            as Map<String, Map<String, dynamic>>;
+
+        // Create a unique key for the product with variant
+        final variantName =
+            variant?.combinationName ?? line.variantName ?? 'Standard';
+        final productKey = '${product.designation} ($variantName)';
+
+        if (!productsMap.containsKey(productKey)) {
+          productsMap[productKey] = {
+            'quantity': 0,
+            'total': 0.0,
+            'totalBeforeDiscount': 0.0,
+            'discount': 0.0,
+            'isPercentage': line.isPercentage,
+            'variant': variantName,
+            'unitPrice': unitPrice,
+          };
+        }
+
+        productsMap[productKey]!['quantity'] += line.quantity;
+        productsMap[productKey]!['total'] += lineTotal;
+        productsMap[productKey]!['totalBeforeDiscount'] +=
+            lineTotalBeforeDiscount;
+        productsMap[productKey]!['discount'] += discountAmount;
+
+        reportData[categoryName]!['total'] += lineTotal;
+        reportData[categoryName]!['totalDiscount'] += discountAmount;
+        reportData[categoryName]!['totalBeforeDiscount'] +=
+            lineTotalBeforeDiscount;
+      }
     }
+
+    return reportData.entries.map((entry) {
+      return <String, dynamic>{
+        'category': entry.key,
+        'total': entry.value['total'],
+        'totalDiscount': entry.value['totalDiscount'],
+        'totalBeforeDiscount': entry.value['totalBeforeDiscount'],
+        'products': (entry.value['products'] as Map<String, dynamic>)
+            .entries
+            .map((product) {
+          return <String, dynamic>{
+            'name': product.key.split(' (')[0],
+            'quantity': product.value['quantity'],
+            'total': product.value['total'],
+            'totalBeforeDiscount': product.value['totalBeforeDiscount'],
+            'discount': product.value['discount'],
+            'isPercentage': product.value['isPercentage'],
+            'variant': product.value['variant'],
+            'unitPrice': product.value['unitPrice'],
+          };
+        }).toList(),
+      };
+    }).toList();
   }
 
   bool _isDateInRange(DateTime date, DateTime start, DateTime end) {
@@ -579,12 +593,24 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                     color: darkBlue,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  'Total: ${categoryData['total'].toStringAsFixed(2)} DT',
-                                  style: TextStyle(
-                                    color: deepBlue,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total: ${categoryData['total'].toStringAsFixed(2)} DT',
+                                      style: TextStyle(
+                                        color: deepBlue,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Remise totale: ${categoryData['totalDiscount'].toStringAsFixed(2)} DT',
+                                      style: TextStyle(
+                                        color: warmRed,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 children: [
                                   ...(categoryData['products'] as List)
@@ -596,10 +622,17 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                         '${product['name']} (${product['variant']})',
                                         style: TextStyle(color: darkBlue),
                                       ),
-                                      subtitle: Text(
-                                        'Quantité: ${product['quantity']}',
-                                        style:
-                                            TextStyle(color: Colors.grey[600]),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                              'Quantité: ${product['quantity']}'),
+                                          Text(
+                                            'Prix avant remise: ${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
+                                        ],
                                       ),
                                       trailing: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -614,7 +647,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                             ),
                                           ),
                                           Text(
-                                            'Remise: ${product['discount']}${product['isPercentage'] ? '%' : 'DT'}',
+                                            'Remise: ${product['discount'].toStringAsFixed(2)} DT',
                                             style: TextStyle(
                                               color: warmRed,
                                               fontSize: 12,
