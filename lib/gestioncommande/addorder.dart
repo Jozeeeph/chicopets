@@ -158,6 +158,15 @@ class Addorder {
 
     TextEditingController changeReturnedController = TextEditingController();
 
+    double ticketRestaurantAmount = 0.0;
+    int numberOfTicketsRestaurant = 1;
+    double ticketValue = 0.0;
+    double ticketTax = 0.0;
+    double ticketCommission = 0.0;
+    TextEditingController ticketValueController = TextEditingController();
+    TextEditingController ticketTaxController = TextEditingController();
+    TextEditingController ticketCommissionController = TextEditingController();
+
     String? checkNumber; // For cheque number
     String? cardTransactionId; // For TPE transaction ID
     DateTime? checkDate; // For cheque date
@@ -595,6 +604,93 @@ class Addorder {
                                         "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
                                 ],
 
+                                // Dans la partie conditionnelle des méthodes de paiement
+                                if (selectedPaymentMethod ==
+                                    "Ticket Restaurant")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: numberOfTicketsRestaurant
+                                                .toString()),
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Nombre de tickets",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            numberOfTicketsRestaurant =
+                                                int.tryParse(value) ?? 1;
+                                            if (numberOfTicketsRestaurant < 1) {
+                                              numberOfTicketsRestaurant = 1;
+                                            }
+                                            // Calculer le montant total des tickets
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketValueController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Valeur d'un ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketValue =
+                                                double.tryParse(value) ?? 0.0;
+                                            // Calculer le montant total des tickets
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketTaxController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Taxe par ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketTax =
+                                                double.tryParse(value) ?? 0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketCommissionController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              "Commission par ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketCommission =
+                                                double.tryParse(value) ?? 0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+
                                 if (selectedPaymentMethod == "Mixte") ...[
                                   Text("Mode: Paiement mixte"),
                                   if (cashAmount > 0)
@@ -1024,6 +1120,17 @@ class Addorder {
                                     },
                                   ),
                                   Text("Chèque"),
+                                  // Dans la section des Radio boutons pour les méthodes de paiement
+                                  Radio<String>(
+                                    value: "Ticket Restaurant",
+                                    groupValue: selectedPaymentMethod,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedPaymentMethod = value!;
+                                      });
+                                    },
+                                  ),
+                                  Text("Ticket Restaurant"),
                                   Radio<String>(
                                     value: "Mixte",
                                     groupValue: selectedPaymentMethod,
@@ -1474,6 +1581,7 @@ class Addorder {
                         cardTransactionId,
                         checkDate,
                         bankName,
+                        ticketRestaurantAmount,
                         useLoyaltyPoints,
                         pointsToUse,
                         pointsDiscount);
@@ -1531,10 +1639,12 @@ class Addorder {
     String? cardTransactionId,
     DateTime? checkDate,
     String? bankName,
+    double? ticketRestaurantAmount,
     bool useLoyaltyPoints,
     int pointsToUse,
     double pointsDiscount,
   ) async {
+    // Validate discount limits
     if (!isPercentageDiscount &&
         globalDiscount >
             _calculateMaxGlobalDiscountValue(
@@ -1562,6 +1672,7 @@ class Addorder {
       );
       return;
     }
+
     if (selectedProducts.isEmpty) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(content: Text("Aucun produit sélectionné.")),
@@ -1569,6 +1680,7 @@ class Addorder {
       return;
     }
 
+    // Calculate totals
     double totalBeforeDiscount = calculateTotalBeforeDiscount(
         selectedProducts, quantityProducts, discounts, typeDiscounts);
     double total = calculateTotal(
@@ -1580,94 +1692,15 @@ class Addorder {
       isPercentageDiscount,
     );
 
+    // Apply loyalty points discount if used
     if (useLoyaltyPoints && pointsToUse > 0) {
       total = max(0, total - pointsDiscount);
     }
 
+    // Determine payment status and remaining amount
     double totalAmountPaid = 0.0;
     String status;
-    double remainingAmount = max(0, total - totalAmountPaid - pointsDiscount);
-    switch (selectedPaymentMethod) {
-      case "Espèce":
-        totalAmountPaid = cashAmount;
-        status = (cashAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-            ? "payée"
-            : "semi-payée";
-        remainingAmount =
-            (cashAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? 0.0
-                : total - cashAmount - (useLoyaltyPoints ? pointsDiscount : 0);
-        break;
-      case "TPE":
-        totalAmountPaid = cardAmount;
-        status = (cardAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-            ? "payée"
-            : "semi-payée";
-        remainingAmount =
-            (cardAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? 0.0
-                : total - cardAmount - (useLoyaltyPoints ? pointsDiscount : 0);
-        break;
-      case "Chèque":
-        totalAmountPaid = checkAmount;
-        status =
-            (checkAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? "payée"
-                : "semi-payée";
-        remainingAmount =
-            (checkAmount + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? 0.0
-                : total - checkAmount - (useLoyaltyPoints ? pointsDiscount : 0);
-        break;
-      case "Mixte":
-        totalAmountPaid = cashAmount + cardAmount + checkAmount;
-        status =
-            (totalAmountPaid + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? "payée"
-                : "semi-payée";
-        remainingAmount =
-            (totalAmountPaid + (useLoyaltyPoints ? pointsDiscount : 0)) >= total
-                ? 0.0
-                : total -
-                    totalAmountPaid -
-                    (useLoyaltyPoints ? pointsDiscount : 0);
-        break;
-      default:
-        status = "non payée";
-        remainingAmount = total;
-    }
-
-    switch (selectedPaymentMethod) {
-      case "Espèce":
-        totalAmountPaid = cashAmount;
-        if (cashAmount >= total) {
-          status = "payée";
-          remainingAmount = 0.0;
-        } else {
-          status = "semi-payée";
-          remainingAmount = total - cashAmount;
-        }
-        break;
-      case "TPE":
-        totalAmountPaid = cardAmount;
-        status = cardAmount >= total ? "payée" : "semi-payée";
-        remainingAmount = cardAmount >= total ? 0.0 : total - cardAmount;
-        break;
-      case "Chèque":
-        totalAmountPaid = checkAmount;
-        status = checkAmount >= total ? "payée" : "semi-payée";
-        remainingAmount = checkAmount >= total ? 0.0 : total - checkAmount;
-        break;
-      case "Mixte":
-        totalAmountPaid = cashAmount + cardAmount + checkAmount;
-        status = totalAmountPaid >= total ? "payée" : "semi-payée";
-        remainingAmount =
-            totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
-        break;
-      default:
-        status = "non payée";
-        remainingAmount = total;
-    }
+    double remainingAmount;
 
     switch (selectedPaymentMethod) {
       case "Espèce":
@@ -1685,20 +1718,31 @@ class Addorder {
         status = checkAmount >= total ? "payée" : "semi-payée";
         remainingAmount = checkAmount >= total ? 0.0 : total - checkAmount;
         break;
+      case "Ticket Restaurant":
+        totalAmountPaid = ticketRestaurantAmount ?? 0;
+        status =
+            (ticketRestaurantAmount ?? 0) >= total ? "payée" : "semi-payée";
+        remainingAmount = (ticketRestaurantAmount ?? 0) >= total
+            ? 0.0
+            : total - (ticketRestaurantAmount ?? 0);
+        break;
       case "Mixte":
         totalAmountPaid = cashAmount + cardAmount + checkAmount;
-        status = (totalAmountPaid >= total) ? "payée" : "semi-payée";
+        status = totalAmountPaid >= total ? "payée" : "semi-payée";
         remainingAmount =
-            (totalAmountPaid >= total) ? 0.0 : total - totalAmountPaid;
+            totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
         break;
       default:
         status = "non payée";
         remainingAmount = total;
     }
 
+    // Validate payment amounts
     if ((selectedPaymentMethod == "TPE" && cardAmount <= 0) ||
         (selectedPaymentMethod == "Chèque" && checkAmount <= 0) ||
         (selectedPaymentMethod == "Espèce" && cashAmount <= 0) ||
+        (selectedPaymentMethod == "Ticket Restaurant" &&
+            (ticketRestaurantAmount == null || ticketRestaurantAmount <= 0)) ||
         (selectedPaymentMethod == "Mixte" &&
             (cashAmount + cardAmount + checkAmount) <= 0)) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -1710,27 +1754,36 @@ class Addorder {
       return;
     }
 
-    print("Total avant remise: $totalBeforeDiscount");
-    print("Total après remise: $total");
-    print("Statut de la commande: $status");
-    print("Montant restant: $remainingAmount");
-
+    // Create order lines
     List<OrderLine> orderLines = selectedProducts.map((product) {
       int productIndex = selectedProducts.indexOf(product);
+      Variant? variant = product.hasVariants && product.variants.isNotEmpty
+          ? product.variants.firstWhere(
+              (v) => v.defaultVariant,
+              orElse: () => product.variants.first,
+            )
+          : null;
+
       return OrderLine(
         idOrder: 0,
         productCode: product.code,
         productId: product.id,
+        variantId: variant?.id,
+        variantCode: variant?.code,
+        variantName: variant?.combinationName,
         quantity: quantityProducts[productIndex],
-        prixUnitaire: product.prixTTC,
+        prixUnitaire: variant?.finalPrice ?? product.prixTTC,
         discount: discounts[productIndex],
         isPercentage: typeDiscounts[productIndex],
       );
     }).toList();
 
+    // Get current user
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('current_user');
     final user = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
+
+    // Create order
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
@@ -1770,115 +1823,40 @@ class Addorder {
           selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
               ? bankName
               : null,
+      ticketRestaurantAmount: selectedPaymentMethod == "Ticket Restaurant"
+          ? ticketRestaurantAmount
+          : null,
+      numberOfTicketsRestaurant:
+          selectedPaymentMethod == "Ticket Restaurant" ? numberOfTickets : null,
+      pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
+      pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
     );
 
-    print("Order to be saved: ${order.toMap()}");
-
     try {
-      double totalBeforePoints = calculateTotal(
-        selectedProducts,
-        quantityProducts,
-        discounts,
-        typeDiscounts,
-        globalDiscount,
-        isPercentageDiscount,
-      );
-
-      // Apply points discount if used
-      if (useLoyaltyPoints && pointsToUse > 0) {
-        totalBeforePoints -= pointsDiscount;
-        if (totalBeforePoints < 0) totalBeforePoints = 0;
-      }
-
-      // Create order lines with variant information
-      List<OrderLine> orderLines = selectedProducts.map((product) {
-        int productIndex = selectedProducts.indexOf(product);
-        Variant? variant = product.hasVariants && product.variants.isNotEmpty
-            ? product.variants.first
-            : null;
-
-        return OrderLine(
-          idOrder: 0,
-          productCode: product.code,
-          productId: product.id,
-          variantId: variant?.id,
-          variantCode: variant?.code,
-          variantName: variant?.combinationName,
-          quantity: quantityProducts[productIndex],
-          prixUnitaire: variant?.finalPrice ?? product.prixTTC,
-          discount: discounts[productIndex],
-          isPercentage: typeDiscounts[productIndex],
-        );
-      }).toList();
-
-      Order order = Order(
-        date: DateTime.now().toIso8601String(),
-        orderLines: orderLines,
-        total: totalBeforePoints, // Use the total after points discount
-        modePaiement: selectedPaymentMethod,
-        status: status,
-        remainingAmount: remainingAmount,
-        globalDiscount: globalDiscount,
-        isPercentageDiscount: isPercentageDiscount,
-        userId: user?.id,
-        idClient: selectedClient?.id,
-        cashAmount: selectedPaymentMethod == "Espèce" ||
-                selectedPaymentMethod == "Mixte"
-            ? cashAmount
-            : null,
-        cardAmount:
-            selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
-                ? cardAmount
-                : null,
-        checkAmount: selectedPaymentMethod == "Chèque" ||
-                selectedPaymentMethod == "Mixte"
-            ? checkAmount
-            : null,
-        checkNumber: selectedPaymentMethod == "Chèque" ||
-                selectedPaymentMethod == "Mixte"
-            ? checkNumber
-            : null,
-        cardTransactionId:
-            selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
-                ? cardTransactionId
-                : null,
-        checkDate: selectedPaymentMethod == "Chèque" ||
-                selectedPaymentMethod == "Mixte"
-            ? checkDate
-            : null,
-        bankName: selectedPaymentMethod == "Chèque" ||
-                selectedPaymentMethod == "Mixte"
-            ? bankName
-            : null,
-        pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
-        pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
-      );
-      print("order saveddddd ${order.toMap()}");
-
+      // Save order to database
       int orderId = await SqlDb().addOrder(order);
 
+      if (orderId <= 0) {
+        throw Exception("Failed to save order");
+      }
+
+      // Update client debt if needed
       if (selectedClient != null && remainingAmount > 0) {
         try {
           final db = await SqlDb().db;
+          double newDebt = selectedClient.debt + remainingAmount;
 
-          // Calculate new debt
-          double newDebt = selectedClient!.debt + remainingAmount;
-
-          // Update client debt in database
           await db.update(
             'clients',
             {'debt': newDebt},
             where: 'id = ?',
-            whereArgs: [selectedClient!.id],
+            whereArgs: [selectedClient.id],
           );
 
-          // Update the selectedClient object locally
-          selectedClient = selectedClient!.copyWith(
+          selectedClient = selectedClient.copyWith(
             debt: newDebt,
             lastPurchaseDate: DateTime.now(),
           );
-
-          print("La dette ajoutée au client: ${selectedClient.debt} DT");
         } catch (e) {
           print("Error updating client debt: $e");
           Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -1890,42 +1868,65 @@ class Addorder {
         }
       }
 
-      if (selectedClient != null && orderId > 0) {
+      // Handle loyalty points
+      if (selectedClient != null) {
         final db = await SqlDb().db;
         final fidelityController = FidelityController();
 
-        // 1. Apply points discount if used
         if (useLoyaltyPoints && pointsToUse > 0) {
           await fidelityController.applyPointsToOrder(
               order, selectedClient, pointsToUse, db);
         }
 
-        // 2. Add earned points (even if we used points)
         await fidelityController.addPointsFromOrder(order, db);
       }
 
-      if (orderId > 0) {
-        print("Order saved successfully with ID: $orderId");
+      // Update stock
+      bool isValidOrder = true;
+      for (int i = 0; i < selectedProducts.length; i++) {
+        final product = selectedProducts[i];
+        final quantity = quantityProducts[i];
 
-        Order completeOrder = Order(
-          idOrder: orderId,
-          date: order.date,
-          orderLines: order.orderLines,
-          total: order.total,
-          modePaiement: order.modePaiement,
-          status: order.status,
-          remainingAmount: order.remainingAmount,
-          globalDiscount: order.globalDiscount,
-          isPercentageDiscount: order.isPercentageDiscount,
-          idClient: order.idClient,
-        );
+        if (product.hasVariants && product.variants.isNotEmpty) {
+          final variant = product.variants.first;
+          if (variant.stock - quantity < 0) {
+            isValidOrder = false;
+            Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
+              SnackBar(
+                content: Text(variant.stock == 0
+                    ? "${product.designation} (${variant.combinationName}) est en rupture de stock !"
+                    : "Stock insuffisant pour ${product.designation} (${variant.combinationName}) (reste: ${variant.stock})"),
+                backgroundColor:
+                    variant.stock == 0 ? Colors.red : Colors.orange,
+              ),
+            );
+          } else {
+            await SqlDb()
+                .updateVariantStock(variant.id!, variant.stock - quantity);
+          }
+        } else if (product.stock - quantity < 0) {
+          isValidOrder = false;
+          Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text(product.stock == 0
+                  ? "${product.designation} est en rupture de stock !"
+                  : "Stock insuffisant pour ${product.designation} (reste: ${product.stock})"),
+              backgroundColor: product.stock == 0 ? Colors.red : Colors.orange,
+            ),
+          );
+        } else {
+          await SqlDb()
+              .updateProductStock(product.id!, product.stock - quantity);
+        }
+      }
 
-        // Generate PDF tickets
+      // Generate PDF tickets if order is valid
+      if (isValidOrder) {
+        Order completeOrder = order.copyWith(idOrder: orderId);
         for (int i = 0; i < numberOfTickets; i++) {
           await Getorderlist.generateAndSavePDF(completeOrder);
         }
 
-        // Show success notification
         Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
           SnackBar(
             content: Text(
@@ -1934,95 +1935,11 @@ class Addorder {
           ),
         );
 
-        // Stock validation and update
-        bool isValidOrder = true;
-        for (int i = 0; i < selectedProducts.length; i++) {
-          final product = selectedProducts[i];
-          final quantity = quantityProducts[i];
-
-          if (product.hasVariants && product.variants.isNotEmpty) {
-            // Handle variant stock
-            final variant = product.variants.first;
-            if (variant.stock == 0) {
-              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-                SnackBar(
-                  content: Text(
-                      "${product.designation} (${variant.combinationName}) est en rupture de stock !"),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              isValidOrder = false;
-            } else if (variant.stock - quantity < 0) {
-              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-                SnackBar(
-                  content: Text(
-                      "Stock insuffisant pour ${product.designation} (${variant.combinationName}) (reste: ${variant.stock})"),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-              isValidOrder = false;
-            }
-          } else {
-            // Handle regular product stock
-            if (product.stock == 0) {
-              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-                SnackBar(
-                  content:
-                      Text("${product.designation} est en rupture de stock !"),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              isValidOrder = false;
-            } else if (product.stock - quantity < 0) {
-              Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-                SnackBar(
-                  content: Text(
-                      "Stock insuffisant pour ${product.designation} (reste: ${product.stock})"),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-              isValidOrder = false;
-            }
-          }
-        }
-
-        if (isValidOrder) {
-          // Update stocks
-          for (int i = 0; i < selectedProducts.length; i++) {
-            final product = selectedProducts[i];
-            final quantity = quantityProducts[i];
-
-            final newStock = product.stock - quantity;
-
-            if (product.hasVariants && product.variants.isNotEmpty) {
-              // Update variant stock
-              final variant = product.variants.first;
-              final newStockV = variant.stock - quantity;
-
-              await SqlDb().updateVariantStock(variant.id!, newStockV);
-              print("new stock variant $newStockV");
-
-              // Also update the product's total stock if needed
-              await SqlDb().updateProductStock(product.id!, newStock);
-            } else {
-              // Update regular product stock
-              await SqlDb().updateProductStock(product.id!, newStock);
-            }
-          }
-        }
-
-        // Clear the order
+        // Clear the order data
         selectedProducts.clear();
         quantityProducts.clear();
         discounts.clear();
         typeDiscounts.clear();
-      } else {
-        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text("Échec de l'enregistrement de la commande"),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     } catch (e) {
       print("Error saving order: $e");
