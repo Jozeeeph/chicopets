@@ -606,90 +606,21 @@ class Addorder {
 
                                 // Dans la partie conditionnelle des méthodes de paiement
                                 if (selectedPaymentMethod ==
-                                    "Ticket Restaurant")
-                                  Column(
-                                    children: [
-                                      TextField(
-                                        controller: TextEditingController(
-                                            text: numberOfTicketsRestaurant
-                                                .toString()),
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: "Nombre de tickets",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            numberOfTicketsRestaurant =
-                                                int.tryParse(value) ?? 1;
-                                            if (numberOfTicketsRestaurant < 1) {
-                                              numberOfTicketsRestaurant = 1;
-                                            }
-                                            // Calculer le montant total des tickets
-                                            ticketRestaurantAmount =
-                                                numberOfTicketsRestaurant *
-                                                    ticketValue;
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(height: 10),
-                                      TextField(
-                                        controller: ticketValueController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: "Valeur d'un ticket (DT)",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            ticketValue =
-                                                double.tryParse(value) ?? 0.0;
-                                            // Calculer le montant total des tickets
-                                            ticketRestaurantAmount =
-                                                numberOfTicketsRestaurant *
-                                                    ticketValue;
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(height: 10),
-                                      TextField(
-                                        controller: ticketTaxController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: "Taxe par ticket (DT)",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            ticketTax =
-                                                double.tryParse(value) ?? 0.0;
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(height: 10),
-                                      TextField(
-                                        controller: ticketCommissionController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText:
-                                              "Commission par ticket (DT)",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            ticketCommission =
-                                                double.tryParse(value) ?? 0.0;
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
+                                    "Ticket Restaurant") ...[
+                                  Text("Mode: Ticket Restaurant"),
+                                  Text(
+                                      "Nombre de tickets: $numberOfTicketsRestaurant"),
+                                  Text(
+                                      "Valeur d'un ticket: ${ticketValue.toStringAsFixed(2)} DT"),
+                                  Text(
+                                      "Taxe par ticket: ${ticketTax.toStringAsFixed(2)} DT"),
+                                  Text(
+                                      "Commission par ticket: ${ticketCommission.toStringAsFixed(2)} DT"),
+                                  Text(
+                                      "Montant total: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                ],
 
                                 if (selectedPaymentMethod == "Mixte") ...[
                                   Text("Mode: Paiement mixte"),
@@ -1082,6 +1013,73 @@ class Addorder {
                           SizedBox(height: 16),
 
                           // Montant donné et rendu
+                          Divider(thickness: 1, color: Colors.black),
+                          Text("Détails de paiement:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          SizedBox(height: 4),
+
+                          if (selectedPaymentMethod == "Espèce") ...[
+                            Text("Mode: Espèces"),
+                            Text(
+                                "Montant donné: ${cashAmount.toStringAsFixed(2)} DT"),
+                            if (changeReturned > 0)
+                              Text(
+                                  "Monnaie rendue: ${changeReturned.toStringAsFixed(2)} DT"),
+                          ],
+
+                          if (selectedPaymentMethod == "TPE") ...[
+                            Text("Mode: Carte"),
+                            Text(
+                                "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
+                            if (cardTransactionId != null)
+                              Text("Transaction: $cardTransactionId"),
+                          ],
+
+                          if (selectedPaymentMethod == "Chèque") ...[
+                            Text("Mode: Chèque"),
+                            Text(
+                                "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
+                            if (checkNumber != null) Text("N°: $checkNumber"),
+                            if (bankName != null) Text("Banque: $bankName"),
+                            if (checkDate != null)
+                              Text(
+                                  "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                          ],
+
+                          if (selectedPaymentMethod == "Ticket Restaurant") ...[
+                            Text("Mode: Ticket Restaurant"),
+                            Text(
+                                "Nombre de tickets: $numberOfTicketsRestaurant"),
+                            Text(
+                                "Valeur unitaire: ${ticketValue.toStringAsFixed(2)} DT"),
+                            Text(
+                                "Montant total: ${ticketRestaurantAmount.toStringAsFixed(2)} DT"),
+                          ],
+
+                          if (selectedPaymentMethod == "Mixte") ...[
+                            Text("Mode: Paiement mixte"),
+                            if (cashAmount > 0)
+                              Text(
+                                  "- Espèces: ${cashAmount.toStringAsFixed(2)} DT"),
+                            if (cardAmount > 0) ...[
+                              Text(
+                                  "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
+                              if (cardTransactionId != null)
+                                Text("  Transaction: $cardTransactionId"),
+                            ],
+                            if (checkAmount > 0) ...[
+                              Text(
+                                  "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
+                              if (checkNumber != null)
+                                Text("  N°: $checkNumber"),
+                              if (bankName != null) Text("  Banque: $bankName"),
+                              if (checkDate != null)
+                                Text(
+                                    "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                            ],
+                          ],
+
+// In the payment options column (right column):
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1120,7 +1118,6 @@ class Addorder {
                                     },
                                   ),
                                   Text("Chèque"),
-                                  // Dans la section des Radio boutons pour les méthodes de paiement
                                   Radio<String>(
                                     value: "Ticket Restaurant",
                                     groupValue: selectedPaymentMethod,
@@ -1144,7 +1141,7 @@ class Addorder {
                                 ],
                               ),
 
-                              // Ajoutez ces champs conditionnels
+                              // Espèce payment fields
                               if (selectedPaymentMethod == "Espèce")
                                 TextField(
                                   controller: amountGivenController,
@@ -1182,12 +1179,13 @@ class Addorder {
                                     });
                                   },
                                 ),
+
+                              // TPE payment fields
                               if (selectedPaymentMethod == "TPE")
                                 Column(
                                   children: [
                                     TextField(
-                                      controller:
-                                          amountGivenTPEController, // Vide au début
+                                      controller: amountGivenTPEController,
                                       keyboardType: TextInputType.number,
                                       decoration: InputDecoration(
                                         labelText: "Montant par carte (DT)",
@@ -1214,8 +1212,8 @@ class Addorder {
                                     ),
                                     SizedBox(height: 10),
                                     TextField(
-                                      onChanged: (value) => cardTransactionId =
-                                          value, // Add this line
+                                      onChanged: (value) =>
+                                          cardTransactionId = value,
                                       decoration: InputDecoration(
                                         labelText: "ID de transaction TPE",
                                         border: OutlineInputBorder(),
@@ -1224,6 +1222,7 @@ class Addorder {
                                   ],
                                 ),
 
+                              // Chèque payment fields
                               if (selectedPaymentMethod == "Chèque")
                                 Column(
                                   children: [
@@ -1255,8 +1254,7 @@ class Addorder {
                                     ),
                                     SizedBox(height: 10),
                                     TextField(
-                                      onChanged: (value) =>
-                                          checkNumber = value, // Add this line
+                                      onChanged: (value) => checkNumber = value,
                                       decoration: InputDecoration(
                                         labelText: "Numéro du chèque",
                                         border: OutlineInputBorder(),
@@ -1264,8 +1262,7 @@ class Addorder {
                                     ),
                                     SizedBox(height: 10),
                                     TextField(
-                                      onChanged: (value) =>
-                                          bankName = value, // Add this line
+                                      onChanged: (value) => bankName = value,
                                       decoration: InputDecoration(
                                         labelText: "Banque émettrice",
                                         border: OutlineInputBorder(),
@@ -1284,8 +1281,7 @@ class Addorder {
                                         );
                                         if (selectedDate != null) {
                                           setState(() {
-                                            checkDate =
-                                                selectedDate; // Add this line
+                                            checkDate = selectedDate;
                                           });
                                         }
                                       },
@@ -1309,10 +1305,93 @@ class Addorder {
                                   ],
                                 ),
 
+                              // Ticket Restaurant payment fields - NOW IN THE RIGHT PLACE
+                              if (selectedPaymentMethod == "Ticket Restaurant")
+                                Column(
+                                  children: [
+                                    TextField(
+                                      controller: TextEditingController(
+                                          text: numberOfTicketsRestaurant
+                                              .toString()),
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Nombre de tickets",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          numberOfTicketsRestaurant =
+                                              int.tryParse(value) ?? 1;
+                                          if (numberOfTicketsRestaurant < 1) {
+                                            numberOfTicketsRestaurant = 1;
+                                          }
+                                          ticketRestaurantAmount =
+                                              numberOfTicketsRestaurant *
+                                                  ticketValue;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: ticketValueController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Valeur d'un ticket (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          ticketValue =
+                                              double.tryParse(value) ?? 0.0;
+                                          ticketRestaurantAmount =
+                                              numberOfTicketsRestaurant *
+                                                  ticketValue;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: ticketTaxController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Taxe par ticket (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          ticketTax =
+                                              double.tryParse(value) ?? 0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    TextField(
+                                      controller: ticketCommissionController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        labelText: "Commission par ticket (DT)",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          ticketCommission =
+                                              double.tryParse(value) ?? 0.0;
+                                        });
+                                      },
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+
+                              // Mixte payment fields
                               if (selectedPaymentMethod == "Mixte")
                                 Column(
                                   children: [
-                                    // Section Espèces
                                     Text("Espèces:",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold)),
@@ -1342,8 +1421,6 @@ class Addorder {
                                         });
                                       },
                                     ),
-
-                                    // Section TPE
                                     SizedBox(height: 10),
                                     Text("TPE:",
                                         style: TextStyle(
@@ -1388,8 +1465,6 @@ class Addorder {
                                         });
                                       },
                                     ),
-
-                                    // Section Chèque
                                     SizedBox(height: 10),
                                     Text("Chèque:",
                                         style: TextStyle(
@@ -1482,8 +1557,6 @@ class Addorder {
                                         ),
                                       ),
                                     ),
-
-                                    // Total saisi
                                     SizedBox(height: 10),
                                     Text(
                                       "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
@@ -1511,22 +1584,17 @@ class Addorder {
                                           fontWeight: FontWeight.bold)),
                                   SizedBox(width: 10),
                                   Container(
-                                    width: 40, // réduit la largeur
+                                    width: 40,
                                     height: 35,
                                     child: TextField(
                                       controller: TextEditingController(
                                           text: numberOfTickets.toString()),
                                       keyboardType: TextInputType.number,
-                                      style: TextStyle(
-                                          fontSize:
-                                              14), // réduit la taille du texte
+                                      style: TextStyle(fontSize: 14),
                                       decoration: InputDecoration(
-                                        isDense:
-                                            true, // rend le champ plus compact
+                                        isDense: true,
                                         contentPadding: EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical:
-                                                6), // réduit les marges internes
+                                            horizontal: 8, vertical: 6),
                                         border: OutlineInputBorder(),
                                       ),
                                       onChanged: (value) {
