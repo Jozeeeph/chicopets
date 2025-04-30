@@ -185,8 +185,7 @@ class _ManageCommandState extends State<ManageCommand> {
               itemBuilder: (context, index) {
                 Order order = snapshot.data![index];
 
-                print(
-                    "Remaining amount when retrieving order: ${order.remainingAmount}");
+                print("Remaining amount when retrieving order: ${order.remainingAmount}");
 
                 bool isCancelled = order.status == 'annulée';
                 bool isSemiPaid = order.status == 'non payée';

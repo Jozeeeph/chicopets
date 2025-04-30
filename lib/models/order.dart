@@ -1,28 +1,40 @@
 import 'package:caissechicopets/models/orderline.dart';
 
 class Order {
-  int? idOrder;
-  String date;
-  List<OrderLine> orderLines;
+  // Primary fields
+  final int? idOrder;
+  final String date;
+  final List<OrderLine> orderLines;
+  final String modePaiement;
   double total;
-  String modePaiement; // Peut être "Espèce", "TPE", "Chèque", "Mixte"
-  String status;
   double remainingAmount;
-  int? idClient;
-  double globalDiscount;
-  bool isPercentageDiscount;
+  String status;
+  final int? idClient;
+  final double globalDiscount;
+  final bool isPercentageDiscount;
+  final int? userId;
 
-  // Nouveaux champs pour les paiements mixtes
-  double? cashAmount;
-  double? cardAmount;
-  double? checkAmount;
-  String? checkNumber; // Numéro du chèque
-  String? cardTransactionId; // ID de transaction TPE
-  DateTime? checkDate; // Date du chèque
-  String? bankName; // Nom de la banque pour les chèques
-  int? pointsUsed;
-  double? pointsDiscount;
-  int? userId;
+  // Payment details
+  final double? cashAmount;
+  final double? cardAmount;
+  final double? checkAmount;
+  final double? ticketRestaurantAmount;
+
+  // Payment metadata
+  final String? checkNumber;
+  final String? cardTransactionId;
+  final DateTime? checkDate;
+  final String? bankName;
+
+  // Ticket restaurant details
+  final int? numberOfTicketsRestaurant;
+  final double? ticketValue;
+  final double? ticketTax;
+  final double? ticketCommission;
+
+  // Loyalty program
+  final int? pointsUsed;
+  final double? pointsDiscount;
 
   Order({
     this.idOrder,
@@ -42,13 +54,25 @@ class Order {
     this.cardTransactionId,
     this.checkDate,
     this.bankName,
+    this.ticketRestaurantAmount,
+    this.numberOfTicketsRestaurant,
+    this.ticketValue,
+    this.ticketTax,
+    this.ticketCommission,
     this.pointsUsed,
     this.pointsDiscount,
     this.userId,
-  });
+  }) {
+    // Validate required fields
+    if (total < 0) throw ArgumentError("Total cannot be negative");
+    if (globalDiscount < 0) throw ArgumentError("Discount cannot be negative");
+    if (remainingAmount < 0)
+      throw ArgumentError("Remaining amount cannot be negative");
+  }
 
   Map<String, dynamic> toMap() {
     return {
+      // Core order information
       'id_order': idOrder,
       'date': date,
       'total': total,
@@ -58,47 +82,153 @@ class Order {
       'id_client': idClient,
       'global_discount': globalDiscount,
       'is_percentage_discount': isPercentageDiscount ? 1 : 0,
+      'user_id': userId,
+
+      // Payment amounts
       'cash_amount': cashAmount,
       'card_amount': cardAmount,
       'check_amount': checkAmount,
+      'ticket_restaurant_amount': ticketRestaurantAmount,
+
+      // Payment details
       'check_number': checkNumber,
       'card_transaction_id': cardTransactionId,
       'check_date': checkDate?.toIso8601String(),
       'bank_name': bankName,
+
+      // Ticket restaurant details
+      'number_of_tickets_restaurant': numberOfTicketsRestaurant,
+      'ticket_value': ticketValue,
+      'ticket_tax': ticketTax,
+      'ticket_commission': ticketCommission,
+
+      // Loyalty program
       'points_used': pointsUsed,
       'points_discount': pointsDiscount,
-      'user_id': userId,
     };
   }
 
   factory Order.fromMap(Map<String, dynamic> map, List<OrderLine> orderLines) {
     return Order(
-      idOrder: map['id_order'],
-      date: map['date'],
+      idOrder: map['id_order'] as int?,
+      date: map['date'] as String,
       orderLines: orderLines,
-      total: map['total'].toDouble(),
-      modePaiement: map['mode_paiement'],
-      status: map['status'] ?? "non payée",
-      remainingAmount: map['remaining_amount']?.toDouble() ?? 0.0,
-      idClient: map['id_client'],
-      globalDiscount: map['global_discount'],
-      isPercentageDiscount: map['is_percentage_discount'] == 1,
-      cashAmount: map['cash_amount']?.toDouble(),
-      cardAmount: map['card_amount']?.toDouble(),
-      checkAmount: map['check_amount']?.toDouble(),
-      checkNumber: map['check_number'],
-      cardTransactionId: map['card_transaction_id'],
-      checkDate:
-          map['check_date'] != null ? DateTime.parse(map['check_date']) : null,
-      bankName: map['bank_name'],
-      pointsUsed: map['points_used'],
-      pointsDiscount: map['points_discount'],
-      userId: map['user_id'],
+      total: (map['total'] as num).toDouble(),
+      modePaiement: map['mode_paiement'] as String,
+      status: map['status'] as String? ?? "non payée",
+      remainingAmount: (map['remaining_amount'] as num?)?.toDouble() ?? 0.0,
+      idClient: map['id_client'] as int?,
+      globalDiscount: (map['global_discount'] as num).toDouble(),
+      isPercentageDiscount: (map['is_percentage_discount'] as int?) == 1,
+      userId: map['user_id'] as int?,
+
+      // Payment amounts
+      cashAmount: (map['cash_amount'] as num?)?.toDouble(),
+      cardAmount: (map['card_amount'] as num?)?.toDouble(),
+      checkAmount: (map['check_amount'] as num?)?.toDouble(),
+      ticketRestaurantAmount:
+          (map['ticket_restaurant_amount'] as num?)?.toDouble(),
+
+      // Payment details
+      checkNumber: map['check_number'] as String?,
+      cardTransactionId: map['card_transaction_id'] as String?,
+      checkDate: map['check_date'] != null
+          ? DateTime.parse(map['check_date'] as String)
+          : null,
+      bankName: map['bank_name'] as String?,
+
+      // Ticket restaurant details
+      numberOfTicketsRestaurant: map['number_of_tickets_restaurant'] as int?,
+      ticketValue: (map['ticket_value'] as num?)?.toDouble(),
+      ticketTax: (map['ticket_tax'] as num?)?.toDouble(),
+      ticketCommission: (map['ticket_commission'] as num?)?.toDouble(),
+
+      // Loyalty program
+      pointsUsed: map['points_used'] as int?,
+      pointsDiscount: (map['points_discount'] as num?)?.toDouble(),
+    );
+  }
+
+  Order copyWith({
+    int? idOrder,
+    String? date,
+    List<OrderLine>? orderLines,
+    double? total,
+    String? modePaiement,
+    String? status,
+    double? remainingAmount,
+    int? idClient,
+    double? globalDiscount,
+    bool? isPercentageDiscount,
+    int? userId,
+    double? cashAmount,
+    double? cardAmount,
+    double? checkAmount,
+    double? ticketRestaurantAmount,
+    String? checkNumber,
+    String? cardTransactionId,
+    DateTime? checkDate,
+    String? bankName,
+    int? numberOfTicketsRestaurant,
+    double? ticketValue,
+    double? ticketTax,
+    double? ticketCommission,
+    int? pointsUsed,
+    double? pointsDiscount,
+  }) {
+    return Order(
+      idOrder: idOrder ?? this.idOrder,
+      date: date ?? this.date,
+      orderLines: orderLines ?? this.orderLines,
+      total: total ?? this.total,
+      modePaiement: modePaiement ?? this.modePaiement,
+      status: status ?? this.status,
+      remainingAmount: remainingAmount ?? this.remainingAmount,
+      idClient: idClient ?? this.idClient,
+      globalDiscount: globalDiscount ?? this.globalDiscount,
+      isPercentageDiscount: isPercentageDiscount ?? this.isPercentageDiscount,
+      userId: userId ?? this.userId,
+      cashAmount: cashAmount ?? this.cashAmount,
+      cardAmount: cardAmount ?? this.cardAmount,
+      checkAmount: checkAmount ?? this.checkAmount,
+      ticketRestaurantAmount:
+          ticketRestaurantAmount ?? this.ticketRestaurantAmount,
+      checkNumber: checkNumber ?? this.checkNumber,
+      cardTransactionId: cardTransactionId ?? this.cardTransactionId,
+      checkDate: checkDate ?? this.checkDate,
+      bankName: bankName ?? this.bankName,
+      numberOfTicketsRestaurant:
+          numberOfTicketsRestaurant ?? this.numberOfTicketsRestaurant,
+      ticketValue: ticketValue ?? this.ticketValue,
+      ticketTax: ticketTax ?? this.ticketTax,
+      ticketCommission: ticketCommission ?? this.ticketCommission,
+      pointsUsed: pointsUsed ?? this.pointsUsed,
+      pointsDiscount: pointsDiscount ?? this.pointsDiscount,
     );
   }
 
   @override
   String toString() {
-    return 'Order #$idOrder (User: $userId, Total: $total, Date: $date, Status: $status)';
+    return 'Order{'
+        'id: $idOrder, '
+        'date: $date, '
+        'total: $total DT, '
+        'payment: $modePaiement, '
+        'status: $status, '
+        'client: $idClient, '
+        'user: $userId'
+        '}';
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Order &&
+          runtimeType == other.runtimeType &&
+          idOrder == other.idOrder &&
+          date == other.date &&
+          total == other.total;
+
+  @override
+  int get hashCode => idOrder.hashCode ^ date.hashCode ^ total.hashCode;
 }
