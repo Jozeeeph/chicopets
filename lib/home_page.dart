@@ -1,10 +1,5 @@
 import 'dart:convert';
-
-import 'package:caissechicopets/controllers/cash_service.dart';
-import 'package:caissechicopets/models/cash_state.dart';
-import 'package:caissechicopets/views/cashdesk_views/cash_closure_report_page.dart';
-import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
-import 'package:caissechicopets/views/cashdesk_views/cash_initial_amount_page.dart';
+import 'package:caissechicopets/views/cashdesk_views/cashier_home_page.dart';
 import 'package:caissechicopets/views/user_views/code_verification_page.dart';
 import 'package:caissechicopets/views/user_views/create_admin_account_page.dart';
 import 'package:caissechicopets/views/dashboard_views/dashboard_page.dart';
@@ -28,23 +23,23 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = true;
   User? _currentUser;
 
-@override
-void initState() {
-  super.initState();
-  _checkAdminAccount();
-  _loadCurrentUser();
-}
-
-Future<void> _loadCurrentUser() async {
-  final prefs = await SharedPreferences.getInstance();
-  final userJson = prefs.getString('current_user');
-  
-  if (mounted) {
-    setState(() {
-      _currentUser = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminAccount();
+    _loadCurrentUser();
   }
-}
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userJson = prefs.getString('current_user');
+    
+    if (mounted) {
+      setState(() {
+        _currentUser = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
+      });
+    }
+  }
 
   Future<void> _checkAdminAccount() async {
     final hasAdmin = await _sqlDb.hasAdminAccount();
@@ -55,15 +50,7 @@ Future<void> _loadCurrentUser() async {
   }
 
  void _navigateToPage(Widget page) async {
-  // Vérification des droits pour le tableau de bord
-  if (page is DashboardPage && (_currentUser == null || _currentUser!.role != 'admin')) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Accès réservé aux administrateurs')),
-    );
-    return;
-  }
-
-  // Si utilisateur déconnecté, demander le code
+  // Si utilisateur déconnecté, demander le code en premier
   if (_currentUser == null) {
     Navigator.push(
       context,
@@ -71,11 +58,18 @@ Future<void> _loadCurrentUser() async {
         builder: (context) => CodeVerificationPage(
           pageName: page is DashboardPage 
               ? 'Tableau de bord' 
-              : 'Passage de commande',
+              : 'Partie Caissier',
           destinationPage: page,
           onVerificationSuccess: (user) {
             setState(() => _currentUser = user);
-            _handlePostVerificationNavigation(page);
+            // Après vérification, vérifier les droits si c'est le dashboard
+            if (page is DashboardPage && user.role != 'admin') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Accès réservé aux administrateurs')),
+              );
+            } else {
+              _handlePostVerificationNavigation(page);
+            }
           },
         ),
       ),
@@ -83,95 +77,35 @@ Future<void> _loadCurrentUser() async {
     return;
   }
 
-  // Si utilisateur déjà connecté, gérer la navigation normalement
+  // Si utilisateur déjà connecté, vérifier les droits pour le dashboard
+  if (page is DashboardPage && _currentUser!.role != 'admin') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Accès réservé aux administrateurs')),
+    );
+    return;
+  }
+
+  // Si tout est OK, gérer la navigation normalement
   _handlePostVerificationNavigation(page);
 }
 
-Future<void> _handlePostVerificationNavigation(Widget page) async {
-  // Cas spécial pour la page de caisse
-  if (page is CashDeskPage) {
-    final cashService = CashService();
-    final cashState = await cashService.getCashState();
-
-    // Cas 1: Caisse fermée ou jamais ouverte -> demande montant initial
-    if (cashState == null || cashState.isClosed) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CashInitialAmountPage(
-            onAmountSubmitted: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => page),
-              );
-            },
-          ),
-        ),
-      );
-      return;
-    }
-    // Cas 2: Caisse déjà ouverte -> accès direct
+  Future<void> _handlePostVerificationNavigation(Widget page) async {
+    // Navigation normale pour toutes les pages
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => page),
+    );
   }
 
-  // Navigation normale pour les autres pages
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(builder: (context) => page),
-  );
-}
-
-  Future<void> _closeCashRegister() async {
-  final cashService = CashService();
-  final cashState = await cashService.getCashState();
-  
-  final shouldClose = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('Confirmer la clôture'),
-      content: Text('Voulez-vous vraiment clôturer la caisse ?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text('Annuler'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: Text('Confirmer', style: TextStyle(color: Colors.red)),
-        ),
-      ],
-    ),
-  ) ?? false;
-
-  if (shouldClose) {
-    // Sauvegarder l'état clôturé
-    await cashService.saveCashState(CashState(
-      initialAmount: cashState?.initialAmount ?? 0,
-      openingTime: cashState?.openingTime,
-      closingTime: DateTime.now(),
-      isClosed: true,
-    ));
-
-    // Déconnecter l'utilisateur
+  Future<void> _logout() async {
     await SessionManager.clearSession();
-    
-    // Afficher le rapport
     if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CashClosureReportPage(
-            cashState: cashState ?? CashState(initialAmount: 0, isClosed: true),
-          ),
-        ),
-      );
+      setState(() {
+        _currentUser = null;
+      });
     }
-
-    // Mettre à jour l'état
-    if (mounted) {
-      setState(() => _currentUser = null);
-    }
+    // Pas besoin de navigation car on est déjà sur la home page
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +122,16 @@ Future<void> _handlePostVerificationNavigation(Widget page) async {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Accueil'),
+        actions: [
+          if (_currentUser != null)
+            IconButton(
+              icon: Icon(Icons.logout),
+              onPressed: _logout,
+            ),
+        ],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -215,7 +159,7 @@ Future<void> _handlePostVerificationNavigation(Widget page) async {
                 width: MediaQuery.of(context).size.width * 0.6,
                 child: GridView.count(
                   shrinkWrap: true,
-                  crossAxisCount: 3,
+                  crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   childAspectRatio: 1.0,
@@ -229,20 +173,11 @@ Future<void> _handlePostVerificationNavigation(Widget page) async {
                     ),
                     _buildCard(
                       context,
-                      label: 'Passage de commande',
-                      icon: Icons.shopping_cart,
-                      page: const CashDeskPage(),
+                      label: 'Partie Caissier',
+                      icon: Icons.point_of_sale,
+                      page: const CashierHomePage(),
                       color: const Color(0xFFFF9800),
                     ),
-                    if (_currentUser != null && _currentUser!.role == 'admin')
-                      _buildCard(
-                        context,
-                        label: 'Clôturer la caisse',
-                        icon: Icons.close,
-                        page: Container(), // page factice
-                        color: Colors.red,
-                        onTapOverride: _closeCashRegister,
-                      ),
                   ],
                 ),
               ),
@@ -259,7 +194,7 @@ Future<void> _handlePostVerificationNavigation(Widget page) async {
     required IconData icon,
     required Widget page,
     required Color color,
-    VoidCallback? onTapOverride, // Nouveau paramètre
+    VoidCallback? onTapOverride,
   }) {
     return Card(
       elevation: 4,
@@ -268,8 +203,7 @@ Future<void> _handlePostVerificationNavigation(Widget page) async {
       ),
       color: color,
       child: InkWell(
-        onTap: onTapOverride ??
-            () => _navigateToPage(page), // Utilise override si présent
+        onTap: onTapOverride ?? () => _navigateToPage(page),
         borderRadius: BorderRadius.circular(30),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
