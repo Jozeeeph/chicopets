@@ -1,9 +1,8 @@
+import 'package:caissechicopets/models/order.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/views/client_views/client_form.dart';
-import 'package:flutter/animation.dart';
-import 'package:caissechicopets/models/order.dart';
 import 'package:intl/intl.dart';
 
 class ClientManagementWidget extends StatefulWidget {
@@ -23,37 +22,22 @@ class ClientManagementWidget extends StatefulWidget {
   _ClientManagementWidgetState createState() => _ClientManagementWidgetState();
 }
 
-class _ClientManagementWidgetState extends State<ClientManagementWidget>
-    with SingleTickerProviderStateMixin {
+class _ClientManagementWidgetState extends State<ClientManagementWidget> {
   final SqlDb _sqlDb = SqlDb();
   List<Client> _clients = [];
   List<Client> _filteredClients = [];
   final TextEditingController _searchController = TextEditingController();
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  List<Client> _selectedClients = [];
 
   @override
   void initState() {
     super.initState();
     _loadClients();
     _searchController.addListener(_filterClients);
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeIn,
-      ),
-    );
-    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -81,46 +65,131 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
     });
   }
 
-  void _showPointsInfo(BuildContext context, Client client) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Informations client'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${client.name} ${client.firstName}'),
-            SizedBox(height: 8),
-            Text('Téléphone: ${client.phoneNumber}'),
-            SizedBox(height: 16),
-            Text('Points de fidélité: ${client.loyaltyPoints} points',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('Dette: ${client.debt.toStringAsFixed(2)} DT',
-                style: TextStyle(
-                    color: client.debt > 0 ? widget.warmRed : widget.tealGreen,
-                    fontWeight: FontWeight.bold)),
-            if (client.lastPurchaseDate != null)
-              Text(
-                  'Dernier achat: ${DateFormat('dd/MM/yyyy').format(client.lastPurchaseDate!)}'),
-          ],
+  void _toggleClientSelection(Client client) {
+    setState(() {
+      if (_selectedClients.contains(client)) {
+        _selectedClients.remove(client);
+      } else {
+        _selectedClients.add(client);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedClients.length == _filteredClients.length) {
+        _selectedClients.clear();
+      } else {
+        _selectedClients = List.from(_filteredClients);
+      }
+    });
+  }
+
+  Future<void> _deleteClients(List<Client> clients) async {
+    for (var client in clients) {
+      await _sqlDb.deleteClient(client.id!);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("${clients.length} clients supprimés avec succès"),
+        backgroundColor: widget.tealGreen,
+      ),
+    );
+    _selectedClients.clear();
+    _loadClients();
+  }
+
+Future<void> _confirmDelete({Client? singleClient}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Confirmer la suppression'),
+      content: Text(singleClient != null
+          ? 'Voulez-vous vraiment supprimer définitivement le client ${singleClient.name} ${singleClient.firstName} ?'
+          : 'Voulez-vous vraiment supprimer les ${_selectedClients.length} clients sélectionnés ?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Annuler'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed == true) {
+    try {
+      if (singleClient != null) {
+        await _deleteClients([singleClient]);
+      } else {
+        await _deleteClients(_selectedClients);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: ${e.toString()}'),
+          backgroundColor: widget.warmRed,
+        ),
+      );
+    }
+  }
+}
+
+  void _showClientForm([Client? client]) async {
+    await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: widget.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ClientForm(
+            client: client,
+            onSubmit: (client) async {
+              try {
+                if (client.id == null) {
+                  await _sqlDb.addClient(client);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Client ajouté avec succès'),
+                      backgroundColor: widget.tealGreen,
+                    ),
+                  );
+                } else {
+                  await _sqlDb.updateClient(client);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Client mis à jour avec succès'),
+                      backgroundColor: widget.tealGreen,
+                    ),
+                  );
+                }
+                _loadClients();
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur: ${e.toString()}'),
+                    backgroundColor: widget.warmRed,
+                  ),
+                );
+              }
+            },
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Future<void> _updateDebt(BuildContext context, Client client) async {
+  Future<void> _updateDebt(Client client) async {
     final amountController = TextEditingController(
       text: client.debt.abs().toStringAsFixed(2),
     );
 
-    final isPayment = client.debt > 0; // True if client owes money
+    final isPayment = client.debt > 0;
 
     await showDialog(
       context: context,
@@ -131,33 +200,28 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Client: ${client.name} ${client.firstName}'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             TextFormField(
               controller: amountController,
               keyboardType: TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Montant (DT)',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Entrez un montant';
-                if (double.tryParse(value) == null) return 'Montant invalide';
-                return null;
-              },
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Annuler'),
+            child: const Text('Annuler'),
           ),
           ElevatedButton(
             onPressed: () async {
               final amount = double.tryParse(amountController.text) ?? 0;
               if (amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Le montant doit être positif')),
+                  const SnackBar(content: Text('Le montant doit être positif')),
                 );
                 return;
               }
@@ -196,7 +260,240 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
     );
   }
 
-  void _showClientOrders(BuildContext context, Client client) async {
+Widget _buildDebtCell(Client client) {
+  return InkWell(
+    onTap: () => _updateDebt(client),
+    child: Container(
+      width: 90, // Largeur fixe pour un meilleur alignement
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: client.debt > 0
+            ? widget.warmRed.withOpacity(0.1)
+            : widget.tealGreen.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Center(
+        child: Text(
+          '${client.debt.toStringAsFixed(2)} DT',
+          style: _cellTextStyle().copyWith(
+            color: client.debt > 0 ? widget.warmRed : widget.tealGreen,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Material(
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Rechercher...',
+                      hintText: 'Nom, prénom ou téléphone',
+                      prefixIcon: Icon(Icons.search, color: widget.deepBlue),
+                      filled: true,
+                      fillColor: widget.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 16),
+              FloatingActionButton(
+                backgroundColor: widget.deepBlue,
+                child: Icon(Icons.add, color: widget.white),
+                onPressed: () => _showClientForm(),
+                heroTag: 'addClient',
+              ),
+            ],
+          ),
+        ),
+        if (_selectedClients.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text('${_selectedClients.length} sélectionné(s)'),
+                Spacer(),
+                IconButton(
+                  icon: Icon(Icons.delete, color: widget.warmRed),
+                  onPressed: () => _confirmDelete(),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: _filteredClients.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people_outline,
+                          size: 60, color: widget.lightGray),
+                      const SizedBox(height: 16),
+                      Text('Aucun client trouvé',
+                          style: TextStyle(color: widget.darkBlue)),
+                    ],
+                  ),
+                )
+              : _buildClientTable(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClientTable() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // En-têtes du tableau
+            Container(
+              decoration: BoxDecoration(
+                color: widget.deepBlue.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                      flex: 2, child: Text('Code', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 3,
+                      child: Text('Nom & Prénom', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Téléphone', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Points', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Crédit', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Commandes', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Produits', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Actions', style: _headerTextStyle())),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Liste des clients
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _filteredClients.length,
+              itemBuilder: (context, index) {
+                final client = _filteredClients[index];
+                final isSelected = _selectedClients.contains(client);
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: () {
+                      if (widget.onClientSelected != null) {
+                        widget.onClientSelected!(client);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                              flex: 2,
+                              child: Text(client.id.toString(),
+                                  style: _cellTextStyle())),
+                          Expanded(
+                              flex: 3,
+                              child: Text('${client.name} ${client.firstName}',
+                                  style: _cellTextStyle())),
+                          Expanded(
+                              flex: 2,
+                              child: Text(client.phoneNumber,
+                                  style: _cellTextStyle())),
+                          Expanded(
+                              flex: 2,
+                              child: Text(client.loyaltyPoints.toString(),
+                                  style: _cellTextStyle())),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: _buildDebtCell(client),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: IconButton(
+                              icon: Icon(Icons.receipt, color: widget.deepBlue),
+                              onPressed: () =>
+                                  _showClientOrders(context, client),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: IconButton(
+                              icon: Icon(Icons.shopping_basket,
+                                  color: widget.softOrange),
+                              onPressed: () =>
+                                  _showClientProducts(context, client),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit,
+                                      color: widget.softOrange),
+                                  onPressed: () => _showClientForm(client),
+                                ),
+                                IconButton(
+                                  icon:
+                                      Icon(Icons.delete, color: widget.warmRed),
+                                  onPressed: () =>
+                                      _confirmDelete(singleClient: client),
+                                  tooltip: 'Supprimer le client',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showClientOrders(BuildContext context, Client client) async {
     final orders = await _sqlDb.getClientOrders(client.id!);
 
     showDialog(
@@ -281,7 +578,6 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
 
   void _showClientProducts(BuildContext context, Client client) async {
     try {
-      // Afficher un indicateur de chargement
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -290,7 +586,6 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
 
       final products = await _sqlDb.getProductsPurchasedByClient(client.id!);
 
-      // Fermer l'indicateur de chargement
       Navigator.of(context).pop();
 
       if (products.isEmpty) {
@@ -333,14 +628,13 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Fermer', style: TextStyle(color: widget.deepBlue)),
+              child: Text('Fermer'),
             ),
           ],
         ),
       );
     } catch (e) {
-      Navigator.of(context)
-          .pop(); // Fermer l'indicateur de chargement en cas d'erreur
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur: ${e.toString()}'),
@@ -350,391 +644,19 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget>
     }
   }
 
-  void _showClientForm([Client? client]) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: widget.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        elevation: 10,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ClientForm(
-            client: client,
-            onSubmit: (client) async {
-              try {
-                if (client.id == null) {
-                  final id = await _sqlDb.addClient(client);
-                  if (id > 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Client ajouté avec succès'),
-                        backgroundColor: widget.tealGreen,
-                      ),
-                    );
-                  }
-                } else {
-                  await _sqlDb.updateClient(client);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Client mis à jour avec succès'),
-                      backgroundColor: widget.tealGreen,
-                    ),
-                  );
-                }
-                _loadClients();
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur: ${e.toString()}'),
-                    backgroundColor: widget.warmRed,
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-      ),
+  TextStyle _headerTextStyle() {
+    return TextStyle(
+      fontWeight: FontWeight.bold,
+      color: widget.deepBlue,
+      fontSize: 14,
     );
   }
 
-  void _deleteClient(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: widget.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text('Confirmer la suppression',
-            style: TextStyle(color: widget.darkBlue)),
-        content: Text('Voulez-vous vraiment supprimer ce client ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Annuler', style: TextStyle(color: widget.deepBlue)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Supprimer', style: TextStyle(color: widget.warmRed)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _sqlDb.deleteClient(id);
-      _loadClients();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Client supprimé'),
-          backgroundColor: widget.tealGreen,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Column(
-        children: [
-          Container(
-            margin: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: widget.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 6,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-                hintText: 'Rechercher un client...',
-                prefixIcon: Icon(Icons.search, color: widget.deepBlue),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, color: widget.warmRed),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterClients();
-                        },
-                      )
-                    : null,
-              ),
-            ),
-          ),
-          SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FloatingActionButton(
-                  backgroundColor: widget.deepBlue,
-                  child: Icon(Icons.add, color: widget.white),
-                  onPressed: () => _showClientForm(),
-                  heroTag: 'addClient',
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16),
-          Expanded(
-            child: _filteredClients.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people_outline,
-                            size: 60, color: widget.lightGray),
-                        SizedBox(height: 16),
-                        Text('Aucun client trouvé',
-                            style: TextStyle(color: widget.darkBlue)),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredClients.length,
-                    itemBuilder: (context, index) {
-                      final client = _filteredClients[index];
-                      return Dismissible(
-                        key: Key(client.id.toString()),
-                        background: Container(
-                          color: widget.warmRed,
-                          alignment: Alignment.centerRight,
-                          padding: EdgeInsets.only(right: 20),
-                          child: Icon(Icons.delete, color: widget.white),
-                        ),
-                        confirmDismiss: (direction) async {
-                          return await showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text('Confirmer'),
-                              content: Text('Supprimer ce client ?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: Text('Non'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: Text('Oui',
-                                      style: TextStyle(color: widget.warmRed)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        onDismissed: (direction) => _deleteClient(client.id!),
-                        child: Card(
-                          elevation: 4,
-                          margin:
-                              EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              if (widget.onClientSelected != null) {
-                                widget.onClientSelected?.call(client);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                children: [
-                                  ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: widget.tealGreen,
-                                      child: Text(
-                                        client.name
-                                            .substring(0, 1)
-                                            .toUpperCase(),
-                                        style: TextStyle(color: widget.white),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      '${client.name} ${client.firstName}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: widget.darkBlue,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(client.phoneNumber),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '${client.loyaltyPoints} pts',
-                                              style: TextStyle(
-                                                color: widget.deepBlue,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            SizedBox(width: 16),
-                                            Text(
-                                              '${client.debt.toStringAsFixed(2)} DT',
-                                              style: TextStyle(
-                                                color: client.debt > 0
-                                                    ? widget.warmRed
-                                                    : widget.tealGreen,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: IconButton(
-                                      icon: Icon(Icons.info_outline),
-                                      onPressed: () {
-                                        _showPointsInfo(context, client);
-                                      },
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        if (client.debt != 0)
-                                          InkWell(
-                                            onTap: () =>
-                                                _updateDebt(context, client),
-                                            child: Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: client.debt > 0
-                                                    ? widget.tealGreen
-                                                        .withOpacity(0.2)
-                                                    : widget.softOrange
-                                                        .withOpacity(0.2),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    client.debt > 0
-                                                        ? Icons.payment
-                                                        : Icons.money_off,
-                                                    size: 16,
-                                                    color: client.debt > 0
-                                                        ? widget.tealGreen
-                                                        : widget.softOrange,
-                                                  ),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    client.debt > 0
-                                                        ? 'Payer'
-                                                        : 'Ajouter dette',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: client.debt > 0
-                                                          ? widget.tealGreen
-                                                          : widget.softOrange,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        if (client.debt != 0)
-                                          SizedBox(width: 8),
-                                        if (widget.onClientSelected != null)
-                                          InkWell(
-                                            onTap: () => _showClientOrders(
-                                                context, client),
-                                            child: Container(
-                                              padding: EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: widget.lightGray,
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.receipt,
-                                                      size: 16,
-                                                      color: widget.deepBlue),
-                                                  SizedBox(width: 4),
-                                                  Text('Commandes',
-                                                      style: TextStyle(
-                                                          fontSize: 12)),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        SizedBox(width: 8),
-                                        InkWell(
-                                          onTap: () => _showClientProducts(
-                                              context, client),
-                                          child: Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 12, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: widget.lightGray,
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.shopping_basket,
-                                                    size: 16,
-                                                    color: widget.softOrange),
-                                                SizedBox(width: 4),
-                                                Text('Produits',
-                                                    style: TextStyle(
-                                                        fontSize: 12)),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        IconButton(
-                                          icon: Icon(Icons.edit,
-                                              color: widget.softOrange),
-                                          onPressed: () =>
-                                              _showClientForm(client),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+  TextStyle _cellTextStyle() {
+    return TextStyle(
+      fontWeight: FontWeight.normal,
+      color: widget.darkBlue,
+      fontSize: 14,
     );
   }
 }
