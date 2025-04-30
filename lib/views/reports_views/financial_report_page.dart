@@ -299,290 +299,258 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
 
 // Supprimer la méthode _onSelectionChanged qui n'est plus utilisée
 
-  Widget _buildFinancialSummary() {
-    // Calcul sécurisé des composantes des paiements mixtes
-    double mixedCash = _paymentData
-        .where((p) => p['modePaiement'] == 'Mixte')
-        .fold(0.0,
-            (sum, p) => sum + ((p['cashAmount'] as num?)?.toDouble() ?? 0.0));
+ Widget _buildFinancialSummary() {
+  // Calcul des composantes des paiements mixtes
+  double mixedCash = _paymentData
+      .where((p) => p['modePaiement'] == 'Mixte')
+      .fold(0.0, (sum, p) => sum + ((p['cashAmount'] as num?)?.toDouble() ?? 0.0));
 
-    double mixedCard = _paymentData
-        .where((p) => p['modePaiement'] == 'Mixte')
-        .fold(0.0,
-            (sum, p) => sum + ((p['cardAmount'] as num?)?.toDouble() ?? 0.0));
+  double mixedCard = _paymentData
+      .where((p) => p['modePaiement'] == 'Mixte')
+      .fold(0.0, (sum, p) => sum + ((p['cardAmount'] as num?)?.toDouble() ?? 0.0));
 
-    double mixedCheck = _paymentData
-        .where((p) => p['modePaiement'] == 'Mixte')
-        .fold(0.0,
-            (sum, p) => sum + ((p['checkAmount'] as num?)?.toDouble() ?? 0.0));
+  double mixedCheck = _paymentData
+      .where((p) => p['modePaiement'] == 'Mixte')
+      .fold(0.0, (sum, p) => sum + ((p['checkAmount'] as num?)?.toDouble() ?? 0.0));
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // En-tête
-            Row(
-              children: [
-                Icon(Icons.assessment, color: deepBlue),
-                const SizedBox(width: 8),
-                Text(
-                  'Résumé Financier',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: darkBlue,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Divider(color: lightGray, thickness: 1),
-            const SizedBox(height: 8),
-
-            // Chiffre d'affaire total
-            _buildSummaryRow(
-              'Chiffre d\'affaire net',
-              _totalAll,
-              Icons.euro,
-              isMain: true,
-            ),
-            const SizedBox(height: 12),
-
-            // Détails des paiements avec vérification de null
-            if ((_totalCash + mixedCash) > 0)
-              _buildPaymentRow(
-                'Total Espèces',
-                _totalCash + mixedCash,
-                Icons.money,
-                hasMixed: mixedCash > 0,
-              ),
-
-            if ((_totalCard + mixedCard) > 0)
-              _buildPaymentRow(
-                'Total Carte',
-                _totalCard + mixedCard,
-                Icons.credit_card,
-                hasMixed: mixedCard > 0,
-              ),
-
-            if ((_totalCheck + mixedCheck) > 0)
-              _buildPaymentRow(
-                'Total Chèque',
-                _totalCheck + mixedCheck,
-                Icons.account_balance,
-                hasMixed: mixedCheck > 0,
-              ),
-
-            // Détail des paiements mixtes (si existants)
-            if (_totalMixed > 0) ...[
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  'Dont paiements mixtes:',
-                  style: TextStyle(
-                    color: darkBlue.withOpacity(0.8),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-              if (mixedCash > 0)
-                _buildPaymentSubRow('• Part espèces', mixedCash),
-              if (mixedCard > 0) _buildPaymentSubRow('• Part carte', mixedCard),
-              if (mixedCheck > 0)
-                _buildPaymentSubRow('• Part chèque', mixedCheck),
-            ],
-
-            const SizedBox(height: 12),
-            Divider(color: lightGray, thickness: 1),
-            const SizedBox(height: 8),
-
-            // Section Remises
-            if (_totalPercentageDiscount > 0)
-              _buildSummaryRow(
-                'Remise globale (%)',
-                _totalPercentageDiscount,
-                Icons.discount,
-                suffix: '%',
-                isDiscount: true,
-              ),
-
-            if (_totalFixedDiscount > 0)
-              _buildSummaryRow(
-                'Remise globale (DT)',
-                -_totalFixedDiscount,
-                Icons.discount,
-                isDiscount: true,
-              ),
-
-            const SizedBox(height: 12),
-            Divider(color: lightGray, thickness: 1),
-            const SizedBox(height: 8),
-
-            // Montant retour
-            if (_totalRemaining > 0)
-              _buildSummaryRow(
-                'Montant à recevoir',
-                _totalRemaining,
-                Icons.keyboard_return,
-                isAlert: true,
-              ),
-
-            const SizedBox(height: 12),
-            Divider(color: lightGray, thickness: 1),
-            const SizedBox(height: 8),
-
-            // Statistiques
-            _buildSummaryRow(
-              'Nombre de clients',
-              _clientCount.toDouble(),
-              Icons.people,
-              isCount: true,
-            ),
-            _buildSummaryRow(
-              'Nombre d\'articles',
-              _articleCount.toDouble(),
-              Icons.shopping_basket,
-              isCount: true,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-// Méthode pour les lignes principales de paiement
-  Widget _buildPaymentRow(String label, double value, IconData icon,
-      {bool hasMixed = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // En-tête
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 20, color: darkBlue),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: darkBlue,
-                    ),
-                  ),
-                  if (hasMixed) ...[
-                    const SizedBox(width: 4),
-                    Tooltip(
-                      message: 'Inclut les paiements mixtes',
-                      child: Icon(Icons.info_outline,
-                          size: 16, color: Colors.grey),
-                    ),
-                  ],
-                ],
-              ),
+              Icon(Icons.assessment, color: deepBlue),
+              const SizedBox(width: 8),
               Text(
-                '${value.toStringAsFixed(2)} DT',
+                'Résumé Financier',
                 style: TextStyle(
-                  fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  fontSize: 18,
                   color: darkBlue,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Divider(color: lightGray, thickness: 1),
+          const SizedBox(height: 8),
+
+          // Chiffre d'affaire total
+          _buildSummaryRow(
+            'Chiffre d\'affaire total',
+            _totalAll,
+            Icons.euro,
+            isMain: true,
+          ),
+          const SizedBox(height: 12),
+
+          // Paiements non mixtes
+          if (_totalCash > 0)
+            _buildPaymentRow('Total Espèces', _totalCash, Icons.money),
+          
+          if (_totalCard > 0)
+            _buildPaymentRow('Total Carte', _totalCard, Icons.credit_card),
+          
+          if (_totalCheck > 0)
+            _buildPaymentRow('Total Chèque', _totalCheck, Icons.account_balance),
+          
+          // Paiements mixtes
+          if (_totalMixed > 0)
+            _buildPaymentRow('Total Paiements Mixtes', _totalMixed, Icons.blur_on),
+
+    
+
+
+          const SizedBox(height: 12),
+          Divider(color: lightGray, thickness: 1),
+          const SizedBox(height: 8),
+
+          // Section Remises
+          if (_totalPercentageDiscount > 0)
+            _buildSummaryRow(
+              'Remise globale (%)',
+              _totalPercentageDiscount,
+              Icons.discount,
+              suffix: '%',
+              isDiscount: true,
+            ),
+
+          if (_totalFixedDiscount > 0)
+            _buildSummaryRow(
+              'Remise globale (DT)',
+              -_totalFixedDiscount,
+              Icons.discount,
+              isDiscount: true,
+            ),
+
+          const SizedBox(height: 12),
+          Divider(color: lightGray, thickness: 1),
+          const SizedBox(height: 8),
+
+          // Montant retour
+          if (_totalRemaining > 0)
+            _buildSummaryRow(
+              'Montant à recevoir',
+              _totalRemaining,
+              Icons.keyboard_return,
+              isAlert: true,
+            ),
+
+          const SizedBox(height: 12),
+          Divider(color: lightGray, thickness: 1),
+          const SizedBox(height: 8),
+
+          // Statistiques
+          _buildSummaryRow(
+            'Nombre de clients',
+            _clientCount.toDouble(),
+            Icons.people,
+            isCount: true,
+          ),
+          _buildSummaryRow(
+            'Nombre d\'articles',
+            _articleCount.toDouble(),
+            Icons.shopping_basket,
+            isCount: true,
+          ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
+// Méthode pour les lignes principales de paiement
+Widget _buildPaymentRow(String label, double value, IconData icon,
+    {bool hasMixed = false}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: darkBlue),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: darkBlue,
+                  ),
+                ),
+                if (hasMixed) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Inclut les paiements mixtes',
+                    child: Icon(Icons.info_outline,
+                        size: 16, color: Colors.grey),
+                  ),
+                ],
+              ],
+            ),
+            Text(
+              '${value.toStringAsFixed(2)} DT',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: darkBlue,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
 // Méthode pour les sous-lignes de détail
-  Widget _buildPaymentSubRow(String label, double value) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 24, top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: darkBlue.withOpacity(0.8),
-            ),
+Widget _buildPaymentSubRow(String label, double value) {
+  return Padding(
+    padding: const EdgeInsets.only(left: 32, top: 4, bottom: 4), // Augmentez le padding left
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: darkBlue.withOpacity(0.8),
           ),
-          Text(
-            '${value.toStringAsFixed(2)} DT',
-            style: TextStyle(
-              fontSize: 14,
-              color: darkBlue.withOpacity(0.8),
-            ),
+        ),
+        Text(
+          '${value.toStringAsFixed(2)} DT',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500, // Ajoutez un peu de gras
+            color: darkBlue.withOpacity(0.8),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
 // Méthode pour les lignes de résumé
-  Widget _buildSummaryRow(
-    String label,
-    double value,
-    IconData icon, {
-    bool isMain = false,
-    bool isDiscount = false,
-    bool isCount = false,
-    bool isAlert = false,
-    String suffix = '',
-  }) {
-    Color textColor = darkBlue;
-    if (isDiscount) textColor = warmRed;
-    if (isAlert) textColor = softOrange;
-    if (isMain) textColor = deepBlue;
+Widget _buildSummaryRow(
+  String label,
+  double value,
+  IconData icon, {
+  bool isMain = false,
+  bool isDiscount = false,
+  bool isCount = false,
+  bool isAlert = false,
+  String suffix = '',
+}) {
+  Color textColor = darkBlue;
+  if (isDiscount) textColor = warmRed;
+  if (isAlert) textColor = softOrange;
+  if (isMain) textColor = deepBlue;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: textColor,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: isMain ? 16 : 15,
-                  color: textColor,
-                  fontWeight: isMain ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            isCount
-                ? '${value.toInt()}$suffix'
-                : '${value.toStringAsFixed(2)}$suffix',
-            style: TextStyle(
-              fontSize: isMain ? 18 : 16,
-              fontWeight: FontWeight.bold,
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
               color: textColor,
             ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: isMain ? 16 : 15,
+                color: textColor,
+                fontWeight: isMain ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          isCount
+              ? '${value.toInt()}$suffix'
+              : '${value.toStringAsFixed(2)}$suffix',
+          style: TextStyle(
+            fontSize: isMain ? 18 : 16,
+            fontWeight: FontWeight.bold,
+            color: textColor,
           ),
-        ],
-      ),
-    );
-  }
-
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildPaymentDetails(Map<String, dynamic> payment) {
     String details = '';
 
@@ -630,19 +598,19 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
     );
   }
 
-  Future<void> _fetchData() async {
-    if (_startDate == null) return;
+ Future<void> _fetchData() async {
+  if (_startDate == null) return;
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      final db = await SqlDb().db;
-      final startDateStr = DateFormat('yyyy-MM-dd').format(_startDate!);
-      final endDateStr = _endDate != null
-          ? DateFormat('yyyy-MM-dd').format(_endDate!)
-          : startDateStr;
+  try {
+    final db = await SqlDb().db;
+    final startDateStr = DateFormat('yyyy-MM-dd').format(_startDate!);
+    final endDateStr = _endDate != null 
+        ? DateFormat('yyyy-MM-dd').format(_endDate!)
+        : startDateStr;
 
-      final result = await db.rawQuery('''
+    final result = await db.rawQuery('''
       SELECT 
         id_order as idOrder,
         date,
@@ -660,98 +628,94 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
       ORDER BY date DESC
     ''', [startDateStr, endDateStr]);
 
-      double totalCash = 0;
-      double totalCard = 0;
-      double totalCheck = 0;
-      double totalMixed = 0; // Nouvelle variable pour suivre le total mixte
-      double totalPercentageDiscount = 0;
-      double totalFixedDiscount = 0;
-      double totalRemaining = 0;
-      int clientCount = 0;
-      int articleCount = 0;
-      Set<int> uniqueClients = Set();
+    double totalCash = 0;
+    double totalCard = 0;
+    double totalCheck = 0;
+    double totalMixed = 0; // Montant total des paiements mixtes
+    double totalPercentageDiscount = 0;
+    double totalFixedDiscount = 0;
+    double totalRemaining = 0;
+    int clientCount = 0;
+    int articleCount = 0;
+    Set<int> uniqueClients = Set();
 
-      final articlesResult = await db.rawQuery('''
+    // Calcul des articles vendus
+    final articlesResult = await db.rawQuery('''
       SELECT SUM(quantity) as total 
       FROM order_items oi
       JOIN orders o ON oi.id_order = o.id_order
       WHERE date(o.date) BETWEEN date(?) AND date(?)
     ''', [startDateStr, endDateStr]);
 
-      articleCount =
-          int.tryParse(articlesResult.first['total']?.toString() ?? '0') ?? 0;
+    articleCount = int.tryParse(articlesResult.first['total']?.toString() ?? '0') ?? 0;
 
-      for (var payment in result) {
-        final idClient = payment['idClient'] as int?;
-        final modePaiement = payment['modePaiement'] as String?;
-        final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-        final cashAmount = (payment['cashAmount'] as num?)?.toDouble() ?? 0.0;
-        final cardAmount = (payment['cardAmount'] as num?)?.toDouble() ?? 0.0;
-        final checkAmount = (payment['checkAmount'] as num?)?.toDouble() ?? 0.0;
-        final discount = (payment['discount'] as num?)?.toDouble() ?? 0.0;
-        final isPercentage = payment['isPercentageDiscount'] == 1;
-        final remainingAmount =
-            (payment['remainingAmount'] as num?)?.toDouble() ?? 0.0;
+    for (var payment in result) {
+      final idClient = payment['idClient'] as int?;
+      final modePaiement = payment['modePaiement'] as String?;
+      final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
+      final cashAmount = (payment['cashAmount'] as num?)?.toDouble() ?? 0.0;
+      final cardAmount = (payment['cardAmount'] as num?)?.toDouble() ?? 0.0;
+      final checkAmount = (payment['checkAmount'] as num?)?.toDouble() ?? 0.0;
+      final discount = (payment['discount'] as num?)?.toDouble() ?? 0.0;
+      final isPercentage = payment['isPercentageDiscount'] == 1;
+      final remainingAmount = (payment['remainingAmount'] as num?)?.toDouble() ?? 0.0;
 
-        if (idClient != null) {
-          uniqueClients.add(idClient);
-        }
-
-        // Calcul des totaux par mode de paiement
-        if (modePaiement == 'Espèce') {
-          totalCash += amount;
-        } else if (modePaiement == 'TPE') {
-          totalCard += amount;
-        } else if (modePaiement == 'Chèque') {
-          totalCheck += amount;
-        } else if (modePaiement == 'Mixte') {
-          // Pour les paiements mixtes, on additionne chaque composante
-          totalCash += cashAmount;
-          totalCard += cardAmount;
-          totalCheck += checkAmount;
-          // ET on garde aussi le total mixte séparément
-          totalMixed += amount;
-        }
-
-        // Calcul des remises
-        if (isPercentage) {
-          totalPercentageDiscount += discount;
-        } else {
-          totalFixedDiscount += discount;
-        }
-
-        totalRemaining += remainingAmount;
+      if (idClient != null) {
+        uniqueClients.add(idClient);
       }
 
-      clientCount = uniqueClients.length;
-      // Le chiffre d'affaires total inclut maintenant TOUS les paiements
-      double totalAll = totalCash + totalCard + totalCheck + totalMixed;
+      // Calcul des totaux par mode de paiement
+      if (modePaiement == 'Espèce') {
+        totalCash += amount;
+      } else if (modePaiement == 'TPE') {
+        totalCard += amount;
+      } else if (modePaiement == 'Chèque') {
+        totalCheck += amount;
+      } else if (modePaiement == 'Mixte') {
+        totalMixed += amount; // On garde le montant total du mixte
+      }
 
-      setState(() {
-        _paymentData = result;
-        _totalCash = totalCash;
-        _totalCard = totalCard;
-        _totalCheck = totalCheck;
-        _totalMixed = totalMixed; // On garde cette information
-        _totalAll = totalAll;
-        _totalPercentageDiscount = totalPercentageDiscount;
-        _totalFixedDiscount = totalFixedDiscount;
-        _totalRemaining = totalRemaining;
-        _clientCount = clientCount;
-        _articleCount = articleCount;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: warmRed,
-        ),
-      );
+      // Calcul des remises
+      if (isPercentage) {
+        totalPercentageDiscount += discount;
+      } else {
+        totalFixedDiscount += discount;
+      }
+
+      totalRemaining += remainingAmount;
     }
-  }
 
+    clientCount = uniqueClients.length;
+    
+    // Le total général est la somme de tout :
+    // - Paiements non mixtes (Espèce, Carte, Chèque)
+    // - Paiements mixtes (déjà comptés dans totalMixed)
+    double totalAll = totalCash + totalCard + totalCheck + totalMixed;
+
+    setState(() {
+      _paymentData = result;
+      _totalCash = totalCash;
+      _totalCard = totalCard;
+      _totalCheck = totalCheck;
+      _totalMixed = totalMixed;
+      _totalAll = totalAll;
+      _totalPercentageDiscount = totalPercentageDiscount;
+      _totalFixedDiscount = totalFixedDiscount;
+      _totalRemaining = totalRemaining;
+      _clientCount = clientCount;
+      _articleCount = articleCount;
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() => _isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erreur: $e'),
+        backgroundColor: warmRed,
+      ),
+    );
+  }
+}
   Future<void> _exportToPDF() async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

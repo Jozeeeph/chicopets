@@ -9,11 +9,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 class CodeVerificationPage extends StatefulWidget {
   final String pageName;
   final Widget destinationPage; // Nouveau paramètre pour la page de destination
+  final Function(User) onVerificationSuccess;
 
   const CodeVerificationPage({
     super.key,
     required this.pageName,
-    required this.destinationPage, // Paramètre requis
+    required this.destinationPage,
+    required this.onVerificationSuccess,
   });
 
   @override
@@ -49,52 +51,55 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
   }
 
 // Dans la méthode _verifyCode de code_verification_page.dart
-  Future<void> _verifyCode() async {
-    setState(() => _isLoading = true);
+ Future<void> _verifyCode() async {
+  setState(() => _isLoading = true);
 
-    final user = await _sqlDb.getUserByCode(_enteredCode);
+  final user = await _sqlDb.getUserByCode(_enteredCode);
 
-    if (user != null && user.isActive) {
-      // Sauvegarder la session utilisateur
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('current_user', jsonEncode(user.toMap()));
+  if (user != null && user.isActive) {
+    // Sauvegarder la session utilisateur
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('current_user', jsonEncode(user.toMap()));
 
-      // Vérifier les autorisations
-      if (widget.pageName == 'Tableau de bord') {
-        if (user.role == 'admin') {
-          if (!mounted) return;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => widget.destinationPage),
-          );
-        } else {
-          setState(() {
-            _showError = true;
-            _enteredCode = "";
-            _isLoading = false;
-          });
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Accès réservé aux administrateurs')),
-          );
-        }
-      }
-      // Pour la page de commande, tous les utilisateurs actifs peuvent accéder
-      else if (widget.pageName == 'Passage de commande') {
+    // Appeler le callback de succès
+    widget.onVerificationSuccess(user);
+
+    // Vérifier les autorisations
+    if (widget.pageName == 'Tableau de bord') {
+      if (user.role == 'admin') {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => widget.destinationPage),
         );
+      } else {
+        setState(() {
+          _showError = true;
+          _enteredCode = "";
+          _isLoading = false;
+        });
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Accès réservé aux administrateurs')),
+        );
       }
-    } else {
-      setState(() {
-        _showError = true;
-        _enteredCode = "";
-        _isLoading = false;
-      });
     }
+    // Pour la page de commande, tous les utilisateurs actifs peuvent accéder
+    else if (widget.pageName == 'Passage de commande') {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => widget.destinationPage),
+      );
+    }
+  } else {
+    setState(() {
+      _showError = true;
+      _enteredCode = "";
+      _isLoading = false;
+    });
   }
+}
 
   void _onBackspacePressed() {
     setState(() {
