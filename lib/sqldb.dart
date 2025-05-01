@@ -38,7 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -107,6 +107,7 @@ class SqlDb {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             id_order INTEGER NOT NULL,
             product_code TEXT,
+            product_name TEXT,
             product_id INTEGER,
             variant_id INTEGER,
             variant_code TEXT,
@@ -415,9 +416,9 @@ class SqlDb {
     await Orderlinecontroller().cancelOrderLine(idOrder, idProduct, dbClient);
   }
 
-  Future<void> deleteOrderLine(int idOrder, String idProduct) async {
+  Future<void> deleteOrderLine(int idOrder, String idProduct,int variantId) async {
     final dbClient = await db;
-    await Orderlinecontroller().deleteOrderLine(idOrder, idProduct, dbClient);
+    await Orderlinecontroller().deleteOrderLine(idOrder, idProduct,variantId, dbClient);
   }
 
   //Category Repository

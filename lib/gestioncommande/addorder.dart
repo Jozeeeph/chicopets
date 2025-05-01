@@ -13,11 +13,12 @@ import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Addorder {
   static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
+
   Future<bool> processCardPayment(double amount, String currency) async {
     try {
       bool connected = await _connectToPaymentTerminal();
@@ -99,8 +100,20 @@ class Addorder {
     bool useLoyaltyPoints = false;
     int pointsToUse = 0;
     double pointsDiscount = 0.0;
+    // Initialize selectedVariants with default variants for variant-based products
+    List<Variant?> selectedVariants =
+        List.generate(selectedProducts.length, (index) {
+      Product product = selectedProducts[index];
+      if (product.hasVariants && product.variants.isNotEmpty) {
+        return product.variants.firstWhere(
+          (v) => v.defaultVariant,
+          orElse: () => product.variants.first,
+        );
+      }
+      return null;
+    });
 
-    print("seee ${selectedProducts.length}");
+    print("Initial selectedVariants: $selectedVariants");
 
     if (selectedProducts.isEmpty) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -155,7 +168,6 @@ class Addorder {
     TextEditingController amountGivenController = TextEditingController();
     TextEditingController amountGivenTPEController = TextEditingController();
     TextEditingController amountGivenChequeController = TextEditingController();
-
     TextEditingController changeReturnedController = TextEditingController();
 
     double ticketRestaurantAmount = 0.0;
@@ -167,9 +179,9 @@ class Addorder {
     TextEditingController ticketTaxController = TextEditingController();
     TextEditingController ticketCommissionController = TextEditingController();
 
-    String? checkNumber; // For cheque number
-    String? cardTransactionId; // For TPE transaction ID
-    DateTime? checkDate; // For cheque date
+    String? checkNumber;
+    String? cardTransactionId;
+    DateTime? checkDate;
     String? bankName;
 
     double globalDiscount = order.globalDiscount;
@@ -199,17 +211,16 @@ class Addorder {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            // Calculer la limite de remise globale
             double maxGlobalDiscountPercentage =
                 _calculateMaxGlobalDiscountPercentage(
                     selectedProducts, quantityProducts);
             double maxGlobalDiscountValue = _calculateMaxGlobalDiscountValue(
                 selectedProducts, quantityProducts);
 
-            // Texte à afficher pour la limite de remise
             String discountLimitText = isPercentageDiscount
                 ? "La remise globale ne peut pas dépasser ${maxGlobalDiscountPercentage.toStringAsFixed(2)}%"
                 : "La remise globale ne peut pas dépasser ${maxGlobalDiscountValue.toStringAsFixed(2)} DT";
+
             void updateTotalAndChange() {
               setState(() {
                 totalBeforeDiscount = calculateTotalBeforeDiscount(
@@ -234,7 +245,6 @@ class Addorder {
               bool hasProductDiscount =
                   discounts.any((discount) => discount > 0);
 
-              // Vérification des limites de remise par produit
               for (int i = 0; i < selectedProducts.length; i++) {
                 double discount = discounts[i];
                 bool isPercentage = typeDiscounts[i];
@@ -262,7 +272,6 @@ class Addorder {
                 }
               }
 
-              // Vérification des limites de remise globale (même si cachée)
               if (!hasProductDiscount) {
                 double currentGlobalDiscount =
                     isPercentageDiscount ? globalDiscount : globalDiscountValue;
@@ -310,140 +319,138 @@ class Addorder {
               ),
               content: SingleChildScrollView(
                 child: Container(
-                  width: MediaQuery.of(context).size.width *
-                      0.65, // Prend 65% de la largeur de l'écran
+                  width: MediaQuery.of(context).size.width * 0.65,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Colonne de gauche - Ticket de commande
+                      // Left column - Order ticket
                       Expanded(
                         flex: 5,
                         child: Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.black, width: 1),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: Offset(2, 2),
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.black, width: 1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(2, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.receipt, size: 24),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Ticket de Commande",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Header
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.receipt, size: 24),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        "Ticket de Commande",
+                              ),
+                              Divider(thickness: 1, color: Colors.black),
+
+                              // Column Headers
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                        "Qt",
                                         style: TextStyle(
+                                          fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 18,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        "Article",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        "Prix U",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        "Montant",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.end,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Divider(thickness: 1, color: Colors.black),
+                              ),
+                              Divider(thickness: 1, color: Colors.black),
 
-                                // Column Headers
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                              if (selectedProducts.isNotEmpty)
+                                ...selectedProducts.map((product) {
+                                  int index = selectedProducts.indexOf(product);
+                                  Variant? selectedVariant =
+                                      selectedVariants[index];
+
+                                  // Get default variant if none selected
+                                  if (selectedVariant == null &&
+                                      product.hasVariants &&
+                                      product.variants.isNotEmpty) {
+                                    selectedVariant =
+                                        product.variants.firstWhere(
+                                      (v) => v.defaultVariant,
+                                      orElse: () => product.variants.first,
+                                    );
+                                    selectedVariants[index] = selectedVariant;
+                                  }
+
+                                  double basePrice =
+                                      selectedVariant?.finalPrice ??
+                                          product.prixTTC;
+                                  double discountedPrice = typeDiscounts[index]
+                                      ? basePrice * (1 - discounts[index] / 100)
+                                      : basePrice - discounts[index];
+
+                                  String productName = product.designation;
+                                  if (selectedVariant != null) {
+                                    productName +=
+                                        " (${selectedVariant.combinationName})";
+                                  }
+
+                                  return Column(
                                     children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: Text(
-                                          "Qt",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(
-                                          "Article",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          "Prix U",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          "Montant",
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.end,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Divider(thickness: 1, color: Colors.black),
-
-                                if (selectedProducts.isNotEmpty)
-                                  ...selectedProducts.map((product) {
-                                    int index =
-                                        selectedProducts.indexOf(product);
-
-                                    // Get default or first variant
-                                    Variant? selectedVariant =
-                                        product.hasVariants &&
-                                                product.variants.isNotEmpty
-                                            ? product.variants.firstWhere(
-                                                (v) => v.defaultVariant,
-                                                orElse: () =>
-                                                    product.variants.first,
-                                              )
-                                            : null;
-
-                                    double basePrice =
-                                        selectedVariant?.finalPrice ??
-                                            product.prixTTC;
-                                    double discountedPrice =
-                                        typeDiscounts[index]
-                                            ? basePrice *
-                                                (1 - discounts[index] / 100)
-                                            : basePrice - discounts[index];
-
-                                    String productName = product.designation;
-                                    if (selectedVariant != null) {
-                                      productName +=
-                                          " (${selectedVariant.combinationName.isNotEmpty ? selectedVariant.combinationName : selectedVariant.code})";
-                                    }
-
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 4),
-                                      child: Row(
+                                      Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceBetween,
                                         children: [
@@ -454,9 +461,40 @@ class Addorder {
                                           ),
                                           Expanded(
                                             flex: 3,
-                                            child: Text(productName,
-                                                overflow:
-                                                    TextOverflow.ellipsis),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  productName,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                if (product.hasVariants &&
+                                                    product.variants.isNotEmpty)
+                                                  DropdownButton<Variant>(
+                                                    value: selectedVariant,
+                                                    hint:
+                                                        Text("Select Variant"),
+                                                    items: product.variants
+                                                        .map((variant) {
+                                                      return DropdownMenuItem<
+                                                          Variant>(
+                                                        value: variant,
+                                                        child: Text(variant
+                                                            .combinationName),
+                                                      );
+                                                    }).toList(),
+                                                    onChanged:
+                                                        (Variant? newVariant) {
+                                                      setState(() {
+                                                        selectedVariants[
+                                                            index] = newVariant;
+                                                      });
+                                                    },
+                                                  ),
+                                              ],
+                                            ),
                                           ),
                                           Expanded(
                                             flex: 2,
@@ -476,1144 +514,1080 @@ class Addorder {
                                           ),
                                         ],
                                       ),
-                                    );
-                                  }).toList()
-                                else
-                                  Center(
-                                      child:
-                                          Text("Aucun produit sélectionné.")),
+                                      Divider(height: 1, color: Colors.grey),
+                                    ],
+                                  );
+                                }).toList()
+                              else
+                                Center(
+                                    child: Text("Aucun produit sélectionné.")),
 
-                                // Client Section
-                                Divider(thickness: 1, color: Colors.black),
+                              // Client Section
+                              Divider(thickness: 1, color: Colors.black),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Client:",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    selectedClient != null
+                                        ? "${selectedClient!.name} ${selectedClient!.firstName}"
+                                        : "Non spécifié",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontStyle: selectedClient == null
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              if (pointsDiscount > 0)
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
+                                    Text("Réduction points:",
+                                        style: TextStyle(color: Colors.green)),
                                     Text(
-                                      "Client:",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                        "-${pointsDiscount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(color: Colors.green)),
+                                  ],
+                                ),
+
+                              if (globalDiscount > 0 ||
+                                  discounts.any((d) => d > 0))
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text("Total avant remise:"),
                                     Text(
-                                      selectedClient != null
-                                          ? "${selectedClient!.name} ${selectedClient!.firstName}"
-                                          : "Non spécifié",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontStyle: selectedClient == null
-                                            ? FontStyle.italic
-                                            : FontStyle.normal,
-                                      ),
+                                        "${totalBeforeDiscount.toStringAsFixed(2)} DT"),
+                                  ],
+                                ),
+
+                              if (globalDiscount > 0)
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text("Remise:",
+                                        style: TextStyle(color: Colors.red)),
+                                    Text(
+                                      isPercentageDiscount
+                                          ? "-${globalDiscount.toStringAsFixed(2)}%"
+                                          : "-${globalDiscount.toStringAsFixed(2)} DT",
+                                      style: TextStyle(color: Colors.red),
                                     ),
                                   ],
                                 ),
 
-                                if (pointsDiscount > 0)
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text("Réduction points:",
-                                          style:
-                                              TextStyle(color: Colors.green)),
-                                      Text(
-                                          "-${pointsDiscount.toStringAsFixed(2)} DT",
-                                          style:
-                                              TextStyle(color: Colors.green)),
-                                    ],
-                                  ),
-
-                                if (globalDiscount > 0 ||
-                                    discounts.any((d) => d > 0))
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text("Total avant remise:"),
-                                      Text(
-                                          "${totalBeforeDiscount.toStringAsFixed(2)} DT"),
-                                    ],
-                                  ),
-
-                                if (globalDiscount > 0)
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text("Remise:",
-                                          style: TextStyle(color: Colors.red)),
-                                      Text(
-                                        isPercentageDiscount
-                                            ? "-${globalDiscount.toStringAsFixed(2)}%"
-                                            : "-${globalDiscount.toStringAsFixed(2)} DT",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text("Total:",
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold)),
-                                    Text("${total.toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-
-                                Divider(thickness: 1, color: Colors.black),
-                                Text("Détails de paiement:",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
-                                SizedBox(height: 4),
-
-                                if (selectedPaymentMethod == "Espèce") ...[
-                                  Text("Mode: Espèces"),
-                                  Text(
-                                      "Montant donné: ${cashAmount.toStringAsFixed(2)} DT"),
-                                  if (changeReturned > 0)
-                                    Text(
-                                        "Monnaie rendue: ${changeReturned.toStringAsFixed(2)} DT"),
-                                ],
-
-                                if (selectedPaymentMethod == "TPE") ...[
-                                  Text("Mode: Carte"),
-                                  Text(
-                                      "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
-                                  if (cardTransactionId != null)
-                                    Text("Transaction: $cardTransactionId"),
-                                ],
-
-                                if (selectedPaymentMethod == "Chèque") ...[
-                                  Text("Mode: Chèque"),
-                                  Text(
-                                      "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
-                                  if (checkNumber != null)
-                                    Text("N°: $checkNumber"),
-                                  if (bankName != null)
-                                    Text("Banque: $bankName"),
-                                  if (checkDate != null)
-                                    Text(
-                                        "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
-                                ],
-
-                                // Dans la partie conditionnelle des méthodes de paiement
-                                if (selectedPaymentMethod ==
-                                    "Ticket Restaurant") ...[
-                                  Text("Mode: Ticket Restaurant"),
-                                  Text(
-                                      "Nombre de tickets: $numberOfTicketsRestaurant"),
-                                  Text(
-                                      "Valeur d'un ticket: ${ticketValue.toStringAsFixed(2)} DT"),
-                                  Text(
-                                      "Taxe par ticket: ${ticketTax.toStringAsFixed(2)} DT"),
-                                  Text(
-                                      "Commission par ticket: ${ticketCommission.toStringAsFixed(2)} DT"),
-                                  Text(
-                                      "Montant total: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                ],
-
-                                if (selectedPaymentMethod == "Mixte") ...[
-                                  Text("Mode: Paiement mixte"),
-                                  if (cashAmount > 0)
-                                    Text(
-                                        "- Espèces: ${cashAmount.toStringAsFixed(2)} DT"),
-                                  if (cardAmount > 0) ...[
-                                    Text(
-                                        "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
-                                    if (cardTransactionId != null)
-                                      Text("  Transaction: $cardTransactionId"),
-                                  ],
-                                  if (checkAmount > 0) ...[
-                                    Text(
-                                        "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
-                                    if (checkNumber != null)
-                                      Text("  N°: $checkNumber"),
-                                    if (bankName != null)
-                                      Text("  Banque: $bankName"),
-                                    if (checkDate != null)
-                                      Text(
-                                          "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
-                                  ],
-                                ],
-
-                                Divider(thickness: 1, color: Colors.black),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text("Total payé:",
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold)),
-                                    Text(
-                                      "${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT",
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text("Total:",
                                       style: TextStyle(
                                           fontSize: 18,
-                                          fontWeight: FontWeight.bold),
+                                          fontWeight: FontWeight.bold)),
+                                  Text("${total.toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+
+                              Divider(thickness: 1, color: Colors.black),
+                              Text("Détails de paiement:",
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+
+                              if (selectedPaymentMethod == "Espèce") ...[
+                                Text("Mode: Espèces"),
+                                Text(
+                                    "Montant donné: ${cashAmount.toStringAsFixed(2)} DT"),
+                                if (changeReturned > 0)
+                                  Text(
+                                      "Monnaie rendue: ${changeReturned.toStringAsFixed(2)} DT"),
+                              ],
+
+                              if (selectedPaymentMethod == "TPE") ...[
+                                Text("Mode: Carte"),
+                                Text(
+                                    "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
+                                if (cardTransactionId != null)
+                                  Text("Transaction: $cardTransactionId"),
+                              ],
+
+                              if (selectedPaymentMethod == "Chèque") ...[
+                                Text("Mode: Chèque"),
+                                Text(
+                                    "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
+                                if (checkNumber != null)
+                                  Text("N°: $checkNumber"),
+                                if (bankName != null) Text("Banque: $bankName"),
+                                if (checkDate != null)
+                                  Text(
+                                      "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                              ],
+
+                              if (selectedPaymentMethod ==
+                                  "Ticket Restaurant") ...[
+                                Text("Mode: Ticket Restaurant"),
+                                Text(
+                                    "Nombre de tickets: $numberOfTicketsRestaurant"),
+                                Text(
+                                    "Valeur d'un ticket: ${ticketValue.toStringAsFixed(2)} DT"),
+                                Text(
+                                    "Taxe par ticket: ${ticketTax.toStringAsFixed(2)} DT"),
+                                Text(
+                                    "Commission par ticket: ${ticketCommission.toStringAsFixed(2)} DT"),
+                                Text(
+                                    "Montant total: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                              ],
+
+                              if (selectedPaymentMethod == "Mixte") ...[
+                                Text("Mode: Paiement mixte"),
+                                if (cashAmount > 0)
+                                  Text(
+                                      "- Espèces: ${cashAmount.toStringAsFixed(2)} DT"),
+                                if (cardAmount > 0) ...[
+                                  Text(
+                                      "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
+                                  if (cardTransactionId != null)
+                                    Text("  Transaction: $cardTransactionId"),
+                                ],
+                                if (checkAmount > 0) ...[
+                                  Text(
+                                      "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
+                                  if (checkNumber != null)
+                                    Text("  N°: $checkNumber"),
+                                  if (bankName != null)
+                                    Text("  Banque: $bankName"),
+                                  if (checkDate != null)
+                                    Text(
+                                        "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
+                                ],
+                              ],
+
+                              Divider(thickness: 1, color: Colors.black),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text("Total payé:",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold)),
+                                  Text(
+                                    "${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT",
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+
+                              if ((cashAmount + cardAmount + checkAmount) <
+                                  total)
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Reste à payer:",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red),
+                                    ),
+                                    Text(
+                                      "${(total - (cashAmount + cardAmount + checkAmount)).toStringAsFixed(2)} DT",
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red),
                                     ),
                                   ],
                                 ),
-
-                                if ((cashAmount + cardAmount + checkAmount) <
-                                    total)
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        "Reste à payer:",
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red),
-                                      ),
-                                      Text(
-                                        "${(total - (cashAmount + cardAmount + checkAmount)).toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            )),
+                            ],
+                          ),
+                        ),
                       ),
 
                       SizedBox(width: 16),
 
-                      // Colonne de droite - Options de paiement
+                      // Right column - Payment options
                       Expanded(
-                        flex: 5, // 40% de l'espace
-                        child: Column(children: [
-                          // Sélection du client
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.person,
-                                    color: Colors.blue, size: 24),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Client',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      Text(
-                                        selectedClient != null
-                                            ? '${selectedClient!.name} ${selectedClient!.firstName}'
-                                            : 'Non spécifié',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                      selectedClient != null
-                                          ? Icons.edit
-                                          : Icons.add_circle_outline,
-                                      color: Colors.blue),
-                                  onPressed: () {
-                                    _showClientSelection(context, (client) {
-                                      setState(() {
-                                        selectedClient = client;
-                                      });
-                                    });
-                                  },
-                                  tooltip: 'Sélectionner un client',
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          SizedBox(height: 16),
-                          SizedBox(height: 16),
-
-                          // --- AJOUTEZ ICI LE WIDGET DE POINTS DE FIDÉLITÉ ---
-                          if (selectedClient != null)
-                            FutureBuilder<FidelityRules>(
-                              future: SqlDb().db.then((db) =>
-                                  FidelityController().getFidelityRules(db)),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) return SizedBox();
-                                final rules = snapshot.data!;
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                        flex: 5,
+                        child: Column(
+                          children: [
+                            // Client selection
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.person,
+                                      color: Colors.blue, size: 24),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Checkbox(
-                                          value: useLoyaltyPoints,
-                                          onChanged: (value) async {
-                                            if (value == true) {
-                                              final db = await SqlDb().db;
-                                              final canUse =
-                                                  await FidelityController()
-                                                      .canUsePoints(
-                                                selectedClient!,
-                                                total,
-                                                db,
-                                              );
-
-                                              if (!canUse) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Points insuffisants ou expirés (min: ${rules.minPointsToUse})',
-                                                    ),
-                                                  ),
-                                                );
-                                                return;
-                                              }
-                                            }
-                                            setState(() => useLoyaltyPoints =
-                                                value ?? false);
-                                          },
+                                        Text(
+                                          'Client',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
-                                        Text('Utiliser les points de fidélité'),
-                                        IconButton(
-                                          icon: Icon(Icons.info_outline),
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title:
-                                                    Text('Points de fidélité'),
-                                                content: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                        'Solde: ${selectedClient!.loyaltyPoints} points'),
-                                                    Text(
-                                                        '1 point = ${rules.dinarPerPoint} DT'),
-                                                    Text(
-                                                        '${rules.pointsPerDinar} point(s) par dinar dépensé'),
-                                                    Text(
-                                                        'Minimum ${rules.minPointsToUse} points pour utiliser'),
-                                                    if (rules
-                                                            .pointsValidityMonths >
-                                                        0)
-                                                      Text(
-                                                          'Validité: ${rules.pointsValidityMonths} mois'),
-                                                  ],
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(context),
-                                                    child: Text('OK'),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
+                                        Text(
+                                          selectedClient != null
+                                              ? '${selectedClient!.name} ${selectedClient!.firstName}'
+                                              : 'Non spécifié',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    if (useLoyaltyPoints) ...[
-                                      Slider(
-                                        min: 0,
-                                        max: selectedClient!.loyaltyPoints
-                                            .toDouble(),
-                                        divisions:
-                                            selectedClient!.loyaltyPoints,
-                                        value: pointsToUse.toDouble(),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                        selectedClient != null
+                                            ? Icons.edit
+                                            : Icons.add_circle_outline,
+                                        color: Colors.blue),
+                                    onPressed: () {
+                                      _showClientSelection(context, (client) {
+                                        setState(() {
+                                          selectedClient = client;
+                                        });
+                                      });
+                                    },
+                                    tooltip: 'Sélectionner un client',
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            SizedBox(height: 16),
+
+                            // Loyalty points
+                            if (selectedClient != null)
+                              FutureBuilder<FidelityRules>(
+                                future: SqlDb().db.then((db) =>
+                                    FidelityController().getFidelityRules(db)),
+                                builder: (context, snapshot) {
+                                  if (!snapshot.hasData) return SizedBox();
+                                  final rules = snapshot.data!;
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Checkbox(
+                                            value: useLoyaltyPoints,
+                                            onChanged: (value) async {
+                                              if (value == true) {
+                                                final db = await SqlDb().db;
+                                                final canUse =
+                                                    await FidelityController()
+                                                        .canUsePoints(
+                                                            selectedClient!,
+                                                            total,
+                                                            db);
+
+                                                if (!canUse) {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                          'Points insuffisants ou expirés (min: ${rules.minPointsToUse})'),
+                                                    ),
+                                                  );
+                                                  return;
+                                                }
+                                              }
+                                              setState(() => useLoyaltyPoints =
+                                                  value ?? false);
+                                            },
+                                          ),
+                                          Text(
+                                              'Utiliser les points de fidélité'),
+                                          IconButton(
+                                            icon: Icon(Icons.info_outline),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) =>
+                                                    AlertDialog(
+                                                  title: Text(
+                                                      'Points de fidélité'),
+                                                  content: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                          'Solde: ${selectedClient!.loyaltyPoints} points'),
+                                                      Text(
+                                                          '1 point = ${rules.dinarPerPoint} DT'),
+                                                      Text(
+                                                          '${rules.pointsPerDinar} point(s) par dinar dépensé'),
+                                                      Text(
+                                                          'Minimum ${rules.minPointsToUse} points pour utiliser'),
+                                                      if (rules
+                                                              .pointsValidityMonths >
+                                                          0)
+                                                        Text(
+                                                            'Validité: ${rules.pointsValidityMonths} mois'),
+                                                    ],
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                              context),
+                                                      child: Text('OK'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      if (useLoyaltyPoints) ...[
+                                        Slider(
+                                          min: 0,
+                                          max: selectedClient!.loyaltyPoints
+                                              .toDouble(),
+                                          divisions:
+                                              selectedClient!.loyaltyPoints,
+                                          value: pointsToUse.toDouble(),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              pointsToUse = value.toInt();
+                                              pointsDiscount = pointsToUse *
+                                                  rules.dinarPerPoint;
+
+                                              final maxDiscount =
+                                                  totalBeforeDiscount *
+                                                      (rules.maxPercentageUse /
+                                                          100);
+                                              if (pointsDiscount >
+                                                  maxDiscount) {
+                                                pointsDiscount = maxDiscount;
+                                                pointsToUse = (pointsDiscount /
+                                                        rules.dinarPerPoint)
+                                                    .round();
+                                              }
+
+                                              total = calculateTotal(
+                                                    selectedProducts,
+                                                    quantityProducts,
+                                                    discounts,
+                                                    typeDiscounts,
+                                                    isPercentageDiscount
+                                                        ? globalDiscount
+                                                        : globalDiscountValue,
+                                                    isPercentageDiscount,
+                                                  ) -
+                                                  pointsDiscount;
+
+                                              if (total < 0) total = 0;
+                                            });
+                                          },
+                                        ),
+                                        Text(
+                                            'Utiliser $pointsToUse points (${pointsDiscount.toStringAsFixed(2)} DT)'),
+                                        Text(
+                                            'Nouveau solde: ${selectedClient!.loyaltyPoints - pointsToUse} points'),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+
+                            SizedBox(height: 16),
+
+                            // Global discount (if no product discounts)
+                            if (!discounts.any((discount) => discount > 0))
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Remise Globale:",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  SizedBox(height: 8),
+                                  Text("Type de Remise:",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      Radio(
+                                        value: true,
+                                        groupValue: isPercentageDiscount,
                                         onChanged: (value) {
                                           setState(() {
-                                            pointsToUse = value.toInt();
-                                            pointsDiscount = pointsToUse *
-                                                rules.dinarPerPoint;
-
-                                            // Ne pas dépasser le pourcentage maximum
-                                            final maxDiscount =
-                                                totalBeforeDiscount *
-                                                    (rules.maxPercentageUse /
-                                                        100);
-                                            if (pointsDiscount > maxDiscount) {
-                                              pointsDiscount = maxDiscount;
-                                              pointsToUse = (pointsDiscount /
-                                                      rules.dinarPerPoint)
-                                                  .round();
-                                            }
-
-                                            // Mettre à jour le total affiché
-                                            total = calculateTotal(
-                                                  selectedProducts,
-                                                  quantityProducts,
-                                                  discounts,
-                                                  typeDiscounts,
-                                                  isPercentageDiscount
-                                                      ? globalDiscount
-                                                      : globalDiscountValue,
-                                                  isPercentageDiscount,
-                                                ) -
-                                                pointsDiscount;
-
-                                            if (total < 0) total = 0;
+                                            isPercentageDiscount =
+                                                value as bool;
+                                            globalDiscountController.text = '';
+                                            globalDiscountValueController.text =
+                                                '';
+                                            updateTotalAndChange();
                                           });
                                         },
                                       ),
-                                      Text(
-                                          'Utiliser $pointsToUse points (${pointsDiscount.toStringAsFixed(2)} DT)'),
-                                      Text(
-                                          'Nouveau solde: ${selectedClient!.loyaltyPoints - pointsToUse} points'),
+                                      Text("Pourcentage"),
+                                      Radio(
+                                        value: false,
+                                        groupValue: isPercentageDiscount,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            isPercentageDiscount =
+                                                value as bool;
+                                            globalDiscountController.text = '';
+                                            globalDiscountValueController.text =
+                                                '';
+                                            updateTotalAndChange();
+                                          });
+                                        },
+                                      ),
+                                      Text("Valeur (DT)"),
                                     ],
-                                  ],
-                                );
-                              },
-                            ),
-                          // ---------------------------------------------------
+                                  ),
+                                  SizedBox(height: 16),
+                                  if (isPercentageDiscount)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: globalDiscountController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: "Remise Globale (%)",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              globalDiscount =
+                                                  double.tryParse(value) ?? 0.0;
+                                              updateTotalAndChange();
+                                            });
+                                          },
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  if (!isPercentageDiscount)
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller:
+                                              globalDiscountValueController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: "Remise Globale (DT)",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              globalDiscountValue =
+                                                  double.tryParse(value) ?? 0.0;
+                                              updateTotalAndChange();
+                                            });
+                                          },
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
 
-                          SizedBox(height: 16),
+                            SizedBox(height: 16),
 
-                          // Remise Globale (si aucune remise produit)
-                          if (!discounts.any((discount) => discount > 0))
+                            // Payment options
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Remise Globale:",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
-                                SizedBox(height: 8),
-                                Text("Type de Remise:",
+                                Text("Mode de Paiement:",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
                                 Row(
                                   children: [
-                                    Radio(
-                                      value: true,
-                                      groupValue: isPercentageDiscount,
+                                    Radio<String>(
+                                      value: "Espèce",
+                                      groupValue: selectedPaymentMethod,
                                       onChanged: (value) {
                                         setState(() {
-                                          isPercentageDiscount = value as bool;
-                                          globalDiscountController.text = '';
-                                          globalDiscountValueController.text =
-                                              '';
-                                          updateTotalAndChange();
+                                          selectedPaymentMethod = value!;
                                         });
                                       },
                                     ),
-                                    Text("Pourcentage"),
-                                    Radio(
-                                      value: false,
-                                      groupValue: isPercentageDiscount,
+                                    Text("Espèce"),
+                                    Radio<String>(
+                                      value: "TPE",
+                                      groupValue: selectedPaymentMethod,
                                       onChanged: (value) {
                                         setState(() {
-                                          isPercentageDiscount = value as bool;
-                                          globalDiscountController.text = '';
-                                          globalDiscountValueController.text =
-                                              '';
-                                          updateTotalAndChange();
+                                          selectedPaymentMethod = value!;
                                         });
                                       },
                                     ),
-                                    Text("Valeur (DT)"),
+                                    Text("TPE"),
+                                    Radio<String>(
+                                      value: "Chèque",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Chèque"),
+                                    Radio<String>(
+                                      value: "Ticket Restaurant",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Ticket Restaurant"),
+                                    Radio<String>(
+                                      value: "Mixte",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Mixte"),
                                   ],
                                 ),
+
+                                // Espèce payment fields
+                                if (selectedPaymentMethod == "Espèce")
+                                  TextField(
+                                    controller: amountGivenController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      labelText: "Montant donné (DT)",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        String cleanedValue = cleanInput(value);
+                                        if (cleanedValue == 'NEGATIVE') {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  "Veuillez entrer un nombre positif."),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          amountGivenController.text = '';
+                                          return;
+                                        }
+                                        amountGivenController.text =
+                                            cleanedValue;
+                                        amountGivenController.selection =
+                                            TextSelection.fromPosition(
+                                                TextPosition(
+                                                    offset:
+                                                        cleanedValue.length));
+                                        cashAmount =
+                                            double.tryParse(cleanedValue) ??
+                                                0.0;
+                                        changeReturned = cashAmount - total;
+                                        changeReturnedController.text =
+                                            changeReturned.toStringAsFixed(2);
+                                      });
+                                    },
+                                  ),
+
+                                // TPE payment fields
+                                if (selectedPaymentMethod == "TPE")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: amountGivenTPEController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant par carte (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            cardAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            cardTransactionId = value,
+                                        decoration: InputDecoration(
+                                          labelText: "ID de transaction TPE",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                // Chèque payment fields
+                                if (selectedPaymentMethod == "Chèque")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: amountGivenChequeController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant par chèque (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            checkAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            checkNumber = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Numéro du chèque",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) => bankName = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Banque émettrice",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      InkWell(
+                                        onTap: () async {
+                                          final selectedDate =
+                                              await showDatePicker(
+                                            context: context,
+                                            initialDate: DateTime.now(),
+                                            firstDate: DateTime.now(),
+                                            lastDate: DateTime.now()
+                                                .add(Duration(days: 365)),
+                                          );
+                                          if (selectedDate != null) {
+                                            setState(() {
+                                              checkDate = selectedDate;
+                                            });
+                                          }
+                                        },
+                                        child: InputDecorator(
+                                          decoration: InputDecoration(
+                                            labelText: "Date du chèque",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(checkDate != null
+                                                  ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
+                                                  : "Sélectionner une date"),
+                                              Icon(Icons.calendar_today),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                // Ticket Restaurant payment fields
+                                if (selectedPaymentMethod ==
+                                    "Ticket Restaurant")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: numberOfTicketsRestaurant
+                                                .toString()),
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Nombre de tickets",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            numberOfTicketsRestaurant =
+                                                int.tryParse(value) ?? 1;
+                                            if (numberOfTicketsRestaurant < 1) {
+                                              numberOfTicketsRestaurant = 1;
+                                            }
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketValueController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Valeur d'un ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketValue =
+                                                double.tryParse(value) ?? 0.0;
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketTaxController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Taxe par ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketTax =
+                                                double.tryParse(value) ?? 0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketCommissionController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              "Commission par ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketCommission =
+                                                double.tryParse(value) ?? 0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+
+                                // Mixte payment fields
+                                if (selectedPaymentMethod == "Mixte")
+                                  Column(
+                                    children: [
+                                      Text("Espèces:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      TextField(
+                                        controller: amountGivenController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant en espèces (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            cashAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text("TPE:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      TextField(
+                                        controller: amountGivenTPEController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant par carte (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            cardAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: cardTransactionId ?? ''),
+                                        decoration: InputDecoration(
+                                          labelText: "ID de transaction TPE",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            cardTransactionId = value;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text("Chèque:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      TextField(
+                                        controller: amountGivenChequeController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant par chèque (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            checkAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: checkNumber ?? ''),
+                                        decoration: InputDecoration(
+                                          labelText: "Numéro du chèque",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            checkNumber = value;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: bankName ?? ''),
+                                        decoration: InputDecoration(
+                                          labelText: "Banque émettrice",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            bankName = value;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      InkWell(
+                                        onTap: () async {
+                                          final selectedDate =
+                                              await showDatePicker(
+                                            context: context,
+                                            initialDate: DateTime.now(),
+                                            firstDate: DateTime.now(),
+                                            lastDate: DateTime.now()
+                                                .add(Duration(days: 365)),
+                                          );
+                                          if (selectedDate != null) {
+                                            setState(() {
+                                              checkDate = selectedDate;
+                                            });
+                                          }
+                                        },
+                                        child: InputDecorator(
+                                          decoration: InputDecoration(
+                                            labelText: "Date du chèque",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(checkDate != null
+                                                  ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
+                                                  : "Sélectionner une date"),
+                                              Icon(Icons.calendar_today),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+
+                                SizedBox(height: 10),
+                                if (selectedPaymentMethod == "Espèce")
+                                  TextField(
+                                    controller: changeReturnedController,
+                                    readOnly: true,
+                                    decoration: InputDecoration(
+                                      labelText: "Monnaie rendue (DT)",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
                                 SizedBox(height: 16),
-                                if (isPercentageDiscount)
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: globalDiscountController,
+                                Row(
+                                  children: [
+                                    Text("Nombre de tickets à imprimer:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    SizedBox(width: 10),
+                                    Container(
+                                      width: 40,
+                                      height: 35,
+                                      child: TextField(
+                                        controller: TextEditingController(
+                                            text: numberOfTickets.toString()),
                                         keyboardType: TextInputType.number,
+                                        style: TextStyle(fontSize: 14),
                                         decoration: InputDecoration(
-                                          labelText: "Remise Globale (%)",
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 6),
                                           border: OutlineInputBorder(),
                                         ),
                                         onChanged: (value) {
                                           setState(() {
-                                            globalDiscount =
-                                                double.tryParse(value) ?? 0.0;
-                                            updateTotalAndChange();
+                                            numberOfTickets =
+                                                int.tryParse(value) ?? 1;
+                                            if (numberOfTickets < 1) {
+                                              numberOfTickets = 1;
+                                            }
                                           });
                                         },
                                       ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                if (!isPercentageDiscount)
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller:
-                                            globalDiscountValueController,
-                                        keyboardType: TextInputType.number,
-                                        decoration: InputDecoration(
-                                          labelText: "Remise Globale (DT)",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            globalDiscountValue =
-                                                double.tryParse(value) ?? 0.0;
-                                            updateTotalAndChange();
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
-
-                          SizedBox(height: 16),
-
-                          // Mode de paiement
-
-                          SizedBox(height: 16),
-
-                          // Montant donné et rendu
-                          Divider(thickness: 1, color: Colors.black),
-                          Text("Détails de paiement:",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          SizedBox(height: 4),
-
-                          if (selectedPaymentMethod == "Espèce") ...[
-                            Text("Mode: Espèces"),
-                            Text(
-                                "Montant donné: ${cashAmount.toStringAsFixed(2)} DT"),
-                            if (changeReturned > 0)
-                              Text(
-                                  "Monnaie rendue: ${changeReturned.toStringAsFixed(2)} DT"),
                           ],
-
-                          if (selectedPaymentMethod == "TPE") ...[
-                            Text("Mode: Carte"),
-                            Text(
-                                "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
-                            if (cardTransactionId != null)
-                              Text("Transaction: $cardTransactionId"),
-                          ],
-
-                          if (selectedPaymentMethod == "Chèque") ...[
-                            Text("Mode: Chèque"),
-                            Text(
-                                "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
-                            if (checkNumber != null) Text("N°: $checkNumber"),
-                            if (bankName != null) Text("Banque: $bankName"),
-                            if (checkDate != null)
-                              Text(
-                                  "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
-                          ],
-
-                          if (selectedPaymentMethod == "Ticket Restaurant") ...[
-                            Text("Mode: Ticket Restaurant"),
-                            Text(
-                                "Nombre de tickets: $numberOfTicketsRestaurant"),
-                            Text(
-                                "Valeur unitaire: ${ticketValue.toStringAsFixed(2)} DT"),
-                            Text(
-                                "Montant total: ${ticketRestaurantAmount.toStringAsFixed(2)} DT"),
-                          ],
-
-                          if (selectedPaymentMethod == "Mixte") ...[
-                            Text("Mode: Paiement mixte"),
-                            if (cashAmount > 0)
-                              Text(
-                                  "- Espèces: ${cashAmount.toStringAsFixed(2)} DT"),
-                            if (cardAmount > 0) ...[
-                              Text(
-                                  "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
-                              if (cardTransactionId != null)
-                                Text("  Transaction: $cardTransactionId"),
-                            ],
-                            if (checkAmount > 0) ...[
-                              Text(
-                                  "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
-                              if (checkNumber != null)
-                                Text("  N°: $checkNumber"),
-                              if (bankName != null) Text("  Banque: $bankName"),
-                              if (checkDate != null)
-                                Text(
-                                    "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
-                            ],
-                          ],
-
-// In the payment options column (right column):
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Mode de Paiement:",
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Row(
-                                children: [
-                                  Radio<String>(
-                                    value: "Espèce",
-                                    groupValue: selectedPaymentMethod,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedPaymentMethod = value!;
-                                      });
-                                    },
-                                  ),
-                                  Text("Espèce"),
-                                  Radio<String>(
-                                    value: "TPE",
-                                    groupValue: selectedPaymentMethod,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedPaymentMethod = value!;
-                                      });
-                                    },
-                                  ),
-                                  Text("TPE"),
-                                  Radio<String>(
-                                    value: "Chèque",
-                                    groupValue: selectedPaymentMethod,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedPaymentMethod = value!;
-                                      });
-                                    },
-                                  ),
-                                  Text("Chèque"),
-                                  Radio<String>(
-                                    value: "Ticket Restaurant",
-                                    groupValue: selectedPaymentMethod,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedPaymentMethod = value!;
-                                      });
-                                    },
-                                  ),
-                                  Text("Ticket Restaurant"),
-                                  Radio<String>(
-                                    value: "Mixte",
-                                    groupValue: selectedPaymentMethod,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        selectedPaymentMethod = value!;
-                                      });
-                                    },
-                                  ),
-                                  Text("Mixte"),
-                                ],
-                              ),
-
-                              // Espèce payment fields
-                              if (selectedPaymentMethod == "Espèce")
-                                TextField(
-                                  controller: amountGivenController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: InputDecoration(
-                                    labelText: "Montant donné (DT)",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      String cleanedValue = cleanInput(value);
-                                      if (cleanedValue == 'NEGATIVE') {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                "Veuillez entrer un nombre positif."),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                        amountGivenController.text = '';
-                                        return;
-                                      }
-                                      amountGivenController.text = cleanedValue;
-                                      amountGivenController.selection =
-                                          TextSelection.fromPosition(
-                                        TextPosition(
-                                            offset: cleanedValue.length),
-                                      );
-                                      cashAmount =
-                                          double.tryParse(cleanedValue) ?? 0.0;
-                                      changeReturned = cashAmount - total;
-                                      changeReturnedController.text =
-                                          changeReturned.toStringAsFixed(2);
-                                    });
-                                  },
-                                ),
-
-                              // TPE payment fields
-                              if (selectedPaymentMethod == "TPE")
-                                Column(
-                                  children: [
-                                    TextField(
-                                      controller: amountGivenTPEController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Montant par carte (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          String cleanedValue =
-                                              cleanInput(value);
-                                          if (cleanedValue == 'NEGATIVE') {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      "Veuillez entrer un nombre positif.")),
-                                            );
-                                            return;
-                                          }
-                                          cardAmount =
-                                              double.tryParse(cleanedValue) ??
-                                                  0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      onChanged: (value) =>
-                                          cardTransactionId = value,
-                                      decoration: InputDecoration(
-                                        labelText: "ID de transaction TPE",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                              // Chèque payment fields
-                              if (selectedPaymentMethod == "Chèque")
-                                Column(
-                                  children: [
-                                    TextField(
-                                      controller: amountGivenChequeController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Montant par chèque (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          String cleanedValue =
-                                              cleanInput(value);
-                                          if (cleanedValue == 'NEGATIVE') {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      "Veuillez entrer un nombre positif.")),
-                                            );
-                                            return;
-                                          }
-                                          checkAmount =
-                                              double.tryParse(cleanedValue) ??
-                                                  0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      onChanged: (value) => checkNumber = value,
-                                      decoration: InputDecoration(
-                                        labelText: "Numéro du chèque",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      onChanged: (value) => bankName = value,
-                                      decoration: InputDecoration(
-                                        labelText: "Banque émettrice",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                    SizedBox(height: 10),
-                                    InkWell(
-                                      onTap: () async {
-                                        final selectedDate =
-                                            await showDatePicker(
-                                          context: context,
-                                          initialDate: DateTime.now(),
-                                          firstDate: DateTime.now(),
-                                          lastDate: DateTime.now()
-                                              .add(Duration(days: 365)),
-                                        );
-                                        if (selectedDate != null) {
-                                          setState(() {
-                                            checkDate = selectedDate;
-                                          });
-                                        }
-                                      },
-                                      child: InputDecorator(
-                                        decoration: InputDecoration(
-                                          labelText: "Date du chèque",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(checkDate != null
-                                                ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
-                                                : "Sélectionner une date"),
-                                            Icon(Icons.calendar_today),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                              // Ticket Restaurant payment fields - NOW IN THE RIGHT PLACE
-                              if (selectedPaymentMethod == "Ticket Restaurant")
-                                Column(
-                                  children: [
-                                    TextField(
-                                      controller: TextEditingController(
-                                          text: numberOfTicketsRestaurant
-                                              .toString()),
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Nombre de tickets",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          numberOfTicketsRestaurant =
-                                              int.tryParse(value) ?? 1;
-                                          if (numberOfTicketsRestaurant < 1) {
-                                            numberOfTicketsRestaurant = 1;
-                                          }
-                                          ticketRestaurantAmount =
-                                              numberOfTicketsRestaurant *
-                                                  ticketValue;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: ticketValueController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Valeur d'un ticket (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          ticketValue =
-                                              double.tryParse(value) ?? 0.0;
-                                          ticketRestaurantAmount =
-                                              numberOfTicketsRestaurant *
-                                                  ticketValue;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: ticketTaxController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Taxe par ticket (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          ticketTax =
-                                              double.tryParse(value) ?? 0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: ticketCommissionController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Commission par ticket (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          ticketCommission =
-                                              double.tryParse(value) ?? 0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-
-                              // Mixte payment fields
-                              if (selectedPaymentMethod == "Mixte")
-                                Column(
-                                  children: [
-                                    Text("Espèces:",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                    TextField(
-                                      controller: amountGivenController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Montant en espèces (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          String cleanedValue =
-                                              cleanInput(value);
-                                          if (cleanedValue == 'NEGATIVE') {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      "Veuillez entrer un nombre positif.")),
-                                            );
-                                            return;
-                                          }
-                                          cashAmount =
-                                              double.tryParse(cleanedValue) ??
-                                                  0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text("TPE:",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                    TextField(
-                                      controller: amountGivenTPEController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Montant par carte (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          String cleanedValue =
-                                              cleanInput(value);
-                                          if (cleanedValue == 'NEGATIVE') {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      "Veuillez entrer un nombre positif.")),
-                                            );
-                                            return;
-                                          }
-                                          cardAmount =
-                                              double.tryParse(cleanedValue) ??
-                                                  0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: TextEditingController(
-                                          text: cardTransactionId ?? ''),
-                                      decoration: InputDecoration(
-                                        labelText: "ID de transaction TPE",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          cardTransactionId = value;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text("Chèque:",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                    TextField(
-                                      controller: amountGivenChequeController,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: "Montant par chèque (DT)",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          String cleanedValue =
-                                              cleanInput(value);
-                                          if (cleanedValue == 'NEGATIVE') {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      "Veuillez entrer un nombre positif.")),
-                                            );
-                                            return;
-                                          }
-                                          checkAmount =
-                                              double.tryParse(cleanedValue) ??
-                                                  0.0;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: TextEditingController(
-                                          text: checkNumber ?? ''),
-                                      decoration: InputDecoration(
-                                        labelText: "Numéro du chèque",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          checkNumber = value;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    TextField(
-                                      controller: TextEditingController(
-                                          text: bankName ?? ''),
-                                      decoration: InputDecoration(
-                                        labelText: "Banque émettrice",
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          bankName = value;
-                                        });
-                                      },
-                                    ),
-                                    SizedBox(height: 10),
-                                    InkWell(
-                                      onTap: () async {
-                                        final selectedDate =
-                                            await showDatePicker(
-                                          context: context,
-                                          initialDate: DateTime.now(),
-                                          firstDate: DateTime.now(),
-                                          lastDate: DateTime.now()
-                                              .add(Duration(days: 365)),
-                                        );
-                                        if (selectedDate != null) {
-                                          setState(() {
-                                            checkDate = selectedDate;
-                                          });
-                                        }
-                                      },
-                                      child: InputDecorator(
-                                        decoration: InputDecoration(
-                                          labelText: "Date du chèque",
-                                          border: OutlineInputBorder(),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(checkDate != null
-                                                ? "${checkDate!.day}/${checkDate!.month}/${checkDate!.year}"
-                                                : "Sélectionner une date"),
-                                            Icon(Icons.calendar_today),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-
-                              SizedBox(height: 10),
-                              if (selectedPaymentMethod == "Espèce")
-                                TextField(
-                                  controller: changeReturnedController,
-                                  readOnly: true,
-                                  decoration: InputDecoration(
-                                    labelText: "Monnaie rendue (DT)",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                              SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Text("Nombre de tickets à imprimer:",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  SizedBox(width: 10),
-                                  Container(
-                                    width: 40,
-                                    height: 35,
-                                    child: TextField(
-                                      controller: TextEditingController(
-                                          text: numberOfTickets.toString()),
-                                      keyboardType: TextInputType.number,
-                                      style: TextStyle(fontSize: 14),
-                                      decoration: InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 6),
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          numberOfTickets =
-                                              int.tryParse(value) ?? 1;
-                                          if (numberOfTickets < 1) {
-                                            numberOfTickets = 1;
-                                          }
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ]),
-                      )
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1633,7 +1607,7 @@ class Addorder {
                     await _confirmPlaceOrder(
                         selectedProducts,
                         quantityProducts,
-                        discounts, // Changed from amountGiven to discounts
+                        discounts,
                         typeDiscounts,
                         isPercentageDiscount
                             ? globalDiscount
@@ -1652,13 +1626,14 @@ class Addorder {
                         ticketRestaurantAmount,
                         useLoyaltyPoints,
                         pointsToUse,
-                        pointsDiscount);
+                        pointsDiscount,
+                        selectedVariants);
                   },
                   child: Text(
                     "Confirmer",
                     style: TextStyle(color: Color(0xFF009688)),
                   ),
-                )
+                ),
               ],
             );
           },
@@ -1711,6 +1686,7 @@ class Addorder {
     bool useLoyaltyPoints,
     int pointsToUse,
     double pointsDiscount,
+    List<Variant?> selectedVariants,
   ) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
@@ -1822,29 +1798,62 @@ class Addorder {
       return;
     }
 
-    // Create order lines
-    List<OrderLine> orderLines = selectedProducts.map((product) {
-      int productIndex = selectedProducts.indexOf(product);
-      Variant? variant = product.hasVariants && product.variants.isNotEmpty
-          ? product.variants.firstWhere(
-              (v) => v.defaultVariant,
-              orElse: () => product.variants.first,
-            )
-          : null;
+    // Create order lines with proper variant handling
+    List<OrderLine> orderLines = [];
+    print("Selected variants before order creation: $selectedVariants");
+    for (int i = 0; i < selectedProducts.length; i++) {
+      Product product = selectedProducts[i];
+      Variant? variant = selectedVariants[i];
+      print("Variant passed iiiiiiiiiisssss : $variant");
 
-      return OrderLine(
+      // For products with variants but no variant selected, use the default variant
+      if (product.hasVariants &&
+          variant == null &&
+          product.variants.isNotEmpty) {
+        variant = product.variants.firstWhere(
+          (v) => v.defaultVariant,
+          orElse: () => product.variants.first,
+        );
+        selectedVariants[i] = variant; // Update selectedVariants
+      }
+
+      // Validate variant for variant-based products
+      if (product.hasVariants && variant == null) {
+        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(
+                "Veuillez sélectionner une variante pour ${product.designation}."),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      String productName = product.designation;
+      double price = product.prixTTC;
+      if (variant != null) {
+        productName += " (${variant.combinationName})";
+        price = variant.finalPrice;
+      }
+
+      print("priceee :  $price");
+
+      orderLines.add(OrderLine(
         idOrder: 0,
-        productCode: product.code,
+        productCode: product.code ?? 'PROD_${product.id}',
+        productName: productName,
         productId: product.id,
         variantId: variant?.id,
         variantCode: variant?.code,
         variantName: variant?.combinationName,
-        quantity: quantityProducts[productIndex],
-        prixUnitaire: variant?.finalPrice ?? product.prixTTC,
-        discount: discounts[productIndex],
-        isPercentage: typeDiscounts[productIndex],
-      );
-    }).toList();
+        quantity: quantityProducts[i],
+        prixUnitaire: price,
+        discount: discounts[i],
+        isPercentage: typeDiscounts[i],
+      ));
+      print("ORDERLINES $orderLines");
+      print("Order line created with prixUnitaire: ${orderLines.last.prixUnitaire}");
+    }
 
     // Get current user
     final prefs = await SharedPreferences.getInstance();
@@ -1954,9 +1963,12 @@ class Addorder {
       for (int i = 0; i < selectedProducts.length; i++) {
         final product = selectedProducts[i];
         final quantity = quantityProducts[i];
+        final variant = selectedVariants[i];
 
-        if (product.hasVariants && product.variants.isNotEmpty) {
-          final variant = product.variants.first;
+        print(
+            "Updating stock for product ${product.designation}, variant: $variant");
+
+        if (product.hasVariants && variant != null) {
           if (variant.stock - quantity < 0) {
             isValidOrder = false;
             Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -1969,6 +1981,8 @@ class Addorder {
               ),
             );
           } else {
+            print(
+                "Updating variant stock: id=${variant.id}, new stock=${variant.stock - quantity}");
             await SqlDb()
                 .updateVariantStock(variant.id!, variant.stock - quantity);
           }
@@ -1983,6 +1997,8 @@ class Addorder {
             ),
           );
         } else {
+          print(
+              "Updating product stock: id=${product.id}, new stock=${product.stock - quantity}");
           await SqlDb()
               .updateProductStock(product.id!, product.stock - quantity);
         }
@@ -2008,6 +2024,7 @@ class Addorder {
         quantityProducts.clear();
         discounts.clear();
         typeDiscounts.clear();
+        selectedVariants.clear();
       }
     } catch (e) {
       print("Error saving order: $e");
@@ -2098,7 +2115,7 @@ class Addorder {
         basePrice = product.prixTTC;
       }
 
-      // Add to total without applying discounts (this is BEFORE discount calculation)
+      // Add to total without applying discounts
       total += basePrice * quantity;
     }
 

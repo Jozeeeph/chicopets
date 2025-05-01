@@ -1,6 +1,7 @@
 class OrderLine {
   final int idOrder;
   final String? productCode;
+  final String? productName;
   final int? productId;
   final int? variantId;
   final String? variantCode;
@@ -13,6 +14,7 @@ class OrderLine {
   OrderLine({
     required this.idOrder,
     this.productCode,
+    this.productName,
     this.productId,
     this.variantId,
     this.variantCode,
@@ -38,6 +40,7 @@ class OrderLine {
     return {
       'id_order': idOrder,
       'product_code': productCode,
+      'product_name': productName,
       'product_id': productId,
       'variant_id': variantId,
       'variant_code': variantCode,
@@ -53,6 +56,7 @@ class OrderLine {
     return OrderLine(
       idOrder: map['id_order'] as int,
       productCode: map['product_code'] as String?,
+      productName: map['product_name'] as String?,
       productId: map['product_id'] as int?,
       variantId: map['variant_id'] as int?,
       variantCode: map['variant_code'] as String?,
@@ -62,5 +66,23 @@ class OrderLine {
       discount: (map['discount'] as num).toDouble(),
       isPercentage: map['isPercentage'] == 1,
     );
+  }
+
+  @override
+  String toString() {
+    return 'OrderLine{'
+        'idOrder: $idOrder, '
+        'productCode: $productCode, '
+        'productName: $productName, '
+        'productId: $productId, '
+        'variantId: $variantId, '
+        'variantCode: $variantCode, '
+        'variantName: $variantName, '
+        'quantity: $quantity, '
+        'prixUnitaire: $prixUnitaire, '
+        'discount: $discount, '
+        'isPercentage: $isPercentage, '
+        'finalPrice: $finalPrice'
+        '}';
   }
 }
