@@ -145,7 +145,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
         // Create a unique key for the product with variant
         final variantName =
             variant?.combinationName ?? line.variantName ?? 'Standard';
-        final productKey = '${product.designation} ($variantName)';
+        final productKey = "${line.productName}";
 
         if (!productsMap.containsKey(productKey)) {
           productsMap[productKey] = {
@@ -253,8 +253,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
             as Map<String, Map<String, dynamic>>;
 
         // Create a unique key for the product with variant
-        final variantName =
-            variant?.combinationName ?? line.variantName ?? 'Standard';
+        final variantName =variant?.combinationName ?? line.variantName ?? 'Standard';
         final productKey = '${product.designation} ($variantName)';
 
         if (!productsMap.containsKey(productKey)) {

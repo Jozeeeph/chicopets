@@ -18,8 +18,7 @@ class OrderController {
           'status': order.status,
           'remaining_amount': order.remainingAmount,
           'id_client': order.idClient,
-          'user_id':
-              order.userId, // This must match your database column name exactly
+          'user_id': order.userId,
           'global_discount': order.globalDiscount,
           'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
           // Include all other fields that should be saved
@@ -29,15 +28,6 @@ class OrderController {
       // Debug print after insertion
       print('Order inserted with ID: $orderId');
 
-      // Verify the order was saved with user ID
-      final insertedOrder = await dbClient.query(
-        'orders',
-        where: 'id_order = ?',
-        whereArgs: [orderId],
-      );
-
-      print('Verified order user ID: ${insertedOrder.first['user_id']}');
-
       // Insert order lines
       for (var orderLine in order.orderLines) {
         await dbClient.insert(
@@ -46,11 +36,14 @@ class OrderController {
             'id_order': orderId,
             'product_code': orderLine.productCode,
             'product_id': orderLine.productId,
+            'product_name': orderLine.productName, // Add this line
             'quantity': orderLine.quantity,
             'prix_unitaire': orderLine.prixUnitaire,
             'discount': orderLine.discount,
             'isPercentage': orderLine.isPercentage ? 1 : 0,
-            // Include variant fields if needed
+            // Add variant fields if needed
+            'variant_id': orderLine.variantId,
+            'variant_name': orderLine.variantName,
           },
         );
       }
@@ -141,10 +134,11 @@ class OrderController {
       orderLines.add(OrderLine(
         idOrder: line['id_order'] as int,
         productCode: line['product_code']?.toString(),
+        productName: line['product_name']?.toString(),
         productId: line['product_id'] as int?,
+        variantId: line['variant_id'] as int?,
         quantity: line['quantity'] as int,
-        prixUnitaire:
-            product?.prixTTC ?? (line['prix_unitaire'] as num).toDouble(),
+        prixUnitaire:(line['prix_unitaire'] as num).toDouble(),
         discount: (line['discount'] as num).toDouble(),
         isPercentage: (line['isPercentage'] as int) == 1,
       ));
@@ -224,6 +218,7 @@ class OrderController {
         {
           'id_order': order.idOrder,
           'product_code': orderLine.productCode,
+          'product_name': orderLine.productName,
           'product_id': orderLine.productId,
           'quantity': orderLine.quantity,
           'prix_unitaire': orderLine.prixUnitaire,

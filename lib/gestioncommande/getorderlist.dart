@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/orderline.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/models/order.dart';
@@ -9,7 +10,8 @@ import 'package:caissechicopets/models/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart'; // Added for font loading
+import 'package:flutter/services.dart';
+import 'package:sqflite/sqflite.dart'; // Added for font loading
 
 class Getorderlist {
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -279,10 +281,6 @@ class Getorderlist {
                                                 color: Color(0xFFE53935))));
                                   }
 
-                                  Product product = snapshot.data!;
-                                  double discountedPrice =
-                                      orderLine.prixUnitaire *
-                                          (1 - orderLine.discount / 100);
                                   return Padding(
                                     padding:
                                         const EdgeInsets.symmetric(vertical: 4),
@@ -302,7 +300,8 @@ class Getorderlist {
                                         Expanded(
                                           flex: 2,
                                           child: Text(
-                                            product.designation,
+                                            orderLine.productName ??
+                                                'Unknown Product',
                                             style: const TextStyle(
                                                 fontSize: 16,
                                                 color: Color(0xFF000000)),
@@ -635,7 +634,6 @@ class Getorderlist {
                                   style: TextStyle(color: Color(0xFFE53935))));
                         }
 
-                        Product product = snapshot.data!;
                         double discountedPrice = orderLine.prixUnitaire *
                             (1 - orderLine.discount / 100);
                         return Padding(
@@ -654,7 +652,7 @@ class Getorderlist {
                               Expanded(
                                 flex: 2,
                                 child: Text(
-                                  product.designation,
+                                  "x${orderLine.productName}",
                                   style: TextStyle(
                                       fontSize: 16, color: Color(0xFF000000)),
                                 ),
@@ -662,7 +660,7 @@ class Getorderlist {
                               Expanded(
                                 flex: 1,
                                 child: Text(
-                                  "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                  "${orderLine.finalPrice.toStringAsFixed(2)} DT",
                                   style: TextStyle(
                                       fontSize: 16, color: Color(0xFF000000)),
                                 ),
@@ -902,105 +900,159 @@ class Getorderlist {
     );
   }
 
+  // In your Getorderlist class
   static Future<void> deleteOrderLine(
     BuildContext context,
     Order order,
     OrderLine orderLine,
     Function() onOrderLineDeleted,
   ) async {
-    final SqlDb sqldb = SqlDb();
-
-    bool? confirmDelete = await showDialog<bool>(
+    final bool? confirmDelete = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirmer la suppression'),
-          content: const Text(
-              'Voulez-vous vraiment supprimer cet article de la commande?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child:
-                  const Text('Supprimer', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text(
+            'Voulez-vous vraiment supprimer cet article de la commande?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
 
-    if (confirmDelete == true) {
-      try {
-        // Delete order line from database
-        await sqldb.deleteOrderLine(order.idOrder!,
-            orderLine.productCode ?? orderLine.productId?.toString() ?? '');
+    if (confirmDelete != true) return;
 
-        // Restock the product if it exists
-        if (orderLine.productId != null) {
-          final product = await sqldb.getProductById(orderLine.productId!);
-          if (product != null) {
-            int newStock = product.stock + orderLine.quantity;
-            await sqldb.updateProductStock(orderLine.productId!, newStock);
-          }
+    try {
+      final SqlDb sqldb = SqlDb();
+      final dbClient = await sqldb.db;
+
+      // Calculate new total
+      final double lineTotal = orderLine.finalPrice * orderLine.quantity;
+      final double newTotal = order.total - lineTotal;
+
+      // Transaction with proper error handling
+      await dbClient.transaction((txn) async {
+        // 1. Delete the order line and verify deletion
+        final deletedCount = await _deleteOrderLineWithVerification(
+          txn,
+          order.idOrder!,
+          orderLine,
+        );
+
+        if (deletedCount == 0) {
+          throw Exception('Failed to delete order line - no rows affected');
         }
 
-        // Update local Order object
-        order.orderLines.removeWhere((line) =>
-            (line.productCode != null &&
-                line.productCode == orderLine.productCode) ||
-            (line.productId != null && line.productId == orderLine.productId));
+        // 2. Restock the item
+        await _restockItem(txn, orderLine);
 
-        // Check if order is now empty
-        if (order.orderLines.isEmpty) {
-          // Delete the entire order
-          await sqldb.deleteOrder(order.idOrder!);
-
-          // Show success message
-          scaffoldMessengerKey.currentState?.showSnackBar(
-            const SnackBar(
-              content: Text('Commande vide supprimée'),
-              backgroundColor: Colors.green,
-            ),
+        // 3. Update order total or delete if empty
+        if (order.orderLines.length == 1) {
+          await txn.delete('orders',
+              where: 'id_order = ?', whereArgs: [order.idOrder]);
+        } else {
+          await txn.update(
+            'orders',
+            {'total': newTotal},
+            where: 'id_order = ?',
+            whereArgs: [order.idOrder],
           );
-
-          // Call callback to update UI
-          onOrderLineDeleted();
-          return;
         }
+      });
 
-        // Recalculate order total if not empty
-        double newTotal =
-            order.total - (orderLine.finalPrice * orderLine.quantity);
+      // Update local state
+      order.orderLines.removeWhere((line) =>
+          line.productId == orderLine.productId &&
+          line.variantId == orderLine.variantId);
+      order.total = newTotal;
 
-        // Update order total in database
-        await sqldb.updateOrderTotal(order.idOrder!, newTotal);
+      // Show success message
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        order.orderLines.isEmpty
+            ? const SnackBar(
+                content: Text('Commande vide supprimée'),
+                backgroundColor: Colors.green,
+              )
+            : const SnackBar(
+                content: Text('Article supprimé avec succès'),
+                backgroundColor: Colors.green,
+              ),
+      );
 
-        // Update local Order object
-        order.total = newTotal;
-
-        // Show success message
-        scaffoldMessengerKey.currentState?.showSnackBar(
-          const SnackBar(
-            content: Text('Article supprimé avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Call callback to update UI
-        onOrderLineDeleted();
-      } catch (e) {
-        scaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la suppression: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      onOrderLineDeleted();
+    } catch (e) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+
+  static Future<int> _deleteOrderLineWithVerification(
+    DatabaseExecutor dbClient,
+    int idOrder,
+    OrderLine orderLine,
+  ) async {
+    if (orderLine.productCode == null && orderLine.productId == null) {
+      throw Exception('Invalid order line: missing product identifier');
+    }
+
+    final String idProduct =
+        orderLine.productCode ?? orderLine.productId!.toString();
+    final int? variantId = orderLine.variantId;
+    String whereClause;
+    List<dynamic> whereArgs;
+
+    if (variantId != null) {
+      whereClause =
+          'id_order = ? AND variant_id = ? AND (product_code = ? OR product_id = ?)';
+      whereArgs = [idOrder, variantId, idProduct, idProduct];
+    } else {
+      whereClause =
+          'id_order = ? AND variant_id IS NULL AND (product_code = ? OR product_id = ?)';
+      whereArgs = [idOrder, idProduct, idProduct];
+    }
+
+    final deletedCount = await dbClient.delete(
+      'order_items',
+      where: whereClause,
+      whereArgs: whereArgs,
+    );
+
+    return deletedCount;
+  }
+
+  static Future<void> _restockItem(
+    DatabaseExecutor dbClient,
+    OrderLine orderLine,
+  ) async {
+    if (orderLine.variantId != null) {
+      final updatedRows = await dbClient.rawUpdate(
+        'UPDATE variants SET stock = stock + ? WHERE id = ?',
+        [orderLine.quantity, orderLine.variantId],
+      );
+      print(
+          '║ Restocked variant ${orderLine.variantId} with ${orderLine.quantity} items ($updatedRows rows updated)');
+    } else if (orderLine.productId != null) {
+      final updatedRows = await dbClient.rawUpdate(
+        'UPDATE products SET stock = stock + ? WHERE id = ?',
+        [orderLine.quantity, orderLine.productId],
+      );
+      print(
+          '║ Restocked product ${orderLine.productId} with ${orderLine.quantity} items ($updatedRows rows updated)');
+    }
+  }
+
+  // Debug helper methods
+
 
   static String formatDate(String date) {
     DateTime parsedDate = DateTime.parse(date);

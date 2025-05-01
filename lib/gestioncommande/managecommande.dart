@@ -185,7 +185,8 @@ class _ManageCommandState extends State<ManageCommand> {
               itemBuilder: (context, index) {
                 Order order = snapshot.data![index];
 
-                print("Remaining amount when retrieving order: ${order.remainingAmount}");
+                print(
+                    "Remaining amount when retrieving order: ${order.remainingAmount}");
 
                 bool isCancelled = order.status == 'annulée';
                 bool isSemiPaid = order.status == 'non payée';
@@ -293,10 +294,9 @@ class _ManageCommandState extends State<ManageCommand> {
                                   ),
                                 );
                               } else {
-                                Product product = productSnapshot.data!;
                                 return ListTile(
                                   title: Text(
-                                    'Produit: ${product.designation}',
+                                    'Produit: ${orderLine.productName}',
                                     style: const TextStyle(
                                       color: Colors.black,
                                       fontWeight: FontWeight.bold,
