@@ -38,7 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -55,28 +55,29 @@ class SqlDb {
           print("Creating tables...");
 
           await db.execute('''
-          CREATE TABLE products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT,
-            designation TEXT,
-            description TEXT,
-            stock INTEGER,
-            prix_ht REAL,
-            taxe REAL,
-            prix_ttc REAL,
-            date_expiration TEXT,
-            category_id INTEGER,
-            sub_category_id INTEGER,
-            category_name TEXT,
-            sub_category_name TEXT,
-            is_deleted INTEGER DEFAULT 0,
-            marge REAL,
-            remise_max REAL DEFAULT 0.0,
-            remise_valeur_max REAL DEFAULT 0.0,
-            has_variants INTEGER DEFAULT 0,
-            sellable INTEGER DEFAULT 1
-          );
-        ''');
+  CREATE TABLE products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT,
+    designation TEXT,
+    description TEXT,
+    stock INTEGER,
+    prix_ht REAL,
+    taxe REAL,
+    prix_ttc REAL,
+    date_expiration TEXT,
+    category_id INTEGER,
+    sub_category_id INTEGER,
+    category_name TEXT,
+    sub_category_name TEXT,
+    is_deleted INTEGER DEFAULT 0,
+    marge REAL,
+    remise_max REAL DEFAULT 0.0,
+    remise_valeur_max REAL DEFAULT 0.0,
+    has_variants INTEGER DEFAULT 0,
+    sellable INTEGER DEFAULT 1,
+    status TEXT DEFAULT 'En stock'
+  );
+''');
           print("Products table created");
 
           await db.execute('''
@@ -416,9 +417,11 @@ class SqlDb {
     await Orderlinecontroller().cancelOrderLine(idOrder, idProduct, dbClient);
   }
 
-  Future<void> deleteOrderLine(int idOrder, String idProduct,int variantId) async {
+  Future<void> deleteOrderLine(
+      int idOrder, String idProduct, int variantId) async {
     final dbClient = await db;
-    await Orderlinecontroller().deleteOrderLine(idOrder, idProduct,variantId, dbClient);
+    await Orderlinecontroller()
+        .deleteOrderLine(idOrder, idProduct, variantId, dbClient);
   }
 
   //Category Repository
@@ -802,4 +805,13 @@ class SqlDb {
     final db = await this.db;
     return await Attributcontroller().deleteAttribute(attributId, db);
   }
+  Future<int> updateProductPrice(int productId, double newPrice) async {
+  final db = await this.db;
+  return await db.update(
+    'products',
+    {'prix_ttc': newPrice},
+    where: 'id = ?',
+    whereArgs: [productId],
+  );
+}
 }
