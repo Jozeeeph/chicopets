@@ -341,4 +341,14 @@ class ProductController {
   
   return results;
 }
+Future<double> getProductTotalSales(int productId, Database dbClient) async {
+  final result = await dbClient.rawQuery('''
+    SELECT SUM(oi.quantity * oi.prix_unitaire) as total_sales
+    FROM order_items oi
+    JOIN orders o ON oi.id_order = o.id_order
+    WHERE oi.product_id = ? AND o.status != 'cancelled'
+  ''', [productId]);
+
+  return result.first['total_sales'] as double? ?? 0.0;
+}
 }

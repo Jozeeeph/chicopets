@@ -4,6 +4,7 @@ import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
 import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
 import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
+import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
@@ -140,7 +141,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Gestion de stock',
                         icon: Icons.warehouse,
-                        page: null,
+                        page: const StockManagementPage(),
                         color: const Color(0xFF795548),
                       ),
                       _buildCard(
@@ -179,13 +180,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         color: const Color(0xFFF44336),
                       ),
                     ],
-                    _buildCard(
-                      context,
-                      label: 'Passage de commande',
-                      icon: Icons.point_of_sale,
-                      page: const CashDeskPage(),
-                      color: const Color(0xFF4CAF50),
-                    ),
                     _buildCard(
                       context,
                       label: 'Galerie de photos',

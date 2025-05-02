@@ -21,6 +21,7 @@ class Product {
   double remiseValeurMax;
   bool hasVariants;
   bool sellable;
+  String status;
 
   Product({
     this.id, // Changed from default 0 to nullable
@@ -43,6 +44,7 @@ class Product {
     this.remiseValeurMax = 0.0,
     this.hasVariants = false,
     this.sellable = true,
+    this.status = 'En stock',
   });
 
   String get productReferenceId => id?.toString() ?? 'new';
@@ -68,6 +70,7 @@ class Product {
     double? remiseValeurMax,
     bool? hasVariants,
     bool? sellable,
+    String? status
   }) {
     return Product(
       id: id ?? this.id,
@@ -90,6 +93,7 @@ class Product {
       remiseValeurMax: remiseValeurMax ?? this.remiseValeurMax,
       hasVariants: hasVariants ?? this.hasVariants,
       sellable: sellable ?? this.sellable,
+      status: status ?? this.status,
     );
   }
 
@@ -113,6 +117,7 @@ class Product {
       'remise_valeur_max': remiseValeurMax,
       'has_variants': hasVariants ? 1 : 0,
       'sellable': sellable ? 1 : 0,
+      'status': status,
     };
 
     // Only include ID if it's not null and not 0 (for updates)
@@ -144,6 +149,7 @@ class Product {
       remiseValeurMax: (map['remise_valeur_max'] ?? 0.0).toDouble(),
       hasVariants: map['has_variants'] == 1,
       sellable: map['sellable'] == 1,
+      status: map['status'] ?? 'En stock',
     );
   }
 
