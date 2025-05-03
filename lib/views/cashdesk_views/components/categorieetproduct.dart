@@ -131,136 +131,143 @@ class _CategorieetproductState extends State<Categorieetproduct> {
           ),
           elevation: 5,
           backgroundColor: Colors.white,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: tealGreen, width: 2),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+              maxWidth: MediaQuery.of(context).size.width * 0.8,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Select Variant for ${product.designation}',
-                  style: TextStyle(
-                    color: darkBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: product.variants.length,
-                    itemBuilder: (context, index) {
-                      final variant = product.variants[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 5),
-                        color:
-                            variant.stock > 0 ? Colors.white : Colors.grey[200],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: variant.stock > 0 ? tealGreen : warmRed,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 15, vertical: 8),
-                          leading: Icon(
-                            variant.stock > 0
-                                ? Icons.check_circle
-                                : Icons.remove_circle,
-                            color: variant.stock > 0 ? Colors.green : warmRed,
-                            size: 30,
-                          ),
-                          title: Text(
-                            variant.combinationName,
-                            style: TextStyle(
-                              color: darkBlue,
-                              fontWeight: FontWeight.bold,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Select Variant for ${product.designation}',
+                      style: TextStyle(
+                        color: darkBlue,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.5,
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: product.variants.length,
+                        itemBuilder: (context, index) {
+                          final variant = product.variants[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 5),
+                            color: variant.stock > 0
+                                ? Colors.white
+                                : Colors.grey[200],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: variant.stock > 0 ? tealGreen : warmRed,
+                                width: 1.5,
+                              ),
                             ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Price: ${variant.finalPrice} DT',
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 15, vertical: 8),
+                              leading: Icon(
+                                variant.stock > 0
+                                    ? Icons.check_circle
+                                    : Icons.remove_circle,
+                                color:
+                                    variant.stock > 0 ? Colors.green : warmRed,
+                                size: 30,
+                              ),
+                              title: Text(
+                                variant.combinationName,
                                 style: TextStyle(
                                   color: darkBlue,
-                                ),
-                              ),
-                              Text(
-                                'Stock: ${variant.stock}',
-                                style: TextStyle(
-                                  color:
-                                      variant.stock > 0 ? tealGreen : warmRed,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (variant.defaultVariant)
-                                Container(
-                                  margin: const EdgeInsets.only(top: 4),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: tealGreen.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'Default',
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Price: ${variant.finalPrice} DT',
                                     style: TextStyle(
-                                      color: tealGreen,
-                                      fontSize: 12,
+                                      color: darkBlue,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Stock: ${variant.stock}',
+                                    style: TextStyle(
+                                      color: variant.stock > 0
+                                          ? tealGreen
+                                          : warmRed,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                          trailing: Icon(
-                            Icons.arrow_forward_ios,
-                            color: darkBlue,
-                            size: 16,
-                          ),
-                          onTap: variant.stock > 0
-                              ? () {
-                                  Navigator.pop(context);
-                                  widget.onProductSelected(product, variant);
-                                }
-                              : null,
+                                  if (variant.defaultVariant)
+                                    Container(
+                                      margin: const EdgeInsets.only(top: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: tealGreen.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Default',
+                                        style: TextStyle(
+                                          color: tealGreen,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: Icon(
+                                Icons.arrow_forward_ios,
+                                color: darkBlue,
+                                size: 16,
+                              ),
+                              onTap: variant.stock > 0
+                                  ? () {
+                                      Navigator.pop(context);
+                                      widget.onProductSelected(
+                                          product, variant);
+                                    }
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: tealGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: tealGreen,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 30, vertical: 12),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 30, vertical: 12),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -292,40 +299,39 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   Widget _buildCategoryButton(Category category) {
-    return GestureDetector(
-      onTap: () => _onCategorySelected(category.id),
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: selectedCategoryId == category.id
-              ? tealGreen.withOpacity(0.2)
-              : darkBlue.withOpacity(0.1),
-          border: Border.all(
-            color: selectedCategoryId == category.id ? tealGreen : deepBlue,
-            width: 1.8,
-          ),
-          borderRadius: BorderRadius.circular(30),
-        ),
+    return Container(
+      margin: const EdgeInsets.all(8),
+      child: GestureDetector(
+        onTap: () => _onCategorySelected(category.id),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: SizedBox(
-                width: 80,
-                height: 80,
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: selectedCategoryId == category.id
+                    ? tealGreen.withOpacity(0.2)
+                    : darkBlue.withOpacity(0.1),
+                border: Border.all(
+                  color:
+                      selectedCategoryId == category.id ? tealGreen : deepBlue,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(35),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(35),
                 child: _buildCategoryImage(category.imagePath),
               ),
             ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: 80,
               child: Text(
                 category.name ?? 'Unnamed',
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 16,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -348,16 +354,16 @@ class _CategorieetproductState extends State<Categorieetproduct> {
       if (effectivePath.startsWith('assets/')) {
         return Image.asset(
           effectivePath,
-          width: 100,
-          height: 100,
+          width: 70,
+          height: 70,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _buildDefaultCategoryImage(),
         );
       } else if (File(effectivePath).existsSync()) {
         return Image.file(
           File(effectivePath),
-          width: 100,
-          height: 100,
+          width: 70,
+          height: 70,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _buildDefaultCategoryImage(),
         );
@@ -371,10 +377,10 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   Widget _buildDefaultCategoryImage() {
     return Container(
-      width: 100,
-      height: 100,
+      width: 70,
+      height: 70,
       color: lightGray,
-      child: Icon(Icons.category, size: 50, color: deepBlue),
+      child: Icon(Icons.category, size: 40, color: deepBlue),
     );
   }
 
@@ -383,13 +389,9 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     if (product.hasVariants && product.variants.isNotEmpty) {
       totalStock =
           product.variants.fold(0, (sum, variant) => sum + variant.stock);
-    } else {
-      totalStock = product.stock;
     }
 
-    if (totalStock <= 0) {
-      return const SizedBox.shrink();
-    }
+    if (totalStock <= 0) return const SizedBox.shrink();
 
     Variant? defaultVariant;
     if (product.hasVariants && product.variants.isNotEmpty) {
@@ -404,93 +406,69 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     final variantName = defaultVariant?.combinationName;
 
     return Container(
-      margin: const EdgeInsets.all(2.0),
+      margin: const EdgeInsets.all(1), // Reduced from 2
       decoration: BoxDecoration(
         color: darkBlue,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(6), // Reduced from 8
       ),
       child: InkWell(
+        borderRadius: BorderRadius.circular(6), // Reduced from 8
         onTap: () => _onProductSelected(product),
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(2), // Reduced from 4
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min, // Added to minimize height
             children: [
+              Flexible(
+                // Added Flexible for better text containment
+                child: Text(
+                  product.designation,
+                  style: TextStyle(
+                    color: white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10, // Reduced from 12
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 1), // Reduced from 2
               Text(
-                product.designation,
+                "${displayPrice.toStringAsFixed(2)} DT",
                 style: TextStyle(
-                  color: white,
+                  color: softOrange,
+                  fontSize: 9, // Reduced from 11
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orangeAccent.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      "${displayPrice.toStringAsFixed(2)} DT",
-                      style: TextStyle(
-                        color: softOrange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    if (variantName != null)
-                      Text(
-                        variantName,
-                        style: TextStyle(
-                          color: white,
-                          fontSize: 10,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    if (defaultVariant?.defaultVariant ?? false)
-                      Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: tealGreen.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Default',
-                          style: TextStyle(
-                            color: white,
-                            fontSize: 8,
-                          ),
-                        ),
-                      ),
-                  ],
                 ),
               ),
-              const SizedBox(height: 4),
+              if (variantName != null)
+                Text(
+                  variantName,
+                  style: TextStyle(
+                    color: white,
+                    fontSize: 8, // Reduced from 9
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              const SizedBox(height: 1), // Reduced from 2
               Text(
-                "Stock: $displayStock",
+                "$displayStock", // Removed "Stock: " prefix
                 style: TextStyle(
                   color: displayStock > 5
                       ? const Color.fromARGB(255, 60, 218, 65)
                       : warmRed,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 9, // Reduced from 10
                 ),
               ),
               if (product.hasVariants)
                 Text(
-                  "${product.variants.length} variante(s)",
+                  "${product.variants.length}v", // Changed to more compact "v"
                   style: TextStyle(
                     color: const Color.fromARGB(255, 64, 204, 255),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 8, // Reduced from 9
                   ),
                 ),
             ],
@@ -502,124 +480,151 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Row(
-        children: [
-          // Categories column
-          Expanded(
-            flex: 2,
-            child: RefreshIndicator(
-              onRefresh: () async {
-                _loadData();
-              },
-              child: FutureBuilder<List<Category>>(
-                future: categories,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No categories available'));
-                  }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Categories column
+                SizedBox(
+                  width: constraints.maxWidth * 0.25,
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      _loadData();
+                    },
+                    child: FutureBuilder<List<Category>>(
+                      future: categories,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        } else if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          return const Center(
+                              child: Text('No categories available'));
+                        }
 
-                  return Scrollbar(
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 1,
-                        mainAxisSpacing: 28.0,
-                        crossAxisSpacing: 40.0,
-                      ),
-                      padding: const EdgeInsets.all(8.0),
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) {
-                        return _buildCategoryButton(snapshot.data![index]);
+                        return Scrollbar(
+                          child: GridView.builder(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 1,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            itemCount: snapshot.data!.length,
+                            itemBuilder: (context, index) {
+                              return _buildCategoryButton(
+                                  snapshot.data![index]);
+                            },
+                          ),
+                        );
                       },
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-          VerticalDivider(
-            color: lightGray,
-            thickness: 2,
-          ),
-          // Products column
-          Expanded(
-            flex: 4,
-            child: RefreshIndicator(
-              onRefresh: () async {
-                _loadData();
-              },
-              child: FutureBuilder<List<Product>>(
-                future: products,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No products available'));
-                  }
+                  ),
+                ),
 
-                  final productMap = <int, Product>{};
-                  for (final product in snapshot.data!) {
-                    if (product.id != null) {
-                      int totalStock = product.stock;
-                      if (product.hasVariants && product.variants.isNotEmpty) {
-                        totalStock =
-                            product.variants.fold(0, (sum, v) => sum + v.stock);
-                      }
+                VerticalDivider(
+                  color: lightGray,
+                  thickness: 1,
+                  width: 1,
+                ),
 
-                      if (totalStock > 0 && !productMap.containsKey(product.id!)) {
-                        productMap[product.id!] = product;
-                      }
-                    }
-                  }
+                // Products column
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      _loadData();
+                    },
+                    child: FutureBuilder<List<Product>>(
+                      future: products,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        } else if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          return const Center(
+                              child: Text('No products available'));
+                        }
 
-                  final uniqueProducts = productMap.values.toList();
-                  final filteredProducts = selectedCategoryId == null
-                      ? uniqueProducts
-                      : uniqueProducts
-                          .where((p) => p.categoryId == selectedCategoryId)
-                          .toList();
+                        final productMap = <int, Product>{};
+                        for (final product in snapshot.data!) {
+                          if (product.id != null) {
+                            int totalStock = product.stock;
+                            if (product.hasVariants &&
+                                product.variants.isNotEmpty) {
+                              totalStock = product.variants
+                                  .fold(0, (sum, v) => sum + v.stock);
+                            }
 
-                  if (filteredProducts.isEmpty) {
-                    return Center(
-                      child: Text(
-                        selectedCategoryId == null
-                            ? 'No available products'
-                            : 'No products in this category',
-                        style: TextStyle(color: darkBlue),
-                      ),
-                    );
-                  }
+                            if (totalStock > 0 &&
+                                !productMap.containsKey(product.id!)) {
+                              productMap[product.id!] = product;
+                            }
+                          }
+                        }
 
-                  return Scrollbar(
-                    child: GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount:
-                            MediaQuery.of(context).size.width > 1000 ? 6 : 4,
-                        childAspectRatio: 1.2,
-                        mainAxisSpacing: 6.0,
-                        crossAxisSpacing: 6.0,
-                      ),
-                      padding: const EdgeInsets.all(8.0),
-                      itemCount: filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(filteredProducts[index]);
+                        final uniqueProducts = productMap.values.toList();
+                        final filteredProducts = selectedCategoryId == null
+                            ? uniqueProducts
+                            : uniqueProducts
+                                .where(
+                                    (p) => p.categoryId == selectedCategoryId)
+                                .toList();
+
+                        if (filteredProducts.isEmpty) {
+                          return Center(
+                            child: Text(
+                              selectedCategoryId == null
+                                  ? 'No available products'
+                                  : 'No products in this category',
+                              style: TextStyle(color: darkBlue),
+                            ),
+                          );
+                        }
+
+                        final crossAxisCount =
+                            constraints.maxWidth > 800 ? 4 : 3;
+
+                        return Scrollbar(
+                          child: GridView.builder(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              childAspectRatio: 0.9,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            itemCount: filteredProducts.length,
+                            itemBuilder: (context, index) {
+                              return _buildProductCard(filteredProducts[index]);
+                            },
+                          ),
+                        );
                       },
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -38,7 +38,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -58,25 +58,27 @@ class SqlDb {
   CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT,
-    designation TEXT,
+    designation TEXT NOT NULL,
     description TEXT,
-    stock INTEGER,
-    prix_ht REAL,
-    taxe REAL,
-    prix_ttc REAL,
-    date_expiration TEXT,
-    category_id INTEGER,
+    stock INTEGER NOT NULL,
+    prix_ht REAL NOT NULL,
+    taxe REAL NOT NULL,
+    prix_ttc REAL NOT NULL,
+    date_expiration TEXT NOT NULL,
+    category_id INTEGER NOT NULL,
     sub_category_id INTEGER,
     category_name TEXT,
     sub_category_name TEXT,
     is_deleted INTEGER DEFAULT 0,
-    marge REAL,
+    marge REAL NOT NULL,
     remise_max REAL DEFAULT 0.0,
     remise_valeur_max REAL DEFAULT 0.0,
     has_variants INTEGER DEFAULT 0,
     sellable INTEGER DEFAULT 1,
-    status TEXT DEFAULT 'En stock'
-  );
+    status TEXT DEFAULT 'En stock',
+    image TEXT,
+    brand TEXT
+);
 ''');
           print("Products table created");
 
@@ -805,13 +807,14 @@ class SqlDb {
     final db = await this.db;
     return await Attributcontroller().deleteAttribute(attributId, db);
   }
+
   Future<int> updateProductPrice(int productId, double newPrice) async {
-  final db = await this.db;
-  return await db.update(
-    'products',
-    {'prix_ttc': newPrice},
-    where: 'id = ?',
-    whereArgs: [productId],
-  );
-}
+    final db = await this.db;
+    return await db.update(
+      'products',
+      {'prix_ttc': newPrice},
+      where: 'id = ?',
+      whereArgs: [productId],
+    );
+  }
 }

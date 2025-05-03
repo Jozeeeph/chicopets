@@ -22,6 +22,8 @@ class Product {
   bool hasVariants;
   bool sellable;
   String status;
+  String? image; // Added image attribute
+  String? brand; // Added brand attribute
 
   Product({
     this.id, // Changed from default 0 to nullable
@@ -45,6 +47,8 @@ class Product {
     this.hasVariants = false,
     this.sellable = true,
     this.status = 'En stock',
+    this.image, // Added to constructor
+    this.brand, // Added to constructor
   });
 
   String get productReferenceId => id?.toString() ?? 'new';
@@ -70,7 +74,9 @@ class Product {
     double? remiseValeurMax,
     bool? hasVariants,
     bool? sellable,
-    String? status
+    String? status,
+    String? image, // Added to copyWith
+    String? brand, // Added to copyWith
   }) {
     return Product(
       id: id ?? this.id,
@@ -94,6 +100,8 @@ class Product {
       hasVariants: hasVariants ?? this.hasVariants,
       sellable: sellable ?? this.sellable,
       status: status ?? this.status,
+      image: image ?? this.image, // Added to copyWith
+      brand: brand ?? this.brand, // Added to copyWith
     );
   }
 
@@ -118,6 +126,8 @@ class Product {
       'has_variants': hasVariants ? 1 : 0,
       'sellable': sellable ? 1 : 0,
       'status': status,
+      'image': image, // Added to toMap
+      'brand': brand, // Added to toMap
     };
 
     // Only include ID if it's not null and not 0 (for updates)
@@ -150,6 +160,8 @@ class Product {
       hasVariants: map['has_variants'] == 1,
       sellable: map['sellable'] == 1,
       status: map['status'] ?? 'En stock',
+      image: map['image'], // Added to fromMap
+      brand: map['brand'], // Added to fromMap
     );
   }
 
@@ -175,6 +187,7 @@ class Product {
         'stock: $stock, prixHT: $prixHT, taxe: $taxe, prixTTC: $prixTTC, '
         'category: $categoryName ($categoryId), '
         'subCategory: $subCategoryName ($subCategoryId), '
-        'variants: ${variants.length} , sellable : $sellable';
+        'variants: ${variants.length}, sellable: $sellable, '
+        'image: $image, brand: $brand'; // Updated toString
   }
 }
