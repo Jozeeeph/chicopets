@@ -300,14 +300,16 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   Widget _buildCategoryButton(Category category) {
     return Container(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(
+          horizontal: 3, vertical: 8), // Reduced vertical margin
       child: GestureDetector(
         onTap: () => _onCategorySelected(category.id),
         child: Column(
+          mainAxisSize: MainAxisSize.min, // Important to prevent overflow
           children: [
             Container(
-              width: 70,
-              height: 70,
+              width: 80, // Reduced from 90
+              height: 80, // Reduced from 90
               decoration: BoxDecoration(
                 color: selectedCategoryId == category.id
                     ? tealGreen.withOpacity(0.2)
@@ -317,25 +319,26 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       selectedCategoryId == category.id ? tealGreen : deepBlue,
                   width: 1.5,
                 ),
-                borderRadius: BorderRadius.circular(35),
+                borderRadius:
+                    BorderRadius.circular(35), // Adjusted to match new size
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(35),
                 child: _buildCategoryImage(category.imagePath),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4), // Reduced spacing
             SizedBox(
-              width: 80,
+              width: 70, // Match image width
               child: Text(
                 category.name ?? 'Unnamed',
                 style: TextStyle(
                   color: deepBlue,
-                  fontSize: 12,
+                  fontSize: 12, // Slightly reduced
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -377,10 +380,10 @@ class _CategorieetproductState extends State<Categorieetproduct> {
 
   Widget _buildDefaultCategoryImage() {
     return Container(
-      width: 70,
-      height: 70,
+      width: 100,
+      height: 100,
       color: lightGray,
-      child: Icon(Icons.category, size: 40, color: deepBlue),
+      child: Icon(Icons.category, size: 50, color: deepBlue),
     );
   }
 
@@ -406,77 +409,76 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     final variantName = defaultVariant?.combinationName;
 
     return Container(
-      margin: const EdgeInsets.all(1), // Reduced from 2
-      decoration: BoxDecoration(
-        color: darkBlue,
-        borderRadius: BorderRadius.circular(6), // Reduced from 8
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6), // Reduced from 8
-        onTap: () => _onProductSelected(product),
-        child: Padding(
-          padding: const EdgeInsets.all(2), // Reduced from 4
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min, // Added to minimize height
-            children: [
-              Flexible(
-                // Added Flexible for better text containment
-                child: Text(
-                  product.designation,
-                  style: TextStyle(
-                    color: white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10, // Reduced from 12
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(height: 1), // Reduced from 2
-              Text(
-                "${displayPrice.toStringAsFixed(2)} DT",
+    margin: const EdgeInsets.symmetric(horizontal: 1, vertical: 8), // Réduit vertical
+    decoration: BoxDecoration(
+      color: darkBlue,
+      borderRadius: BorderRadius.circular(12), // Bord plus arrondi
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _onProductSelected(product),
+      child: Padding(
+        padding: const EdgeInsets.all(6), // Padding réduit
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                product.designation,
                 style: TextStyle(
-                  color: softOrange,
-                  fontSize: 9, // Reduced from 11
+                  color: white,
                   fontWeight: FontWeight.bold,
+                  fontSize: 12, // Réduit de 14 à 12
                 ),
+                textAlign: TextAlign.center,
+                maxLines: 2, // Réduit de 3 à 2
+                overflow: TextOverflow.ellipsis,
               ),
-              if (variantName != null)
-                Text(
-                  variantName,
-                  style: TextStyle(
-                    color: white,
-                    fontSize: 8, // Reduced from 9
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              const SizedBox(height: 1), // Reduced from 2
+            ),
+            const SizedBox(height: 2),
+            Text(
+              "${displayPrice.toStringAsFixed(2)} DT",
+              style: TextStyle(
+                color: softOrange,
+                fontSize: 12, // Réduit de 14 à 12
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (variantName != null)
               Text(
-                "$displayStock", // Removed "Stock: " prefix
+                variantName,
                 style: TextStyle(
-                  color: displayStock > 5
-                      ? const Color.fromARGB(255, 60, 218, 65)
-                      : warmRed,
-                  fontSize: 9, // Reduced from 10
+                  color: white,
+                  fontSize: 10, // Réduit de 14 à 10
+                ),
+                maxLines: 2, // Réduit de 3 à 1
+                overflow: TextOverflow.ellipsis,
+              ),
+            const SizedBox(height: 2),
+            Text(
+              "$displayStock",
+              style: TextStyle(
+                color: displayStock > 5
+                    ? const Color.fromARGB(255, 60, 218, 65)
+                    : warmRed,
+                fontSize: 11, // Réduit de 14 à 11
+              ),
+            ),
+            if (product.hasVariants)
+              Text(
+                "${product.variants.length}v",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 64, 204, 255),
+                  fontSize: 10, // Réduit de 13 à 10
                 ),
               ),
-              if (product.hasVariants)
-                Text(
-                  "${product.variants.length}v", // Changed to more compact "v"
-                  style: TextStyle(
-                    color: const Color.fromARGB(255, 64, 204, 255),
-                    fontSize: 8, // Reduced from 9
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -490,7 +492,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               children: [
                 // Categories column
                 SizedBox(
-                  width: constraints.maxWidth * 0.25,
+                  width: constraints.maxWidth * 0.3,
                   child: RefreshIndicator(
                     onRefresh: () async {
                       _loadData();
@@ -515,10 +517,12 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                           child: GridView.builder(
                             gridDelegate:
                                 const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 1,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
+                              crossAxisCount:
+                                  3, // Réduit de 3 à 2 pour plus d'espace
+                              childAspectRatio:
+                                  0.9, // Ajusté pour la nouvelle taille
+                              mainAxisSpacing: 0.1,
+                              crossAxisSpacing: 10,
                             ),
                             padding: const EdgeInsets.all(8),
                             itemCount: snapshot.data!.length,
@@ -533,11 +537,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                   ),
                 ),
 
-                VerticalDivider(
-                  color: lightGray,
-                  thickness: 1,
-                  width: 1,
-                ),
+                VerticalDivider(color: lightGray, thickness: 2, width: 5),
 
                 // Products column
                 Expanded(
@@ -598,16 +598,16 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         }
 
                         final crossAxisCount =
-                            constraints.maxWidth > 800 ? 4 : 3;
+                            constraints.maxWidth > 800 ? 8 : 5;
 
                         return Scrollbar(
                           child: GridView.builder(
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: crossAxisCount,
-                              childAspectRatio: 0.9,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
+                              childAspectRatio: 1.1,
+                              mainAxisSpacing: 4,
+                              crossAxisSpacing: 4,
                             ),
                             padding: const EdgeInsets.all(8),
                             itemCount: filteredProducts.length,

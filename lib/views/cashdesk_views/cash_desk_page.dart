@@ -27,6 +27,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
   final SqlDb sqldb = SqlDb();
   Future<List<Product>>? products;
   List<Product> selectedProducts = [];
+  List<Variant> selectedVariants= [];// Nouvelle liste pour les variantes sélectionnées
+
   List<int> quantityProducts = [];
   List<bool> typeDiscounts = [];
   List<double> discounts = [];
@@ -387,6 +389,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
             TableCmd(
               total: calculateTotal(
                 selectedProducts,
+                selectedV
                 quantityProducts,
                 discounts,
                 typeDiscounts,
