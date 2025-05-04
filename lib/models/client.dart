@@ -4,7 +4,7 @@ class Client {
   String firstName;
   String phoneNumber;
   int loyaltyPoints;
-  double debt; // Changed from 'dept' to 'debt'
+  double debt;
   List<int> idOrders;
   DateTime? lastPurchaseDate;
 

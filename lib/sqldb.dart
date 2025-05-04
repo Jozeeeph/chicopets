@@ -13,6 +13,7 @@ import 'package:caissechicopets/controllers/variantController.dart';
 import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/client.dart';
+import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/order.dart';
@@ -248,6 +249,18 @@ class SqlDb {
             );
         ''');
           print("Fidelity rules table created");
+          await db.execute('''
+  CREATE TABLE vouchers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    points_used INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    is_used INTEGER DEFAULT 0,
+    used_at TEXT,
+    FOREIGN KEY (client_id) REFERENCES clients (id)
+  )
+''');
         } catch (e) {
           print("Error creating tables: $e");
           rethrow;
@@ -611,6 +624,43 @@ class SqlDb {
   Future<int> updateClient(Client client) async {
     final dbClient = await db;
     return await Clientcontroller().updateClient(client, dbClient);
+  }
+
+  // Dans votre classe SqlDb, ajoutez ces méthodes :
+
+  Future<FidelityRules> getFidelityRules() async {
+    final dbClient = await db;
+    final maps = await dbClient.query('fidelity_rules', limit: 1);
+
+    if (maps.isEmpty) {
+      return FidelityRules();
+    }
+
+    return FidelityRules.fromMap(maps.first);
+  }
+
+  Future<int> createVoucher({
+    required int clientId,
+    required double amount,
+    required int pointsUsed,
+  }) async {
+    final dbClient = await db;
+    return await Clientcontroller().createVoucher(
+        clientId: clientId,
+        amount: amount,
+        pointsUsed: pointsUsed,
+        db: dbClient);
+  }
+
+  Future<List<Map<String, dynamic>>> getClientVouchers(int clientId) async {
+    final dbClient = await db;
+    return await Clientcontroller().getClientVouchers(clientId, dbClient);
+  }
+
+  Future<int> updateClientLoyaltyPoints(int clientId, int newPoints) async {
+    final dbClient = await db;
+    return await Clientcontroller()
+        .updateClientLoyaltyPoints(clientId, newPoints, dbClient);
   }
 
   Future<int> updateClientDebt(int clientId, double newDebt) async {
