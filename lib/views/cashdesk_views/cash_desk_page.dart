@@ -27,8 +27,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
   final SqlDb sqldb = SqlDb();
   Future<List<Product>>? products;
   List<Product> selectedProducts = [];
-  List<Variant> selectedVariants= [];// Nouvelle liste pour les variantes sélectionnées
-
   List<int> quantityProducts = [];
   List<bool> typeDiscounts = [];
   List<double> discounts = [];
@@ -359,105 +357,106 @@ class _CashDeskPageState extends State<CashDeskPage> {
     return total.clamp(0, double.infinity);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          ),
+  // ... (keep all your imports and other code the same)
+
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
         ),
-        title: const Text('Caisse de vente'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.black),
-            onPressed: _showSessionInfo,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: _logout,
-          ),
-        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            TableCmd(
-              total: calculateTotal(
-                selectedProducts,
-                selectedV
-                quantityProducts,
-                discounts,
-                typeDiscounts,
-                globalDiscount,
-                isPercentageDiscount,
-              ),
+      title: const Text('Caisse de vente'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.info_outline, color: Colors.black),
+          onPressed: _showSessionInfo,
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.black),
+          onPressed: _logout,
+        ),
+      ],
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TableCmd(
+            total: calculateTotal(
+              selectedProducts,
+              quantityProducts,
+              discounts,
+              typeDiscounts,
+              globalDiscount,
+              isPercentageDiscount,
+            ),
+            selectedProducts: selectedProducts,
+            quantityProducts: quantityProducts,
+            discounts: discounts,
+            globalDiscount: globalDiscount,
+            typeDiscounts: typeDiscounts,
+            onApplyDiscount: _handleApplyDiscount,
+            onAddProduct: _handleAddProduct,
+            onDeleteProduct: _handleDeleteProduct,
+            onSearchProduct: _handleSearchProduct,
+            onQuantityChange: _handleQuantityChange,
+            onFetchOrders: _handleFetchOrders,
+            onPlaceOrder: _handlePlaceOrder,
+            isPercentageDiscount: isPercentageDiscount,
+            selectedProductIndex: selectedProductIndex,
+            onProductSelected: (index) {
+              setState(() {
+                selectedProductIndex = index;
+              });
+            },
+            calculateTotal: calculateTotal,
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Categorieetproduct(
               selectedProducts: selectedProducts,
               quantityProducts: quantityProducts,
               discounts: discounts,
-              globalDiscount: globalDiscount,
-              typeDiscounts: typeDiscounts,
-              onApplyDiscount: _handleApplyDiscount,
-              onAddProduct: _handleAddProduct,
-              onDeleteProduct: _handleDeleteProduct,
-              onSearchProduct: _handleSearchProduct,
-              onQuantityChange: _handleQuantityChange,
-              onFetchOrders: _handleFetchOrders,
-              onPlaceOrder: _handlePlaceOrder,
-              isPercentageDiscount: isPercentageDiscount,
-              selectedProductIndex: selectedProductIndex,
-              onProductSelected: (index) {
+              onProductSelected: (Product product, [Variant? variant]) {
                 setState(() {
-                  selectedProductIndex = index;
+                  int index = selectedProducts.indexWhere((p) {
+                    if (p.code?.trim().toLowerCase() !=
+                        product.code?.trim().toLowerCase()) {
+                      return false;
+                    }
+                    if (variant != null && p.variants.isNotEmpty) {
+                      return p.variants.any((v) => v.code == variant.code);
+                    }
+                    return variant == null;
+                  });
+
+                  if (index == -1) {
+                    final productToAdd = variant != null
+                        ? (Product.fromMap(product.toMap())
+                          ..variants = [variant])
+                        : product;
+
+                    selectedProducts.add(productToAdd);
+                    quantityProducts.add(1);
+                    discounts.add(0.0);
+                    typeDiscounts.add(true);
+                    selectedProductIndex = selectedProducts.length - 1;
+                  } else {
+                    quantityProducts[index]++;
+                    selectedProductIndex = index;
+                  }
                 });
               },
-              calculateTotal: calculateTotal,
             ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: Categorieetproduct(
-                selectedProducts: selectedProducts,
-                quantityProducts: quantityProducts,
-                discounts: discounts,
-                onProductSelected: (Product product, [Variant? variant]) {
-                  setState(() {
-                    int index = selectedProducts.indexWhere((p) {
-                      if (p.code?.trim().toLowerCase() !=
-                          product.code?.trim().toLowerCase()) {
-                        return false;
-                      }
-                      if (variant != null && p.variants.isNotEmpty) {
-                        return p.variants.any((v) => v.code == variant.code);
-                      }
-                      return variant == null;
-                    });
-
-                    if (index == -1) {
-                      final productToAdd = variant != null
-                          ? (Product.fromMap(product.toMap())
-                            ..variants = [variant])
-                          : product;
-
-                      selectedProducts.add(productToAdd);
-                      quantityProducts.add(1);
-                      discounts.add(0.0);
-                      typeDiscounts.add(true);
-                      selectedProductIndex = selectedProducts.length - 1;
-                    } else {
-                      quantityProducts[index]++;
-                      selectedProductIndex = index;
-                    }
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
