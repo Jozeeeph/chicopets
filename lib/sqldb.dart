@@ -39,7 +39,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -867,4 +867,22 @@ class SqlDb {
       whereArgs: [productId],
     );
   }
+  Future<Variant?> getVariantByCode(String code) async {
+  try {
+    final db = await this.db;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'variants',
+      where: 'code = ?',
+      whereArgs: [code],
+    );
+
+    if (maps.isNotEmpty) {
+      return Variant.fromMap(maps.first);
+    }
+    return null;
+  } catch (e) {
+    print('Error getting variant by code: $e');
+    return null;
+  }
+}
 }

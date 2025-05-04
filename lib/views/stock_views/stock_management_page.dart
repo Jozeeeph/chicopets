@@ -45,19 +45,20 @@ class _StockManagementPageState extends State<StockManagementPage> {
   Future<void> _loadData() async {
     try {
       final products = await _sqlDb.getProducts();
-      
+
       final List<double> sales = await Future.wait<double>(
-        products.map((p) => _getProductTotalSales(p.id!))
-      );
-      
+          products.map((p) => _getProductTotalSales(p.id!)));
+
       final List<List<Variant>> variants = await Future.wait<List<Variant>>(
-        products.map((p) => _sqlDb.getVariantsByProductId(p.id!))
-      );
+          products.map((p) => _sqlDb.getVariantsByProductId(p.id!)));
 
       for (var product in products) {
         _stockControllers[product.id!] = TextEditingController(
-          text: product.stock.toString()
-        );
+            text: product.hasVariants
+                ? variants[products.indexOf(product)]
+                    .fold(0, (sum, v) => sum + v.stock)
+                    .toString()
+                : product.stock.toString());
       }
 
       setState(() {
@@ -65,6 +66,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
         for (int i = 0; i < products.length; i++) {
           _productSales[products[i].id!] = sales[i];
           _productVariants[products[i].id!] = variants[i];
+          // Mettre à jour le stock du produit si il a des variantes
+          if (products[i].hasVariants) {
+            products[i].stock = variants[i].fold(0, (sum, v) => sum + v.stock);
+          }
         }
         _isLoading = false;
       });
@@ -136,9 +141,39 @@ class _StockManagementPageState extends State<StockManagementPage> {
     } else {
       newStatus = 'En stock';
     }
-    
+
     if (product.status != newStatus) {
       _updateProductStatus(product, newStatus);
+    }
+  }
+
+  // Méthode pour mettre à jour le stock d'une variante
+  Future<void> _updateVariantStock(Variant variant, int newStock) async {
+    try {
+      await _sqlDb.updateVariantStock(variant.id!, newStock);
+      setState(() {
+        variant.stock = newStock;
+        _updateProductStockFromVariants(variant.productId);
+      });
+      _showSuccess('Stock variante mis à jour');
+    } catch (e) {
+      _showError('Erreur de mise à jour: ${e.toString()}');
+    }
+  }
+
+// Méthode pour recalculer le stock total du produit à partir des variantes
+  void _updateProductStockFromVariants(int productId) {
+    final variants = _productVariants[productId] ?? [];
+    final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
+
+    // Mettre à jour le contrôleur du stock total
+    _stockControllers[productId]?.text = totalStock.toString();
+
+    // Trouver et mettre à jour le produit correspondant
+    final product = _products.firstWhere((p) => p.id == productId);
+    if (product.stock != totalStock) {
+      product.stock = totalStock;
+      _updateStatusBasedOnStock(product);
     }
   }
 
@@ -156,7 +191,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
   String _formatExpirationDate(String rawDate) {
     if (rawDate.isEmpty) return 'Non définie';
-    
+
     try {
       final possibleFormats = [
         DateFormat('yyyy-MM-dd'),
@@ -164,7 +199,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
         DateFormat('MM/dd/yyyy'),
         DateFormat('dd/MM/yyyy'),
       ];
-      
+
       DateTime? parsedDate;
       for (final format in possibleFormats) {
         try {
@@ -172,7 +207,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
           break;
         } catch (_) {}
       }
-      
+
       if (parsedDate != null) {
         return DateFormat('dd/MM/yyyy').format(parsedDate);
       }
@@ -184,7 +219,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
   bool _isExpiringSoon(String expirationDate) {
     if (expirationDate.isEmpty) return false;
-    
+
     try {
       final possibleFormats = [
         DateFormat('yyyy-MM-dd'),
@@ -192,7 +227,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
         DateFormat('MM/dd/yyyy'),
         DateFormat('dd/MM/yyyy'),
       ];
-      
+
       DateTime? parsedDate;
       for (final format in possibleFormats) {
         try {
@@ -200,9 +235,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
           break;
         } catch (_) {}
       }
-      
+
       if (parsedDate == null) return false;
-      
+
       final today = DateTime.now();
       final difference = parsedDate.difference(today).inDays;
       return difference <= 30 && difference >= 0;
@@ -254,7 +289,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 decoration: InputDecoration(
                   labelText: 'Rechercher...',
                   hintText: 'Code, désignation ou catégorie',
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF0056A6)),
+                  prefixIcon:
+                      const Icon(Icons.search, color: Color(0xFF0056A6)),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -314,16 +350,34 @@ class _StockManagementPageState extends State<StockManagementPage> {
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               child: Row(
                 children: [
-                  Expanded(flex: 2, child: Text('Code', style: _headerTextStyle())),
-                  Expanded(flex: 3, child: Text('Désignation', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Catégorie', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Stock', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Statut', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Prix Achat', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Prix Vente', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Profit', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Expiration', style: _headerTextStyle())),
-                  Expanded(flex: 2, child: Text('Ventes', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2, child: Text('Code', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 3,
+                      child: Text('Désignation', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Catégorie', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2, child: Text('Stock', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Statut', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Prix Achat', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Prix Vente', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Profit', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Expiration', style: _headerTextStyle())),
+                  Expanded(
+                      flex: 2,
+                      child: Text('Ventes', style: _headerTextStyle())),
                 ],
               ),
             ),
@@ -349,51 +403,77 @@ class _StockManagementPageState extends State<StockManagementPage> {
                         Row(
                           children: [
                             Expanded(
+                                flex: 2,
+                                child: Text(product.code ?? 'N/A',
+                                    style: _cellTextStyle())),
+                            Expanded(
+                                flex: 3,
+                                child: Text(product.designation,
+                                    style: _cellTextStyle())),
+                            Expanded(
+                                flex: 2,
+                                child: Text(product.categoryName ?? 'N/A',
+                                    style: _cellTextStyle())),
+                            Expanded(
                               flex: 2,
-                              child: Text(product.code ?? 'N/A', style: _cellTextStyle()),
+                              child: product.hasVariants
+                                  ? TextFormField(
+                                      controller:
+                                          _stockControllers[product.id!],
+                                      enabled:
+                                          false, // Désactivé pour les produits avec variantes
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 8),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    )
+                                  : TextFormField(
+                                      controller:
+                                          _stockControllers[product.id!],
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 8),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      onChanged: (value) {
+                                        final newStock = int.tryParse(value) ??
+                                            product.stock;
+                                        _updateProductStock(product, newStock);
+                                      },
+                                    ),
                             ),
                             Expanded(
-                              flex: 3,
-                              child: Text(product.designation, style: _cellTextStyle()),
-                            ),
+                                flex: 2,
+                                child: _buildStatusIndicator(product.status)),
+                            Expanded(
+                                flex: 2,
+                                child: Text(
+                                    '${product.prixHT.toStringAsFixed(2)} DT',
+                                    style: _cellTextStyle())),
+                            Expanded(
+                                flex: 2,
+                                child: Text(
+                                    '${product.prixTTC.toStringAsFixed(2)} DT',
+                                    style: _cellTextStyle())),
                             Expanded(
                               flex: 2,
-                              child: Text(product.categoryName ?? 'N/A', style: _cellTextStyle()),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: _stockControllers[product.id!],
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  final newStock = int.tryParse(value) ?? product.stock;
-                                  _updateProductStock(product, newStock);
-                                },
+                              child: Text(
+                                '${(product.prixTTC - product.prixHT).toStringAsFixed(2)} DT',
+                                style: _cellTextStyle()
+                                    .copyWith(color: Colors.green),
                               ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: _buildStatusIndicator(product.status),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Text('${product.prixHT.toStringAsFixed(2)} DT', style: _cellTextStyle()),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Text('${product.prixTTC.toStringAsFixed(2)} DT', style: _cellTextStyle()),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Text('${(product.prixTTC - product.prixHT).toStringAsFixed(2)} DT', 
-                                style: _cellTextStyle().copyWith(color: Colors.green)),
                             ),
                             Expanded(
                               flex: 2,
@@ -401,14 +481,16 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                 _formatExpirationDate(product.dateExpiration),
                                 style: _cellTextStyle().copyWith(
                                   color: isExpiring ? Colors.red : null,
-                                  fontWeight: isExpiring ? FontWeight.bold : null,
+                                  fontWeight:
+                                      isExpiring ? FontWeight.bold : null,
                                 ),
                               ),
                             ),
                             Expanded(
                               flex: 2,
-                              child: Text('${_productSales[product.id]?.toStringAsFixed(2) ?? '0.00'} DT', 
-                                style: _cellTextStyle()),
+                              child: Text(
+                                  '${_productSales[product.id]?.toStringAsFixed(2) ?? '0.00'} DT',
+                                  style: _cellTextStyle()),
                             ),
                           ],
                         ),
@@ -419,21 +501,60 @@ class _StockManagementPageState extends State<StockManagementPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Variantes:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const Text('Variantes:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
                                 ...variants.map((v) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.arrow_right, size: 16),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          '${v.combinationName} - Stock: ${v.stock} - Prix: ${v.finalPrice.toStringAsFixed(2)} DT',
-                                          style: const TextStyle(fontSize: 14)),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4.0),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.arrow_right,
+                                              size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${v.combinationName} - Prix: ${v.finalPrice.toStringAsFixed(2)} DT',
+                                              style:
+                                                  const TextStyle(fontSize: 14),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 100,
+                                            child: TextFormField(
+                                              initialValue: v.stock.toString(),
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: InputDecoration(
+                                                labelText: 'Stock',
+                                                isDense: true,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 8),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onChanged: (value) {
+                                                final newStock =
+                                                    int.tryParse(value) ??
+                                                        v.stock;
+                                                _updateVariantStock(
+                                                    v, newStock);
+                                              },
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                )).toList(),
+                                    )),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Stock total variantes: ${variants.fold(0, (sum, v) => sum + v.stock)}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ],
                             ),
                           ),
