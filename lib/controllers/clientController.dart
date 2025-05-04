@@ -1,5 +1,6 @@
 import 'package:caissechicopets/controllers/fidelity_controller.dart';
 import 'package:caissechicopets/models/client.dart';
+import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:sqflite/sqflite.dart';
@@ -134,14 +135,59 @@ class Clientcontroller {
     print('Updated order with client ID'); // Debug
   }
 
-  Future<int> updateClientDebt(int clientId, double newDebt,db) async {
-  return await db.update(
-    'clients',
-    {'debt': newDebt},
-    where: 'id = ?',
-    whereArgs: [clientId],
-  );
-}
+  Future<int> updateClientDebt(int clientId, double newDebt, db) async {
+    return await db.update(
+      'clients',
+      {'debt': newDebt},
+      where: 'id = ?',
+      whereArgs: [clientId],
+    );
+  }
+
+// Dans votre classe SqlDb, ajoutez ces méthodes :
+
+  Future<FidelityRules> getFidelityRules(db) async {
+    final maps = await db.query('fidelity_rules', limit: 1);
+
+    if (maps.isEmpty) {
+      return FidelityRules();
+    }
+
+    return FidelityRules.fromMap(maps.first);
+  }
+
+  Future<int> createVoucher({
+    required int clientId,
+    required double amount,
+    required int pointsUsed,
+    db
+  }) async {
+    return await db.insert('vouchers', {
+      'client_id': clientId,
+      'amount': amount,
+      'points_used': pointsUsed,
+      'created_at': DateTime.now().toIso8601String(),
+      'is_used': 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getClientVouchers(int clientId,db) async {
+    return await db.query(
+      'vouchers',
+      where: 'client_id = ?',
+      whereArgs: [clientId],
+      orderBy: 'created_at DESC',
+    );
+  }
+
+  Future<int> updateClientLoyaltyPoints(int clientId, int newPoints,db) async {
+    return await db.update(
+      'clients',
+      {'loyalty_points': newPoints},
+      where: 'id = ?',
+      whereArgs: [clientId],
+    );
+  }
 
   Future<List<Client>> getClientsWithExpiringPoints(
       Database db, int daysBeforeExpiration) async {
