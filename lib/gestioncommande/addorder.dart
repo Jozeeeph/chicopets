@@ -7,6 +7,7 @@ import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
+import 'package:caissechicopets/models/voucher.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
@@ -179,6 +180,12 @@ class Addorder {
     TextEditingController ticketTaxController = TextEditingController();
     TextEditingController ticketCommissionController = TextEditingController();
 
+    TextEditingController clientPhoneController = TextEditingController();
+    List<Voucher> clientVouchers = [];
+    Voucher? selectedVoucher;
+    double voucherAmount = 0.0;
+    bool showVoucherDropdown = false;
+
     String? checkNumber;
     String? cardTransactionId;
     DateTime? checkDate;
@@ -319,7 +326,7 @@ class Addorder {
               ),
               content: SingleChildScrollView(
                 child: Container(
-                  width: MediaQuery.of(context).size.width * 0.65,
+                  width: MediaQuery.of(context).size.width * 1,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1097,6 +1104,16 @@ class Addorder {
                                     ),
                                     Text("Ticket Restaurant"),
                                     Radio<String>(
+                                      value: "Bon d'achat",
+                                      groupValue: selectedPaymentMethod,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedPaymentMethod = value!;
+                                        });
+                                      },
+                                    ),
+                                    Text("Bon d'achat"),
+                                    Radio<String>(
                                       value: "Mixte",
                                       groupValue: selectedPaymentMethod,
                                       onChanged: (value) {
@@ -1358,6 +1375,125 @@ class Addorder {
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold),
                                       ),
+                                    ],
+                                  ),
+
+                                if (selectedPaymentMethod == "Bon d'achat")
+                                  Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: clientPhoneController,
+                                              keyboardType: TextInputType.phone,
+                                              decoration: InputDecoration(
+                                                labelText:
+                                                    "Numéro de téléphone client",
+                                                border: OutlineInputBorder(),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 10),
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              String phoneInput =
+                                                  clientPhoneController.text
+                                                      .trim();
+
+                                              if (phoneInput.isEmpty) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Veuillez entrer un numéro de téléphone")),
+                                                );
+                                                return;
+                                              }
+
+                                              int? clientId = await SqlDb()
+                                                  .getClientIdByPhone(
+                                                      phoneInput);
+                                              print(
+                                                  "Client ID found: $clientId for phone: $phoneInput");
+
+                                              if (clientId == null) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Aucun client trouvé avec ce numéro")),
+                                                );
+                                                return;
+                                              }
+
+                                              List<Voucher> vouchers =
+                                                  await SqlDb()
+                                                      .fetchClientVouchers(
+                                                          clientId);
+                                              setState(() {
+                                                clientVouchers = vouchers;
+                                                showVoucherDropdown = true;
+                                              });
+                                            },
+                                            child: Text("Rechercher"),
+                                            style: ElevatedButton.styleFrom(
+                                              padding: EdgeInsets.symmetric(
+                                                  vertical: 15, horizontal: 20),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 10),
+                                      if (showVoucherDropdown)
+                                        Column(
+                                          children: [
+                                            if (clientVouchers.isEmpty)
+                                              Text(
+                                                "Aucun bon d'achat disponible pour ce client",
+                                                style: TextStyle(
+                                                    color: Colors.grey),
+                                              )
+                                            else
+                                              DropdownButtonFormField<Voucher>(
+                                                decoration: InputDecoration(
+                                                  labelText:
+                                                      "Sélectionner un bon d'achat",
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                                items: clientVouchers
+                                                    .map((Voucher voucher) {
+                                                  return DropdownMenuItem<
+                                                      Voucher>(
+                                                    value: voucher,
+                                                    child: Text(
+                                                      "Bon #${voucher.id} - ${voucher.amount} DT (${voucher.isUsed ? 'Utilisé' : 'Disponible'})",
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (Voucher? selected) {
+                                                  setState(() {
+                                                    selectedVoucher = selected;
+                                                    voucherAmount =
+                                                        selected?.amount ?? 0.0;
+                                                  });
+                                                },
+                                                validator: (value) => value ==
+                                                        null
+                                                    ? 'Veuillez sélectionner un bon'
+                                                    : null,
+                                              ),
+                                            SizedBox(height: 10),
+                                            if (selectedVoucher != null)
+                                              Text(
+                                                "Montant du bon: ${selectedVoucher!.amount.toStringAsFixed(2)} DT",
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                     ],
                                   ),
 
@@ -1852,7 +1988,8 @@ class Addorder {
         isPercentage: typeDiscounts[i],
       ));
       print("ORDERLINES $orderLines");
-      print("Order line created with prixUnitaire: ${orderLines.last.prixUnitaire}");
+      print(
+          "Order line created with prixUnitaire: ${orderLines.last.prixUnitaire}");
     }
 
     // Get current user

@@ -156,12 +156,11 @@ class Clientcontroller {
     return FidelityRules.fromMap(maps.first);
   }
 
-  Future<int> createVoucher({
-    required int clientId,
-    required double amount,
-    required int pointsUsed,
-    db
-  }) async {
+  Future<int> createVoucher(
+      {required int clientId,
+      required double amount,
+      required int pointsUsed,
+      db}) async {
     return await db.insert('vouchers', {
       'client_id': clientId,
       'amount': amount,
@@ -171,7 +170,7 @@ class Clientcontroller {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getClientVouchers(int clientId,db) async {
+  Future<List<Map<String, dynamic>>> getClientVouchers(int clientId, db) async {
     return await db.query(
       'vouchers',
       where: 'client_id = ?',
@@ -180,7 +179,7 @@ class Clientcontroller {
     );
   }
 
-  Future<int> updateClientLoyaltyPoints(int clientId, int newPoints,db) async {
+  Future<int> updateClientLoyaltyPoints(int clientId, int newPoints, db) async {
     return await db.update(
       'clients',
       {'loyalty_points': newPoints},
@@ -210,5 +209,46 @@ class Clientcontroller {
     );
 
     return clients.map((c) => Client.fromMap(c)).toList();
+  }
+
+  Future<int?> getClientIdByPhone(String phoneNumber, Database dbClient) async {
+    if (phoneNumber.isEmpty) return null;
+
+    try {
+      // Normalize phone number (remove all non-digit characters)
+      String cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+
+      final List<Map<String, dynamic>> result = await dbClient.query(
+        'clients',
+        where:
+            'REPLACE(REPLACE(REPLACE(phone_number, " ", ""), "-", ""), "+", "") LIKE ?',
+        whereArgs: ['%$cleanPhone%'],
+        columns: ['id'],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        return result.first['id'] as int;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting client ID by phone: $e');
+      return null;
+    }
+  }
+}
+
+Future<Client?> getClientByPhone(String phoneNumber, dbClient) async {
+  try {
+    final List<Map<String, dynamic>> result = await dbClient.query(
+      'clients',
+      where: 'phone_number = ?',
+      whereArgs: [phoneNumber],
+      limit: 1,
+    );
+    return result.isNotEmpty ? Client.fromMap(result.first) : null;
+  } catch (e) {
+    print('Error getting client by phone: $e');
+    return null;
   }
 }

@@ -19,6 +19,9 @@ class Order {
   final double? cardAmount;
   final double? checkAmount;
   final double? ticketRestaurantAmount;
+  final double? voucherAmount;
+  final List<int>? voucherIds;
+  final String? voucherReference;
 
   // Payment metadata
   final String? checkNumber;
@@ -50,11 +53,14 @@ class Order {
     this.cashAmount,
     this.cardAmount,
     this.checkAmount,
+    this.ticketRestaurantAmount,
+    this.voucherAmount,
+    this.voucherIds,
+    this.voucherReference,
     this.checkNumber,
     this.cardTransactionId,
     this.checkDate,
     this.bankName,
-    this.ticketRestaurantAmount,
     this.numberOfTicketsRestaurant,
     this.ticketValue,
     this.ticketTax,
@@ -68,6 +74,9 @@ class Order {
     if (globalDiscount < 0) throw ArgumentError("Discount cannot be negative");
     if (remainingAmount < 0)
       throw ArgumentError("Remaining amount cannot be negative");
+    if (voucherAmount != null && voucherAmount! < 0) {
+      throw ArgumentError("Voucher amount cannot be negative");
+    }
   }
 
   Map<String, dynamic> toMap() {
@@ -89,6 +98,9 @@ class Order {
       'card_amount': cardAmount,
       'check_amount': checkAmount,
       'ticket_restaurant_amount': ticketRestaurantAmount,
+      'voucher_amount': voucherAmount,
+      'voucher_ids': voucherIds?.join(','),
+      'voucher_reference': voucherReference,
 
       // Payment details
       'check_number': checkNumber,
@@ -109,6 +121,13 @@ class Order {
   }
 
   factory Order.fromMap(Map<String, dynamic> map, List<OrderLine> orderLines) {
+    List<int>? voucherIds;
+    if (map['voucher_ids'] != null &&
+        map['voucher_ids'].toString().isNotEmpty) {
+      voucherIds =
+          (map['voucher_ids'] as String).split(',').map(int.parse).toList();
+    }
+
     return Order(
       idOrder: map['id_order'] as int?,
       date: map['date'] as String,
@@ -128,6 +147,9 @@ class Order {
       checkAmount: (map['check_amount'] as num?)?.toDouble(),
       ticketRestaurantAmount:
           (map['ticket_restaurant_amount'] as num?)?.toDouble(),
+      voucherAmount: (map['voucher_amount'] as num?)?.toDouble(),
+      voucherIds: voucherIds,
+      voucherReference: map['voucher_reference'] as String?,
 
       // Payment details
       checkNumber: map['check_number'] as String?,
@@ -165,6 +187,9 @@ class Order {
     double? cardAmount,
     double? checkAmount,
     double? ticketRestaurantAmount,
+    double? voucherAmount,
+    List<int>? voucherIds,
+    String? voucherReference,
     String? checkNumber,
     String? cardTransactionId,
     DateTime? checkDate,
@@ -193,6 +218,9 @@ class Order {
       checkAmount: checkAmount ?? this.checkAmount,
       ticketRestaurantAmount:
           ticketRestaurantAmount ?? this.ticketRestaurantAmount,
+      voucherAmount: voucherAmount ?? this.voucherAmount,
+      voucherIds: voucherIds ?? this.voucherIds,
+      voucherReference: voucherReference ?? this.voucherReference,
       checkNumber: checkNumber ?? this.checkNumber,
       cardTransactionId: cardTransactionId ?? this.cardTransactionId,
       checkDate: checkDate ?? this.checkDate,
@@ -207,6 +235,30 @@ class Order {
     );
   }
 
+  // Helper methods for voucher payments
+  double get totalPayment {
+    return (cashAmount ?? 0) +
+        (cardAmount ?? 0) +
+        (checkAmount ?? 0) +
+        (ticketRestaurantAmount ?? 0) +
+        (voucherAmount ?? 0) +
+        (pointsDiscount ?? 0);
+  }
+
+  bool get usedVoucher => voucherAmount != null && voucherAmount! > 0;
+
+  void processPayment() {
+    final totalPaid = (cashAmount ?? 0) +
+        (cardAmount ?? 0) +
+        (checkAmount ?? 0) +
+        (ticketRestaurantAmount ?? 0) +
+        (voucherAmount ?? 0) +
+        (pointsDiscount ?? 0);
+
+    remainingAmount = total - totalPaid;
+    status = remainingAmount <= 0 ? "payée" : "partiellement payée";
+  }
+
   @override
   String toString() {
     return 'Order{'
@@ -216,7 +268,8 @@ class Order {
         'payment: $modePaiement, '
         'status: $status, '
         'client: $idClient, '
-        'user: $userId'
+        'user: $userId, '
+        'voucher: ${voucherAmount?.toStringAsFixed(2)} DT'
         '}';
   }
 

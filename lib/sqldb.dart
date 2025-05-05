@@ -19,6 +19,7 @@ import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/subcategory.dart';
+import 'package:caissechicopets/models/voucher.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -606,6 +607,13 @@ class SqlDb {
     await Clientcontroller().addOrderToClient(clientId, orderId, dbClient);
   }
 
+  Future<int?> getClientIdByPhone(String phoneNumber) async {
+    if (phoneNumber.isEmpty) return null;
+
+    final dbClient = await db;
+    return await Clientcontroller().getClientIdByPhone(phoneNumber, dbClient);
+  }
+
   Future<int> addClient(Client client) async {
     final dbClient = await db;
     return await Clientcontroller().addClient(client, dbClient);
@@ -867,22 +875,67 @@ class SqlDb {
       whereArgs: [productId],
     );
   }
-  Future<Variant?> getVariantByCode(String code) async {
-  try {
-    final db = await this.db;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'variants',
-      where: 'code = ?',
-      whereArgs: [code],
-    );
 
-    if (maps.isNotEmpty) {
-      return Variant.fromMap(maps.first);
+  Future<Variant?> getVariantByCode(String code) async {
+    try {
+      final db = await this.db;
+      final List<Map<String, dynamic>> maps = await db.query(
+        'variants',
+        where: 'code = ?',
+        whereArgs: [code],
+      );
+
+      if (maps.isNotEmpty) {
+        return Variant.fromMap(maps.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting variant by code: $e');
+      return null;
     }
-    return null;
-  } catch (e) {
-    print('Error getting variant by code: $e');
-    return null;
   }
-}
+
+  //Voucher Repository
+  Future<List<Voucher>> fetchClientVouchers(int clientId) async {
+    final dbClient = await db;
+
+    try {
+      final List<Map<String, dynamic>> maps = await dbClient.query(
+        'vouchers',
+        where: 'client_id = ? AND is_used = 0',
+        whereArgs: [clientId],
+        orderBy: 'created_at DESC', // Optional: order by creation date
+      );
+
+      return List.generate(maps.length, (i) {
+        return Voucher(
+          id: maps[i]['id'],
+          clientId: maps[i]['client_id'],
+          amount: maps[i]['amount'],
+          pointsUsed: maps[i]['points_used'],
+          createdAt: DateTime.parse(maps[i]['created_at']),
+          isUsed: maps[i]['is_used'] == 1,
+          usedAt: maps[i]['used_at'] != null
+              ? DateTime.parse(maps[i]['used_at'])
+              : null,
+        );
+      });
+    } catch (e) {
+      print('Error fetching vouchers: $e');
+      return []; // Return empty list on error
+    }
+  }
+
+  Future<void> markVoucherAsUsed(int voucherId) async {
+    final dbClient = await db;
+    await dbClient.update(
+      'vouchers',
+      {
+        'is_used': 1,
+        'used_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [voucherId],
+    );
+  }
 }
