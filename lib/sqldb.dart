@@ -40,7 +40,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -254,12 +254,18 @@ class SqlDb {
   CREATE TABLE vouchers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
-    amount REAL NOT NULL,
-    points_used INTEGER NOT NULL,
+    amount REAL NOT NULL CHECK (amount > 0),
+    remaining_amount REAL NOT NULL CHECK (remaining_amount >= 0),
+    points_used INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
-    is_used INTEGER DEFAULT 0,
+    expires_at TEXT,
+    is_used INTEGER DEFAULT 0 CHECK (is_used IN (0, 1)),
     used_at TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients (id)
+    code TEXT UNIQUE,
+    notes TEXT,
+    FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+    CHECK (remaining_amount <= amount),
+    CHECK (CASE WHEN is_used = 1 THEN used_at IS NOT NULL ELSE 1 END)
   )
 ''');
         } catch (e) {

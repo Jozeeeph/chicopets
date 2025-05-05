@@ -190,6 +190,7 @@ class Addorder {
     String? cardTransactionId;
     DateTime? checkDate;
     String? bankName;
+    bool isLoading = false;
 
     double globalDiscount = order.globalDiscount;
     double globalDiscountValue = 0.0;
@@ -686,6 +687,9 @@ class Addorder {
                                     Text(
                                         "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
                                 ],
+                                if (selectedVoucher != null)
+                                  Text(
+                                      "- Bon d'achat: ${voucherAmount.toStringAsFixed(2)} DT"),
                               ],
 
                               Divider(thickness: 1, color: Colors.black),
@@ -1390,6 +1394,7 @@ class Addorder {
                                               decoration: InputDecoration(
                                                 labelText:
                                                     "Numéro de téléphone client",
+                                                hintText: "Ex: 5365214",
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
@@ -1411,36 +1416,54 @@ class Addorder {
                                                 return;
                                               }
 
-                                              int? clientId = await SqlDb()
-                                                  .getClientIdByPhone(
-                                                      phoneInput);
-                                              print(
-                                                  "Client ID found: $clientId for phone: $phoneInput");
+                                              // Show loading indicator
+                                              setState(() => isLoading = true);
 
-                                              if (clientId == null) {
+                                              try {
+                                                int? clientId = await SqlDb()
+                                                    .getClientIdByPhone(
+                                                        phoneInput);
+
+                                                if (clientId == null) {
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                        content: Text(
+                                                            "Aucun client trouvé avec ce numéro")),
+                                                  );
+                                                  return;
+                                                }
+
+                                                List<Voucher> vouchers =
+                                                    await SqlDb()
+                                                        .fetchClientVouchers(
+                                                            clientId);
+
+                                                setState(() {
+                                                  clientVouchers = vouchers;
+                                                  showVoucherDropdown = true;
+                                                  selectedVoucher =
+                                                      null; // Reset selected voucher
+                                                  voucherAmount =
+                                                      0.0; // Reset voucher amount
+                                                });
+                                              } catch (e) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
                                                   SnackBar(
                                                       content: Text(
-                                                          "Aucun client trouvé avec ce numéro")),
+                                                          "Erreur lors de la recherche: ${e.toString()}")),
                                                 );
-                                                return;
+                                              } finally {
+                                                setState(
+                                                    () => isLoading = false);
                                               }
-
-                                              List<Voucher> vouchers =
-                                                  await SqlDb()
-                                                      .fetchClientVouchers(
-                                                          clientId);
-                                              setState(() {
-                                                clientVouchers = vouchers;
-                                                showVoucherDropdown = true;
-                                              });
                                             },
-                                            child: Text("Rechercher"),
-                                            style: ElevatedButton.styleFrom(
-                                              padding: EdgeInsets.symmetric(
-                                                  vertical: 15, horizontal: 20),
-                                            ),
+                                            child: isLoading
+                                                ? CircularProgressIndicator(
+                                                    color: Colors.white,
+                                                    strokeWidth: 2)
+                                                : Text("Rechercher"),
                                           ),
                                         ],
                                       ),
@@ -1461,21 +1484,54 @@ class Addorder {
                                                       "Sélectionner un bon d'achat",
                                                   border: OutlineInputBorder(),
                                                 ),
+                                                value: selectedVoucher,
                                                 items: clientVouchers
                                                     .map((Voucher voucher) {
                                                   return DropdownMenuItem<
                                                       Voucher>(
                                                     value: voucher,
                                                     child: Text(
-                                                      "Bon #${voucher.id} - ${voucher.amount} DT (${voucher.isUsed ? 'Utilisé' : 'Disponible'})",
+                                                      "Bon #${voucher.id} - ${voucher.amount.toStringAsFixed(2)} DT",
                                                     ),
                                                   );
                                                 }).toList(),
                                                 onChanged: (Voucher? selected) {
                                                   setState(() {
                                                     selectedVoucher = selected;
-                                                    voucherAmount =
-                                                        selected?.amount ?? 0.0;
+                                                    if (selected != null) {
+                                                      voucherAmount = min(
+                                                          selected.amount,
+                                                          total -
+                                                              (cashAmount +
+                                                                  cardAmount +
+                                                                  checkAmount));
+
+                                                      // Ensure we don't exceed the remaining amount
+                                                      if (voucherAmount < 0)
+                                                        voucherAmount = 0;
+
+                                                      // Recalculate totals
+                                                      total = calculateTotal(
+                                                        selectedProducts,
+                                                        quantityProducts,
+                                                        discounts,
+                                                        typeDiscounts,
+                                                        isPercentageDiscount
+                                                            ? globalDiscount
+                                                            : globalDiscountValue,
+                                                        isPercentageDiscount,
+                                                      );
+
+                                                      if (useLoyaltyPoints &&
+                                                          pointsToUse > 0) {
+                                                        total = max(
+                                                            0,
+                                                            total -
+                                                                pointsDiscount);
+                                                      }
+                                                    } else {
+                                                      voucherAmount = 0.0;
+                                                    }
                                                   });
                                                 },
                                                 validator: (value) => value ==
@@ -1484,7 +1540,7 @@ class Addorder {
                                                     : null,
                                               ),
                                             SizedBox(height: 10),
-                                            if (selectedVoucher != null)
+                                            if (selectedVoucher != null) ...[
                                               Text(
                                                 "Montant du bon: ${selectedVoucher!.amount.toStringAsFixed(2)} DT",
                                                 style: TextStyle(
@@ -1492,15 +1548,27 @@ class Addorder {
                                                   fontSize: 16,
                                                 ),
                                               ),
+                                              SizedBox(height: 10),
+                                              Text(
+                                                "Montant restant: ${(total - voucherAmount).toStringAsFixed(2)} DT",
+                                                style: TextStyle(
+                                                  color:
+                                                      (total - voucherAmount) >
+                                                              0
+                                                          ? Colors.red
+                                                          : Colors.green,
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                     ],
                                   ),
-
                                 // Mixte payment fields
                                 if (selectedPaymentMethod == "Mixte")
                                   Column(
                                     children: [
+                                      // Existing cash section
                                       Text("Espèces:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1527,10 +1595,27 @@ class Addorder {
                                             cashAmount =
                                                 double.tryParse(cleanedValue) ??
                                                     0.0;
+                                            total = _updateMixedPaymentTotal(
+                                              setState,
+                                              selectedProducts,
+                                              quantityProducts,
+                                              discounts,
+                                              typeDiscounts,
+                                              globalDiscount,
+                                              globalDiscountValue,
+                                              isPercentageDiscount,
+                                              useLoyaltyPoints,
+                                              pointsToUse,
+                                              pointsDiscount,
+                                              selectedVoucher,
+                                              voucherAmount,
+                                            ); // Pass setState here
                                           });
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Existing card section
                                       Text("TPE:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1557,6 +1642,21 @@ class Addorder {
                                             cardAmount =
                                                 double.tryParse(cleanedValue) ??
                                                     0.0;
+                                            total = _updateMixedPaymentTotal(
+                                              setState,
+                                              selectedProducts,
+                                              quantityProducts,
+                                              discounts,
+                                              typeDiscounts,
+                                              globalDiscount,
+                                              globalDiscountValue,
+                                              isPercentageDiscount,
+                                              useLoyaltyPoints,
+                                              pointsToUse,
+                                              pointsDiscount,
+                                              selectedVoucher,
+                                              voucherAmount,
+                                            );
                                           });
                                         },
                                       ),
@@ -1568,13 +1668,12 @@ class Addorder {
                                           labelText: "ID de transaction TPE",
                                           border: OutlineInputBorder(),
                                         ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            cardTransactionId = value;
-                                          });
-                                        },
+                                        onChanged: (value) =>
+                                            cardTransactionId = value,
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Existing check section
                                       Text("Chèque:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1601,6 +1700,21 @@ class Addorder {
                                             checkAmount =
                                                 double.tryParse(cleanedValue) ??
                                                     0.0;
+                                            total = _updateMixedPaymentTotal(
+                                              setState,
+                                              selectedProducts,
+                                              quantityProducts,
+                                              discounts,
+                                              typeDiscounts,
+                                              globalDiscount,
+                                              globalDiscountValue,
+                                              isPercentageDiscount,
+                                              useLoyaltyPoints,
+                                              pointsToUse,
+                                              pointsDiscount,
+                                              selectedVoucher,
+                                              voucherAmount,
+                                            );
                                           });
                                         },
                                       ),
@@ -1612,11 +1726,8 @@ class Addorder {
                                           labelText: "Numéro du chèque",
                                           border: OutlineInputBorder(),
                                         ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            checkNumber = value;
-                                          });
-                                        },
+                                        onChanged: (value) =>
+                                            checkNumber = value,
                                       ),
                                       SizedBox(height: 10),
                                       TextField(
@@ -1626,11 +1737,7 @@ class Addorder {
                                           labelText: "Banque émettrice",
                                           border: OutlineInputBorder(),
                                         ),
-                                        onChanged: (value) {
-                                          setState(() {
-                                            bankName = value;
-                                          });
-                                        },
+                                        onChanged: (value) => bankName = value,
                                       ),
                                       SizedBox(height: 10),
                                       InkWell(
@@ -1644,9 +1751,8 @@ class Addorder {
                                                 .add(Duration(days: 365)),
                                           );
                                           if (selectedDate != null) {
-                                            setState(() {
-                                              checkDate = selectedDate;
-                                            });
+                                            setState(
+                                                () => checkDate = selectedDate);
                                           }
                                         },
                                         child: InputDecorator(
@@ -1667,11 +1773,119 @@ class Addorder {
                                         ),
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Add Bon d'achat section
+                                      Text("Bon d'achat:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: clientPhoneController,
+                                              keyboardType: TextInputType.phone,
+                                              decoration: InputDecoration(
+                                                labelText: "Numéro client",
+                                                border: OutlineInputBorder(),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 10),
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              String phoneInput =
+                                                  clientPhoneController.text
+                                                      .trim();
+                                              if (phoneInput.isEmpty) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Veuillez entrer un numéro")),
+                                                );
+                                                return;
+                                              }
+
+                                              int? clientId = await SqlDb()
+                                                  .getClientIdByPhone(
+                                                      phoneInput);
+                                              if (clientId == null) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Client non trouvé")),
+                                                );
+                                                return;
+                                              }
+
+                                              List<Voucher> vouchers =
+                                                  await SqlDb()
+                                                      .fetchClientVouchers(
+                                                          clientId);
+                                              setState(() {
+                                                clientVouchers = vouchers;
+                                                showVoucherDropdown = true;
+                                              });
+                                            },
+                                            child: Text("Rechercher"),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 10),
+                                      if (showVoucherDropdown)
+                                        DropdownButtonFormField<Voucher>(
+                                          decoration: InputDecoration(
+                                            labelText: "Sélectionner un bon",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          items: clientVouchers.map((voucher) {
+                                            return DropdownMenuItem<Voucher>(
+                                              value: voucher,
+                                              child: Text(
+                                                  "Bon #${voucher.id} - ${voucher.amount} DT"),
+                                            );
+                                          }).toList(),
+                                          onChanged: (Voucher? selected) {
+                                            setState(() {
+                                              selectedVoucher = selected;
+                                              voucherAmount =
+                                                  selected?.amount ?? 0.0;
+                                              total = _updateMixedPaymentTotal(
+                                                setState,
+                                                selectedProducts,
+                                                quantityProducts,
+                                                discounts,
+                                                typeDiscounts,
+                                                globalDiscount,
+                                                globalDiscountValue,
+                                                isPercentageDiscount,
+                                                useLoyaltyPoints,
+                                                pointsToUse,
+                                                pointsDiscount,
+                                                selectedVoucher,
+                                                voucherAmount,
+                                              );
+                                            });
+                                          },
+                                        ),
+                                      SizedBox(height: 10),
+
+                                      // Total display
                                       Text(
-                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
+                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount + voucherAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold),
                                       ),
+                                      if ((cashAmount +
+                                              cardAmount +
+                                              checkAmount +
+                                              voucherAmount) <
+                                          total)
+                                        Text(
+                                          "Reste à payer: ${(total - (cashAmount + cardAmount + checkAmount + voucherAmount)).toStringAsFixed(2)} DT",
+                                          style: TextStyle(color: Colors.red),
+                                        ),
                                     ],
                                   ),
 
@@ -1763,7 +1977,8 @@ class Addorder {
                         useLoyaltyPoints,
                         pointsToUse,
                         pointsDiscount,
-                        selectedVariants);
+                        selectedVariants,
+                        selectedVoucher);
                   },
                   child: Text(
                     "Confirmer",
@@ -1776,6 +1991,49 @@ class Addorder {
         );
       },
     );
+  }
+
+  // Add this method to your Addorder class
+  static double _updateMixedPaymentTotal(
+    void Function(void Function()) setState,
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+    List<bool> typeDiscounts,
+    double globalDiscount,
+    double globalDiscountValue,
+    bool isPercentageDiscount,
+    bool useLoyaltyPoints,
+    int pointsToUse,
+    double pointsDiscount,
+    Voucher? selectedVoucher,
+    double voucherAmount,
+  ) {
+    double newTotal = 0.0;
+
+    setState(() {
+      // Recalculate totals when any payment amount changes
+      newTotal = calculateTotal(
+        selectedProducts,
+        quantityProducts,
+        discounts,
+        typeDiscounts,
+        isPercentageDiscount ? globalDiscount : globalDiscountValue,
+        isPercentageDiscount,
+      );
+
+      // Apply loyalty points discount if used
+      if (useLoyaltyPoints && pointsToUse > 0) {
+        newTotal = max(0, newTotal - pointsDiscount);
+      }
+
+      // Apply voucher discount if used
+      if (selectedVoucher != null) {
+        newTotal = max(0, newTotal - voucherAmount);
+      }
+    });
+
+    return newTotal;
   }
 
   static double _calculateMaxGlobalDiscountPercentage(
@@ -1823,6 +2081,7 @@ class Addorder {
     int pointsToUse,
     double pointsDiscount,
     List<Variant?> selectedVariants,
+    Voucher? selectedVoucher,
   ) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
@@ -1877,11 +2136,20 @@ class Addorder {
       total = max(0, total - pointsDiscount);
     }
 
-    // Determine payment status and remaining amount
+    // Declare payment variables
     double totalAmountPaid = 0.0;
-    String status;
-    double remainingAmount;
+    String status = "non payée";
+    double remainingAmount = total;
+    double voucherAmountUsed = 0.0;
 
+    // Handle voucher payment
+    if (selectedVoucher != null) {
+      // Determine how much of the voucher can be used
+      voucherAmountUsed = min(selectedVoucher.amount, total);
+      total = max(0, total - voucherAmountUsed);
+    }
+
+    // Handle other payment methods
     switch (selectedPaymentMethod) {
       case "Espèce":
         totalAmountPaid = cashAmount;
@@ -1906,15 +2174,19 @@ class Addorder {
             ? 0.0
             : total - (ticketRestaurantAmount ?? 0);
         break;
+      case "Bon d'achat":
+        // Already handled above
+        totalAmountPaid = voucherAmountUsed;
+        status = "payée";
+        remainingAmount = 0.0;
+        break;
       case "Mixte":
-        totalAmountPaid = cashAmount + cardAmount + checkAmount;
+        totalAmountPaid =
+            cashAmount + cardAmount + checkAmount + voucherAmountUsed;
         status = totalAmountPaid >= total ? "payée" : "semi-payée";
         remainingAmount =
             totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
         break;
-      default:
-        status = "non payée";
-        remainingAmount = total;
     }
 
     // Validate payment amounts
@@ -1924,7 +2196,7 @@ class Addorder {
         (selectedPaymentMethod == "Ticket Restaurant" &&
             (ticketRestaurantAmount == null || ticketRestaurantAmount <= 0)) ||
         (selectedPaymentMethod == "Mixte" &&
-            (cashAmount + cardAmount + checkAmount) <= 0)) {
+            (cashAmount + cardAmount + checkAmount + voucherAmountUsed) <= 0)) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text("Veuillez entrer un montant valide pour le paiement."),
@@ -1936,11 +2208,9 @@ class Addorder {
 
     // Create order lines with proper variant handling
     List<OrderLine> orderLines = [];
-    print("Selected variants before order creation: $selectedVariants");
     for (int i = 0; i < selectedProducts.length; i++) {
       Product product = selectedProducts[i];
       Variant? variant = selectedVariants[i];
-      print("Variant passed iiiiiiiiiisssss : $variant");
 
       // For products with variants but no variant selected, use the default variant
       if (product.hasVariants &&
@@ -1950,29 +2220,11 @@ class Addorder {
           (v) => v.defaultVariant,
           orElse: () => product.variants.first,
         );
-        selectedVariants[i] = variant; // Update selectedVariants
-      }
-
-      // Validate variant for variant-based products
-      if (product.hasVariants && variant == null) {
-        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text(
-                "Veuillez sélectionner une variante pour ${product.designation}."),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+        selectedVariants[i] = variant;
       }
 
       String productName = product.designation;
-      double price = product.prixTTC;
-      if (variant != null) {
-        productName += " (${variant.combinationName})";
-        price = variant.finalPrice;
-      }
-
-      print("priceee :  $price");
+      double price = variant?.finalPrice ?? product.prixTTC;
 
       orderLines.add(OrderLine(
         idOrder: 0,
@@ -1987,9 +2239,6 @@ class Addorder {
         discount: discounts[i],
         isPercentage: typeDiscounts[i],
       ));
-      print("ORDERLINES $orderLines");
-      print(
-          "Order line created with prixUnitaire: ${orderLines.last.prixUnitaire}");
     }
 
     // Get current user
@@ -2001,7 +2250,7 @@ class Addorder {
     Order order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
-      total: total,
+      total: totalBeforeDiscount, // Original total before any discounts
       modePaiement: selectedPaymentMethod,
       status: status,
       remainingAmount: remainingAmount,
@@ -2044,6 +2293,8 @@ class Addorder {
           selectedPaymentMethod == "Ticket Restaurant" ? numberOfTickets : null,
       pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
       pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
+      voucherAmount: selectedVoucher != null ? voucherAmountUsed : null,
+      voucherReference: selectedVoucher?.code,
     );
 
     try {
@@ -2095,15 +2346,31 @@ class Addorder {
         await fidelityController.addPointsFromOrder(order, db);
       }
 
+      // Mark voucher as used if applicable
+      if (selectedVoucher != null) {
+        try {
+          final db = await SqlDb().db;
+          await db.update(
+            'vouchers',
+            {
+              'is_used': 1,
+              'used_at': DateTime.now().toIso8601String(),
+              'remaining_amount': selectedVoucher.amount - voucherAmountUsed,
+            },
+            where: 'id = ?',
+            whereArgs: [selectedVoucher.id],
+          );
+        } catch (e) {
+          print("Error marking voucher as used: $e");
+        }
+      }
+
       // Update stock
       bool isValidOrder = true;
       for (int i = 0; i < selectedProducts.length; i++) {
         final product = selectedProducts[i];
         final quantity = quantityProducts[i];
         final variant = selectedVariants[i];
-
-        print(
-            "Updating stock for product ${product.designation}, variant: $variant");
 
         if (product.hasVariants && variant != null) {
           if (variant.stock - quantity < 0) {
@@ -2118,8 +2385,6 @@ class Addorder {
               ),
             );
           } else {
-            print(
-                "Updating variant stock: id=${variant.id}, new stock=${variant.stock - quantity}");
             await SqlDb()
                 .updateVariantStock(variant.id!, variant.stock - quantity);
           }
@@ -2134,8 +2399,6 @@ class Addorder {
             ),
           );
         } else {
-          print(
-              "Updating product stock: id=${product.id}, new stock=${product.stock - quantity}");
           await SqlDb()
               .updateProductStock(product.id!, product.stock - quantity);
         }
