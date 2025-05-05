@@ -1,4 +1,6 @@
+import 'package:caissechicopets/controllers/fidelity_controller.dart';
 import 'package:caissechicopets/models/order.dart';
+import 'package:caissechicopets/models/voucher.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/sqldb.dart';
@@ -139,110 +141,130 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
   }
 
   Future<void> _convertPointsToVoucher(Client client) async {
-    final fidelityRules = await _sqlDb.getFidelityRules();
+    try {
+      final db = await _sqlDb.db;
+      final fidelityRules = await FidelityController().getFidelityRules(db);
 
-    if (client.loyaltyPoints < fidelityRules.minPointsToUse) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Le client doit avoir au moins ${fidelityRules.minPointsToUse} points pour les convertir'),
-          backgroundColor: widget.warmRed,
-        ),
+      if (client.loyaltyPoints < fidelityRules.minPointsToUse) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Le client doit avoir au moins ${fidelityRules.minPointsToUse} points pour les convertir'),
+            backgroundColor: widget.warmRed,
+          ),
+        );
+        return;
+      }
+
+      final maxVoucherAmount =
+          client.loyaltyPoints * fidelityRules.dinarPerPoint;
+      final amountController = TextEditingController(
+        text: maxVoucherAmount.toStringAsFixed(2),
       );
-      return;
-    }
 
-    final maxPointsToUse =
-        (client.loyaltyPoints * fidelityRules.dinarPerPoint).toInt();
-
-    final voucherController = TextEditingController(
-      text: maxPointsToUse.toString(),
-    );
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Convertir les points en bon d\'achat'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Points disponibles: ${client.loyaltyPoints}'),
-            Text(
-                'Valeur: ${(client.loyaltyPoints * fidelityRules.dinarPerPoint).toStringAsFixed(2)} DT'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: voucherController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Montant du bon (DT)',
-                border: OutlineInputBorder(),
+      final result = await showDialog<double>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Convertir les points en bon d\'achat'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Points disponibles: ${client.loyaltyPoints}'),
+              Text('Taux: ${fidelityRules.dinarPerPoint} DT/point'),
+              Text(
+                  'Valeur maximale: ${maxVoucherAmount.toStringAsFixed(2)} DT'),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Montant du bon (DT)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty)
+                    return 'Entrez un montant';
+                  final amount = double.tryParse(value) ?? 0;
+                  if (amount <= 0) return 'Le montant doit être positif';
+                  if (amount > maxVoucherAmount) return 'Montant trop élevé';
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Entrez un montant';
-                final amount = double.tryParse(value) ?? 0;
-                if (amount <= 0) return 'Le montant doit être positif';
-                if (amount > maxPointsToUse) return 'Montant trop élevé';
-                return null;
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text) ?? 0;
+                if (amount <= 0 || amount > maxVoucherAmount) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Montant invalide')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, amount);
               },
+              child: const Text('Confirmer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: widget.tealGreen,
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+      );
+
+      if (result != null && result > 0) {
+        // Calculate points to deduct
+        final pointsToDeduct = (result / fidelityRules.dinarPerPoint).toInt();
+
+        // Create voucher map (without ID)
+        final voucherMap = {
+          'client_id': client.id!,
+          'amount': result,
+          'remaining_amount': result,
+          'points_used': pointsToDeduct,
+          'created_at': DateTime.now().toIso8601String(),
+          'is_used': 0,
+          'code': 'VOUCH-${DateTime.now().millisecondsSinceEpoch}',
+        };
+
+        // Update database in transaction
+        await db.transaction((txn) async {
+          // Insert voucher (don't specify ID)
+          await txn.insert('vouchers', voucherMap);
+
+          // Update client points
+          await txn.update(
+            'clients',
+            {'loyalty_points': client.loyaltyPoints - pointsToDeduct},
+            where: 'id = ?',
+            whereArgs: [client.id],
+          );
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Bon d\'achat de ${result.toStringAsFixed(2)} DT créé avec succès'),
+            backgroundColor: widget.tealGreen,
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = double.tryParse(voucherController.text) ?? 0;
+        );
 
-              if (amount <= 0 || amount > maxPointsToUse) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Montant invalide')),
-                );
-                return;
-              }
-
-              final pointsToDeduct =
-                  (amount / fidelityRules.dinarPerPoint).toInt();
-
-              try {
-                await _sqlDb.createVoucher(
-                  clientId: client.id!,
-                  amount: amount,
-                  pointsUsed: pointsToDeduct,
-                );
-
-                await _sqlDb.updateClientLoyaltyPoints(
-                    client.id!, client.loyaltyPoints - pointsToDeduct);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Bon d\'achat de ${amount.toStringAsFixed(2)} DT créé avec succès'),
-                    backgroundColor: widget.tealGreen,
-                  ),
-                );
-
-                _loadClients();
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur: ${e.toString()}'),
-                    backgroundColor: widget.warmRed,
-                  ),
-                );
-              }
-            },
-            child: const Text('Confirmer'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: widget.tealGreen,
-            ),
-          ),
-        ],
-      ),
-    );
+        // Refresh client list
+        _loadClients();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: ${e.toString()}'),
+          backgroundColor: widget.warmRed,
+        ),
+      );
+    }
   }
 
   Future<void> _showClientVouchers(BuildContext context, Client client) async {
