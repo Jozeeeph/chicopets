@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class OrderLine {
   final int idOrder;
   final String? productCode;
@@ -10,6 +12,7 @@ class OrderLine {
   final double prixUnitaire;
   final double discount;
   final bool isPercentage;
+  final Map<String, dynamic>? productData;
 
   OrderLine({
     required this.idOrder,
@@ -23,6 +26,7 @@ class OrderLine {
     required this.prixUnitaire,
     required this.discount,
     required this.isPercentage,
+    this.productData,
   }) : assert(productCode != null || productId != null,
             'Either productCode or productId must be provided');
 
@@ -49,6 +53,7 @@ class OrderLine {
       'prix_unitaire': prixUnitaire,
       'discount': discount,
       'isPercentage': isPercentage ? 1 : 0,
+      'product_data': productData != null ? jsonEncode(productData) : null,
     };
   }
 
@@ -65,6 +70,9 @@ class OrderLine {
       prixUnitaire: (map['prix_unitaire'] as num).toDouble(),
       discount: (map['discount'] as num).toDouble(),
       isPercentage: map['isPercentage'] == 1,
+      productData: map['product_data'] != null
+          ? jsonDecode(map['product_data'] as String)
+          : null,
     );
   }
 
