@@ -1935,35 +1935,11 @@ class Addorder {
     }
 
     // Create order lines with proper variant handling
+    // Dans la méthode _confirmPlaceOrder, lors de la création des OrderLines
     List<OrderLine> orderLines = [];
-    print("Selected variants before order creation: $selectedVariants");
     for (int i = 0; i < selectedProducts.length; i++) {
       Product product = selectedProducts[i];
       Variant? variant = selectedVariants[i];
-      print("Variant passed iiiiiiiiiisssss : $variant");
-
-      // For products with variants but no variant selected, use the default variant
-      if (product.hasVariants &&
-          variant == null &&
-          product.variants.isNotEmpty) {
-        variant = product.variants.firstWhere(
-          (v) => v.defaultVariant,
-          orElse: () => product.variants.first,
-        );
-        selectedVariants[i] = variant; // Update selectedVariants
-      }
-
-      // Validate variant for variant-based products
-      if (product.hasVariants && variant == null) {
-        Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text(
-                "Veuillez sélectionner une variante pour ${product.designation}."),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
 
       String productName = product.designation;
       double price = product.prixTTC;
@@ -1971,8 +1947,6 @@ class Addorder {
         productName += " (${variant.combinationName})";
         price = variant.finalPrice;
       }
-
-      print("priceee :  $price");
 
       orderLines.add(OrderLine(
         idOrder: 0,
@@ -1986,10 +1960,8 @@ class Addorder {
         prixUnitaire: price,
         discount: discounts[i],
         isPercentage: typeDiscounts[i],
+        productData: product.toMap(), // Sauvegarde des données du produit
       ));
-      print("ORDERLINES $orderLines");
-      print(
-          "Order line created with prixUnitaire: ${orderLines.last.prixUnitaire}");
     }
 
     // Get current user

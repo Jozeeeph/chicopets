@@ -262,106 +262,92 @@ class Getorderlist {
                           ),
                           children: [
                             ...order.orderLines.map((orderLine) {
-                              return FutureBuilder<Product?>(
-                                future:
-                                    sqldb.getProductById(orderLine.productId!),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return const Center(
-                                        child: CircularProgressIndicator());
-                                  }
+                              // Utilisez product_data si disponible, sinon les champs standards
+                              String productName =
+                                  orderLine.productData?['designation'] ??
+                                      orderLine.productName ??
+                                      'Produit inconnu';
 
-                                  if (snapshot.hasError ||
-                                      !snapshot.hasData ||
-                                      snapshot.data == null) {
-                                    return const ListTile(
-                                        title: Text("Produit supprimé",
-                                            style: TextStyle(
-                                                color: Color(0xFFE53935))));
-                                  }
+                              if (orderLine.variantName != null) {
+                                productName += " (${orderLine.variantName})";
+                              }
 
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            "x${orderLine.quantity}",
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Color(0xFF000000)),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Text(
-                                            orderLine.productName ??
-                                                'Unknown Product',
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Color(0xFF000000)),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 1,
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
-                                                style: const TextStyle(
-                                                    fontSize: 16,
-                                                    color: Color(0xFF000000)),
-                                              ),
-                                              if (orderLine.discount > 0)
-                                                Text(
-                                                  orderLine.isPercentage
-                                                      ? "-${orderLine.discount.toStringAsFixed(2)}%"
-                                                      : "-${orderLine.discount.toStringAsFixed(2)} DT",
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    color: Colors.red,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            "${(orderLine.finalPrice * orderLine.quantity).toStringAsFixed(2)} DT",
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF000000),
-                                            ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(Icons.delete,
-                                              color: Colors.red),
-                                          onPressed: () async {
-                                            await deleteOrderLine(
-                                                context, order, orderLine, () {
-                                              Navigator.pop(
-                                                  context); // Close current dialog
-                                              showListOrdersPopUp(
-                                                  context); // Refresh list
-                                            });
-                                          },
-                                        ),
-                                      ],
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                        "x${orderLine.quantity}", // Afficher la quantité
+                                        style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Color(0xFF000000)),
+                                      ),
                                     ),
-                                  );
-                                },
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        productName,
+                                        style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Color(0xFF000000)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                            style: const TextStyle(
+                                                fontSize: 16,
+                                                color: Color(0xFF000000)),
+                                          ),
+                                          if (orderLine.discount > 0)
+                                            Text(
+                                              orderLine.isPercentage
+                                                  ? "-${orderLine.discount.toStringAsFixed(2)}%"
+                                                  : "-${orderLine.discount.toStringAsFixed(2)} DT",
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                        "${(orderLine.finalPrice * orderLine.quantity).toStringAsFixed(2)} DT",
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF000000),
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon:
+                                          Icon(Icons.delete, color: Colors.red),
+                                      onPressed: () async {
+                                        await deleteOrderLine(
+                                            context, order, orderLine, () {
+                                          Navigator.pop(context);
+                                          showListOrdersPopUp(context);
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
                               );
                             }).toList(),
                             Padding(
@@ -613,72 +599,64 @@ class Getorderlist {
                     ),
                   ),
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
+                  // Dans la méthode _showOrderTicketPopup, remplacez la partie d'affichage des produits par :
+
                   ...order.orderLines.map((orderLine) {
-                    return FutureBuilder<Product?>(
-                      future:
-                          sqldb.getProductByCode(orderLine.productCode ?? ''),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                              child: CircularProgressIndicator(
-                            color: Color(0xFF26A9E0),
-                          ));
-                        }
+                    // Utilisez product_data si disponible, sinon les champs standards
+                    String productName =
+                        orderLine.productData?['designation'] ??
+                            orderLine.productName ??
+                            'Produit inconnu';
 
-                        if (snapshot.hasError ||
-                            !snapshot.hasData ||
-                            snapshot.data == null) {
-                          return const ListTile(
-                              title: Text("Produit introuvable",
-                                  style: TextStyle(color: Color(0xFFE53935))));
-                        }
+                    if (orderLine.variantName != null) {
+                      productName += " (${orderLine.variantName})";
+                    }
 
-                        double discountedPrice = orderLine.prixUnitaire *
-                            (1 - orderLine.discount / 100);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  "x${orderLine.quantity}",
-                                  style: TextStyle(
-                                      fontSize: 16, color: Color(0xFF000000)),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  "x${orderLine.productName}",
-                                  style: TextStyle(
-                                      fontSize: 16, color: Color(0xFF000000)),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  "${orderLine.finalPrice.toStringAsFixed(2)} DT",
-                                  style: TextStyle(
-                                      fontSize: 16, color: Color(0xFF000000)),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF000000)),
-                                ),
-                              ),
-                            ],
+                    double discountedPrice =
+                        orderLine.prixUnitaire * (1 - orderLine.discount / 100);
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              "x${orderLine.quantity}", // Afficher la quantité ici
+                              style: TextStyle(
+                                  fontSize: 16, color: Color(0xFF000000)),
+                            ),
                           ),
-                        );
-                      },
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              productName,
+                              style: TextStyle(
+                                  fontSize: 16, color: Color(0xFF000000)),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              "${discountedPrice.toStringAsFixed(2)} DT",
+                              style: TextStyle(
+                                  fontSize: 16, color: Color(0xFF000000)),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              "${(discountedPrice * orderLine.quantity).toStringAsFixed(2)} DT",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF000000),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }).toList(),
                   Divider(thickness: 1, color: Color(0xFFE0E0E0)),
@@ -1052,7 +1030,6 @@ class Getorderlist {
   }
 
   // Debug helper methods
-
 
   static String formatDate(String date) {
     DateTime parsedDate = DateTime.parse(date);

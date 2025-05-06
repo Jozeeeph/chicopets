@@ -121,6 +121,7 @@ class SqlDb {
             prix_unitaire REAL NOT NULL DEFAULT 0,
             discount REAL NOT NULL DEFAULT 0,
             isPercentage INTEGER NOT NULL CHECK (isPercentage IN (0, 1)),
+            product_data TEXT,
             FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
             FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
