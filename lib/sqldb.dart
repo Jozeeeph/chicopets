@@ -40,7 +40,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -121,6 +121,7 @@ class SqlDb {
             prix_unitaire REAL NOT NULL DEFAULT 0,
             discount REAL NOT NULL DEFAULT 0,
             isPercentage INTEGER NOT NULL CHECK (isPercentage IN (0, 1)),
+            product_data TEXT,
             FOREIGN KEY (id_order) REFERENCES orders(id_order) ON DELETE CASCADE,
             FOREIGN KEY (product_code) REFERENCES products(code) ON DELETE CASCADE,
             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -254,18 +255,12 @@ class SqlDb {
   CREATE TABLE vouchers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
-    amount REAL NOT NULL CHECK (amount > 0),
-    remaining_amount REAL NOT NULL CHECK (remaining_amount >= 0),
-    points_used INTEGER NOT NULL DEFAULT 0,
+    amount REAL NOT NULL,
+    points_used INTEGER NOT NULL,
     created_at TEXT NOT NULL,
-    expires_at TEXT,
-    is_used INTEGER DEFAULT 0 CHECK (is_used IN (0, 1)),
+    is_used INTEGER DEFAULT 0,
     used_at TEXT,
-    code TEXT UNIQUE,
-    notes TEXT,
-    FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
-    CHECK (remaining_amount <= amount),
-    CHECK (CASE WHEN is_used = 1 THEN used_at IS NOT NULL ELSE 1 END)
+    FOREIGN KEY (client_id) REFERENCES clients (id)
   )
 ''');
         } catch (e) {
