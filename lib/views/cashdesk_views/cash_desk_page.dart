@@ -52,7 +52,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void _showSessionInfo() {
-    final duration = _sessionStartTime != null 
+    final duration = _sessionStartTime != null
         ? DateTime.now().difference(_sessionStartTime!)
         : Duration.zero;
 
@@ -79,7 +79,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ListTile(
                 leading: const Icon(Icons.point_of_sale),
                 title: const Text('Transactions en cours'),
-                subtitle: Text('${selectedProducts.length} produits sélectionnés'),
+                subtitle:
+                    Text('${selectedProducts.length} produits sélectionnés'),
               ),
             ],
           ),
@@ -100,7 +101,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
       },
     );
   }
-
 
   List<Widget> _buildSalesReport(Map<String, Map<String, dynamic>> salesData) {
     List<Widget> widgets = [];
@@ -168,23 +168,31 @@ class _CashDeskPageState extends State<CashDeskPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Date: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(order.date))}'),
+              Text(
+                  'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(order.date))}'),
               Text('Statut: ${order.status}'),
               Text('Mode Paiement: ${order.modePaiement}'),
               const SizedBox(height: 16),
-              const Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ...order.orderLines.map((line) => ListTile(
-                title: Text(line.productCode!),
-                subtitle: Text('${line.quantity} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
-                trailing: Text('${(line.finalPrice * line.quantity).toStringAsFixed(2)} DT'),
-              )).toList(),
+              const Text('Articles:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              ...order.orderLines
+                  .map((line) => ListTile(
+                        title: Text(line.productCode!),
+                        subtitle: Text(
+                            '${line.quantity} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
+                        trailing: Text(
+                            '${(line.finalPrice * line.quantity).toStringAsFixed(2)} DT'),
+                      ))
+                  .toList(),
               const Divider(),
-              Text('Total: ${order.total.toStringAsFixed(2)} DT', 
+              Text('Total: ${order.total.toStringAsFixed(2)} DT',
                   style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT',
+              Text(
+                  'Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: order.remainingAmount > 0 ? Colors.red : Colors.green,
+                    color:
+                        order.remainingAmount > 0 ? Colors.red : Colors.green,
                   )),
             ],
           ),
@@ -333,7 +341,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
         .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
   }
 
-
   double _calculateTotal() {
     double total = 0.0;
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -359,104 +366,115 @@ class _CashDeskPageState extends State<CashDeskPage> {
 
   // ... (keep all your imports and other code the same)
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        ),
-      ),
-      title: const Text('Caisse de vente'),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.info_outline, color: Colors.black),
-          onPressed: _showSessionInfo,
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout, color: Colors.black),
-          onPressed: _logout,
-        ),
-      ],
-    ),
-    body: Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        children: [
-          TableCmd(
-            total: calculateTotal(
-              selectedProducts,
-              quantityProducts,
-              discounts,
-              typeDiscounts,
-              globalDiscount,
-              isPercentageDiscount,
-            ),
-            selectedProducts: selectedProducts,
-            quantityProducts: quantityProducts,
-            discounts: discounts,
-            globalDiscount: globalDiscount,
-            typeDiscounts: typeDiscounts,
-            onApplyDiscount: _handleApplyDiscount,
-            onAddProduct: _handleAddProduct,
-            onDeleteProduct: _handleDeleteProduct,
-            onSearchProduct: _handleSearchProduct,
-            onQuantityChange: _handleQuantityChange,
-            onFetchOrders: _handleFetchOrders,
-            onPlaceOrder: _handlePlaceOrder,
-            isPercentageDiscount: isPercentageDiscount,
-            selectedProductIndex: selectedProductIndex,
-            onProductSelected: (index) {
-              setState(() {
-                selectedProductIndex = index;
-              });
-            },
-            calculateTotal: calculateTotal,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
           ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: Categorieetproduct(
-              selectedProducts: selectedProducts,
-              quantityProducts: quantityProducts,
-              discounts: discounts,
-              onProductSelected: (Product product, [Variant? variant]) {
-                setState(() {
-                  int index = selectedProducts.indexWhere((p) {
-                    if (p.code?.trim().toLowerCase() !=
-                        product.code?.trim().toLowerCase()) {
-                      return false;
-                    }
-                    if (variant != null && p.variants.isNotEmpty) {
-                      return p.variants.any((v) => v.code == variant.code);
-                    }
-                    return variant == null;
-                  });
-
-                  if (index == -1) {
-                    final productToAdd = variant != null
-                        ? (Product.fromMap(product.toMap())
-                          ..variants = [variant])
-                        : product;
-
-                    selectedProducts.add(productToAdd);
-                    quantityProducts.add(1);
-                    discounts.add(0.0);
-                    typeDiscounts.add(true);
-                    selectedProductIndex = selectedProducts.length - 1;
-                  } else {
-                    quantityProducts[index]++;
-                    selectedProductIndex = index;
-                  }
-                });
-              },
-            ),
+        ),
+        title: const Text('Caisse de vente'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Colors.black),
+            onPressed: _showSessionInfo,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            onPressed: _logout,
           ),
         ],
       ),
-    ),
-  );
-}
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            TableCmd(
+              total: calculateTotal(
+                selectedProducts,
+                quantityProducts,
+                discounts,
+                typeDiscounts,
+                globalDiscount,
+                isPercentageDiscount,
+              ),
+              selectedProducts: selectedProducts,
+              quantityProducts: quantityProducts,
+              discounts: discounts,
+              globalDiscount: globalDiscount,
+              typeDiscounts: typeDiscounts,
+              onApplyDiscount: _handleApplyDiscount,
+              onAddProduct: _handleAddProduct,
+              onDeleteProduct: _handleDeleteProduct,
+              onSearchProduct: _handleSearchProduct,
+              onQuantityChange: _handleQuantityChange,
+              onFetchOrders: _handleFetchOrders,
+              onPlaceOrder: _handlePlaceOrder,
+              isPercentageDiscount: isPercentageDiscount,
+              selectedProductIndex: selectedProductIndex,
+              onProductSelected: (index) {
+                setState(() {
+                  selectedProductIndex = index;
+                });
+              },
+              calculateTotal: calculateTotal,
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Categorieetproduct(
+                selectedProducts: selectedProducts,
+                quantityProducts: quantityProducts,
+                discounts: discounts,
+                onProductSelected: (Product product, [Variant? variant]) {
+                  setState(() {
+                    // Create a unique identifier for this product+variant combination
+                    String uniqueId = '${product.id}';
+                    if (variant != null) {
+                      uniqueId += '_${variant.id}';
+                    }
+
+                    // Check if this exact combination already exists
+                    int existingIndex = -1;
+                    for (int i = 0; i < selectedProducts.length; i++) {
+                      String currentId = '${selectedProducts[i].id}';
+                      if (selectedProducts[i].variants.isNotEmpty) {
+                        currentId +=
+                            '_${selectedProducts[i].variants.first.id}';
+                      }
+                      if (currentId == uniqueId) {
+                        existingIndex = i;
+                        break;
+                      }
+                    }
+
+                    if (existingIndex >= 0) {
+                      // Increment quantity if same product+variant exists
+                      quantityProducts[existingIndex]++;
+                      selectedProductIndex = existingIndex;
+                    } else {
+                      // Create a new product instance with only the selected variant
+                      final productToAdd = product.copyWith(
+                        variants: variant != null ? [variant] : [],
+                        prixTTC: variant?.finalPrice ?? product.prixTTC,
+                      );
+
+                      selectedProducts.add(productToAdd);
+                      quantityProducts.add(1);
+                      discounts.add(0.0);
+                      typeDiscounts.add(true);
+                      selectedProductIndex = selectedProducts.length - 1;
+                    }
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
