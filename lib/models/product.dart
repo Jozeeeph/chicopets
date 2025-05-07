@@ -64,8 +64,8 @@ class Product {
     double? prixTTC,
     String? dateExpiration,
     int? categoryId,
-    String? categoryName,
     int? subCategoryId,
+    String? categoryName,
     String? subCategoryName,
     int? isDeleted,
     double? marge,
@@ -75,8 +75,8 @@ class Product {
     bool? hasVariants,
     bool? sellable,
     String? status,
-    String? image, // Added to copyWith
-    String? brand, // Added to copyWith
+    String? image,
+    String? brand,
   }) {
     return Product(
       id: id ?? this.id,
@@ -89,8 +89,8 @@ class Product {
       prixTTC: prixTTC ?? this.prixTTC,
       dateExpiration: dateExpiration ?? this.dateExpiration,
       categoryId: categoryId ?? this.categoryId,
-      categoryName: categoryName ?? this.categoryName,
       subCategoryId: subCategoryId ?? this.subCategoryId,
+      categoryName: categoryName ?? this.categoryName,
       subCategoryName: subCategoryName ?? this.subCategoryName,
       isDeleted: isDeleted ?? this.isDeleted,
       marge: marge ?? this.marge,
@@ -100,8 +100,8 @@ class Product {
       hasVariants: hasVariants ?? this.hasVariants,
       sellable: sellable ?? this.sellable,
       status: status ?? this.status,
-      image: image ?? this.image, // Added to copyWith
-      brand: brand ?? this.brand, // Added to copyWith
+      image: image ?? this.image,
+      brand: brand ?? this.brand,
     );
   }
 
