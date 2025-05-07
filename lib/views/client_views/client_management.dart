@@ -657,10 +657,12 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
                     'Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT'),
               SizedBox(height: 16),
               Text('Articles:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ...order.orderLines.map((line) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text('- ${line.productCode} x${line.quantity}'),
-                  )),
+              ...order.orderLines.map((line) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text('- ${line.productName} x ${line.quantity}'),
+                );
+              }),
             ],
           ),
         ),
@@ -674,16 +676,19 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
     );
   }
 
-  void _showClientProducts(BuildContext context, Client client) async {
+  Future<void> _showClientProducts(BuildContext context, Client client) async {
     try {
+      // Show loading dialog
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => Center(child: CircularProgressIndicator()),
       );
 
+      // Fetch client's purchased products
       final products = await _sqlDb.getProductsPurchasedByClient(client.id!);
 
+      // Close loading dialog
       Navigator.of(context).pop();
 
       if (products.isEmpty) {
@@ -693,12 +698,16 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
         return;
       }
 
-      showDialog(
+      // Show products dialog
+      await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Historique d\'achats'),
+          title:
+              Text('Historique d\'achats - ${client.name} ${client.firstName}'),
           content: Container(
             width: double.maxFinite,
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7),
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: products.length,
@@ -713,9 +722,13 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Quantité: ${product['total_quantity']}'),
+                        Text('Code: ${product['product_code'] ?? 'N/A'}'),
                         Text(
-                            'Total dépensé: ${product['total_spent']?.toStringAsFixed(2) ?? '0.00'} DT'),
+                            'Quantité totale: ${product['total_quantity'] ?? 0}'),
+                        Text(
+                            'Dernier achat: ${product['last_purchase_date'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(product['last_purchase_date'])) : 'N/A'}'),
+                        Text(
+                            'Total dépensé: ${(product['total_spent'] ?? 0).toStringAsFixed(2)} DT'),
                       ],
                     ),
                   ),
@@ -732,10 +745,12 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
         ),
       );
     } catch (e) {
+      // Close loading dialog if still open
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
+          content: Text(
+              'Erreur lors de la récupération des produits: ${e.toString()}'),
           backgroundColor: widget.warmRed,
         ),
       );

@@ -300,55 +300,70 @@ class ProductController {
   }
 
   Future<List<Map<String, dynamic>>> getProductsPurchasedByClient(
-    int clientId, Database dbClient) async {
-  print('Recherche des produits pour client ID: $clientId');
-  
-  final results = await dbClient.rawQuery('''
-    SELECT 
-      p.designation,
-      p.code,
-      SUM(oi.quantity) as total_quantity,
-      SUM(
-        CASE 
-          WHEN oi.isPercentage = 1 THEN oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
-          ELSE oi.quantity * (oi.prix_unitaire - oi.discount)
-        END
-      ) as total_spent,
-      AVG(
-        CASE 
-          WHEN oi.isPercentage = 1 THEN (oi.prix_unitaire * (1 - oi.discount/100))
-          ELSE (oi.prix_unitaire - oi.discount)
-        END
-      ) as average_price
-    FROM 
-      order_items oi
-    JOIN 
-      products p ON oi.product_code = p.code
-    JOIN 
-      orders o ON oi.id_order = o.id_order
-    WHERE 
-      o.id_client = ?
-      AND o.status != 'cancelled'
-      AND p.is_deleted = 0
-    GROUP BY 
-      p.designation, p.code
-    ORDER BY 
-      total_quantity DESC
-  ''', [clientId]);
+      int clientId, Database dbClient) async {
+    try {
+      print('Fetching products for client ID: $clientId');
 
-  print('Résultats trouvés: ${results.length}');
-  results.forEach(print); // Affiche chaque résultat
-  
-  return results;
-}
-Future<double> getProductTotalSales(int productId, Database dbClient) async {
-  final result = await dbClient.rawQuery('''
+      final results = await dbClient.rawQuery('''
+      SELECT 
+        oi.product_name as designation,
+        oi.product_code as code,
+        SUM(oi.quantity) as total_quantity,
+        SUM(
+          CASE 
+            WHEN oi.isPercentage = 1 THEN 
+              oi.quantity * (oi.prix_unitaire * (1 - oi.discount/100))
+            ELSE 
+              oi.quantity * (oi.prix_unitaire - oi.discount)
+          END
+        ) as total_spent,
+        AVG(
+          CASE 
+            WHEN oi.isPercentage = 1 THEN 
+              (oi.prix_unitaire * (1 - oi.discount/100))
+            ELSE 
+              (oi.prix_unitaire - oi.discount)
+          END
+        ) as average_price,
+        MAX(o.date) as last_purchase_date
+      FROM 
+        order_items oi
+      JOIN 
+        orders o ON oi.id_order = o.id_order
+      WHERE 
+        o.id_client = ?
+        AND o.status != 'cancelled'
+      GROUP BY 
+        oi.product_name, oi.product_code
+      ORDER BY 
+        total_quantity DESC
+    ''', [clientId]);
+
+      print('Found ${results.length} products for client $clientId');
+
+      // Debug print formatted results
+      for (final row in results) {
+        print('Product: ${row['designation']} (${row['code']})');
+        print('- Quantity: ${row['total_quantity']}');
+        print('- Last purchase: ${row['last_purchase_date']}');
+      }
+
+      return results;
+    } catch (e, stackTrace) {
+      print('Error fetching products for client $clientId: $e');
+      print(stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<double> getProductTotalSales(int productId, Database dbClient) async {
+    final result = await dbClient.rawQuery('''
     SELECT SUM(oi.quantity * oi.prix_unitaire) as total_sales
     FROM order_items oi
     JOIN orders o ON oi.id_order = o.id_order
     WHERE oi.product_id = ? AND o.status != 'cancelled'
   ''', [productId]);
 
-  return result.first['total_sales'] as double? ?? 0.0;
-}
+    return result.first['total_sales'] as double? ?? 0.0;
+  }
 }
