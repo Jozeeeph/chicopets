@@ -85,6 +85,7 @@ class Clientcontroller {
           idOrder: orderId,
           productCode: itemMap['product_code'],
           productId: itemMap['product_id'],
+          productName: itemMap['product_name'],
           quantity: itemMap['quantity'],
           prixUnitaire: itemMap['prix_unitaire'],
           discount: itemMap['discount'],
