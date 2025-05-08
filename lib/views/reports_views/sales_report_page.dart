@@ -6,6 +6,10 @@ import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/order.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+
+import 'package:printing/printing.dart';
 
 class SalesReportPage extends StatefulWidget {
   @override
@@ -30,6 +34,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
   List<Map<String, dynamic>> _salesData = [];
   bool _isLoading = false;
   bool _showDateRange = false;
+  bool _showDownloadButton = false;
 
   @override
   void initState() {
@@ -58,7 +63,10 @@ class _SalesReportPageState extends State<SalesReportPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _showDownloadButton = false;
+    });
 
     try {
       print(
@@ -83,7 +91,10 @@ class _SalesReportPageState extends State<SalesReportPage> {
         ),
       );
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _showDownloadButton = _salesData.isNotEmpty;
+      });
     }
   }
 
@@ -253,7 +264,8 @@ class _SalesReportPageState extends State<SalesReportPage> {
             as Map<String, Map<String, dynamic>>;
 
         // Create a unique key for the product with variant
-        final variantName =variant?.combinationName ?? line.variantName ?? 'Standard';
+        final variantName =
+            variant?.combinationName ?? line.variantName ?? 'Standard';
         final productKey = '${product.designation} ($variantName)';
 
         if (!productsMap.containsKey(productKey)) {
@@ -356,6 +368,186 @@ class _SalesReportPageState extends State<SalesReportPage> {
     }
   }
 
+Future<void> _downloadPdfReport() async {
+  final pdf = pw.Document();
+
+  // Configuration exacte pour ticket (70mm de large)
+  final pageFormat = PdfPageFormat(
+    70 * PdfPageFormat.mm, // Largeur fixe 70mm
+    double.infinity, // Hauteur variable
+    marginAll: 2, // Marges très réduites (2 points)
+  );
+
+  pdf.addPage(
+    pw.Page(
+      pageFormat: pageFormat,
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // En-tête centré
+            pw.Center(
+              child: pw.Column(
+                children: [
+                  pw.Text('CHICO PETS',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                      )),
+                  pw.SizedBox(height: 2),
+                  pw.Text('Rapport des ventes',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                      )),
+                  pw.SizedBox(height: 2),
+                  pw.Text(
+                    '${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)} - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
+                ],
+              ),
+            ),
+            
+            pw.SizedBox(height: 4),
+            pw.Divider(thickness: 0.5),
+            pw.SizedBox(height: 4),
+
+            // Détails des ventes - version ultra compacte
+            for (final category in _salesData) ...[
+              pw.Text(
+                category['category'].toUpperCase(),
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              
+              // Produits en tableau compact
+              pw.Table(
+                columnWidths: {
+                  0: pw.FlexColumnWidth(2.5), // Produit
+                  1: pw.FlexColumnWidth(0.8), // Qté
+                  2: pw.FlexColumnWidth(1.2), // PU
+                  3: pw.FlexColumnWidth(1.5), // Total
+                },
+                border: pw.TableBorder.all(width: 0.2),
+                children: [
+                  // En-tête du tableau
+                  pw.TableRow(
+                    children: [
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(1),
+                        child: pw.Text('Produit', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(1),
+                        child: pw.Text('Qté', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(1),
+                        child: pw.Text('P.U', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.all(1),
+                        child: pw.Text('Total', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                      ),
+                    ],
+                  ),
+                  
+                  // Lignes des produits
+                  for (final product in category['products'])
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(1),
+                          child: pw.Text(
+                            '${product['name']}\n(${product['variant']})',
+                            style: const pw.TextStyle(fontSize: 6),
+                            maxLines: 2,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(1),
+                          child: pw.Text(
+                            product['quantity'].toString(),
+                            style: const pw.TextStyle(fontSize: 6),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(1),
+                          child: pw.Text(
+                            product['unitPrice'].toStringAsFixed(2),
+                            style: const pw.TextStyle(fontSize: 6),
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(1),
+                          child: pw.Text(
+                            product['total'].toStringAsFixed(2),
+                            style: const pw.TextStyle(fontSize: 6),
+                            textAlign: pw.TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+              
+              // Total catégorie
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.end,
+                children: [
+                  pw.Text(
+                    'Total ${category['category']}: ${category['total'].toStringAsFixed(2)} DT',
+                    style: pw.TextStyle(
+                      fontSize: 7,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+            ],
+            
+            // Ligne de séparation finale
+            pw.Divider(thickness: 0.5),
+            pw.SizedBox(height: 4),
+            
+            // Total général
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Text(
+                  'TOTAL: ${_salesData.fold(0.0, (sum, category) => sum + category['total']).toStringAsFixed(2)} DT',
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            
+            // Pied de page minimaliste
+            pw.SizedBox(height: 6),
+            pw.Center(
+              child: pw.Text(
+                '${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                style: const pw.TextStyle(fontSize: 6),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -519,40 +711,62 @@ class _SalesReportPageState extends State<SalesReportPage> {
 
             // Bouton pour générer le rapport
             SizedBox(
-              width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _generateReport,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: deepBlue,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: _isLoading
                     ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           CircularProgressIndicator(color: white),
                           SizedBox(width: 10),
-                          Text('Génération en cours...',
-                              style: TextStyle(color: white)),
+                          Text('Génération...', style: TextStyle(color: white)),
                         ],
                       )
                     : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.bar_chart, color: white),
-                          SizedBox(width: 10),
+                          Icon(Icons.bar_chart, color: white, size: 20),
+                          SizedBox(width: 8),
                           Text('Générer le rapport',
-                              style: TextStyle(color: white, fontSize: 16)),
+                              style: TextStyle(color: white)),
                         ],
                       ),
               ),
             ),
+            SizedBox(height: 8),
+
+            // Bouton de téléchargement PDF (visible seulement après génération)
+            if (_showDownloadButton)
+              SizedBox(
+                child: ElevatedButton(
+                  onPressed: _downloadPdfReport,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: tealGreen,
+                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.picture_as_pdf, color: white, size: 20),
+                      SizedBox(width: 8),
+                      Text('Télécharger PDF', style: TextStyle(color: white)),
+                    ],
+                  ),
+                ),
+              ),
             SizedBox(height: 16),
 
-// Résultats
+            // Résultats
             Expanded(
               child: _isLoading
                   ? Center(child: CircularProgressIndicator(color: deepBlue))
