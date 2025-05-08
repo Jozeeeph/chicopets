@@ -256,12 +256,16 @@ class SqlDb {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
     amount REAL NOT NULL,
+    remaining_amount REAL NOT NULL,
     points_used INTEGER NOT NULL,
     created_at TEXT NOT NULL,
+    expires_at TEXT,
     is_used INTEGER DEFAULT 0,
     used_at TEXT,
+    code TEXT,
+    notes TEXT,
     FOREIGN KEY (client_id) REFERENCES clients (id)
-  )
+);
 ''');
         } catch (e) {
           print("Error creating tables: $e");
