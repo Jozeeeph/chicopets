@@ -5,6 +5,7 @@ import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/views/cashdesk_views/cash_closure_report_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:caissechicopets/home_page.dart'; // Adaptez le chemin selon votre structure
 
 class CashierHomePage extends StatefulWidget {
   const CashierHomePage({super.key});
@@ -21,13 +22,11 @@ class _CashierHomePageState extends State<CashierHomePage>
   bool _needsInitialAmount = false;
   final TextEditingController _amountController = TextEditingController();
 
-
   @override
   void initState() {
     super.initState();
     _checkCashState();
   }
-
 
   Future<void> _checkCashState() async {
     final state = await _cashService.getCashState();
@@ -79,6 +78,15 @@ class _CashierHomePageState extends State<CashierHomePage>
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          },
+        ),
         title: Text('Partie Caissier',
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.bold, color: Colors.white)),
@@ -86,13 +94,6 @@ class _CashierHomePageState extends State<CashierHomePage>
         backgroundColor: Color(0xFF0056A6),
         elevation: 10,
         shadowColor: Colors.blue.withOpacity(0.5),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () => Navigator.pop(context),
-            tooltip: 'Déconnexion',
-          ),
-        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -214,34 +215,36 @@ class _CashierHomePageState extends State<CashierHomePage>
   }
 
   Widget _buildActionCards() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 1.2,
-      crossAxisSpacing: 20,
-      mainAxisSpacing: 20,
-      children: [
-        _buildActionCard(
-          title: 'Passage de commande',
-          icon: Icons.shopping_cart,
-          color: Color(0xFF4CAF50),
-          onTap: _needsInitialAmount
-              ? null
-              : () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => CashDeskPage()),
-                  );
-                },
-        ),
-        _buildActionCard(
-          title: 'Clôturer la caisse',
-          icon: Icons.lock_clock,
-          color: Colors.redAccent,
-          onTap: _needsInitialAmount ? null : _closeCashRegister,
-        ),
-      ],
+    return SizedBox(
+      width: MediaQuery.of(context).size.width * 0.6, // Même largeur relative
+      child: GridView.count(
+        shrinkWrap: true,
+        crossAxisCount: 2,
+        crossAxisSpacing: 12, // Même espacement
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.0, // Même ratio
+        children: [
+          _buildActionCard(
+            title: 'Passage\nde commande', // Saut de ligne comme dans home_page
+            icon: Icons.shopping_cart,
+            color: Color(0xFF4CAF50),
+            onTap: _needsInitialAmount
+                ? null
+                : () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => CashDeskPage()),
+                    );
+                  },
+          ),
+          _buildActionCard(
+            title: 'Clôturer\nla caisse', // Saut de ligne comme dans home_page
+            icon: Icons.lock_clock,
+            color: Colors.redAccent,
+            onTap: _needsInitialAmount ? null : _closeCashRegister,
+          ),
+        ],
+      ),
     );
   }
 
@@ -252,56 +255,56 @@ class _CashierHomePageState extends State<CashierHomePage>
     required VoidCallback? onTap,
   }) {
     return Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [color.withOpacity(0.9), color],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 40, color: Colors.white),
-                  SizedBox(height: 15),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(50),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: color, // Couleur unie ici
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 30,
+                  color: Colors.white,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
-                  if (onTap == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Text(
-                        '(Saisir le fond initial d\'abord)',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white70,
-                          fontStyle: FontStyle.italic,
-                        ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (onTap == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '(Fond initial requis)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),
-      
+      ),
     );
   }
 
@@ -363,7 +366,7 @@ class _CashierHomePageState extends State<CashierHomePage>
                 children: [
                   Text('Fond initial:', style: TextStyle(color: Colors.white)),
                   Text(
-                    '${_cashState!.initialAmount.toStringAsFixed(2)} €',
+                    '${_cashState!.initialAmount.toStringAsFixed(2)} DT',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
