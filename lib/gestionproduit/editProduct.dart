@@ -1,3 +1,4 @@
+import 'package:caissechicopets/gestionproduit/addCategory.dart';
 import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/subcategory.dart';
@@ -5,6 +6,7 @@ import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class EditProductScreen extends StatefulWidget {
@@ -29,6 +31,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final TextEditingController stockController = TextEditingController();
   final TextEditingController priceHTController = TextEditingController();
   final TextEditingController priceTTCController = TextEditingController();
+  final TextEditingController priceVenteHTController = TextEditingController();
   final TextEditingController taxController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController margeController = TextEditingController();
@@ -45,9 +48,11 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   int? selectedCategoryId;
   int? selectedSubCategoryId;
+  bool isCategoryFormVisible = false;
   List<Category> categories = [];
   List<SubCategory> subCategories = [];
   bool hasExpirationDate = false;
+  bool sellable = true;
   bool hasVariants = false;
   List<Variant> variants = [];
   Map<String, List<String>> attributes = {};
@@ -56,13 +61,19 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   List<Map<String, dynamic>> availableAttributes = [];
   String? selectedAttributeName;
-  Map<String, Set<String>> selectedAttributeValues = {}; // Changed to Set
+  Map<String, Set<String>> selectedAttributeValues = {};
   Set<String> selectedValues = Set();
 
   @override
   void initState() {
     super.initState();
     // Initialize form fields with product data
+    _initializeFormFields();
+    _setupListeners();
+    _loadInitialData();
+  }
+
+  void _initializeFormFields() {
     codeController.text = widget.product.code ?? '';
     designationController.text = widget.product.designation;
     descriptionController.text = widget.product.description ?? '';
@@ -72,6 +83,9 @@ class _EditProductScreenState extends State<EditProductScreen> {
             .toString()
         : widget.product.stock.toString();
     priceHTController.text = widget.product.prixHT.toString();
+    priceVenteHTController.text =
+        (widget.product.prixHT * (1 + widget.product.marge / 100))
+            .toStringAsFixed(2);
     taxController.text = widget.product.taxe.toString();
     priceTTCController.text = widget.product.prixTTC.toString();
     dateController.text = widget.product.dateExpiration;
@@ -82,23 +96,85 @@ class _EditProductScreenState extends State<EditProductScreen> {
     selectedTax = widget.product.taxe;
     hasExpirationDate = widget.product.dateExpiration.isNotEmpty;
     hasVariants = widget.product.hasVariants;
+    sellable = widget.product.sellable;
 
     // Calculate initial values
-    double prixHT = widget.product.prixHT;
-    double marge = widget.product.marge;
-    double remiseMax = widget.product.remiseMax;
-    double profit = (prixHT * marge) / 100;
-    double remiseValeurMax = (profit * remiseMax) / 100;
+    double profit = (widget.product.prixHT * widget.product.marge) / 100;
+    double remiseValeurMax = (profit * widget.product.remiseMax) / 100;
     remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
     profitController.text = profit.toStringAsFixed(2);
+  }
 
-    // Set up listeners
+  void _setupListeners() {
     priceHTController.addListener(calculateValues);
     taxController.addListener(calculateValues);
     margeController.addListener(calculateValues);
     profitController.addListener(calculateValues);
     remiseMaxController.addListener(calculerRemiseValeurMax);
+    priceVenteHTController.addListener(() {
+      if (priceVenteHTController.text.isNotEmpty &&
+          priceHTController.text.isNotEmpty) {
+        calculateValues(changedField: 'prixVenteHT');
+      }
+    });
+  }
 
+  void calculerRemiseValeurMax() {
+    double profit = double.tryParse(profitController.text) ?? 0;
+    double remiseMax = double.tryParse(remiseMaxController.text) ?? 0;
+    double remiseValeurMax = (profit * remiseMax) / 100;
+    remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
+  }
+
+  void calculateValues({String? changedField}) {
+    double prixAchatHT = double.tryParse(priceHTController.text) ?? 0.0;
+    double marge = double.tryParse(margeController.text) ?? 0.0;
+    double prixVenteHT = double.tryParse(priceVenteHTController.text) ?? 0.0;
+    double taxe = double.tryParse(taxController.text) ?? 0.0;
+
+    if (prixAchatHT <= 0)
+      return; // On a besoin du prix d'achat pour tous les calculs
+
+    if (changedField == 'marge') {
+      // Calcul basé sur la marge (%)
+      prixVenteHT = prixAchatHT * (1 + marge / 100);
+      priceVenteHTController.text = prixVenteHT.toStringAsFixed(2);
+    } else if (changedField == 'prixVenteHT') {
+      // Calcul basé sur le prix de vente HT
+      marge = ((prixVenteHT - prixAchatHT) / prixAchatHT) * 100;
+      margeController.text = marge.toStringAsFixed(2);
+    }
+
+    // Calcul du profit (identique dans les deux cas)
+    double profit = prixVenteHT - prixAchatHT;
+    profitController.text = profit.toStringAsFixed(2);
+
+    // Calcul du prix TTC
+    double prixTTC = prixVenteHT * (1 + taxe / 100);
+    priceTTCController.text = prixTTC.toStringAsFixed(2);
+  }
+
+  void _loadSubCategories(int categoryId) async {
+    final dbClient = await sqldb.db;
+    final subCategoriesData = await dbClient.query(
+      'sub_categories',
+      where: 'category_id = ?',
+      whereArgs: [categoryId],
+    );
+
+    setState(() {
+      subCategories = subCategoriesData.map((subCat) {
+        return SubCategory(
+          id: subCat['id_sub_category'] as int,
+          name: subCat['sub_category_name'] as String,
+          parentId: subCat['parent_id'] as int?,
+          categoryId: subCat['category_id'] as int,
+        );
+      }).toList();
+    });
+  }
+
+  void _loadInitialData() {
     // Load subcategories
     if (selectedCategoryId != null) {
       _loadSubCategories(selectedCategoryId!);
@@ -216,66 +292,652 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-  void calculerRemiseValeurMax() {
-    double profit = double.tryParse(profitController.text) ?? 0;
-    double remiseMax = double.tryParse(remiseMaxController.text) ?? 0;
-    double remiseValeurMax = (profit * remiseMax) / 100;
-    remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
-  }
-
   @override
-  void dispose() {
-    descriptionController.dispose();
-    remiseMaxController.dispose();
-    profitController.dispose();
-    remiseValeurMaxController.dispose();
-    attributeNameController.dispose();
-    attributeValuesController.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context) {
+    if (isLoadingVariants) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-  void _loadSubCategories(int categoryId) async {
-    final dbClient = await sqldb.db;
-    final subCategoriesData = await dbClient.query(
-      'sub_categories',
-      where: 'category_id = ?',
-      whereArgs: [categoryId],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Modifier le Produit',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF0056A6),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Use a column layout for small screens
+              if (constraints.maxWidth < 1000) {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildProductForm(),
+                      const SizedBox(height: 20),
+                      if (isCategoryFormVisible) _buildCategorySection(),
+                    ],
+                  ),
+                );
+              }
+              // Use row layout for larger screens
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: SingleChildScrollView(
+                      child: _buildProductForm(),
+                    ),
+                  ),
+                  const VerticalDivider(
+                    width: 20,
+                    thickness: 2,
+                    color: Color(0xFFE0E0E0),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: _buildCategorySection(),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _saveProduct,
+        backgroundColor: const Color(0xFF009688),
+        child: const Icon(Icons.save, color: Colors.white),
+      ),
     );
-
-    setState(() {
-      subCategories = subCategoriesData.map((subCat) {
-        return SubCategory(
-          id: subCat['id_sub_category'] as int,
-          name: subCat['sub_category_name'] as String,
-          parentId: subCat['parent_id'] as int?,
-          categoryId: subCat['category_id'] as int,
-        );
-      }).toList();
-    });
   }
 
-  void calculateValues() {
-    double prixHT = double.tryParse(priceHTController.text) ?? 0.0;
-    double taxe = double.tryParse(taxController.text) ?? 0.0;
-    double marge = double.tryParse(margeController.text) ?? 0.0;
-    double profit = double.tryParse(profitController.text) ?? 0.0;
+  Widget _buildProductForm() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Variant toggle
+        CheckboxListTile(
+          title: const Text('Ce produit a-t-il des variantes ?'),
+          value: hasVariants,
+          onChanged: (value) {
+            setState(() {
+              hasVariants = value ?? false;
+              if (!hasVariants) {
+                variants.clear();
+                attributes.clear();
+                selectedDefaultVariant = null;
+              }
+            });
+          },
+        ),
 
-    if (priceHTController.text.isNotEmpty && margeController.text.isNotEmpty) {
-      double prixTTC = prixHT * (1 + marge / 100);
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
-      profitController.text = (prixTTC - prixHT).toStringAsFixed(2);
-    } else if (priceHTController.text.isNotEmpty &&
-        profitController.text.isNotEmpty) {
-      double prixTTC = prixHT + profit;
-      priceTTCController.text = prixTTC.toStringAsFixed(2);
-      margeController.text = ((profit / prixHT) * 100).toStringAsFixed(2);
-    }
+        if (!hasVariants) ...[
+          _buildTextFormField(
+            controller: codeController,
+            label: 'Code à Barre',
+          ),
+          _buildTextFormField(
+            controller: designationController,
+            label: 'Désignation',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Le champ "Désignation" ne doit pas être vide.';
+              }
+              return null;
+            },
+          ),
+          _buildTextFormField(
+            controller: descriptionController,
+            label: 'Description (optionnelle)',
+            maxLines: 3,
+            keyboardType: TextInputType.multiline,
+          ),
+          _buildTextFormField(
+            controller: stockController,
+            label: 'Stock',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Le champ "Stock" ne doit pas être vide.';
+              }
+              if (int.tryParse(value) == null || int.parse(value) < 0) {
+                return 'Le stock doit être un nombre entier positif.';
+              }
+              return null;
+            },
+          ),
+        ],
 
-    if (taxController.text.isNotEmpty) {
-      double prixTTC = double.tryParse(priceTTCController.text) ?? 0.0;
-      double prixTTCWithTax = prixTTC * (1 + taxe / 100);
-      priceTTCController.text = prixTTCWithTax.toStringAsFixed(2);
-    }
+        // Price section
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextFormField(
+                controller: priceHTController,
+                label: 'Prix d\'achat',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Le champ "Prix d\'achat" ne doit pas être vide.';
+                  }
+                  if (double.tryParse(value) == null ||
+                      double.parse(value) <= 0) {
+                    return 'Le prix doit être un nombre positif.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildTextFormField(
+                controller: priceVenteHTController,
+                label: 'Prix Vente HT',
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Nombre invalide';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildTextFormField(
+                controller: priceTTCController,
+                label: 'Prix TTC',
+                enabled: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Margin and Profit
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextFormField(
+                controller: margeController,
+                label: 'Marge (%)',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ce champ est obligatoire';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Nombre invalide';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildTextFormField(
+                controller: profitController,
+                label: 'Profit',
+                keyboardType: TextInputType.number,
+                enabled: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Discount section
+        Row(
+          children: [
+            Expanded(
+              child: _buildTextFormField(
+                controller: remiseMaxController,
+                label: 'Remise % Max',
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Le champ "Remise % Max" ne doit pas être vide.';
+                  }
+                  final percentage = double.tryParse(value);
+                  if (percentage == null || percentage < 0) {
+                    return 'La remise % max doit être un nombre positif ou nul.';
+                  }
+                  if (percentage > 100) {
+                    return 'La remise % max ne peut pas dépasser 100%.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildTextFormField(
+                controller: remiseValeurMaxController,
+                label: 'Remise Valeur Max',
+                keyboardType: TextInputType.number,
+                enabled: false,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Tax dropdown
+        DropdownButtonFormField<double>(
+          decoration: _inputDecoration('Taxe (%)'),
+          value: selectedTax,
+          items: const [
+            DropdownMenuItem(value: 0.0, child: Text('0%')),
+            DropdownMenuItem(value: 7.0, child: Text('7%')),
+            DropdownMenuItem(value: 12.0, child: Text('12%')),
+            DropdownMenuItem(value: 19.0, child: Text('19%')),
+          ],
+          onChanged: (value) {
+            if (value != null && [0.0, 7.0, 12.0, 19.0].contains(value)) {
+              setState(() {
+                selectedTax = value;
+                taxController.text = value.toString();
+              });
+              calculateValues();
+            } else {
+              setState(() {
+                selectedTax = 0.0;
+                taxController.text = '0.0';
+              });
+            }
+          },
+          validator: (value) {
+            if (value == null) {
+              return 'Veuillez sélectionner une taxe.';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // Expiration date
+        CheckboxListTile(
+          title: const Text('Ce produit a-t-il une date d\'expiration ?'),
+          value: hasExpirationDate,
+          onChanged: (value) {
+            setState(() {
+              hasExpirationDate = value ?? false;
+              if (!hasExpirationDate) {
+                dateController.clear();
+              }
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+        Visibility(
+          visible: hasExpirationDate,
+          child: _buildTextFormField(
+            controller: dateController,
+            label: 'Date Expiration',
+            validator: (value) {
+              if (hasExpirationDate) {
+                if (value == null || value.isEmpty) {
+                  return 'Le champ "Date Expiration" ne doit pas être vide.';
+                }
+                List<String> possibleFormats = [
+                  "dd-MM-yyyy",
+                  "MM-dd-yyyy",
+                  "yyyy-MM-dd",
+                  "dd/MM/yyyy",
+                  "MM/dd/yyyy"
+                ];
+                DateTime? date;
+                for (String format in possibleFormats) {
+                  try {
+                    date = DateFormat(format).parseStrict(value);
+                    break;
+                  } catch (e) {
+                    continue;
+                  }
+                }
+                if (date == null) {
+                  return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
+                }
+                if (!date.isAfter(DateTime.now())) {
+                  return 'La date doit être dans le futur.';
+                }
+              }
+              return null;
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Sellable radio buttons
+        Row(
+          children: [
+            const Text(
+              'Vendable: ',
+              style: TextStyle(color: Color(0xFF0056A6)),
+            ),
+            const SizedBox(width: 16),
+            Row(
+              children: [
+                Radio<bool>(
+                  value: true,
+                  groupValue: sellable,
+                  onChanged: (value) {
+                    setState(() {
+                      sellable = value ?? true;
+                    });
+                  },
+                  activeColor: const Color(0xFF0056A6),
+                ),
+                const Text('Oui'),
+                const SizedBox(width: 16),
+                Radio<bool>(
+                  value: false,
+                  groupValue: sellable,
+                  onChanged: (value) {
+                    setState(() {
+                      sellable = value ?? false;
+                    });
+                  },
+                  activeColor: const Color(0xFF0056A6),
+                ),
+                const Text('Non'),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Category dropdown
+        Row(
+          children: [
+            Expanded(
+              child: FutureBuilder<List<Category>>(
+                future: sqldb.getCategories(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const CircularProgressIndicator(
+                      color: Color(0xFF0056A6),
+                    );
+                  }
+                  categories = snapshot.data!;
+                  if (categories.isEmpty) {
+                    return const Text(
+                      "Aucune catégorie disponible",
+                      style: TextStyle(color: Color(0xFF0056A6)),
+                    );
+                  }
+                  return DropdownButtonFormField<int>(
+                    decoration: _inputDecoration('Catégorie'),
+                    value: selectedCategoryId,
+                    items: categories.map((cat) {
+                      return DropdownMenuItem<int>(
+                        value: cat.id,
+                        child: Text(
+                          cat.name,
+                          style: const TextStyle(color: Colors.black),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        selectedCategoryId = val;
+                        selectedSubCategoryId = null;
+                        _loadSubCategories(val!);
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null) {
+                        return "Veuillez sélectionner une catégorie";
+                      }
+                      return null;
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              icon: const Icon(Icons.add, color: Color(0xFF26A9E0)),
+              onPressed: () {
+                setState(() {
+                  isCategoryFormVisible = !isCategoryFormVisible;
+                });
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Visibility(
+          visible: selectedCategoryId != null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sous-catégorie (optionnelle)',
+                style: TextStyle(color: Color(0xFF0056A6)),
+              ),
+              SubCategoryTree(
+                subCategories: subCategories,
+                parentId: null,
+                onSelect: (subCategoryId) {
+                  setState(() {
+                    selectedSubCategoryId = subCategoryId;
+                  });
+                },
+                selectedSubCategoryId: selectedSubCategoryId,
+              ),
+            ],
+          ),
+        ),
+
+        // Variant management section
+        if (hasVariants) _buildVariantSection(),
+      ],
+    );
+  }
+
+  Widget _buildVariantSection() {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          'Gestion des Variantes',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+
+        // Attribute selection
+        Column(
+          children: [
+            const Text(
+              'Sélection des attributs:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: ExpansionTile(
+                title: const Text('Choisir des attributs'),
+                children: availableAttributes.map((attr) {
+                  final attributeName = attr['name'] as String;
+                  final values =
+                      (attr['attribute_values'] as List).cast<String>();
+
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: ExpansionTile(
+                      title: Text(attributeName),
+                      children: values.map((value) {
+                        final fullValue = '$attributeName:$value';
+                        return CheckboxListTile(
+                          title: Text(value),
+                          value: selectedValues.contains(fullValue),
+                          onChanged: (bool? selected) {
+                            setState(() {
+                              if (selected == true) {
+                                selectedValues.add(fullValue);
+                                selectedAttributeValues.update(
+                                  attributeName,
+                                  (set) => set..add(value),
+                                  ifAbsent: () => {value},
+                                );
+                              } else {
+                                selectedValues.remove(fullValue);
+                                selectedAttributeValues[attributeName]
+                                    ?.remove(value);
+                                if (selectedAttributeValues[attributeName]
+                                        ?.isEmpty ??
+                                    false) {
+                                  selectedAttributeValues.remove(attributeName);
+                                }
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+
+        // Selected attributes preview
+        if (selectedAttributeValues.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'Attributs sélectionnés:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: selectedAttributeValues.entries.expand((entry) {
+              return entry.value.map((value) {
+                return Chip(
+                  label: Text('${entry.key}: $value'),
+                  onDeleted: () {
+                    setState(() {
+                      selectedValues.remove('${entry.key}:$value');
+                      selectedAttributeValues[entry.key]?.remove(value);
+                      if (selectedAttributeValues[entry.key]?.isEmpty ??
+                          false) {
+                        selectedAttributeValues.remove(entry.key);
+                      }
+                    });
+                  },
+                );
+              }).toList();
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                selectedAttributeValues.forEach((name, values) {
+                  attributes.update(
+                    name,
+                    (existing) => [...existing, ...values.toList()],
+                    ifAbsent: () => values.toList(),
+                  );
+                });
+                selectedValues.clear();
+                selectedAttributeValues.clear();
+              });
+            },
+            child: const Text('Ajouter aux combinaisons'),
+          ),
+        ],
+
+        // Manual attribute addition
+        const SizedBox(height: 20),
+        _buildTextFormField(
+          controller: attributeNameController,
+          label: 'Nom de l\'attribut (ex: Taille)',
+        ),
+        _buildTextFormField(
+          controller: attributeValuesController,
+          label: 'Valeurs (séparées par virgule, ex: S,M,L)',
+        ),
+        ElevatedButton(
+          onPressed: addAttribute,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0056A6),
+          ),
+          child: const Text(
+            'Ajouter Attribut',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+
+        // Combined attributes display
+        if (attributes.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'Attributs combinés:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 4.0,
+            children: attributes.entries.expand((entry) {
+              return entry.value.map((value) {
+                return Chip(
+                  label: Text('${entry.key}: $value'),
+                  onDeleted: () {
+                    setState(() {
+                      entry.value.remove(value);
+                      if (entry.value.isEmpty) {
+                        attributes.remove(entry.key);
+                      }
+                    });
+                  },
+                );
+              }).toList();
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Generate variants button
+        if (attributes.isNotEmpty)
+          ElevatedButton(
+            onPressed: generateVariants,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF009688),
+            ),
+            child: const Text(
+              'Générer Variantes',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+
+        // Variants table
+        if (variants.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const Text(
+            'Variantes:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          _buildVariantsTable(),
+        ],
+      ],
+    );
   }
 
   void addAttribute() {
@@ -292,7 +954,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-// Dans la méthode qui génère les variantes
   void generateVariants() {
     if (widget.product.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -344,13 +1005,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
     });
   }
 
-  List<Map<String, String>> _generateCombinations(
-      Map<String, List<String>> attributes) {
-    List<Map<String, String>> combinations = [];
-    List<String> attributeNames = attributes.keys.toList();
-
-    _generateCombinationHelper(attributes, attributeNames, 0, {}, combinations);
-    return combinations;
+  void updateTotalStock() {
+    if (hasVariants) {
+      final totalStock =
+          variants.fold(0, (sum, variant) => sum + variant.stock);
+      stockController.text = totalStock.toString();
+    }
   }
 
   void _generateCombinationHelper(
@@ -378,1028 +1038,249 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (isLoadingVariants) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+  List<Map<String, String>> _generateCombinations(
+      Map<String, List<String>> attributes) {
+    List<Map<String, String>> combinations = [];
+    List<String> attributeNames = attributes.keys.toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Modifier le Produit',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0056A6),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CheckboxListTile(
-                  title: const Text('Ce produit a-t-il des variantes ?'),
-                  value: hasVariants,
-                  onChanged: (value) {
-                    setState(() {
-                      hasVariants = value ?? false;
-                      if (!hasVariants) {
-                        variants.clear();
-                        attributes.clear();
-                        selectedDefaultVariant = null;
-                      }
-                    });
-                  },
-                ),
-                if (!hasVariants) ...[
-                  _buildTextFormField(
-                    controller: codeController,
-                    label: 'Code à Barre',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le champ "Code à Barre" ne doit pas être vide.';
-                      }
-                      if (int.tryParse(value) == null) {
-                        return 'Le "Code à Barre" doit être un nombre.';
-                      }
-                      if (int.parse(value) < 0) {
-                        return 'Le "Code à Barre" doit être un nombre positif.';
-                      }
-                      return null;
-                    },
-                  ),
-                  _buildTextFormField(
-                    controller: designationController,
-                    label: 'Désignation',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le champ "Désignation" ne doit pas être vide.';
-                      }
-                      return null;
-                    },
-                  ),
-                  _buildTextFormField(
-                    controller: descriptionController,
-                    label: 'Description (optionnelle)',
-                    maxLines: 3,
-                    keyboardType: TextInputType.multiline,
-                  ),
-                  _buildTextFormField(
-                    controller: stockController,
-                    label: 'Stock',
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Le champ "Stock" ne doit pas être vide.';
-                      }
-                      if (int.tryParse(value) == null || int.parse(value) < 0) {
-                        return 'Le stock doit être un nombre entier positif.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-                _buildTextFormField(
-                  controller: priceHTController,
-                  label: 'Prix d\'achat',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le champ "Prix d\'achat" ne doit pas être vide.';
-                    }
-                    if (double.tryParse(value) == null ||
-                        double.parse(value) <= 0) {
-                      return 'Le prix doit être un nombre positif.';
-                    }
-                    return null;
-                  },
-                ),
-                _buildTextFormField(
-                  controller: margeController,
-                  label: 'Marge (%)',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le champ "Marge (%)" ne doit pas être vide.';
-                    }
-                    if (double.tryParse(value) == null ||
-                        double.parse(value) <= 0) {
-                      return 'La marge doit être un nombre positif.';
-                    }
-                    return null;
-                  },
-                ),
-                _buildTextFormField(
-                  controller: remiseMaxController,
-                  label: 'Remise % Max',
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Le champ "Remise % Max" ne doit pas être vide.';
-                    }
-                    if (double.tryParse(value) == null ||
-                        double.parse(value) < 0) {
-                      return 'La remise % max doit être un nombre positif ou nul.';
-                    }
-                    if (double.parse(value) > 100) {
-                      return 'La remise % max ne peut pas dépasser 100%.';
-                    }
-                    return null;
-                  },
-                ),
-                _buildTextFormField(
-                  controller: profitController,
-                  label: 'Profit',
-                  keyboardType: TextInputType.number,
-                  enabled: false,
-                ),
-                _buildTextFormField(
-                  controller: remiseValeurMaxController,
-                  label: 'Remise Valeur Max',
-                  keyboardType: TextInputType.number,
-                  enabled: false,
-                ),
-                DropdownButtonFormField<double>(
-                  decoration: _inputDecoration('Taxe (%)'),
-                  value: selectedTax,
-                  items: const [
-                    DropdownMenuItem(value: 0.0, child: Text('0%')),
-                    DropdownMenuItem(value: 7.0, child: Text('7%')),
-                    DropdownMenuItem(value: 12.0, child: Text('12%')),
-                    DropdownMenuItem(value: 19.0, child: Text('19%')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null &&
-                        [0.0, 7.0, 12.0, 19.0].contains(value)) {
-                      setState(() {
-                        selectedTax = value;
-                        taxController.text = value.toString();
-                      });
-                      calculateValues();
-                    } else {
-                      setState(() {
-                        selectedTax = 0.0;
-                        taxController.text = '0.0';
-                      });
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Veuillez sélectionner une taxe.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  title:
-                      const Text('Ce produit a-t-il une date d\'expiration ?'),
-                  value: hasExpirationDate,
-                  onChanged: (value) {
-                    setState(() {
-                      hasExpirationDate = value ?? false;
-                      if (!hasExpirationDate) {
-                        dateController.clear();
-                      }
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                Visibility(
-                  visible: hasExpirationDate,
-                  child: _buildTextFormField(
-                    controller: dateController,
-                    label: 'Date Expiration',
-                    validator: (value) {
-                      if (hasExpirationDate) {
-                        if (value == null || value.isEmpty) {
-                          return 'Le champ "Date Expiration" ne doit pas être vide.';
-                        }
-                        List<String> possibleFormats = [
-                          "dd-MM-yyyy",
-                          "MM-dd-yyyy",
-                          "yyyy-MM-dd",
-                          "dd/MM/yyyy",
-                          "MM/dd/yyyy"
-                        ];
-                        DateTime? date;
-                        for (String format in possibleFormats) {
-                          try {
-                            date = DateFormat(format).parseStrict(value);
-                            break;
-                          } catch (e) {
-                            continue;
-                          }
-                        }
-                        if (date == null) {
-                          return 'Format de date invalide. Utilisez un format correct (ex: JJ-MM-AAAA).';
-                        }
-                        if (!date.isAfter(DateTime.now())) {
-                          return 'La date doit être dans le futur.';
-                        }
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FutureBuilder<List<Category>>(
-                  future: sqldb.getCategories(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const CircularProgressIndicator(
-                        color: Color(0xFF0056A6),
-                      );
-                    }
-                    categories = snapshot.data!;
-                    if (categories.isEmpty) {
-                      return const Text(
-                        "Aucune catégorie disponible",
-                        style: TextStyle(color: Color(0xFF0056A6)),
-                      );
-                    }
-                    return DropdownButtonFormField<int>(
-                      decoration: _inputDecoration('Catégorie'),
-                      value: selectedCategoryId,
-                      items: categories.map((cat) {
-                        return DropdownMenuItem<int>(
-                          value: cat.id,
-                          child: Text(
-                            cat.name,
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          selectedCategoryId = val;
-                          selectedSubCategoryId = null;
-                          _loadSubCategories(val!);
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null) {
-                          return "Veuillez sélectionner une catégorie";
-                        }
-                        return null;
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                Visibility(
-                  visible: selectedCategoryId != null,
-                  child: SubCategoryTree(
-                    subCategories: subCategories,
-                    parentId: null,
-                    onSelect: (subCategoryId) {
-                      setState(() {
-                        selectedSubCategoryId = subCategoryId;
-                      });
-                    },
-                    selectedSubCategoryId: selectedSubCategoryId,
-                  ),
-                ),
-                if (hasVariants) ...[
-                  // Add these variables to your state class
+    _generateCombinationHelper(attributes, attributeNames, 0, {}, combinations);
+    return combinations;
+  }
 
-// Replace your current attributes section with this:
-                  Column(
-                    children: [
-                      // Attribute selection section
-                      Column(
-                        children: [
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Sélection des attributs:',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-
-                          const SizedBox(height: 8),
-                          Card(
-                            child: ExpansionTile(
-                              title: const Text('Choisir des attributs'),
-                              children: availableAttributes.map((attr) {
-                                final attributeName = attr['name'] as String;
-                                final values =
-                                    (attr['attribute_values'] as List)
-                                        .cast<String>();
-
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  child: ExpansionTile(
-                                    title: Text(attributeName),
-                                    children: values.map((value) {
-                                      final fullValue = '$attributeName:$value';
-                                      return CheckboxListTile(
-                                        title: Text(value),
-                                        value:
-                                            selectedValues.contains(fullValue),
-                                        onChanged: (bool? selected) {
-                                          setState(() {
-                                            if (selected == true) {
-                                              selectedValues.add(fullValue);
-                                              selectedAttributeValues.update(
-                                                attributeName,
-                                                (set) => set..add(value),
-                                                ifAbsent: () => {value},
-                                              );
-                                            } else {
-                                              selectedValues.remove(fullValue);
-                                              selectedAttributeValues[
-                                                      attributeName]
-                                                  ?.remove(value);
-                                              if (selectedAttributeValues[
-                                                          attributeName]
-                                                      ?.isEmpty ??
-                                                  false) {
-                                                selectedAttributeValues
-                                                    .remove(attributeName);
-                                              }
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Selected attributes preview
-                          if (selectedAttributeValues.isNotEmpty) ...[
-                            const Text(
-                              'Attributs sélectionnés:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              constraints: const BoxConstraints(maxHeight: 100),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: selectedAttributeValues.entries
-                                      .expand((entry) {
-                                    return entry.value.map((value) {
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(right: 8.0),
-                                        child: Chip(
-                                          label: Text('${entry.key}: $value'),
-                                          onDeleted: () {
-                                            setState(() {
-                                              selectedValues.remove(
-                                                  '${entry.key}:$value');
-                                              selectedAttributeValues[entry.key]
-                                                  ?.remove(value);
-                                              if (selectedAttributeValues[
-                                                          entry.key]
-                                                      ?.isEmpty ??
-                                                  false) {
-                                                selectedAttributeValues
-                                                    .remove(entry.key);
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      );
-                                    }).toList();
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  selectedAttributeValues
-                                      .forEach((name, values) {
-                                    attributes.update(
-                                      name,
-                                      (existing) =>
-                                          [...existing, ...values.toList()],
-                                      ifAbsent: () => values.toList(),
-                                    );
-                                  });
-                                  selectedValues.clear();
-                                  selectedAttributeValues.clear();
-                                });
-                              },
-                              child: const Text('Ajouter aux combinaisons'),
-                            ),
-                          ],
-                        ],
-                      ),
-
-                      // Manual attribute addition
-                      const SizedBox(height: 20),
-                      _buildTextFormField(
-                        controller: attributeNameController,
-                        label: 'Nom de l\'attribut (ex: Taille)',
-                      ),
-                      _buildTextFormField(
-                        controller: attributeValuesController,
-                        label: 'Valeurs (séparées par virgule, ex: S,M,L)',
-                      ),
-                      ElevatedButton(
-                        onPressed: addAttribute,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0056A6),
-                        ),
-                        child: const Text(
-                          'Ajouter Attribut',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-
-                      // Combined attributes display (single source of truth)
-                      if (attributes.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Attributs combinés:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 4.0,
-                          children: attributes.entries.expand((entry) {
-                            return entry.value.map((value) {
-                              return Chip(
-                                label: Text('${entry.key}: $value'),
-                                onDeleted: () {
-                                  setState(() {
-                                    entry.value.remove(value);
-                                    if (entry.value.isEmpty) {
-                                      attributes.remove(entry.key);
-                                    }
-                                  });
-                                },
-                              );
-                            }).toList();
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Generate variants button
-                      if (attributes.isNotEmpty)
-                        ElevatedButton(
-                          onPressed: generateVariants,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF009688),
-                          ),
-                          child: const Text(
-                            'Générer Variantes',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (variants.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Variantes:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final double columnSpacing = 8.0;
-                        final double totalWidth = constraints.maxWidth;
-
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Container(
-                            width: totalWidth,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.grey.shade400,
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: DataTable(
-                              columnSpacing: columnSpacing,
-                              horizontalMargin: 12,
-                              dividerThickness: 1,
-                              dataRowHeight: 60,
-                              headingRowHeight: 50,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              headingTextStyle: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                                fontSize: 14,
-                              ),
-                              dataTextStyle: TextStyle(
-                                color: Colors.grey.shade800,
-                                fontSize: 13,
-                              ),
-                              columns: [
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 120,
-                                    child: Center(
-                                      child: Text(
-                                        'Défaut',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 150,
-                                    child: Center(
-                                      child: Text(
-                                        'Combinaison',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: IgnorePointer(
-                                    child: SizedBox(
-                                      width: 100,
-                                      child: Center(
-                                        child: Text(
-                                          'Prix',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: Colors
-                                                .grey, // Gray color for disabled look
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  numeric: true,
-                                  onSort: null, // Disable sorting
-                                ),
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 100,
-                                    child: Center(
-                                      child: Text(
-                                        'Impact Prix',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 100,
-                                    child: Center(
-                                      child: Text(
-                                        'Prix Final',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 100,
-                                    child: Center(
-                                      child: Text(
-                                        'Stock',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: SizedBox(
-                                    width: 150,
-                                    child: Center(
-                                      child: Text(
-                                        'Code-barres',
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: variants.map((variant) {
-                                return DataRow(
-                                  color:
-                                      MaterialStateProperty.resolveWith<Color>(
-                                    (Set<MaterialState> states) {
-                                      if (variant.defaultVariant) {
-                                        return Colors.blue.shade50;
-                                      }
-                                      return states
-                                              .contains(MaterialState.selected)
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withOpacity(0.08)
-                                          : Colors.transparent;
-                                    },
-                                  ),
-                                  cells: [
-                                    DataCell(
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Radio<String>(
-                                            value: variant.combinationName,
-                                            groupValue: selectedDefaultVariant,
-                                            onChanged: (value) {
-                                              setState(() {
-                                                selectedDefaultVariant = value;
-                                                for (var v in variants) {
-                                                  v.defaultVariant =
-                                                      (v.combinationName ==
-                                                          value);
-                                                }
-                                              });
-                                            },
-                                            fillColor: MaterialStateProperty
-                                                .resolveWith<Color>(
-                                              (Set<MaterialState> states) {
-                                                if (states.contains(
-                                                    MaterialState.selected)) {
-                                                  return Colors.blue.shade700;
-                                                }
-                                                return Colors.grey;
-                                              },
-                                            ),
-                                          ),
-                                          SizedBox(width: 4),
-                                          Text('Par défaut'),
-                                        ],
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          variant.combinationName,
-                                          style: TextStyle(
-                                            fontWeight: variant.defaultVariant
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: TextFormField(
-                                          initialValue:
-                                              variant.finalPrice.toString(),
-                                          keyboardType: TextInputType.number,
-                                          textAlign: TextAlign.center,
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey.shade400),
-                                            ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: 8),
-                                            filled: true,
-                                            fillColor: Colors.grey.shade50,
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              variant.price =
-                                                  double.tryParse(value) ?? 0.0;
-                                              variant.finalPrice =
-                                                  variant.price +
-                                                      variant.priceImpact;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: TextFormField(
-                                          initialValue:
-                                              variant.priceImpact.toString(),
-                                          keyboardType: TextInputType.number,
-                                          textAlign: TextAlign.center,
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey.shade400),
-                                            ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: 8),
-                                            filled: true,
-                                            fillColor: Colors.grey.shade50,
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              variant.priceImpact =
-                                                  double.tryParse(value) ?? 0.0;
-                                              variant.finalPrice =
-                                                  variant.price +
-                                                      variant.priceImpact;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: Text(
-                                          variant.finalPrice.toStringAsFixed(2),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green.shade700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: TextFormField(
-                                          initialValue:
-                                              variant.stock.toString(),
-                                          keyboardType: TextInputType.number,
-                                          textAlign: TextAlign.center,
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey.shade400),
-                                            ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: 8),
-                                            filled: true,
-                                            fillColor: variant.stock <= 0
-                                                ? Colors.red.shade50
-                                                : Colors.grey.shade50,
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              variant.stock =
-                                                  int.tryParse(value) ?? 0;
-                                              updateTotalStock(); // Add this line
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Center(
-                                        child: TextFormField(
-                                          initialValue: variant.code,
-                                          textAlign: TextAlign.center,
-                                          decoration: InputDecoration(
-                                            border: OutlineInputBorder(
-                                              borderSide: BorderSide(
-                                                  color: Colors.grey.shade400),
-                                            ),
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                    horizontal: 8),
-                                            filled: true,
-                                            fillColor: Colors.grey.shade50,
-                                          ),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              variant.code = value;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                  ],
-                ],
+  Widget _buildVariantsTable() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade400, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
               ],
             ),
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          if (_formKey.currentState!.validate()) {
-            if (selectedCategoryId == null || selectedSubCategoryId == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Veuillez sélectionner une catégorie et une sous-catégorie.',
-                    style: TextStyle(color: Colors.white),
+            child: DataTable(
+              columnSpacing: 8,
+              horizontalMargin: 12,
+              dividerThickness: 1,
+              dataRowHeight: 60,
+              headingRowHeight: 50,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              headingTextStyle: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade800,
+                fontSize: 14,
+              ),
+              dataTextStyle: TextStyle(
+                color: Colors.grey.shade800,
+                fontSize: 13,
+              ),
+              columns: const [
+                DataColumn(label: Text('Défaut')),
+                DataColumn(label: Text('Combinaison')),
+                DataColumn(label: Text('Prix'), numeric: true),
+                DataColumn(label: Text('Impact Prix'), numeric: true),
+                DataColumn(label: Text('Prix Final'), numeric: true),
+                DataColumn(label: Text('Stock'), numeric: true),
+                DataColumn(label: Text('Code-barres')),
+              ],
+              rows: variants.map((variant) {
+                return DataRow(
+                  color: MaterialStateProperty.resolveWith<Color>(
+                    (Set<MaterialState> states) {
+                      if (variant.defaultVariant) {
+                        return Colors.blue.shade50;
+                      }
+                      return states.contains(MaterialState.selected)
+                          ? Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.08)
+                          : Colors.transparent;
+                    },
                   ),
-                  backgroundColor: Color(0xFFE53935),
-                ),
-              );
-              return;
-            }
-
-            if (hasVariants) {
-              if (variants.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Veuillez générer les variantes avant de sauvegarder.',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    backgroundColor: Color(0xFFE53935),
-                  ),
-                );
-                return;
-              }
-
-              // Validate variants
-              for (final variant in variants) {
-                if (variant.stock < 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Stock invalide pour le variant "${variant.combinationName}"',
+                  cells: [
+                    DataCell(
+                      Radio<String>(
+                        value: variant.combinationName,
+                        groupValue: selectedDefaultVariant,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedDefaultVariant = value;
+                            for (var v in variants) {
+                              v.defaultVariant = (v.combinationName == value);
+                            }
+                          });
+                        },
                       ),
-                      backgroundColor: Colors.red,
                     ),
-                  );
-                  return;
-                }
-              }
-
-              // Ensure only one variant is marked as default
-              final defaultVariants =
-                  variants.where((v) => v.defaultVariant).toList();
-              if (defaultVariants.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Veuillez sélectionner au moins une variante par défaut',
-                      style: TextStyle(color: Colors.white),
+                    DataCell(Text(variant.combinationName)),
+                    DataCell(
+                      TextFormField(
+                        initialValue: variant.price.toStringAsFixed(2),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            variant.price = double.tryParse(value) ?? 0.0;
+                            variant.finalPrice =
+                                variant.price + variant.priceImpact;
+                          });
+                        },
+                      ),
                     ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              // If more than one default variant, keep only the first one
-              if (defaultVariants.length > 1) {
-                for (int i = 1; i < defaultVariants.length; i++) {
-                  defaultVariants[i].defaultVariant = false;
-                }
-              }
-
-              // NEW VALIDATION: Check if sum of variant stocks matches product stock
-              final totalVariantStock =
-                  variants.fold(0, (sum, v) => sum + v.stock);
-              final productStock = int.tryParse(stockController.text) ?? 0;
-
-              if (totalVariantStock != productStock) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Le stock total des variantes ($totalVariantStock) doit correspondre au stock du produit ($productStock)',
+                    DataCell(
+                      TextFormField(
+                        initialValue: variant.priceImpact.toStringAsFixed(2),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            variant.priceImpact = double.tryParse(value) ?? 0.0;
+                            variant.finalPrice =
+                                variant.price + variant.priceImpact;
+                          });
+                        },
+                      ),
                     ),
-                    backgroundColor: Colors.red,
-                  ),
+                    DataCell(
+                      Text(
+                        variant.finalPrice.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      TextFormField(
+                        initialValue: variant.stock.toString(),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            variant.stock = int.tryParse(value) ?? 0;
+                            updateTotalStock();
+                          });
+                        },
+                      ),
+                    ),
+                    DataCell(
+                      TextFormField(
+                        initialValue: variant.code,
+                        onChanged: (value) {
+                          variant.code = value;
+                        },
+                      ),
+                    ),
+                  ],
                 );
-                return;
-              }
-            }
-
-            try {
-              final categoryName =
-                  await sqldb.getCategoryNameById(selectedCategoryId!);
-              final subCategoryName =
-                  await sqldb.getSubCategoryNameById(selectedSubCategoryId!);
-
-              // Prepare variants with proper boolean conversion
-              final updatedVariants = variants.map((v) {
-                return Variant(
-                  id: v.id,
-                  code: v.code,
-                  combinationName: v.combinationName,
-                  price: v.price,
-                  priceImpact: v.priceImpact,
-                  stock: v.stock,
-                  defaultVariant: v.defaultVariant,
-                  attributes: v.attributes,
-                  productId: v.productId,
-                );
-              }).toList();
-
-              final product = Product(
-                id: widget.product.id,
-                code: codeController.text.trim(),
-                designation: designationController.text.trim(),
-                description: descriptionController.text.trim(),
-                stock: hasVariants
-                    ? variants.fold(
-                        0, (sum, v) => sum + v.stock) // Calculate from variants
-                    : int.parse(stockController.text),
-                prixHT: double.parse(priceHTController.text),
-                taxe: selectedTax ?? 0.0,
-                prixTTC: hasVariants
-                    ? variants
-                        .firstWhere((v) => v.defaultVariant,
-                            orElse: () => variants.first)
-                        .price
-                    : double.parse(priceTTCController.text),
-                dateExpiration:
-                    hasExpirationDate ? dateController.text.trim() : '',
-                categoryId: selectedCategoryId!,
-                subCategoryId: selectedSubCategoryId!,
-                categoryName: categoryName,
-                subCategoryName: subCategoryName,
-                marge: double.parse(margeController.text),
-                remiseMax: double.parse(remiseMaxController.text),
-                remiseValeurMax: double.parse(remiseValeurMaxController.text),
-                hasVariants: hasVariants,
-                variants: updatedVariants,
-              );
-
-              // Save with transaction
-              final db = await sqldb.db;
-
-              await db.transaction((txn) async {
-                // Update product
-                await txn.update(
-                  'products',
-                  product.toMap(),
-                  where: 'id = ?',
-                  whereArgs: [product.id],
-                );
-
-                // Delete existing variants
-                await txn.delete(
-                  'variants',
-                  where: 'product_id = ?',
-                  whereArgs: [product.id],
-                );
-
-                // Insert new variants
-                for (final variant in updatedVariants) {
-                  await txn.insert('variants', variant.toMap());
-                }
-              });
-
-              widget.refreshData();
-              if (mounted) Navigator.pop(context);
-            } catch (e) {
-              debugPrint('Error updating product: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        Text('Erreur lors de la mise à jour: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            }
-          }
-        },
-        backgroundColor: const Color(0xFF009688),
-        child: const Icon(Icons.save, color: Colors.white),
-      ),
+              }).toList(),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  void updateTotalStock() {
-    if (hasVariants) {
-      final totalStock =
-          variants.fold(0, (sum, variant) => sum + variant.stock);
-      stockController.text = totalStock.toString();
+  Widget _buildCategorySection() {
+    return isCategoryFormVisible
+        ? AddCategory(
+            onCategoryAdded: () async {
+              final updatedCategories = await sqldb.getCategories();
+              setState(() {
+                categories = updatedCategories;
+                isCategoryFormVisible = false;
+              });
+            },
+            hideAppBar: true,
+          )
+        : Center(
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                "Cliquez sur '+' pour ajouter une catégorie",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+          );
+  }
+
+  // ... [Keep all your existing methods like calculateValues, addAttribute, etc.]
+
+  Future<void> _saveProduct() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final product = Product(
+          id: widget.product.id,
+          code: codeController.text.trim(),
+          designation: designationController.text.trim(),
+          description: descriptionController.text.trim(),
+          stock: hasVariants
+              ? variants.fold(0, (sum, variant) => sum + variant.stock)
+              : int.parse(stockController.text),
+          prixHT: double.parse(priceHTController.text),
+          taxe: selectedTax ?? 0.0,
+          prixTTC: double.parse(priceTTCController.text),
+          dateExpiration: hasExpirationDate ? dateController.text.trim() : '',
+          categoryId: selectedCategoryId!,
+          subCategoryId: selectedSubCategoryId,
+          categoryName: await sqldb.getCategoryNameById(selectedCategoryId!),
+          subCategoryName: selectedSubCategoryId != null
+              ? await sqldb.getSubCategoryNameById(selectedSubCategoryId!)
+              : '',
+          marge: double.parse(margeController.text),
+          remiseMax: double.parse(remiseMaxController.text),
+          remiseValeurMax: double.parse(remiseValeurMaxController.text),
+          hasVariants: hasVariants,
+          variants: variants,
+          sellable: sellable,
+        );
+
+        final db = await sqldb.db;
+        await db.transaction((txn) async {
+          // Update product
+          await txn.update(
+            'products',
+            product.toMap(),
+            where: 'id = ?',
+            whereArgs: [product.id],
+          );
+
+          // Delete existing variants
+          await txn.delete(
+            'variants',
+            where: 'product_id = ?',
+            whereArgs: [product.id],
+          );
+
+          // Insert new variants
+          for (final variant in variants) {
+            await txn.insert('variants', variant.toMap());
+          }
+        });
+
+        widget.refreshData();
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        debugPrint('Error updating product: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la mise à jour: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -1410,6 +1291,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     bool enabled = true,
     int maxLines = 1,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
     void Function(String)? onFieldSubmitted,
   }) {
     return Padding(
@@ -1422,6 +1304,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         maxLines: maxLines,
         validator: validator,
         style: const TextStyle(color: Colors.black),
+        onChanged: onChanged,
         onFieldSubmitted: onFieldSubmitted,
       ),
     );

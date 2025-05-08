@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ImportProductPage extends StatefulWidget {
   const ImportProductPage({super.key});
@@ -24,6 +25,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
   String _errorMessage = '';
   bool _isImporting = false;
   double _progress = 0.0;
+
   Future<void> importProductsWithVariants() async {
     setState(() {
       _importStatus = 'Importing...';
@@ -255,8 +257,179 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
+  Future<void> _exportExcelTemplate() async {
+    try {
+      // Create a new Excel document
+      var excel = Excel.createExcel();
+
+      // Create sheet (use the correct sheet name)
+      var sheet = excel['Sheet1']; // 'Sheet1' est le nom par défaut
+
+      // Add headers
+      List<String> headers = [
+        "ACTION",
+        "IMAGE",
+        "PRODUCTNAME",
+        "REFERENCE",
+        "CATEGORY",
+        "BRAND",
+        "DESCRIPTION",
+        "COSTPRICE",
+        "SELLPRICETAXEXCLUDE",
+        "VAT",
+        "SELLPRICETAXINCLUDE",
+        "QUANTITY",
+        "SELLABLE",
+        "SIMPLEPRODUCT",
+        "VARIANTNAME",
+        "DEFAULTVARIANT",
+        "VARIANTIMAGE",
+        "IMPACTPRICE",
+        "QUANTITYVARIANT"
+      ];
+
+      // Add headers to the first row
+      for (int i = 0; i < headers.length; i++) {
+        sheet.cell(CellIndex.indexByString('${String.fromCharCode(65 + i)}1'))
+          ..value = headers[i]
+          ..cellStyle = CellStyle(
+            backgroundColorHex: "FF4472C4",
+            fontColorHex: "FFFFFFFF",
+            bold: true,
+          );
+      }
+
+      // Add example data (simple product)
+      sheet.appendRow([
+        "CREATE",
+        "product_image.jpg",
+        "Example Simple Product",
+        "PROD001",
+        "Example Category",
+        "Example Brand",
+        "Product description",
+        10.0,
+        15.0,
+        19.0,
+        17.85,
+        100,
+        "TRUE",
+        "TRUE",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]);
+
+      // Add example data (product with variants)
+      sheet.appendRow([
+        "CREATE",
+        "product_with_variants.jpg",
+        "Example Product with Variants",
+        "PROD002",
+        "Example Category",
+        "Example Brand",
+        "Product with variants description",
+        10.0,
+        15.0,
+        19.0,
+        17.85,
+        0,
+        "TRUE",
+        "FALSE",
+        "Color:Red-Size:L",
+        "TRUE",
+        "variant_red.jpg",
+        2.0,
+        50
+      ]);
+
+      // Add second variant for the same product
+      sheet.appendRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "Color:Blue-Size:M",
+        "FALSE",
+        "variant_blue.jpg",
+        1.5,
+        30
+      ]);
+
+      // Create instructions sheet
+      var instructionsSheet = excel['Instructions'];
+      instructionsSheet.appendRow(["Import Instructions"]);
+      instructionsSheet.appendRow([""]);
+      instructionsSheet.appendRow(["1. Required Fields:"]);
+      instructionsSheet
+          .appendRow(["   - PRODUCTNAME: Product name (required)"]);
+      instructionsSheet
+          .appendRow(["   - CATEGORY: Product category (required)"]);
+      instructionsSheet.appendRow(
+          ["   - SELLPRICETAXEXCLUDE: Price without tax (required)"]);
+      instructionsSheet.appendRow([""]);
+      instructionsSheet.appendRow(["2. For products with variants:"]);
+      instructionsSheet.appendRow(["   - Set SIMPLEPRODUCT to FALSE"]);
+      instructionsSheet.appendRow(["   - Add one row per variant"]);
+      instructionsSheet.appendRow(
+          ["   - VARIANTNAME format: Attribute1:Value1-Attribute2:Value2"]);
+      instructionsSheet.appendRow(
+          ["   - Set DEFAULTVARIANT to TRUE for one variant per product"]);
+
+      // Save the file
+      var fileBytes = excel.encode();
+      if (fileBytes == null) {
+        throw Exception('Failed to generate Excel file');
+      }
+
+      // Get download directory
+      final directory = await getDownloadsDirectory();
+      if (directory == null) {
+        throw Exception('Could not access downloads directory');
+      }
+
+      // Create file path
+      final filePath = '${directory.path}/product_import_template.xlsx';
+      final file = File(filePath);
+      await file.writeAsBytes(fileBytes, flush: true);
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Template downloaded to: $filePath'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error exporting template: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting template: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
   bool _verifyHeaders(List<String?> headers) {
-    // Expected headers in order for the new format
     List<String> expectedHeaders = [
       "ACTION",
       "IMAGE",
@@ -403,7 +576,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
   }
 
   double _parseDouble(String value) {
-    // Handle both comma and dot decimal separators
     return double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
   }
 
@@ -466,7 +638,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                             size: 50, color: Colors.blue),
                         const SizedBox(height: 20),
                         Text(
-                          'Import Products with Variants',
+                          'Product Import/Export',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -474,26 +646,47 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Expected format: Code, Designation, PrixHT, Taxe, Category, SubCategory, ImagePath, Marge, RemiseMax, HasVariants, VariantCodes, Attributes, VariantPrice, PriceImpact, VariantStock',
+                          'Import products from Excel or download a template',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed:
-                              _isImporting ? null : importProductsWithVariants,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF009688),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 30, vertical: 15),
-                          ),
-                          child: Text(
-                            _isImporting ? 'Importing...' : 'Select File',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.white,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ElevatedButton(
+                              onPressed: _isImporting
+                                  ? null
+                                  : importProductsWithVariants,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF009688),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 15),
+                              ),
+                              child: Text(
+                                _isImporting ? 'Importing...' : 'Import Excel',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
-                          ),
+                            ElevatedButton(
+                              onPressed: _exportExcelTemplate,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 15),
+                              ),
+                              child: Text(
+                                'Download Template',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
