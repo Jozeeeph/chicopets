@@ -14,22 +14,68 @@ class ManageCommand extends StatefulWidget {
 class _ManageCommandState extends State<ManageCommand> {
   late Future<List<Order>> futureOrders;
   final SqlDb sqlDb = SqlDb();
+  TextEditingController _searchController = TextEditingController();
+  List<Order> _allOrders = [];
+
+  // Couleurs de la palette
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty) {
+        refreshOrders();
+      }
+    });
     refreshOrders();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void refreshOrders() {
     setState(() {
       futureOrders = sqlDb.getOrdersWithOrderLines().then((orders) {
-        // Filter out cancelled orders and empty orders
-        return orders
-            .where((order) =>
-                order.status != 'annulée' && order.orderLines.isNotEmpty)
-            .toList();
+        _allOrders =
+            orders.where((order) => order.status != 'annulée').toList();
+        return _allOrders;
       });
+    });
+  }
+
+  void _filterOrders(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        futureOrders = Future.value(_allOrders);
+      });
+      return;
+    }
+
+    final filtered = await Future.wait(_allOrders.map((order) async {
+      if (order.idClient == null) return null;
+
+      final client = await sqlDb.getClientById(order.idClient!);
+      if (client == null) return null;
+
+      final matches = client.name.toLowerCase().contains(query.toLowerCase()) ||
+          client.firstName.toLowerCase().contains(query.toLowerCase()) ||
+          client.phoneNumber.contains(query);
+
+      return matches ? order : null;
+    }));
+
+    setState(() {
+      futureOrders = Future.value(filtered.whereType<Order>().toList());
     });
   }
 
@@ -47,21 +93,22 @@ class _ManageCommandState extends State<ManageCommand> {
                 borderRadius: BorderRadius.circular(15),
               ),
               title: Row(
-                children: const [
-                  Icon(Icons.warning, color: Colors.red),
-                  SizedBox(width: 10),
+                children: [
+                  Icon(Icons.warning, color: warmRed),
+                  const SizedBox(width: 10),
                   Text(
                     'Confirmation',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, color: darkBlue),
                   ),
                 ],
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Tapez "Annuler" pour confirmer l\'annulation de cette commande.',
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: darkBlue),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 15),
@@ -75,7 +122,7 @@ class _ManageCommandState extends State<ManageCommand> {
                     decoration: InputDecoration(
                       hintText: 'Annuler',
                       filled: true,
-                      fillColor: Colors.grey[200],
+                      fillColor: lightGray,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -88,7 +135,7 @@ class _ManageCommandState extends State<ManageCommand> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Non'),
+                  child: Text('Non', style: TextStyle(color: deepBlue)),
                 ),
                 ElevatedButton(
                   onPressed: isConfirmed
@@ -97,10 +144,13 @@ class _ManageCommandState extends State<ManageCommand> {
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isConfirmed ? Colors.red : Colors.grey[400],
+                    backgroundColor: isConfirmed ? warmRed : Colors.grey[400],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('Annuler la commande'),
+                  child: const Text('Annuler la commande',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             );
@@ -145,195 +195,390 @@ class _ManageCommandState extends State<ManageCommand> {
 
       // Refresh the order list
       refreshOrders();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Commande #${order.idOrder} annulée',
+              style: TextStyle(color: white)),
+          backgroundColor: warmRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: lightGray,
       appBar: AppBar(
         title: const Text(
           'Gérer les Commandes',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFF0056A6),
+        backgroundColor: deepBlue,
+        iconTheme: IconThemeData(color: white),
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(15),
+          ),
+        ),
       ),
-      body: FutureBuilder<List<Order>>(
-        future: futureOrders,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF0056A6)),
-            );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Erreur: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red, fontSize: 16),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2)),
+                ],
               ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                'Aucune commande trouvée.',
-                style: TextStyle(color: Color(0xFF0056A6), fontSize: 16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Rechercher par client',
+                  labelStyle: TextStyle(color: darkBlue),
+                  hintText: 'Nom, prénom ou téléphone',
+                  prefixIcon: Icon(Icons.search, color: deepBlue),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear, color: deepBlue),
+                          onPressed: () {
+                            _searchController.clear();
+                            _filterOrders('');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: _filterOrders,
               ),
-            );
-          } else {
-            return ListView.builder(
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                Order order = snapshot.data![index];
-
-                print(
-                    "Remaining amount when retrieving order: ${order.remainingAmount}");
-
-                bool isCancelled = order.status == 'annulée';
-                bool isSemiPaid = order.status == 'non payée';
-                bool isPaid = order.status == 'payée';
-
-                // Set the background color based on the status
-                Color backgroundColor = isCancelled
-                    ? Colors.red.shade100
-                    : isSemiPaid
-                        ? Colors.orange.shade100
-                        : isPaid
-                            ? Colors.green.shade100
-                            : Colors.grey.shade100;
-
-                return Card(
-                  margin: const EdgeInsets.all(8.0),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Container(
-                    color: backgroundColor, // Apply background color
-                    child: ExpansionTile(
-                      tilePadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      title: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                flex:
-                                    2, // Adjust the flex value to control the space allocation
-                                child: Text(
-                                  'Commande #${order.idOrder} - ${formatDate(order.date)}',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex:
-                                    3, // Adjust the flex value to control the space allocation
-                                child: Text(
-                                  isCancelled
-                                      ? 'Commande annulée - Total: ${order.total.toStringAsFixed(2)} DT'
-                                      : isSemiPaid
-                                          ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
-                                          : isPaid
-                                              ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
-                                              : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
-                                  style: TextStyle(
-                                    color: isCancelled
-                                        ? Colors.red
-                                        : isSemiPaid
-                                            ? const Color.fromARGB(
-                                                255, 188, 113, 0)
-                                            : isPaid
-                                                ? Colors.green
-                                                : const Color(0xFF009688),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign
-                                      .end, // Align the text to the end (right)
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(
-                              height: 4), // Adds spacing between rows
-                        ],
-                      ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<Order>>(
+              future: futureOrders,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                    child: CircularProgressIndicator(color: deepBlue),
+                  );
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Divider(thickness: 1, color: Colors.grey),
-                        ...order.orderLines.map((orderLine) {
-                          return FutureBuilder<Product?>(
-                            future: sqlDb.getProductById(orderLine.productId!),
-                            builder: (context, productSnapshot) {
-                              if (productSnapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const ListTile(
-                                  title: Text(
-                                    'Chargement...',
-                                    style:
-                                        TextStyle(fontStyle: FontStyle.italic),
-                                  ),
-                                );
-                              } else if (productSnapshot.hasError) {
-                                return ListTile(
-                                  title: Text(
-                                    'Erreur: ${productSnapshot.error}',
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                );
-                              } else if (!productSnapshot.hasData ||
-                                  productSnapshot.data == null) {
-                                return const ListTile(
-                                  title: Text(
-                                    'Produit introuvable',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                );
-                              } else {
-                                return ListTile(
-                                  title: Text(
-                                    'Produit: ${orderLine.productName}',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    'Quantité: ${orderLine.quantity} - Prix: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantity * (1 - orderLine.discount / 100)).toStringAsFixed(2) : (orderLine.prixUnitaire * orderLine.quantity - orderLine.discount).toStringAsFixed(2)} DT',
-                                    style:
-                                        const TextStyle(color: Colors.black87),
-                                  ),
-                                );
-                              }
-                            },
-                          );
-                        }),
-                        if (!isCancelled)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: TextButton.icon(
-                              onPressed: () => cancelOrder(context, order),
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              label: const Text(
-                                'Annuler la commande',
-                                style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
+                        Icon(Icons.error_outline, color: warmRed, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          'Erreur de chargement',
+                          style: TextStyle(color: warmRed, fontSize: 18),
+                        ),
                       ],
                     ),
-                  ),
-                );
+                  );
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.assignment_outlined,
+                            color: deepBlue, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          'Aucune commande trouvée',
+                          style: TextStyle(color: darkBlue, fontSize: 18),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  return ListView.builder(
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, index) {
+                      Order order = snapshot.data![index];
+
+                      bool isCancelled = order.status == 'annulée';
+                      bool isSemiPaid = order.status == 'non payée';
+                      bool isPaid = order.status == 'payée';
+
+                      Color statusColor = isCancelled
+                          ? warmRed
+                          : isSemiPaid
+                              ? softOrange
+                              : isPaid
+                                  ? tealGreen
+                                  : deepBlue;
+
+                      IconData statusIcon = isCancelled
+                          ? Icons.cancel
+                          : isSemiPaid
+                              ? Icons.payment
+                              : isPaid
+                                  ? Icons.check_circle
+                                  : Icons.pending;
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: Material(
+                          borderRadius: BorderRadius.circular(12),
+                          elevation: 2,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: lightGray,
+                                width: 1,
+                              ),
+                            ),
+                            child: ExpansionTile(
+                              tilePadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              leading: Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(statusIcon, color: statusColor),
+                              ),
+                              title: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Commande #${order.idOrder}',
+                                    style: TextStyle(
+                                      color: darkBlue,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    formatDate(order.date),
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.attach_money,
+                                          size: 16, color: statusColor),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        isCancelled
+                                            ? 'Annulée'
+                                            : isSemiPaid
+                                                ? 'Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
+                                                : isPaid
+                                                    ? 'Payée: ${order.total.toStringAsFixed(2)} DT'
+                                                    : 'À payer: ${order.total.toStringAsFixed(2)} DT',
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              children: [
+                                Divider(thickness: 1, color: lightGray),
+                                if (order.idClient != null)
+                                  FutureBuilder(
+                                    future:
+                                        sqlDb.getClientById(order.idClient!),
+                                    builder: (context, clientSnapshot) {
+                                      if (clientSnapshot.connectionState ==
+                                          ConnectionState.waiting) {
+                                        return ListTile(
+                                          leading: Icon(Icons.person,
+                                              color: deepBlue),
+                                          title: Text('Chargement client...',
+                                              style:
+                                                  TextStyle(color: darkBlue)),
+                                        );
+                                      }
+                                      if (clientSnapshot.hasError ||
+                                          !clientSnapshot.hasData) {
+                                        return ListTile(
+                                          leading: Icon(Icons.error_outline,
+                                              color: warmRed),
+                                          title: Text('Client non trouvé',
+                                              style:
+                                                  TextStyle(color: darkBlue)),
+                                        );
+                                      }
+                                      final client = clientSnapshot.data!;
+                                      return ListTile(
+                                        leading:
+                                            Icon(Icons.person, color: deepBlue),
+                                        title: Text(
+                                          '${client.firstName} ${client.name}',
+                                          style: TextStyle(
+                                              color: darkBlue,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        subtitle: Text(client.phoneNumber,
+                                            style: TextStyle(color: darkBlue)),
+                                      );
+                                    },
+                                  ),
+                                if (order.orderLines.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.warning, color: softOrange),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Cette commande ne contient plus d\'articles',
+                                          style: TextStyle(
+                                              color: darkBlue,
+                                              fontStyle: FontStyle.italic),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  ...order.orderLines.map((orderLine) {
+                                    bool isCancelled =
+                                        order.status == 'annulée';
+
+                                    return FutureBuilder<Product?>(
+                                      future: sqlDb
+                                          .getProductById(orderLine.productId!),
+                                      builder: (context, productSnapshot) {
+                                        return ListTile(
+                                          leading: Icon(
+                                            isCancelled
+                                                ? Icons.cancel
+                                                : Icons.shopping_bag,
+                                            color: isCancelled
+                                                ? warmRed
+                                                : tealGreen,
+                                          ),
+                                          title: Text(
+                                            orderLine.productName ??
+                                                'Nom de produit inconnu',
+                                            style: TextStyle(
+                                              color: isCancelled
+                                                  ? Colors.grey
+                                                  : darkBlue,
+                                              fontWeight: FontWeight.bold,
+                                              decoration: isCancelled
+                                                  ? TextDecoration.lineThrough
+                                                  : TextDecoration.none,
+                                            ),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                      Icons
+                                                          .format_list_numbered,
+                                                      size: 16,
+                                                      color: isCancelled
+                                                          ? Colors.grey
+                                                          : softOrange),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Quantité: ${orderLine.quantity}',
+                                                    style: TextStyle(
+                                                      color: isCancelled
+                                                          ? Colors.grey
+                                                          : darkBlue,
+                                                      decoration: isCancelled
+                                                          ? TextDecoration
+                                                              .lineThrough
+                                                          : TextDecoration.none,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.attach_money,
+                                                      size: 16,
+                                                      color: isCancelled
+                                                          ? Colors.grey
+                                                          : tealGreen),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Prix: ${orderLine.isPercentage ? (orderLine.prixUnitaire * orderLine.quantity * (1 - orderLine.discount / 100)).toStringAsFixed(2) : (orderLine.prixUnitaire * orderLine.quantity - orderLine.discount).toStringAsFixed(2)} DT',
+                                                    style: TextStyle(
+                                                      color: isCancelled
+                                                          ? Colors.grey
+                                                          : darkBlue,
+                                                      decoration: isCancelled
+                                                          ? TextDecoration
+                                                              .lineThrough
+                                                          : TextDecoration.none,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  }),
+                                if (!isCancelled)
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () =>
+                                          cancelOrder(context, order),
+                                      icon: Icon(Icons.cancel, color: white),
+                                      label: Text('Annuler la commande',
+                                          style: TextStyle(color: white)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: warmRed,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }
               },
-            );
-          }
-        },
+            ),
+          ),
+        ],
       ),
     );
   }

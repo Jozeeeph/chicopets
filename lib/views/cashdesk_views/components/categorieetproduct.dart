@@ -598,7 +598,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         }
 
                         final crossAxisCount =
-                            constraints.maxWidth > 800 ? 8 : 5;
+                            constraints.maxWidth > 800 ? 7 : 5;
 
                         return Scrollbar(
                           child: GridView.builder(

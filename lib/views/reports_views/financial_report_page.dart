@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+
+import 'package:printing/printing.dart';
 
 class FinancialReportPage extends StatefulWidget {
   const FinancialReportPage({super.key});
@@ -716,12 +720,195 @@ Widget _buildSummaryRow(
     );
   }
 }
-  Future<void> _exportToPDF() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Export PDF en développement'),
-        backgroundColor: tealGreen,
+ Future<void> _exportToPDF() async {
+  final pdf = pw.Document();
+
+  // Format identique aux tickets de commande (70mm de large)
+  const double pageWidth = 70 * PdfPageFormat.mm;
+  const double pageHeight = double.infinity;
+  const double margin = 4 * PdfPageFormat.mm;
+
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat(pageWidth, pageHeight, marginAll: margin),
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // En-tête identique aux tickets
+            pw.Center(
+              child: pw.Column(
+                children: [
+                  pw.Text('CHICO PETS',
+                      style: pw.TextStyle(
+                        fontSize: 12,
+                        fontWeight: pw.FontWeight.bold,
+                      )),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Rapport Financier',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                      )),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    '${DateFormat('dd/MM/yyyy').format(_startDate!)}${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
+                    style: pw.TextStyle(fontSize: 9),
+                  ),
+                ],
+              ),
+            ),
+            
+            pw.SizedBox(height: 8),
+            pw.Divider(thickness: 0.5),
+            pw.SizedBox(height: 8),
+
+            // Chiffre d'affaire total
+            _buildPdfSummaryRow(
+              'TOTAL VENTES',
+              _totalAll,
+              isMain: true,
+            ),
+            pw.SizedBox(height: 6),
+
+            // Détails des paiements
+            if (_totalCash > 0)
+              _buildPdfDetailRow('Espèces', _totalCash),
+            
+            if (_totalCard > 0)
+              _buildPdfDetailRow('Carte', _totalCard),
+            
+            if (_totalCheck > 0)
+              _buildPdfDetailRow('Chèque', _totalCheck),
+            
+            if (_totalMixed > 0)
+              _buildPdfDetailRow('Mixtes', _totalMixed),
+
+            pw.SizedBox(height: 6),
+            pw.Divider(thickness: 0.2),
+            pw.SizedBox(height: 6),
+
+            // Remises
+            if (_totalPercentageDiscount > 0)
+              _buildPdfSummaryRow(
+                'Remise (%)',
+                _totalPercentageDiscount,
+                isDiscount: true,
+                suffix: '%',
+              ),
+
+            if (_totalFixedDiscount > 0)
+              _buildPdfSummaryRow(
+                'Remise (DT)',
+                _totalFixedDiscount,
+                isDiscount: true,
+              ),
+
+            pw.SizedBox(height: 6),
+            pw.Divider(thickness: 0.2),
+            pw.SizedBox(height: 6),
+
+            // Montant à recevoir
+            if (_totalRemaining > 0)
+              _buildPdfSummaryRow(
+                'À recevoir',
+                _totalRemaining,
+                isAlert: true,
+              ),
+
+            pw.SizedBox(height: 6),
+            pw.Divider(thickness: 0.5),
+            pw.SizedBox(height: 6),
+
+            // Statistiques
+            _buildPdfSummaryRow(
+              'Clients',
+              _clientCount.toDouble(),
+              isCount: true,
+            ),
+            _buildPdfSummaryRow(
+              'Articles',
+              _articleCount.toDouble(),
+              isCount: true,
+            ),
+
+            // Pied de page
+            pw.SizedBox(height: 12),
+            pw.Center(
+              child: pw.Text(
+                '${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                style: pw.TextStyle(fontSize: 8),
+              ),
+            ),
+            pw.Center(
+              child: pw.Text(
+                'Merci pour votre confiance',
+                style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
+
+// Méthodes helpers pour construire les lignes du PDF
+pw.Widget _buildPdfSummaryRow(
+  String label,
+  double value, {
+  bool isMain = false,
+  bool isDiscount = false,
+  bool isCount = false,
+  bool isAlert = false,
+  String suffix = '',
+}) {
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    children: [
+      pw.Text(
+        label,
+        style: pw.TextStyle(
+          fontSize: isMain ? 10 : 8,
+          fontWeight: isMain ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
       ),
-    );
-  }
+      pw.Text(
+        isCount
+            ? '${value.toInt()}$suffix'
+            : '${value.toStringAsFixed(2)}$suffix',
+        style: pw.TextStyle(
+          fontSize: isMain ? 11 : 9,
+          fontWeight: pw.FontWeight.bold,
+        ),
+      ),
+    ],
+  );
+}
+
+pw.Widget _buildPdfDetailRow(String label, double value) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.only(left: 8),
+    child: pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(
+          label,
+          style: const pw.TextStyle(fontSize: 8),
+        ),
+        pw.Text(
+          '${value.toStringAsFixed(2)} DT',
+          style: pw.TextStyle( // Removed `const` here
+            fontSize: 8,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 }
