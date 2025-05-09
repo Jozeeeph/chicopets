@@ -16,7 +16,8 @@ class _AccountsPageState extends State<AccountsPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _newCodeController = TextEditingController();
-  final TextEditingController _confirmNewCodeController = TextEditingController();
+  final TextEditingController _confirmNewCodeController =
+      TextEditingController();
   String _selectedRole = 'cashier';
   bool _isLoading = true;
 
@@ -134,26 +135,26 @@ class _AccountsPageState extends State<AccountsPage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (_newCodeController.text.isEmpty || 
+                if (_newCodeController.text.isEmpty ||
                     _confirmNewCodeController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Veuillez remplir tous les champs')),
+                    const SnackBar(
+                        content: Text('Veuillez remplir tous les champs')),
                   );
                   return;
                 }
 
                 if (_newCodeController.text != _confirmNewCodeController.text) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Les codes ne correspondent pas')),
+                    const SnackBar(
+                        content: Text('Les codes ne correspondent pas')),
                   );
                   return;
                 }
 
                 try {
                   await _sqlDb.updateUserCode(
-                    user.username, 
-                    _newCodeController.text
-                  );
+                      user.username, _newCodeController.text);
                   await _loadUsers();
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -176,7 +177,8 @@ class _AccountsPageState extends State<AccountsPage> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               child: Text(
                 'Valider',
@@ -339,7 +341,8 @@ class _AccountsPageState extends State<AccountsPage> {
                             value: 'admin',
                             child: Row(
                               children: [
-                                Icon(Icons.admin_panel_settings, color: deepBlue),
+                                Icon(Icons.admin_panel_settings,
+                                    color: deepBlue),
                                 const SizedBox(width: 10),
                                 Text(
                                   'Administrateur',
@@ -378,38 +381,43 @@ class _AccountsPageState extends State<AccountsPage> {
                             borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: deepBlue, width: 2),
                           ),
-                          prefixIcon: Icon(Icons.assignment_ind, color: deepBlue),
+                          prefixIcon:
+                              Icon(Icons.assignment_ind, color: deepBlue),
                           filled: true,
                           fillColor: lightGray.withOpacity(0.3),
                         ),
                         dropdownColor: white,
                       ),
                       const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _addUser,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: tealGreen,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 5,
-                          shadowColor: tealGreen.withOpacity(0.4),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add, color: white),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Ajouter Utilisateur',
-                              style: GoogleFonts.poppins(
-                                color: white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                      Center(
+                        child: IntrinsicWidth(
+                          child: ElevatedButton(
+                            onPressed: _addUser,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: tealGreen,
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 5,
+                              shadowColor: tealGreen.withOpacity(0.4),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add, color: white),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Ajouter Utilisateur',
+                                  style: GoogleFonts.poppins(
+                                    color: white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -501,19 +509,23 @@ class _AccountsPageState extends State<AccountsPage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: Icon(Icons.vpn_key, color: tealGreen),
-                                        onPressed: () => _showResetCodeDialog(user),
+                                        icon: Icon(Icons.vpn_key,
+                                            color: tealGreen),
+                                        onPressed: () =>
+                                            _showResetCodeDialog(user),
                                         tooltip: 'Réinitialiser le code',
                                       ),
                                       IconButton(
-                                        icon: Icon(Icons.delete, color: warmRed),
+                                        icon:
+                                            Icon(Icons.delete, color: warmRed),
                                         onPressed: () {
                                           showDialog(
                                             context: context,
                                             builder: (BuildContext context) {
                                               return AlertDialog(
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
                                                 ),
                                                 title: Text(
                                                   'Confirmer la suppression',
@@ -528,26 +540,35 @@ class _AccountsPageState extends State<AccountsPage> {
                                                 ),
                                                 actions: [
                                                   TextButton(
-                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    onPressed: () =>
+                                                        Navigator.of(context)
+                                                            .pop(),
                                                     child: Text(
                                                       'Annuler',
-                                                      style: TextStyle(color: darkBlue),
+                                                      style: TextStyle(
+                                                          color: darkBlue),
                                                     ),
                                                   ),
                                                   ElevatedButton(
                                                     onPressed: () {
-                                                      Navigator.of(context).pop();
+                                                      Navigator.of(context)
+                                                          .pop();
                                                       _deleteUser(user.id!);
                                                     },
-                                                    style: ElevatedButton.styleFrom(
+                                                    style: ElevatedButton
+                                                        .styleFrom(
                                                       backgroundColor: warmRed,
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(10),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
                                                       ),
                                                     ),
                                                     child: Text(
                                                       'Supprimer',
-                                                      style: GoogleFonts.poppins(
+                                                      style:
+                                                          GoogleFonts.poppins(
                                                         color: white,
                                                       ),
                                                     ),

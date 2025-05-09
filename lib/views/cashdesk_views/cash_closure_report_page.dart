@@ -59,12 +59,12 @@ class CashClosureReportPage extends StatelessWidget {
   }
 
   Future<double> _calculateTotalSales(List<Order> orders) async {
-  double total = 0.0;
-  for (var order in orders) {
-    total += order.total ?? 0.0;
+    double total = 0.0;
+    for (var order in orders) {
+      total += order.total ?? 0.0;
+    }
+    return total;
   }
-  return total;
-}
 
   Future<double> _calculateTotalProfit(List<Order> orders) async {
     double totalProfit = 0.0;
@@ -219,113 +219,193 @@ class CashClosureReportPage extends StatelessWidget {
           final user = snapshot.data![1] as User?;
 
           return Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                Expanded(
+                  child: SingleChildScrollView(
                     child: Column(
                       children: [
+                        // Titre principal
                         Text('Rapport de caisse',
                             style: GoogleFonts.poppins(
                                 fontSize: 20, fontWeight: FontWeight.bold)),
-                        Divider(),
-                        _buildReportRow('Ouverture', cashState.openingTime),
-                        _buildReportRow('Clôture', DateTime.now()),
-                        _buildReportRow('Fond initial',
-                            '${cashState.initialAmount.toStringAsFixed(2)} DT'),
-                        Divider(),
-                        _buildReportRow('Caissier', user?.username ?? 'N/A'),
-                        _buildReportRow('Nombre de commandes', orders.length),
-                        FutureBuilder<double>(
-                          future: _calculateTotalSales(orders),
-                          builder: (context, salesSnapshot) {
-                            if (!salesSnapshot.hasData) {
-                              return _buildReportRow('Total ventes', 'Calcul...');
-                            }
-                            return _buildReportRow(
-                              'Total ventes',
-                              '${salesSnapshot.data!.toStringAsFixed(2)} DT',
-                            );
-                          },
-                        ),
-                        FutureBuilder<double>(
-                          future: _calculateTotalProfit(orders),
-                          builder: (context, profitSnapshot) {
-                            if (!profitSnapshot.hasData) {
-                              return _buildReportRow('Bénéfice total', 'Calcul...');
-                            }
-                            return _buildReportRow(
-                              'Bénéfice total',
-                              '${profitSnapshot.data!.toStringAsFixed(2)} DT',
-                            );
-                          },
-                        ),
-                        FutureBuilder<double>(
-                          future: _calculateTotalSales(orders),
-                          builder: (context, salesSnapshot) {
-                            if (!salesSnapshot.hasData) {
-                              return _buildReportRow('Nouveau fond de caisse', 'Calcul...');
-                            }
-                            final newCashAmount = cashState.initialAmount + (salesSnapshot.data ?? 0);
-                            return _buildReportRow(
-                              'Nouveau fond de caisse',
-                              '${newCashAmount.toStringAsFixed(2)} DT',
-                            );
-                          },
-                        ),
-                        Divider(),
-                        Text('Produits vendus:',
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                        FutureBuilder<Map<String, int>>(
-                          future: _getProductsSold(orders),
-                          builder: (context, productsSnapshot) {
-                            if (!productsSnapshot.hasData) {
-                              return Center(child: CircularProgressIndicator());
-                            }
+                        SizedBox(height: 16),
+                        
+                        // Deux colonnes (cards)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Première colonne (gauche)
+                            Expanded(
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Informations générales',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Divider(),
+                                      _buildReportRow('Ouverture', cashState.openingTime),
+                                      _buildReportRow('Clôture', DateTime.now()),
+                                      _buildReportRow('Caissier', user?.username ?? 'N/A'),
+                                      _buildReportRow('Nombre de commandes', orders.length),
+                                      SizedBox(height: 8),
+                                      
+                                      Text('Résumé financier',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Divider(),
+                                      _buildReportRow('Fond initial',
+                                          '${cashState.initialAmount.toStringAsFixed(2)} DT'),
+                                      FutureBuilder<double>(
+                                        future: _calculateTotalSales(orders),
+                                        builder: (context, salesSnapshot) {
+                                          if (!salesSnapshot.hasData) {
+                                            return _buildReportRow('Total ventes', 'Calcul...');
+                                          }
+                                          return _buildReportRow(
+                                            'Total ventes',
+                                            '${salesSnapshot.data!.toStringAsFixed(2)} DT',
+                                          );
+                                        },
+                                      ),
+                                      FutureBuilder<double>(
+                                        future: _calculateTotalProfit(orders),
+                                        builder: (context, profitSnapshot) {
+                                          if (!profitSnapshot.hasData) {
+                                            return _buildReportRow('Bénéfice total', 'Calcul...');
+                                          }
+                                          return _buildReportRow(
+                                            'Bénéfice total',
+                                            '${profitSnapshot.data!.toStringAsFixed(2)} DT',
+                                          );
+                                        },
+                                      ),
+                                      FutureBuilder<double>(
+                                        future: _calculateTotalSales(orders),
+                                        builder: (context, salesSnapshot) {
+                                          if (!salesSnapshot.hasData) {
+                                            return _buildReportRow('Nouveau fond de caisse', 'Calcul...');
+                                          }
+                                          final newCashAmount = cashState.initialAmount + (salesSnapshot.data ?? 0);
+                                          return _buildReportRow(
+                                            'Nouveau fond de caisse',
+                                            '${newCashAmount.toStringAsFixed(2)} DT',
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                             
-                            return Column(
-                              children: productsSnapshot.data!.entries.map((entry) {
-                                return _buildReportRow(entry.key, '${entry.value} unités');
-                              }).toList(),
-                            );
-                          },
+                            SizedBox(width: 16),
+                            
+                            // Deuxième colonne (droite)
+                            Expanded(
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Produits vendus',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Divider(),
+                                      FutureBuilder<Map<String, int>>(
+                                        future: _getProductsSold(orders),
+                                        builder: (context, productsSnapshot) {
+                                          if (!productsSnapshot.hasData) {
+                                            return Center(child: CircularProgressIndicator());
+                                          }
+                                          
+                                          return productsSnapshot.data!.isEmpty
+                                              ? Text('Aucun produit vendu')
+                                              : Column(
+                                                  children: productsSnapshot.data!.entries.map((entry) {
+                                                    return _buildReportRow(
+                                                      entry.key,
+                                                      '${entry.value} unités',
+                                                    );
+                                                  }).toList(),
+                                                );
+                                        },
+                                      ),
+                                      SizedBox(height: 16),
+                                      
+                                      Text('Commandes',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Divider(),
+                                      orders.isEmpty
+                                          ? Text('Aucune commande')
+                                          : Column(
+                                              children: orders.map((order) {
+                                                return _buildReportRow(
+                                                  '#${order.idOrder} (${DateFormat('dd/MM HH:mm').format(DateTime.parse(order.date))})',
+                                                  '${order.total.toStringAsFixed(2)} DT',
+                                                );
+                                              }).toList(),
+                                            ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        Divider(),
-                        Text('Commandes:',
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                        ...orders.map((order) {
-                          return _buildReportRow(
-                            '#${order.idOrder} (${DateFormat('dd/MM HH:mm').format(DateTime.parse(order.date))})',
-                            '${order.total.toStringAsFixed(2)} DT',
-                          );
-                        }).toList(),
                       ],
                     ),
                   ),
                 ),
-                Spacer(),
-                ElevatedButton.icon(
-                  onPressed: () => _printReport(context),
-                  icon: Icon(Icons.print),
-                  label: Text('Enregistrer et imprimer rapport'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 15),
+                
+                // Boutons en bas
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _printReport(context),
+                            icon: Icon(Icons.print),
+                            label: Text(
+                              'Enregistrer et imprimer rapport',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => const HomePage()),
+                              );
+                            },
+                            child: Text(
+                              'Retour à l\'accueil',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(height: 10),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomePage()),
-                    );
-                  },
-                  child: Text('Retour à l\'accueil'),
                 ),
               ],
             ),
@@ -341,10 +421,30 @@ class CashClosureReportPage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          Flexible(
+            child: Text(label, 
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (value is DateTime)
-            Text('${value.day}/${value.month}/${value.year} ${value.hour}:${value.minute.toString().padLeft(2, '0')}'),
-          if (value is String) Text(value),
+            Text(
+              DateFormat('dd/MM HH:mm').format(value),
+              style: GoogleFonts.poppins(),
+            ),
+          if (value is String) 
+            Flexible(
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (value is int)
+            Text(
+              value.toString(),
+              style: GoogleFonts.poppins(),
+            ),
         ],
       ),
     );
