@@ -31,8 +31,8 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
   final Color warmRed = const Color(0xFFE53935);
 
   Future<void> _createAdminAccount() async {
-    if (_usernameController.text.isEmpty || 
-        _codeController.text.isEmpty || 
+    if (_usernameController.text.isEmpty ||
+        _codeController.text.isEmpty ||
         _confirmCodeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -123,7 +123,7 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                
+
                 // Carte de formulaire
                 Card(
                   elevation: 10,
@@ -154,7 +154,7 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        
+
                         // Champ Nom d'utilisateur
                         TextField(
                           controller: _usernameController,
@@ -176,7 +176,7 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Champ Code d'accès
                         TextField(
                           controller: _codeController,
@@ -186,7 +186,9 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                             prefixIcon: Icon(Iconsax.lock, color: deepBlue),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Iconsax.eye_slash : Iconsax.eye,
+                                _obscurePassword
+                                    ? Iconsax.eye_slash
+                                    : Iconsax.eye,
                                 color: deepBlue,
                               ),
                               onPressed: () {
@@ -210,7 +212,7 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // Champ Confirmation code
                         TextField(
                           controller: _confirmCodeController,
@@ -220,12 +222,15 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                             prefixIcon: Icon(Iconsax.lock_1, color: deepBlue),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscureConfirmPassword ? Iconsax.eye_slash : Iconsax.eye,
+                                _obscureConfirmPassword
+                                    ? Iconsax.eye_slash
+                                    : Iconsax.eye,
                                 color: deepBlue,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
                                 });
                               },
                             ),
@@ -244,21 +249,22 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                           style: GoogleFonts.poppins(),
                         ),
                         const SizedBox(height: 32),
-                        
+
                         // Bouton de création
-                        SizedBox(
-                          width: double.infinity,
+                        Center(
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _createAdminAccount,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: tealGreen,
-                              foregroundColor: white,
-                              minimumSize: const Size(double.infinity, 50),
+                              backgroundColor:
+                                  tealGreen, // Ta couleur personnalisée
+                              foregroundColor:
+                                  Colors.white, // Couleur du texte et icône
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 3,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: _isLoading
                                 ? const SizedBox(
@@ -270,15 +276,18 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                                     ),
                                   )
                                 : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize
+                                        .min, // Ajusté à la taille du contenu
                                     children: [
-                                      Icon(Iconsax.user_add, size: 20),
+                                      const Icon(Iconsax.user_add,
+                                          size: 20, color: Colors.white),
                                       const SizedBox(width: 10),
                                       Text(
                                         'Créer le Compte',
                                         style: GoogleFonts.poppins(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
@@ -289,7 +298,7 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                     ),
                   ),
                 ),
-                
+
                 // Texte en bas
                 const SizedBox(height: 30),
                 Text(
