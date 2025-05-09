@@ -33,10 +33,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('current_user');
-    
+
     if (mounted) {
       setState(() {
-        _currentUser = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
+        _currentUser =
+            userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
       });
     }
   }
@@ -49,45 +50,45 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
- void _navigateToPage(Widget page) async {
-  // Si utilisateur déconnecté, demander le code en premier
-  if (_currentUser == null) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CodeVerificationPage(
-          pageName: page is DashboardPage 
-              ? 'Tableau de bord' 
-              : 'Partie Caissier',
-          destinationPage: page,
-          onVerificationSuccess: (user) {
-            setState(() => _currentUser = user);
-            // Après vérification, vérifier les droits si c'est le dashboard
-            if (page is DashboardPage && user.role != 'admin') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Accès réservé aux administrateurs')),
-              );
-            } else {
-              _handlePostVerificationNavigation(page);
-            }
-          },
+  void _navigateToPage(Widget page) async {
+    // Si utilisateur déconnecté, demander le code en premier
+    if (_currentUser == null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CodeVerificationPage(
+            pageName:
+                page is DashboardPage ? 'Tableau de bord' : 'Partie Caissier',
+            destinationPage: page,
+            onVerificationSuccess: (user) {
+              setState(() => _currentUser = user);
+              // Après vérification, vérifier les droits si c'est le dashboard
+              if (page is DashboardPage && user.role != 'admin') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Accès réservé aux administrateurs')),
+                );
+              } else {
+                _handlePostVerificationNavigation(page);
+              }
+            },
+          ),
         ),
-      ),
-    );
-    return;
-  }
+      );
+      return;
+    }
 
-  // Si utilisateur déjà connecté, vérifier les droits pour le dashboard
-  if (page is DashboardPage && _currentUser!.role != 'admin') {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Accès réservé aux administrateurs')),
-    );
-    return;
-  }
+    // Si utilisateur déjà connecté, vérifier les droits pour le dashboard
+    if (page is DashboardPage && _currentUser!.role != 'admin') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Accès réservé aux administrateurs')),
+      );
+      return;
+    }
 
-  // Si tout est OK, gérer la navigation normalement
-  _handlePostVerificationNavigation(page);
-}
+    // Si tout est OK, gérer la navigation normalement
+    _handlePostVerificationNavigation(page);
+  }
 
   Future<void> _handlePostVerificationNavigation(Widget page) async {
     // Navigation normale pour toutes les pages
@@ -123,14 +124,25 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Accueil'),
+        title: const Text('Accueil'),
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           if (_currentUser != null)
             IconButton(
-              icon: Icon(Icons.logout),
+              icon: const Icon(Icons.logout),
               onPressed: _logout,
             ),
         ],
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0056A6), Color(0xFF26A9E0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: Container(
         decoration: const BoxDecoration(

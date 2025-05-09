@@ -33,7 +33,6 @@ class _SalesReportPageState extends State<SalesReportPage> {
   bool _groupByUser = false;
   List<Map<String, dynamic>> _salesData = [];
   bool _isLoading = false;
-  bool _showDateRange = false;
   bool _showDownloadButton = false;
 
   @override
@@ -332,7 +331,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
             normalizedDate.isBefore(normalizedEnd));
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+  Future<void> _pickDate({required bool isStartDate}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: isStartDate
@@ -348,6 +347,11 @@ class _SalesReportPageState extends State<SalesReportPage> {
               onPrimary: white,
               onSurface: darkBlue,
             ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: deepBlue,
+              ),
+            ),
           ),
           child: child!,
         );
@@ -358,196 +362,243 @@ class _SalesReportPageState extends State<SalesReportPage> {
       setState(() {
         if (isStartDate) {
           _selectedStartDate = picked;
+          // Si la date de fin est antérieure à la nouvelle date de début, on la réinitialise
           if (_selectedEndDate != null && _selectedEndDate!.isBefore(picked)) {
-            _selectedEndDate = picked;
+            _selectedEndDate = null;
           }
         } else {
+          // On ne permet pas de sélectionner une date de fin sans date de début
+          if (_selectedStartDate == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text('Veuillez d\'abord sélectionner une date de début'),
+                backgroundColor: warmRed,
+              ),
+            );
+            return;
+          }
           _selectedEndDate = picked;
         }
       });
     }
   }
 
-Future<void> _downloadPdfReport() async {
-  final pdf = pw.Document();
+  Future<void> _downloadPdfReport() async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
 
-  // Configuration exacte pour ticket (70mm de large)
-  final pageFormat = PdfPageFormat(
-    70 * PdfPageFormat.mm, // Largeur fixe 70mm
-    double.infinity, // Hauteur variable
-    marginAll: 2, // Marges très réduites (2 points)
-  );
+    // Configuration pour ticket (70mm de large)
+    final pageFormat = PdfPageFormat(
+      70 * PdfPageFormat.mm,
+      double.infinity,
+      marginAll: 2,
+    );
 
-  pdf.addPage(
-    pw.Page(
-      pageFormat: pageFormat,
-      build: (pw.Context context) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            // En-tête centré
-            pw.Center(
-              child: pw.Column(
-                children: [
-                  pw.Text('CHICO PETS',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        fontWeight: pw.FontWeight.bold,
-                      )),
-                  pw.SizedBox(height: 2),
-                  pw.Text('Rapport des ventes',
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                      )),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    '${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)} - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
-                    style: pw.TextStyle(fontSize: 8),
-                  ),
-                ],
-              ),
-            ),
-            
-            pw.SizedBox(height: 4),
-            pw.Divider(thickness: 0.5),
-            pw.SizedBox(height: 4),
-
-            // Détails des ventes - version ultra compacte
-            for (final category in _salesData) ...[
-              pw.Text(
-                category['category'].toUpperCase(),
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
+    pdf.addPage(
+      pw.Page(
+        pageFormat: pageFormat,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // En-tête avec le nom de l'utilisateur si filtré par user
+              pw.Center(
+                child: pw.Column(
+                  children: [
+                    pw.Text('CHICO PETS',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                        )),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      _groupByUser
+                          ? 'Rapport des ventes par utilisateur'
+                          : 'Rapport des ventes',
+                      style: pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.SizedBox(height: 2),
+                    if (_groupByUser && _selectedUser != null)
+                      pw.Text(
+                        'Caissier: ${_selectedUser!.username}',
+                        style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      'Période: ${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)}'
+                      ' - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
+                      style: pw.TextStyle(fontSize: 8),
+                    ),
+                  ],
                 ),
               ),
-              pw.SizedBox(height: 2),
-              
-              // Produits en tableau compact
-              pw.Table(
-                columnWidths: {
-                  0: pw.FlexColumnWidth(2.5), // Produit
-                  1: pw.FlexColumnWidth(0.8), // Qté
-                  2: pw.FlexColumnWidth(1.2), // PU
-                  3: pw.FlexColumnWidth(1.5), // Total
-                },
-                border: pw.TableBorder.all(width: 0.2),
-                children: [
-                  // En-tête du tableau
-                  pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(1),
-                        child: pw.Text('Produit', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 4),
+
+              // Détails des ventes
+              for (final category in _salesData)
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      (category['category'] ?? 'Non catégorisé')
+                          .toString()
+                          .toUpperCase(),
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
                       ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(1),
-                        child: pw.Text('Qté', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(1),
-                        child: pw.Text('P.U', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(1),
-                        child: pw.Text('Total', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
-                      ),
-                    ],
-                  ),
-                  
-                  // Lignes des produits
-                  for (final product in category['products'])
-                    pw.TableRow(
+                    ),
+                    pw.SizedBox(height: 2),
+
+                    // Tableau des produits
+                    pw.Table(
+                      columnWidths: {
+                        0: pw.FlexColumnWidth(2.5), // Produit
+                        1: pw.FlexColumnWidth(0.8), // Qté
+                        2: pw.FlexColumnWidth(1.2), // PU
+                        3: pw.FlexColumnWidth(1.5), // Total
+                      },
+                      border: pw.TableBorder.all(width: 0.2),
                       children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(1),
-                          child: pw.Text(
-                            '${product['name']}\n(${product['variant']})',
-                            style: const pw.TextStyle(fontSize: 6),
-                            maxLines: 2,
-                          ),
+                        // En-tête
+                        pw.TableRow(
+                          children: [
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(1),
+                              child: pw.Text('Produit',
+                                  style: pw.TextStyle(
+                                      fontSize: 7,
+                                      fontWeight: pw.FontWeight.bold)),
+                            ),
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(1),
+                              child: pw.Text('Qté',
+                                  style: pw.TextStyle(
+                                      fontSize: 7,
+                                      fontWeight: pw.FontWeight.bold),
+                                  textAlign: pw.TextAlign.center),
+                            ),
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(1),
+                              child: pw.Text('P.U',
+                                  style: pw.TextStyle(
+                                      fontSize: 7,
+                                      fontWeight: pw.FontWeight.bold),
+                                  textAlign: pw.TextAlign.right),
+                            ),
+                            pw.Padding(
+                              padding: const pw.EdgeInsets.all(1),
+                              child: pw.Text('Total',
+                                  style: pw.TextStyle(
+                                      fontSize: 7,
+                                      fontWeight: pw.FontWeight.bold),
+                                  textAlign: pw.TextAlign.right),
+                            ),
+                          ],
                         ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(1),
-                          child: pw.Text(
-                            product['quantity'].toString(),
-                            style: const pw.TextStyle(fontSize: 6),
-                            textAlign: pw.TextAlign.center,
+
+                        // Lignes produits
+                        for (final product
+                            in category['products'] as List<dynamic>)
+                          pw.TableRow(
+                            children: [
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.all(1),
+                                child: pw.Text(
+                                  '${product['name']}\n(${product['variant']})',
+                                  style: const pw.TextStyle(fontSize: 6),
+                                  maxLines: 2,
+                                ),
+                              ),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.all(1),
+                                child: pw.Text(
+                                  product['quantity'].toString(),
+                                  style: const pw.TextStyle(fontSize: 6),
+                                  textAlign: pw.TextAlign.center,
+                                ),
+                              ),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.all(1),
+                                child: pw.Text(
+                                  (product['unitPrice'] as num)
+                                      .toStringAsFixed(2),
+                                  style: const pw.TextStyle(fontSize: 6),
+                                  textAlign: pw.TextAlign.right,
+                                ),
+                              ),
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.all(1),
+                                child: pw.Text(
+                                  (product['total'] as num).toStringAsFixed(2),
+                                  style: const pw.TextStyle(fontSize: 6),
+                                  textAlign: pw.TextAlign.right,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(1),
-                          child: pw.Text(
-                            product['unitPrice'].toStringAsFixed(2),
-                            style: const pw.TextStyle(fontSize: 6),
-                            textAlign: pw.TextAlign.right,
-                          ),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(1),
-                          child: pw.Text(
-                            product['total'].toStringAsFixed(2),
-                            style: const pw.TextStyle(fontSize: 6),
-                            textAlign: pw.TextAlign.right,
+                      ],
+                    ),
+
+                    // Total par catégorie
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'Total: ${(category['total'] as num).toStringAsFixed(2)} DT',
+                          style: pw.TextStyle(
+                            fontSize: 7,
+                            fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                ],
-              ),
-              
-              // Total catégorie
+                    pw.SizedBox(height: 4),
+                  ],
+                ),
+
+              // Total général
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 4),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.end,
                 children: [
                   pw.Text(
-                    'Total ${category['category']}: ${category['total'].toStringAsFixed(2)} DT',
+                    'TOTAL GÉNÉRAL: ${_salesData.fold(0.0, (sum, category) => sum + (category['total'] as num)).toStringAsFixed(2)} DT',
                     style: pw.TextStyle(
-                      fontSize: 7,
+                      fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              pw.SizedBox(height: 4),
-            ],
-            
-            // Ligne de séparation finale
-            pw.Divider(thickness: 0.5),
-            pw.SizedBox(height: 4),
-            
-            // Total général
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.end,
-              children: [
-                pw.Text(
-                  'TOTAL: ${_salesData.fold(0.0, (sum, category) => sum + category['total']).toStringAsFixed(2)} DT',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            
-            // Pied de page minimaliste
-            pw.SizedBox(height: 6),
-            pw.Center(
-              child: pw.Text(
-                '${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                style: const pw.TextStyle(fontSize: 6),
-              ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
 
-  await Printing.layoutPdf(
-    onLayout: (PdfPageFormat format) async => pdf.save(),
-  );
-}
+              // Pied de page
+              pw.SizedBox(height: 6),
+              pw.Center(
+                child: pw.Text(
+                  'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
+                  style: const pw.TextStyle(fontSize: 6),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -595,63 +646,91 @@ Future<void> _downloadPdfReport() async {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Période du rapport',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, color: darkBlue)),
-                        IconButton(
-                          icon: Icon(_showDateRange
-                              ? Icons.calendar_today
-                              : Icons.date_range),
-                          onPressed: () =>
-                              setState(() => _showDateRange = !_showDateRange),
-                          color: deepBlue,
+                        Icon(Icons.date_range, color: deepBlue),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Sélectionner la période:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: darkBlue,
+                          ),
                         ),
                       ],
                     ),
-                    if (!_showDateRange) ...[
-                      ListTile(
-                        leading: Icon(Icons.calendar_today, color: tealGreen),
-                        title: Text('Date unique'),
-                        subtitle: Text(_selectedStartDate != null
-                            ? DateFormat('dd/MM/yyyy')
-                                .format(_selectedStartDate!)
-                            : 'Non sélectionnée'),
-                        trailing: IconButton(
-                          icon: Icon(Icons.edit, color: softOrange),
-                          onPressed: () => _selectDate(context, true),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: Icon(Icons.calendar_today, size: 18),
+                            label: Text(
+                              _selectedStartDate != null
+                                  ? DateFormat('dd/MM/yyyy')
+                                      .format(_selectedStartDate!)
+                                  : 'Début',
+                            ),
+                            onPressed: () => _pickDate(isStartDate: true),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: darkBlue,
+                              backgroundColor: lightGray,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: Icon(Icons.calendar_today, size: 18),
+                            label: Text(
+                              _selectedEndDate != null
+                                  ? DateFormat('dd/MM/yyyy')
+                                      .format(_selectedEndDate!)
+                                  : 'Fin',
+                            ),
+                            onPressed: () => _pickDate(isStartDate: false),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: darkBlue,
+                              backgroundColor: lightGray,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (_selectedStartDate != null || _selectedEndDate != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: deepBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Période sélectionnée:',
+                              style: TextStyle(color: darkBlue),
+                            ),
+                            Text(
+                              '${_selectedStartDate != null ? DateFormat('dd/MM/yyyy').format(_selectedStartDate!) : '--'} '
+                              'à ${_selectedEndDate != null ? DateFormat('dd/MM/yyyy').format(_selectedEndDate!) : '--'}',
+                              style: TextStyle(
+                                color: darkBlue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ] else ...[
-                      ListTile(
-                        leading: Icon(Icons.date_range, color: tealGreen),
-                        title: Text('Du'),
-                        subtitle: Text(_selectedStartDate != null
-                            ? DateFormat('dd/MM/yyyy')
-                                .format(_selectedStartDate!)
-                            : 'Non sélectionnée'),
-                        trailing: IconButton(
-                          icon: Icon(Icons.edit, color: softOrange),
-                          onPressed: () => _selectDate(context, true),
-                        ),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.date_range, color: tealGreen),
-                        title: Text('Au'),
-                        subtitle: Text(_selectedEndDate != null
-                            ? DateFormat('dd/MM/yyyy').format(_selectedEndDate!)
-                            : 'Non sélectionnée'),
-                        trailing: IconButton(
-                          icon: Icon(Icons.edit, color: softOrange),
-                          onPressed: () => _selectDate(context, false),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
