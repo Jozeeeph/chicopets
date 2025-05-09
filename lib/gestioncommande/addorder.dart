@@ -213,6 +213,22 @@ class Addorder {
     TextEditingController globalDiscountValueController =
         TextEditingController();
 
+    double ticketTaxPercentage = 0.0;
+    bool autoCalculateCommission = false;
+    bool autoCalculateTax = false;
+    double commissionRate = 0.1;
+    double taxRate = 1.0;
+
+    // Add the calculateTicketTotal function here
+    void calculateTicketTotal(void Function(void Function()) setState) {
+      setState(() {
+        ticketRestaurantAmount = numberOfTicketsRestaurant *
+            (ticketValue +
+                (ticketValue * (ticketTaxPercentage / 100)) +
+                ticketCommission);
+      });
+    }
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1298,6 +1314,7 @@ class Addorder {
                                     "Ticket Restaurant")
                                   Column(
                                     children: [
+                                      // Number of tickets
                                       TextField(
                                         controller: TextEditingController(
                                             text: numberOfTicketsRestaurant
@@ -1311,19 +1328,20 @@ class Addorder {
                                           setState(() {
                                             numberOfTicketsRestaurant =
                                                 int.tryParse(value) ?? 1;
-                                            if (numberOfTicketsRestaurant < 1) {
+                                            if (numberOfTicketsRestaurant < 1)
                                               numberOfTicketsRestaurant = 1;
-                                            }
-                                            ticketRestaurantAmount =
-                                                numberOfTicketsRestaurant *
-                                                    ticketValue;
+                                            calculateTicketTotal(setState);
                                           });
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Ticket value
                                       TextField(
                                         controller: ticketValueController,
-                                        keyboardType: TextInputType.number,
+                                        keyboardType:
+                                            TextInputType.numberWithOptions(
+                                                decimal: true),
                                         decoration: InputDecoration(
                                           labelText: "Valeur d'un ticket (DT)",
                                           border: OutlineInputBorder(),
@@ -1332,48 +1350,230 @@ class Addorder {
                                           setState(() {
                                             ticketValue =
                                                 double.tryParse(value) ?? 0.0;
-                                            ticketRestaurantAmount =
-                                                numberOfTicketsRestaurant *
-                                                    ticketValue;
+                                            if (autoCalculateCommission) {
+                                              ticketCommission = ticketValue *
+                                                  (ticketTaxPercentage / 100) *
+                                                  commissionRate;
+                                            }
+                                            if (autoCalculateTax &&
+                                                ticketValue > 0) {
+                                              ticketTaxPercentage =
+                                                  (ticketCommission /
+                                                          ticketValue) *
+                                                      taxRate *
+                                                      100;
+                                            }
+                                            calculateTicketTotal(setState);
                                           });
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Tax percentage
                                       TextField(
-                                        controller: ticketTaxController,
-                                        keyboardType: TextInputType.number,
+                                        controller: TextEditingController(
+                                            text:
+                                                ticketTaxPercentage.toString()),
+                                        keyboardType:
+                                            TextInputType.numberWithOptions(
+                                                decimal: true),
                                         decoration: InputDecoration(
-                                          labelText: "Taxe par ticket (DT)",
+                                          labelText: "Taxe par ticket (%)",
                                           border: OutlineInputBorder(),
+                                          suffixText: '%',
+                                          hintText:
+                                              "Peut être positif ou négatif",
                                         ),
                                         onChanged: (value) {
                                           setState(() {
-                                            ticketTax =
+                                            ticketTaxPercentage =
                                                 double.tryParse(value) ?? 0.0;
+                                            if (autoCalculateCommission) {
+                                              ticketCommission = ticketValue *
+                                                  (ticketTaxPercentage / 100) *
+                                                  commissionRate;
+                                            }
+                                            calculateTicketTotal(setState);
                                           });
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Commission
                                       TextField(
-                                        controller: ticketCommissionController,
-                                        keyboardType: TextInputType.number,
+                                        controller: TextEditingController(
+                                            text: ticketCommission.toString()),
+                                        keyboardType:
+                                            TextInputType.numberWithOptions(
+                                                decimal: true),
                                         decoration: InputDecoration(
                                           labelText:
                                               "Commission par ticket (DT)",
                                           border: OutlineInputBorder(),
+                                          suffixText: 'DT',
+                                          hintText:
+                                              "Peut être positif ou négatif",
                                         ),
                                         onChanged: (value) {
                                           setState(() {
                                             ticketCommission =
                                                 double.tryParse(value) ?? 0.0;
+                                            if (autoCalculateTax &&
+                                                ticketValue > 0) {
+                                              ticketTaxPercentage =
+                                                  (ticketCommission /
+                                                          ticketValue) *
+                                                      taxRate *
+                                                      100;
+                                            }
+                                            calculateTicketTotal(setState);
                                           });
                                         },
                                       ),
                                       SizedBox(height: 10),
-                                      Text(
-                                        "Montant total tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold),
+
+                                      // Auto-calculation toggles
+                                      Row(
+                                        children: [
+                                          Checkbox(
+                                            value: autoCalculateCommission,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                autoCalculateCommission =
+                                                    value ?? false;
+                                                if (autoCalculateCommission) {
+                                                  autoCalculateTax = false;
+                                                  ticketCommission =
+                                                      ticketValue *
+                                                          (ticketTaxPercentage /
+                                                              100) *
+                                                          commissionRate;
+                                                }
+                                                calculateTicketTotal(setState);
+                                              });
+                                            },
+                                          ),
+                                          Text(
+                                              "Calculer commission depuis taxe"),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Checkbox(
+                                            value: autoCalculateTax,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                autoCalculateTax =
+                                                    value ?? false;
+                                                if (autoCalculateTax) {
+                                                  autoCalculateCommission =
+                                                      false;
+                                                  if (ticketValue > 0) {
+                                                    ticketTaxPercentage =
+                                                        (ticketCommission /
+                                                                ticketValue) *
+                                                            taxRate *
+                                                            100;
+                                                  }
+                                                }
+                                                calculateTicketTotal(setState);
+                                              });
+                                            },
+                                          ),
+                                          Text(
+                                              "Calculer taxe depuis commission"),
+                                        ],
+                                      ),
+
+                                      // Rate sliders
+                                      if (autoCalculateCommission) ...[
+                                        SizedBox(height: 10),
+                                        Text(
+                                            "Taux de commission: ${(commissionRate * 100).toStringAsFixed(1)}% du montant de la taxe"),
+                                        Slider(
+                                          min: 0,
+                                          max: 1,
+                                          divisions: 20,
+                                          value: commissionRate,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              commissionRate = value;
+                                              ticketCommission = ticketValue *
+                                                  (ticketTaxPercentage / 100) *
+                                                  commissionRate;
+                                              calculateTicketTotal(setState);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                      if (autoCalculateTax) ...[
+                                        SizedBox(height: 10),
+                                        Text(
+                                            "Taux de taxe: ${taxRate.toStringAsFixed(1)}x la commission"),
+                                        Slider(
+                                          min: 0.1,
+                                          max: 2,
+                                          divisions: 19,
+                                          value: taxRate,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              taxRate = value;
+                                              if (ticketValue > 0) {
+                                                ticketTaxPercentage =
+                                                    (ticketCommission /
+                                                            ticketValue) *
+                                                        taxRate *
+                                                        100;
+                                              }
+                                              calculateTicketTotal(setState);
+                                            });
+                                          },
+                                        ),
+                                      ],
+
+                                      SizedBox(height: 20),
+
+                                      // Detailed breakdown
+                                      Container(
+                                        padding: EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text("Détails:",
+                                                style: TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                            SizedBox(height: 5),
+                                            Text(
+                                                "- Valeur ticket: ${ticketValue.toStringAsFixed(2)} DT"),
+                                            autoCalculateTax
+                                                ? Text(
+                                                    "- Taxe (calculée): ${ticketTaxPercentage.toStringAsFixed(2)}% = ${(ticketValue * (ticketTaxPercentage / 100)).toStringAsFixed(2)} DT")
+                                                : Text(
+                                                    "- Taxe: ${ticketTaxPercentage.toStringAsFixed(2)}% = ${(ticketValue * (ticketTaxPercentage / 100)).toStringAsFixed(2)} DT"),
+                                            autoCalculateCommission
+                                                ? Text(
+                                                    "- Commission (calculée): ${ticketCommission.toStringAsFixed(2)} DT")
+                                                : Text(
+                                                    "- Commission: ${ticketCommission.toStringAsFixed(2)} DT"),
+                                            Divider(height: 20),
+                                            Text(
+                                                "- Total par ticket: ${(ticketValue + (ticketValue * (ticketTaxPercentage / 100)) + ticketCommission).toStringAsFixed(2)} DT"),
+                                            SizedBox(height: 5),
+                                            Text(
+                                              "Montant total pour $numberOfTicketsRestaurant tickets: ${ticketRestaurantAmount.toStringAsFixed(2)} DT",
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1498,9 +1698,11 @@ class Addorder {
                                   ),
 
                                 // Mixte payment fields
+                                // In the payment method selection part
                                 if (selectedPaymentMethod == "Mixte")
                                   Column(
                                     children: [
+                                      // Cash
                                       Text("Espèces:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1531,6 +1733,8 @@ class Addorder {
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Card (TPE)
                                       Text("TPE:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1575,6 +1779,8 @@ class Addorder {
                                         },
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Check
                                       Text("Chèque:",
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold)),
@@ -1667,8 +1873,174 @@ class Addorder {
                                         ),
                                       ),
                                       SizedBox(height: 10),
+
+                                      // Restaurant Tickets
+                                      Text("Ticket Restaurant:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      TextField(
+                                        controller: TextEditingController(
+                                            text: numberOfTicketsRestaurant
+                                                .toString()),
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Nombre de tickets",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            numberOfTicketsRestaurant =
+                                                int.tryParse(value) ?? 1;
+                                            if (numberOfTicketsRestaurant < 1) {
+                                              numberOfTicketsRestaurant = 1;
+                                            }
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: ticketValueController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Valeur d'un ticket (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            ticketValue =
+                                                double.tryParse(value) ?? 0.0;
+                                            ticketRestaurantAmount =
+                                                numberOfTicketsRestaurant *
+                                                    ticketValue;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+
+                                      // Vouchers
+                                      Text("Bon d'achat:",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: TextField(
+                                              controller: clientPhoneController,
+                                              keyboardType: TextInputType.phone,
+                                              decoration: InputDecoration(
+                                                labelText:
+                                                    "Numéro de téléphone client",
+                                                border: OutlineInputBorder(),
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(width: 10),
+                                          ElevatedButton(
+                                            onPressed: () async {
+                                              String phoneInput =
+                                                  clientPhoneController.text
+                                                      .trim();
+
+                                              if (phoneInput.isEmpty) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Veuillez entrer un numéro de téléphone")),
+                                                );
+                                                return;
+                                              }
+
+                                              int? clientId = await SqlDb()
+                                                  .getClientIdByPhone(
+                                                      phoneInput);
+                                              print(
+                                                  "Client ID found: $clientId for phone: $phoneInput");
+
+                                              if (clientId == null) {
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                      content: Text(
+                                                          "Aucun client trouvé avec ce numéro")),
+                                                );
+                                                return;
+                                              }
+
+                                              List<Voucher> vouchers =
+                                                  await SqlDb()
+                                                      .fetchClientVouchers(
+                                                          clientId);
+                                              setState(() {
+                                                clientVouchers = vouchers;
+                                                showVoucherDropdown = true;
+                                              });
+                                            },
+                                            child: Text("Rechercher"),
+                                            style: ElevatedButton.styleFrom(
+                                              padding: EdgeInsets.symmetric(
+                                                  vertical: 15, horizontal: 20),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 10),
+                                      if (showVoucherDropdown)
+                                        Column(
+                                          children: [
+                                            if (clientVouchers.isEmpty)
+                                              Text(
+                                                "Aucun bon d'achat disponible pour ce client",
+                                                style: TextStyle(
+                                                    color: Colors.grey),
+                                              )
+                                            else
+                                              DropdownButtonFormField<Voucher>(
+                                                decoration: InputDecoration(
+                                                  labelText:
+                                                      "Sélectionner un bon d'achat",
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                                items: clientVouchers
+                                                    .map((Voucher voucher) {
+                                                  return DropdownMenuItem<
+                                                      Voucher>(
+                                                    value: voucher,
+                                                    child: Text(
+                                                      "Bon #${voucher.id} - ${voucher.amount} DT (${voucher.isUsed ? 'Utilisé' : 'Disponible'})",
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (Voucher? selected) {
+                                                  setState(() {
+                                                    selectedVoucher = selected;
+                                                    voucherAmount =
+                                                        selected?.amount ?? 0.0;
+                                                  });
+                                                },
+                                                validator: (value) => value ==
+                                                        null
+                                                    ? 'Veuillez sélectionner un bon'
+                                                    : null,
+                                              ),
+                                            SizedBox(height: 10),
+                                            if (selectedVoucher != null)
+                                              Text(
+                                                "Montant du bon: ${selectedVoucher!.amount.toStringAsFixed(2)} DT",
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+
+                                      SizedBox(height: 10),
                                       Text(
-                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
+                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount + (ticketRestaurantAmount ?? 0) + (voucherAmount ?? 0)).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold),
                                       ),
@@ -1760,6 +2132,12 @@ class Addorder {
                         checkDate,
                         bankName,
                         ticketRestaurantAmount,
+                        numberOfTicketsRestaurant, // Add this
+                        ticketValue, // Add this
+                        ticketTax, // Add this
+                        ticketCommission, // Add this
+                        selectedVoucher, // Add this
+                        voucherAmount,
                         useLoyaltyPoints,
                         pointsToUse,
                         pointsDiscount,
@@ -1802,28 +2180,33 @@ class Addorder {
   }
 
   static Future<void> _confirmPlaceOrder(
-    List<Product> selectedProducts,
-    List<int> quantityProducts,
-    List<double> discounts,
-    List<bool> typeDiscounts,
-    double globalDiscount,
-    bool isPercentageDiscount,
-    Client? selectedClient,
-    int numberOfTickets,
-    String selectedPaymentMethod,
-    double cashAmount,
-    double cardAmount,
-    double checkAmount,
-    String? checkNumber,
-    String? cardTransactionId,
-    DateTime? checkDate,
-    String? bankName,
-    double? ticketRestaurantAmount,
-    bool useLoyaltyPoints,
-    int pointsToUse,
-    double pointsDiscount,
-    List<Variant?> selectedVariants,
-  ) async {
+      List<Product> selectedProducts,
+      List<int> quantityProducts,
+      List<double> discounts,
+      List<bool> typeDiscounts,
+      double globalDiscount,
+      bool isPercentageDiscount,
+      Client? selectedClient,
+      int numberOfTickets,
+      String selectedPaymentMethod,
+      double cashAmount,
+      double cardAmount,
+      double checkAmount,
+      String? checkNumber,
+      String? cardTransactionId,
+      DateTime? checkDate,
+      String? bankName,
+      double? ticketRestaurantAmount,
+      int? numberOfTicketsRestaurant, // Add this
+      double? ticketValue, // Add this
+      double? ticketTax, // Add this
+      double? ticketCommission, // Add this
+      Voucher? selectedVoucher, // Add this
+      double voucherAmount,
+      bool useLoyaltyPoints,
+      int pointsToUse,
+      double pointsDiscount,
+      List<Variant?> selectedVariants) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
         globalDiscount >
@@ -1907,7 +2290,11 @@ class Addorder {
             : total - (ticketRestaurantAmount ?? 0);
         break;
       case "Mixte":
-        totalAmountPaid = cashAmount + cardAmount + checkAmount;
+        totalAmountPaid = cashAmount +
+            cardAmount +
+            checkAmount +
+            (ticketRestaurantAmount ?? 0) +
+            (voucherAmount ?? 0);
         status = totalAmountPaid >= total ? "payée" : "semi-payée";
         remainingAmount =
             totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
@@ -1981,6 +2368,8 @@ class Addorder {
       isPercentageDiscount: isPercentageDiscount,
       userId: user?.id,
       idClient: selectedClient?.id,
+
+      // Payment amounts
       cashAmount:
           selectedPaymentMethod == "Espèce" || selectedPaymentMethod == "Mixte"
               ? cashAmount
@@ -1993,6 +2382,16 @@ class Addorder {
           selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
               ? checkAmount
               : null,
+      ticketRestaurantAmount: selectedPaymentMethod == "Ticket Restaurant" ||
+              (selectedPaymentMethod == "Mixte" && ticketRestaurantAmount! > 0)
+          ? ticketRestaurantAmount
+          : null,
+      voucherAmount: selectedPaymentMethod == "Bon d'achat" ||
+              (selectedPaymentMethod == "Mixte" && voucherAmount > 0)
+          ? voucherAmount
+          : null,
+
+      // Payment details
       checkNumber:
           selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
               ? checkNumber
@@ -2009,13 +2408,22 @@ class Addorder {
           selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
               ? bankName
               : null,
-      ticketRestaurantAmount: selectedPaymentMethod == "Ticket Restaurant"
-          ? ticketRestaurantAmount
+
+      // Ticket restaurant details
+      numberOfTicketsRestaurant: selectedPaymentMethod == "Ticket Restaurant" ||
+              (selectedPaymentMethod == "Mixte" && ticketRestaurantAmount! > 0)
+          ? numberOfTicketsRestaurant
           : null,
-      numberOfTicketsRestaurant:
-          selectedPaymentMethod == "Ticket Restaurant" ? numberOfTickets : null,
-      pointsUsed: useLoyaltyPoints ? pointsToUse : 0,
-      pointsDiscount: useLoyaltyPoints ? pointsDiscount : 0,
+      ticketValue: ticketValue,
+      ticketTax: ticketTax,
+      ticketCommission: ticketCommission,
+
+      // Voucher details
+      voucherIds: selectedVoucher != null ? [selectedVoucher.id] : null,
+
+      // Loyalty points
+      pointsUsed: useLoyaltyPoints ? pointsToUse : null,
+      pointsDiscount: useLoyaltyPoints ? pointsDiscount : null,
     );
 
     try {
