@@ -5,6 +5,7 @@ import 'package:caissechicopets/controllers/clientController.dart';
 import 'package:caissechicopets/controllers/galleryImagesController.dart';
 import 'package:caissechicopets/controllers/orderController.dart';
 import 'package:caissechicopets/controllers/orderLineController.dart';
+import 'package:caissechicopets/controllers/paymentModeController.dart';
 import 'package:caissechicopets/controllers/productController.dart';
 
 import 'package:caissechicopets/controllers/subCategoryController.dart';
@@ -14,12 +15,14 @@ import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
+import 'package:caissechicopets/models/paymentMode.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/subcategory.dart';
 import 'package:caissechicopets/models/voucher.dart';
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -40,7 +43,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -216,10 +219,21 @@ class SqlDb {
           );
         ''');
           print("Attributes table created");
+
+          await db.execute('''
+            CREATE TABLE payment_methods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      icon TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+);
+          ''');
+          print("payment_methods table created");
           // Après la création des tables
           await db.execute('''
-  CREATE VIEW IF NOT EXISTS sales_report_view AS
-  SELECT 
+            CREATE VIEW IF NOT EXISTS sales_report_view AS
+              SELECT
     o.id_order,
     o.date,
     p.designation as product_name,
@@ -941,6 +955,100 @@ class SqlDb {
       },
       where: 'id = ?',
       whereArgs: [voucherId],
+    );
+  }
+
+  //Payment mode Repository
+  Future<void> createPaymentMethodsTable() async {
+    final db = await this.db;
+
+    // Version simplifiée et corrigée
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS payment_methods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      icon TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    )
+  ''');
+
+    // Vérifier si la table est vide
+    final count = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM payment_methods')) ??
+        0;
+
+    if (count == 0) {
+      // Insertion des méthodes par défaut en une seule transaction
+      await db.transaction((txn) async {
+        final defaultMethods = [
+          {'name': 'Espèce', 'is_active': 1},
+          {'name': 'TPE', 'is_active': 1},
+          {'name': 'Chèque', 'is_active': 1},
+          {'name': 'Ticket Restaurant', 'is_active': 1},
+          {'name': 'Bon d\'achat', 'is_active': 1},
+          {'name': 'Mixte', 'is_active': 1},
+        ];
+
+        for (final method in defaultMethods) {
+          await txn.insert('payment_methods', {
+            ...method,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      });
+    }
+  }
+
+  Future<List<PaymentMethod>> getPaymentMethods(
+      {bool activeOnly = false}) async {
+    final db = await this.db;
+
+    try {
+      final result = await db.query(
+        'payment_methods',
+        where: activeOnly ? 'is_active = 1' : null,
+        orderBy: 'name ASC',
+      );
+
+      return result.map((map) => PaymentMethod.fromMap(map)).toList();
+    } catch (e) {
+      debugPrint('Error fetching payment methods: $e');
+      rethrow;
+    }
+  }
+
+  Future<int> addPaymentMethod(PaymentMethod method) async {
+    final db = await this.db;
+    return await db.insert('payment_methods', method.toMap());
+  }
+
+  Future<int> updatePaymentMethod(PaymentMethod method) async {
+    final db = await this.db;
+    return await db.update(
+      'payment_methods',
+      method.toMap(),
+      where: 'id = ?',
+      whereArgs: [method.id],
+    );
+  }
+
+  Future<int> togglePaymentMethodStatus(int id, bool isActive) async {
+    final db = await this.db;
+    return await db.update(
+      'payment_methods',
+      {'is_active': isActive ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deletePaymentMethod(int id) async {
+    final db = await this.db;
+    return await db.delete(
+      'payment_methods',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:caissechicopets/controllers/fidelity_controller.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
+import 'package:caissechicopets/models/paymentMode.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
@@ -101,6 +102,13 @@ class Addorder {
     bool useLoyaltyPoints = false;
     int pointsToUse = 0;
     double pointsDiscount = 0.0;
+
+    // Récupérer les modes de paiement activés
+    List<PaymentMethod> paymentMethods =
+        await SqlDb().getPaymentMethods(activeOnly: true);
+    String? selectedPaymentMethod =
+        paymentMethods.isNotEmpty ? paymentMethods.first.name : null;
+
     // Initialize selectedVariants with default variants for variant-based products
     List<Variant?> selectedVariants =
         List.generate(selectedProducts.length, (index) {
@@ -113,8 +121,6 @@ class Addorder {
       }
       return null;
     });
-
-    print("Initial selectedVariants: $selectedVariants");
 
     if (selectedProducts.isEmpty) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -141,26 +147,17 @@ class Addorder {
     }
 
     String cleanInput(String input) {
-      // Supprime tous les caractères non numériques sauf '.'
       input = input.replaceAll(RegExp(r'[^0-9.]'), '');
-
-      // Évite d'avoir plusieurs points décimaux
       List<String> parts = input.split('.');
       if (parts.length > 2) {
-        input = parts[0] + '.' + parts.sublist(1).join('');
+        input = '${parts[0]}.${parts.sublist(1).join('')}';
       }
-
-      // Empêche l'entrée de '.' seul au début
       if (input.startsWith('.')) {
         input = '0$input';
       }
-
-      // Vérifie si la valeur est négative
       double? value = double.tryParse(input);
-      if (value == null)
-        return ''; // Retourne une chaîne vide pour éviter les erreurs
+      if (value == null) return '';
       if (value < 0) return 'NEGATIVE';
-
       return input;
     }
 
@@ -203,7 +200,6 @@ class Addorder {
         typeDiscounts,
         isPercentageDiscount ? globalDiscount : globalDiscountValue,
         isPercentageDiscount);
-    String selectedPaymentMethod = "Espèce";
     double cashAmount = 0.0;
     double cardAmount = 0.0;
     double checkAmount = 0.0;
@@ -219,7 +215,6 @@ class Addorder {
     double commissionRate = 0.1;
     double taxRate = 1.0;
 
-    // Add the calculateTicketTotal function here
     void calculateTicketTotal(void Function(void Function()) setState) {
       setState(() {
         ticketRestaurantAmount = numberOfTicketsRestaurant *
@@ -376,9 +371,8 @@ class Addorder {
                                     Text(
                                       "Ticket de Commande",
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18),
                                     ),
                                   ],
                                 ),
@@ -398,9 +392,8 @@ class Addorder {
                                       child: Text(
                                         "Qt",
                                         style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                     Expanded(
@@ -408,9 +401,8 @@ class Addorder {
                                       child: Text(
                                         "Article",
                                         style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                     Expanded(
@@ -418,9 +410,8 @@ class Addorder {
                                       child: Text(
                                         "Prix U",
                                         style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
@@ -429,9 +420,8 @@ class Addorder {
                                       child: Text(
                                         "Montant",
                                         style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
                                         textAlign: TextAlign.end,
                                       ),
                                     ),
@@ -554,9 +544,8 @@ class Addorder {
                                   Text(
                                     "Client:",
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     selectedClient != null
@@ -777,18 +766,16 @@ class Addorder {
                                         Text(
                                           'Client',
                                           style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
+                                              fontSize: 14,
+                                              color: Colors.grey[600]),
                                         ),
                                         Text(
                                           selectedClient != null
                                               ? '${selectedClient!.name} ${selectedClient!.firstName}'
                                               : 'Non spécifié',
                                           style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ],
                                     ),
@@ -1028,9 +1015,7 @@ class Addorder {
                                         Text(
                                           "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountPercentage(selectedProducts, quantityProducts).toStringAsFixed(2)}%",
                                           style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 14,
-                                          ),
+                                              color: Colors.grey, fontSize: 14),
                                         ),
                                       ],
                                     ),
@@ -1059,9 +1044,7 @@ class Addorder {
                                         Text(
                                           "La remise globale ne peut pas dépasser ${_calculateMaxGlobalDiscountValue(selectedProducts, quantityProducts).toStringAsFixed(2)} DT",
                                           style: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 14,
-                                          ),
+                                              color: Colors.grey, fontSize: 14),
                                         ),
                                       ],
                                     ),
@@ -1077,69 +1060,30 @@ class Addorder {
                                 Text("Mode de Paiement:",
                                     style:
                                         TextStyle(fontWeight: FontWeight.bold)),
+                                if (paymentMethods.isEmpty)
+                                  Text("Aucun mode de paiement configuré",
+                                      style: TextStyle(color: Colors.red)),
                                 Row(
-                                  children: [
-                                    Radio<String>(
-                                      value: "Espèce",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Espèce"),
-                                    Radio<String>(
-                                      value: "TPE",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("TPE"),
-                                    Radio<String>(
-                                      value: "Chèque",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Chèque"),
-                                    Radio<String>(
-                                      value: "Ticket Restaurant",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Ticket Restaurant"),
-                                    Radio<String>(
-                                      value: "Bon d'achat",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Bon d'achat"),
-                                    Radio<String>(
-                                      value: "Mixte",
-                                      groupValue: selectedPaymentMethod,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedPaymentMethod = value!;
-                                        });
-                                      },
-                                    ),
-                                    Text("Mixte"),
-                                  ],
+                                  children: paymentMethods.map((method) {
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Radio<String>(
+                                          value: method.name,
+                                          groupValue: selectedPaymentMethod,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              selectedPaymentMethod = value;
+                                            });
+                                          },
+                                        ),
+                                        Text(method.name),
+                                        SizedBox(
+                                            width:
+                                                8), // Espacement entre les options
+                                      ],
+                                    );
+                                  }).toList(),
                                 ),
 
                                 // Espèce payment fields
@@ -1698,7 +1642,6 @@ class Addorder {
                                   ),
 
                                 // Mixte payment fields
-                                // In the payment method selection part
                                 if (selectedPaymentMethod == "Mixte")
                                   Column(
                                     children: [
@@ -2123,7 +2066,7 @@ class Addorder {
                         isPercentageDiscount,
                         selectedClient,
                         numberOfTickets,
-                        selectedPaymentMethod,
+                        selectedPaymentMethod!,
                         cashAmount,
                         cardAmount,
                         checkAmount,
@@ -2132,11 +2075,11 @@ class Addorder {
                         checkDate,
                         bankName,
                         ticketRestaurantAmount,
-                        numberOfTicketsRestaurant, // Add this
-                        ticketValue, // Add this
-                        ticketTax, // Add this
-                        ticketCommission, // Add this
-                        selectedVoucher, // Add this
+                        numberOfTicketsRestaurant,
+                        ticketValue,
+                        ticketTax,
+                        ticketCommission,
+                        selectedVoucher,
                         voucherAmount,
                         useLoyaltyPoints,
                         pointsToUse,
