@@ -638,7 +638,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                             size: 50, color: Colors.blue),
                         const SizedBox(height: 20),
                         Text(
-                          'Product Import/Export',
+                          'Produit Importer/Exporter',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -646,7 +646,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Import products from Excel or download a template',
+                          "Importer des produits d'un fichier Excel ou télécharger le format",
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(),
                         ),
@@ -664,7 +664,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                                     horizontal: 20, vertical: 15),
                               ),
                               child: Text(
-                                _isImporting ? 'Importing...' : 'Import Excel',
+                                _isImporting ? "Entrain d'importer" : "Importer d'un fichier Excel",
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -679,7 +679,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                                     horizontal: 20, vertical: 15),
                               ),
                               child: Text(
-                                'Download Template',
+                                'Télécharger le format',
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -702,21 +702,21 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '${(_progress * 100).toStringAsFixed(1)}% completed',
+                    '${(_progress * 100).toStringAsFixed(1)}% Complet',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
-                    '$_importedProductsCount products imported',
+                    '$_importedProductsCount produits importés',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
-                    '$_importedVariantsCount variants imported',
+                    '$_importedVariantsCount variantes importées',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
@@ -729,7 +729,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
                     ),
-                    child: const Text('Cancel Import'),
+                    child: const Text("annuler l'import"),
                   ),
                 ],
                 if (_errorMessage.isNotEmpty)

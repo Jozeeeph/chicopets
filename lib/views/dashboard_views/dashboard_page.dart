@@ -2,18 +2,17 @@ import 'dart:convert';
 
 import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
 import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
+import 'package:caissechicopets/views/gestionPaymentMode/PaymentModeMgt.dart';
 import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
-import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
 import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
 import 'package:caissechicopets/gestionproduit/manage_product.dart';
 import 'package:caissechicopets/home_page.dart';
 import 'package:caissechicopets/gestionproduit/import_product.dart';
-import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -143,6 +142,13 @@ class _DashboardPageState extends State<DashboardPage> {
                         icon: Icons.warehouse,
                         page: const StockManagementPage(),
                         color: const Color(0xFF795548),
+                      ),
+                      _buildCard(
+                        context,
+                        label: 'Modes de paiement',
+                        icon: Icons.payment,
+                        page:  PaymentMethodManagement(),
+                        color: const Color(0xFF4CAF50),
                       ),
                       _buildCard(
                         context,
