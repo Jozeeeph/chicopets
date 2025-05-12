@@ -20,19 +20,19 @@ class CashDeskPage extends StatefulWidget {
   const CashDeskPage({super.key});
 
   @override
-  _CashDeskPageState createState() => _CashDeskPageState();
+  State<CashDeskPage> createState() => _CashDeskPageState();
 }
 
 class _CashDeskPageState extends State<CashDeskPage> {
-  final SqlDb sqldb = SqlDb();
-  Future<List<Product>>? products;
-  List<Product> selectedProducts = [];
-  List<int> quantityProducts = [];
-  List<bool> typeDiscounts = [];
-  List<double> discounts = [];
-  double globalDiscount = 0.0;
-  int? selectedProductIndex;
-  bool isPercentageDiscount = true;
+  final SqlDb _sqldb = SqlDb();
+  Future<List<Product>>? _products;
+  final List<Product> _selectedProducts = [];
+  final List<int> _quantityProducts = [];
+  final List<bool> _typeDiscounts = [];
+  final List<double> _discounts = [];
+  double _globalDiscount = 0.0;
+  int? _selectedProductIndex;
+  bool _isPercentageDiscount = true;
   String _currentUser = "Non connecté";
   DateTime? _sessionStartTime;
 
@@ -79,8 +79,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ListTile(
                 leading: const Icon(Icons.point_of_sale),
                 title: const Text('Transactions en cours'),
-                subtitle:
-                    Text('${selectedProducts.length} produits sélectionnés'),
+                subtitle: Text('${_selectedProducts.length} produits sélectionnés'),
               ),
             ],
           ),
@@ -102,141 +101,27 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  List<Widget> _buildSalesReport(Map<String, Map<String, dynamic>> salesData) {
-    List<Widget> widgets = [];
-    double grandTotal = 0.0;
-
-    salesData.forEach((category, data) {
-      final products = data['products'] as Map<String, dynamic>;
-      final categoryTotal = data['total'] as double;
-      grandTotal += categoryTotal;
-
-      widgets.add(
-        Card(
-          margin: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              ListTile(
-                title: Text(
-                  'Catégorie: $category',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                trailing: Text(
-                  'Total: ${categoryTotal.toStringAsFixed(2)} DT',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Divider(),
-              ...products.entries.map((productEntry) {
-                final productName = productEntry.key;
-                final productData = productEntry.value as Map<String, dynamic>;
-                return ListTile(
-                  title: Text(productName),
-                  subtitle: Text('Quantité vendue: ${productData['quantity']}'),
-                  trailing: Text(
-                    'Total: ${productData['total'].toStringAsFixed(2)} DT',
-                  ),
-                );
-              }).toList(),
-              const SizedBox(height: 10),
-            ],
-          ),
-        ),
-      );
-    });
-
-    return widgets;
-  }
-
-  double _calculateTotalSales(Map<String, Map<String, dynamic>> salesData) {
-    return salesData.values.fold(0.0, (sum, categoryData) {
-      return sum + (categoryData['total'] as double);
-    });
-  }
-
-  Future<void> _showOrderDetails(Order order) async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Détails Commande #${order.idOrder}'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                  'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(order.date))}'),
-              Text('Statut: ${order.status}'),
-              Text('Mode Paiement: ${order.modePaiement}'),
-              const SizedBox(height: 16),
-              const Text('Articles:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              ...order.orderLines
-                  .map((line) => ListTile(
-                        title: Text(line.productCode!),
-                        subtitle: Text(
-                            '${line.quantity} x ${line.prixUnitaire.toStringAsFixed(2)} DT'),
-                        trailing: Text(
-                            '${(line.finalPrice * line.quantity).toStringAsFixed(2)} DT'),
-                      ))
-                  .toList(),
-              const Divider(),
-              Text('Total: ${order.total.toStringAsFixed(2)} DT',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(
-                  'Reste à payer: ${order.remainingAmount.toStringAsFixed(2)} DT',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color:
-                        order.remainingAmount > 0 ? Colors.red : Colors.green,
-                  )),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  double calculateTotal(
-    List<Product> selectedProducts,
-    List<int> quantityProducts,
-    List<double> discounts,
-    List<bool> typeDiscounts,
-    double globalDiscount,
-    bool isPercentageDiscount,
-  ) {
+  double _calculateTotal() {
     double total = 0.0;
-    for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
+    for (int i = 0; i < _selectedProducts.length; i++) {
+      double productTotal = _selectedProducts[i].prixTTC * _quantityProducts[i];
 
-      if (typeDiscounts[i]) {
-        productTotal *= (1 - discounts[i] / 100);
+      if (_typeDiscounts[i]) {
+        productTotal *= (1 - _discounts[i] / 100);
       } else {
-        productTotal -= discounts[i];
+        productTotal -= _discounts[i];
       }
 
-      if (productTotal < 0) productTotal = 0.0;
-
-      total += productTotal;
+      total += productTotal.clamp(0, double.infinity);
     }
 
-    if (isPercentageDiscount) {
-      total *= (1 - globalDiscount / 100);
+    if (_isPercentageDiscount) {
+      total *= (1 - _globalDiscount / 100);
     } else {
-      total -= globalDiscount;
+      total -= _globalDiscount;
     }
 
-    return total;
+    return total.clamp(0, double.infinity);
   }
 
   Future<void> _logout() async {
@@ -250,45 +135,45 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void _handleApplyDiscount(int index) {
-    if (index >= 0 && index < selectedProducts.length) {
+    if (index >= 0 && index < _selectedProducts.length) {
       Applydiscount.showDiscountInput(
         context,
         index,
-        discounts,
-        typeDiscounts,
-        selectedProducts,
+        _discounts,
+        _typeDiscounts,
+        _selectedProducts,
         () => setState(() {}),
       );
     }
   }
 
   void _handleQuantityChange(int index) {
-    if (index >= 0 && index < quantityProducts.length) {
+    if (index >= 0 && index < _quantityProducts.length) {
       ModifyQt.showQuantityInput(
         context,
         index,
-        quantityProducts,
+        _quantityProducts,
         () => setState(() {}),
       );
     }
   }
 
   void _handleDeleteProduct(int index) {
-    if (index >= 0 && index < selectedProducts.length) {
+    if (index >= 0 && index < _selectedProducts.length) {
       Deleteline.showDeleteConfirmation(
         index,
         context,
-        selectedProducts,
-        quantityProducts,
-        discounts,
-        typeDiscounts,
+        _selectedProducts,
+        _quantityProducts,
+        _discounts,
+        _typeDiscounts,
         () => setState(() {}),
       );
     }
   }
 
   void _handlePlaceOrder() {
-    if (selectedProducts.isEmpty) {
+    if (_selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Aucun produit sélectionné")),
       );
@@ -300,17 +185,17 @@ class _CashDeskPageState extends State<CashDeskPage> {
       orderLines: [],
       total: _calculateTotal(),
       modePaiement: "Espèces",
-      globalDiscount: globalDiscount,
-      isPercentageDiscount: isPercentageDiscount,
+      globalDiscount: _globalDiscount,
+      isPercentageDiscount: _isPercentageDiscount,
     );
 
     Addorder.showPlaceOrderPopup(
       context,
       order,
-      selectedProducts,
-      quantityProducts,
-      discounts,
-      typeDiscounts,
+      _selectedProducts,
+      _quantityProducts,
+      _discounts,
+      _typeDiscounts,
     );
   }
 
@@ -323,7 +208,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
       context: context,
       refreshData: () {
         setState(() {
-          products = sqldb
+          _products = _sqldb
               .getProductsWithCategory()
               .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
         });
@@ -336,35 +221,63 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void _loadProducts() {
-    products = sqldb
+    _products = _sqldb
         .getProductsWithCategory()
         .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
   }
 
-  double _calculateTotal() {
-    double total = 0.0;
-    for (int i = 0; i < selectedProducts.length; i++) {
-      double productTotal = selectedProducts[i].prixTTC * quantityProducts[i];
-
-      if (typeDiscounts[i]) {
-        productTotal *= (1 - discounts[i] / 100);
-      } else {
-        productTotal -= discounts[i];
+  void _handleProductSelected(Product product, [Variant? variant]) {
+    setState(() {
+      // Create a unique identifier for this product+variant combination
+      String uniqueId = '${product.id}';
+      if (variant != null) {
+        uniqueId += '_${variant.id}';
       }
 
-      total += productTotal.clamp(0, double.infinity);
-    }
+      // Check if this exact combination already exists
+      int existingIndex = -1;
+      for (int i = 0; i < _selectedProducts.length; i++) {
+        String currentId = '${_selectedProducts[i].id}';
+        if (_selectedProducts[i].variants.isNotEmpty) {
+          currentId += '_${_selectedProducts[i].variants.first.id}';
+        }
+        if (currentId == uniqueId) {
+          existingIndex = i;
+          break;
+        }
+      }
 
-    if (isPercentageDiscount) {
-      total *= (1 - globalDiscount / 100);
-    } else {
-      total -= globalDiscount;
-    }
+      if (existingIndex >= 0) {
+        // Increment quantity if same product+variant exists
+        _quantityProducts[existingIndex]++;
+        _selectedProductIndex = existingIndex;
+      } else {
+        // Create a new product instance with only the selected variant
+        final productToAdd = product.copyWith(
+          variants: variant != null ? [variant] : [],
+          prixTTC: variant?.finalPrice ?? product.prixTTC,
+        );
 
-    return total.clamp(0, double.infinity);
+        _selectedProducts.add(productToAdd);
+        _quantityProducts.add(1);
+        _discounts.add(0.0);
+        _typeDiscounts.add(true);
+        _selectedProductIndex = _selectedProducts.length - 1;
+      }
+    });
   }
 
-  // ... (keep all your imports and other code the same)
+  void _handleGlobalDiscountChange(double newValue) {
+    setState(() {
+      _globalDiscount = newValue;
+    });
+  }
+
+  void _handleIsPercentageDiscountChange(bool newValue) {
+    setState(() {
+      _isPercentageDiscount = newValue;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -394,19 +307,12 @@ class _CashDeskPageState extends State<CashDeskPage> {
         child: Column(
           children: [
             TableCmd(
-              total: calculateTotal(
-                selectedProducts,
-                quantityProducts,
-                discounts,
-                typeDiscounts,
-                globalDiscount,
-                isPercentageDiscount,
-              ),
-              selectedProducts: selectedProducts,
-              quantityProducts: quantityProducts,
-              discounts: discounts,
-              globalDiscount: globalDiscount,
-              typeDiscounts: typeDiscounts,
+              total: _calculateTotal(),
+              selectedProducts: _selectedProducts,
+              quantityProducts: _quantityProducts,
+              discounts: _discounts,
+              globalDiscount: _globalDiscount,
+              typeDiscounts: _typeDiscounts,
               onApplyDiscount: _handleApplyDiscount,
               onAddProduct: _handleAddProduct,
               onDeleteProduct: _handleDeleteProduct,
@@ -414,62 +320,50 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onQuantityChange: _handleQuantityChange,
               onFetchOrders: _handleFetchOrders,
               onPlaceOrder: _handlePlaceOrder,
-              isPercentageDiscount: isPercentageDiscount,
-              selectedProductIndex: selectedProductIndex,
+              isPercentageDiscount: _isPercentageDiscount,
+              selectedProductIndex: _selectedProductIndex,
               onProductSelected: (index) {
                 setState(() {
-                  selectedProductIndex = index;
+                  _selectedProductIndex = index;
                 });
               },
-              calculateTotal: calculateTotal,
+              calculateTotal: (
+                List<Product> products,
+                List<int> quantities,
+                List<double> discounts,
+                List<bool> discountTypes,
+                double globalDiscount,
+                bool isPercentage,
+              ) {
+                double total = 0.0;
+                for (int i = 0; i < products.length; i++) {
+                  double productTotal = products[i].prixTTC * quantities[i];
+                  if (discountTypes[i]) {
+                    productTotal *= (1 - discounts[i] / 100);
+                  } else {
+                    productTotal -= discounts[i];
+                  }
+                  total += productTotal.clamp(0, double.infinity);
+                }
+
+                if (isPercentage) {
+                  total *= (1 - globalDiscount / 100);
+                } else {
+                  total -= globalDiscount;
+                }
+
+                return total.clamp(0, double.infinity);
+              },
+              onGlobalDiscountChanged: _handleGlobalDiscountChange,
+              onIsPercentageDiscountChanged: _handleIsPercentageDiscountChange,
             ),
             const SizedBox(height: 10),
             Expanded(
               child: Categorieetproduct(
-                selectedProducts: selectedProducts,
-                quantityProducts: quantityProducts,
-                discounts: discounts,
-                onProductSelected: (Product product, [Variant? variant]) {
-                  setState(() {
-                    // Create a unique identifier for this product+variant combination
-                    String uniqueId = '${product.id}';
-                    if (variant != null) {
-                      uniqueId += '_${variant.id}';
-                    }
-
-                    // Check if this exact combination already exists
-                    int existingIndex = -1;
-                    for (int i = 0; i < selectedProducts.length; i++) {
-                      String currentId = '${selectedProducts[i].id}';
-                      if (selectedProducts[i].variants.isNotEmpty) {
-                        currentId +=
-                            '_${selectedProducts[i].variants.first.id}';
-                      }
-                      if (currentId == uniqueId) {
-                        existingIndex = i;
-                        break;
-                      }
-                    }
-
-                    if (existingIndex >= 0) {
-                      // Increment quantity if same product+variant exists
-                      quantityProducts[existingIndex]++;
-                      selectedProductIndex = existingIndex;
-                    } else {
-                      // Create a new product instance with only the selected variant
-                      final productToAdd = product.copyWith(
-                        variants: variant != null ? [variant] : [],
-                        prixTTC: variant?.finalPrice ?? product.prixTTC,
-                      );
-
-                      selectedProducts.add(productToAdd);
-                      quantityProducts.add(1);
-                      discounts.add(0.0);
-                      typeDiscounts.add(true);
-                      selectedProductIndex = selectedProducts.length - 1;
-                    }
-                  });
-                },
+                selectedProducts: _selectedProducts,
+                quantityProducts: _quantityProducts,
+                discounts: _discounts,
+                onProductSelected: _handleProductSelected,
               ),
             ),
           ],
