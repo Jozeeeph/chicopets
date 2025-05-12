@@ -500,10 +500,9 @@ class _TableCmdState extends State<TableCmd> {
                                           ),
                                           Expanded(
                                             child: Text(
-                                              _calculateLineTotal(
+                                              '${_calculateLineTotal(
                                                           product, index)
-                                                      .toStringAsFixed(2) +
-                                                  ' DT',
+                                                      .toStringAsFixed(2)} DT',
                                             ),
                                           ),
                                         ],
@@ -557,8 +556,8 @@ class _TableCmdState extends State<TableCmd> {
                         ? Icons.pause_circle_filled
                         : Icons.play_circle_filled,
                     label: _pendingSelectedProducts.isEmpty
-                        ? 'COMMANDE EN ATTENTE'
-                        : 'RESTAURER COMMANDE',
+                        ? 'EN ATTENTE'
+                        : 'RESTAURER',
                     color: const Color(0xFF0056A6),
                     onPressed: _pendingSelectedProducts.isEmpty
                         ? _saveAsPendingOrder
