@@ -5,9 +5,7 @@ import 'package:caissechicopets/controllers/clientController.dart';
 import 'package:caissechicopets/controllers/galleryImagesController.dart';
 import 'package:caissechicopets/controllers/orderController.dart';
 import 'package:caissechicopets/controllers/orderLineController.dart';
-import 'package:caissechicopets/controllers/paymentModeController.dart';
 import 'package:caissechicopets/controllers/productController.dart';
-
 import 'package:caissechicopets/controllers/subCategoryController.dart';
 import 'package:caissechicopets/controllers/userController.dart';
 import 'package:caissechicopets/controllers/variantController.dart';
