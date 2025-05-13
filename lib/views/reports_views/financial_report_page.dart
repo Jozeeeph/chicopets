@@ -860,138 +860,116 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
     }
   }
 
-  Future<void> _exportToPDF() async {
-    final pdf = pw.Document();
+ Future<void> _exportToPDF() async {
+  final pdf = pw.Document();
 
-    // Format identique aux tickets de commande (70mm de large)
-    const double pageWidth = 70 * PdfPageFormat.mm;
-    const double pageHeight = double.infinity;
-    const double margin = 4 * PdfPageFormat.mm;
+  const double pageWidth = 70 * PdfPageFormat.mm;
+  const double pageHeight = double.infinity;
+  const double margin = 4 * PdfPageFormat.mm;
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(pageWidth, pageHeight, marginAll: margin),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // En-tête identique aux tickets
-              pw.Center(
-                child: pw.Column(
-                  children: [
-                    pw.Text('CHICO PETS',
-                        style: pw.TextStyle(
-                          fontSize: 12,
-                          fontWeight: pw.FontWeight.bold,
-                        )),
-                    pw.SizedBox(height: 4),
-                    pw.Text('Rapport Financier',
-                        style: pw.TextStyle(
-                          fontSize: 10,
-                        )),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      '${DateFormat('dd/MM/yyyy').format(_startDate!)}${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
-                      style: pw.TextStyle(fontSize: 9),
-                    ),
-                  ],
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat(pageWidth, pageHeight),
+      build: (pw.Context context) {
+        return pw.Padding(
+          padding: pw.EdgeInsets.all(margin),
+          child: pw.Container(
+            width: pageWidth - 2 * margin,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                pw.Center(
+                  child: pw.Column(
+                    children: [
+                      pw.Text('CHICO PETS',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                          )),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Rapport Financier',
+                          style: pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        '${DateFormat('dd/MM/yyyy').format(_startDate!)}'
+                        '${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
+                        style: pw.TextStyle(fontSize: 9),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                pw.SizedBox(height: 8),
+                pw.Divider(thickness: 0.5),
+                pw.SizedBox(height: 8),
 
-              pw.SizedBox(height: 8),
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 8),
+                _buildPdfSummaryRow('TOTAL VENTES', _totalAll, isMain: true),
+                pw.SizedBox(height: 6),
 
-              // Chiffre d'affaire total
-              _buildPdfSummaryRow(
-                'TOTAL VENTES',
-                _totalAll,
-                isMain: true,
-              ),
-              pw.SizedBox(height: 6),
+                if (_totalCash > 0) _buildPdfDetailRow('Espèces', _totalCash),
+                if (_totalCard > 0) _buildPdfDetailRow('Carte', _totalCard),
+                if (_totalCheck > 0) _buildPdfDetailRow('Chèque', _totalCheck),
+                if (_totalMixed > 0) _buildPdfDetailRow('Mixtes', _totalMixed),
 
-              // Détails des paiements
-              if (_totalCash > 0) _buildPdfDetailRow('Espèces', _totalCash),
+                pw.SizedBox(height: 6),
+                pw.Divider(thickness: 0.2),
+                pw.SizedBox(height: 6),
 
-              if (_totalCard > 0) _buildPdfDetailRow('Carte', _totalCard),
+                if (_totalPercentageDiscount > 0)
+                  _buildPdfSummaryRow(
+                    'Remise (%)',
+                    _totalPercentageDiscount,
+                    isDiscount: true,
+                    suffix: '%',
+                  ),
+                if (_totalFixedDiscount > 0)
+                  _buildPdfSummaryRow(
+                    'Remise (DT)',
+                    _totalFixedDiscount,
+                    isDiscount: true,
+                  ),
 
-              if (_totalCheck > 0) _buildPdfDetailRow('Chèque', _totalCheck),
+                pw.SizedBox(height: 6),
+                pw.Divider(thickness: 0.2),
+                pw.SizedBox(height: 6),
 
-              if (_totalMixed > 0) _buildPdfDetailRow('Mixtes', _totalMixed),
+                if (_totalRemaining > 0)
+                  _buildPdfSummaryRow('À recevoir', _totalRemaining, isAlert: true),
 
-              pw.SizedBox(height: 6),
-              pw.Divider(thickness: 0.2),
-              pw.SizedBox(height: 6),
+                pw.SizedBox(height: 6),
+                pw.Divider(thickness: 0.5),
+                pw.SizedBox(height: 6),
 
-              // Remises
-              if (_totalPercentageDiscount > 0)
-                _buildPdfSummaryRow(
-                  'Remise (%)',
-                  _totalPercentageDiscount,
-                  isDiscount: true,
-                  suffix: '%',
+                _buildPdfSummaryRow('Clients', _clientCount.toDouble(), isCount: true),
+                _buildPdfSummaryRow('Articles', _articleCount.toDouble(), isCount: true),
+
+                pw.SizedBox(height: 12),
+                pw.Center(
+                  child: pw.Text(
+                    DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
+                    style: pw.TextStyle(fontSize: 8),
+                  ),
                 ),
-
-              if (_totalFixedDiscount > 0)
-                _buildPdfSummaryRow(
-                  'Remise (DT)',
-                  _totalFixedDiscount,
-                  isDiscount: true,
+                pw.Center(
+                  child: pw.Text(
+                    'Merci pour votre confiance',
+                    style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
+                  ),
                 ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
 
-              pw.SizedBox(height: 6),
-              pw.Divider(thickness: 0.2),
-              pw.SizedBox(height: 6),
-
-              // Montant à recevoir
-              if (_totalRemaining > 0)
-                _buildPdfSummaryRow(
-                  'À recevoir',
-                  _totalRemaining,
-                  isAlert: true,
-                ),
-
-              pw.SizedBox(height: 6),
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 6),
-
-              // Statistiques
-              _buildPdfSummaryRow(
-                'Clients',
-                _clientCount.toDouble(),
-                isCount: true,
-              ),
-              _buildPdfSummaryRow(
-                'Articles',
-                _articleCount.toDouble(),
-                isCount: true,
-              ),
-
-              // Pied de page
-              pw.SizedBox(height: 12),
-              pw.Center(
-                child: pw.Text(
-                  '${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-                  style: pw.TextStyle(fontSize: 8),
-                ),
-              ),
-              pw.Center(
-                child: pw.Text(
-                  'Merci pour votre confiance',
-                  style:
-                      pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
+  final bytes = await pdf.save();
+  await Printing.sharePdf(
+    bytes: bytes,
+    filename: 'rapport_financier.pdf',
+  );
+}
 
 // Méthodes helpers pour construire les lignes du PDF
   pw.Widget _buildPdfSummaryRow(

@@ -20,6 +20,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
   final Map<int, double> _productSales = {};
   final Map<int, TextEditingController> _stockControllers = {};
   final TextEditingController _searchController = TextEditingController();
+  final Map<int, int> _pendingStockChanges = {};
+  final Map<int, Map<int, int>> _pendingVariantChanges = {};
+  bool _hasUnsavedChanges = false;
 
   @override
   void initState() {
@@ -34,6 +37,38 @@ class _StockManagementPageState extends State<StockManagementPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+
+    final shouldPop = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Modifications non enregistrées'),
+        content: const Text(
+            'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter sans enregistrer ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Quitter'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _saveAllChanges();
+              Navigator.of(context).pop(true);
+            },
+            child: const Text('Enregistrer et quitter'),
+          ),
+        ],
+      ),
+    );
+
+    return shouldPop ?? false;
   }
 
   void _onSearchChanged() {
@@ -66,12 +101,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
         for (int i = 0; i < products.length; i++) {
           _productSales[products[i].id!] = sales[i];
           _productVariants[products[i].id!] = variants[i];
-          // Mettre à jour le stock du produit si il a des variantes
           if (products[i].hasVariants) {
             products[i].stock = variants[i].fold(0, (sum, v) => sum + v.stock);
           }
         }
         _isLoading = false;
+        _pendingStockChanges.clear();
+        _pendingVariantChanges.clear();
+        _hasUnsavedChanges = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
@@ -110,9 +147,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
         _stockControllers[product.id!]?.text = newStock.toString();
         _updateStatusBasedOnStock(product);
       });
-      _showSuccess('Stock mis à jour');
     } catch (e) {
       _showError('Erreur de mise à jour: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -126,9 +163,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
         whereArgs: [product.id],
       );
       setState(() => product.status = newStatus);
-      _showSuccess('Statut mis à jour');
     } catch (e) {
       _showError('Erreur de mise à jour: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -147,7 +184,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  // Méthode pour mettre à jour le stock d'une variante
   Future<void> _updateVariantStock(Variant variant, int newStock) async {
     try {
       await _sqlDb.updateVariantStock(variant.id!, newStock);
@@ -155,21 +191,18 @@ class _StockManagementPageState extends State<StockManagementPage> {
         variant.stock = newStock;
         _updateProductStockFromVariants(variant.productId);
       });
-      _showSuccess('Stock variante mis à jour');
     } catch (e) {
       _showError('Erreur de mise à jour: ${e.toString()}');
+      rethrow;
     }
   }
 
-// Méthode pour recalculer le stock total du produit à partir des variantes
   void _updateProductStockFromVariants(int productId) {
     final variants = _productVariants[productId] ?? [];
     final totalStock = variants.fold(0, (sum, variant) => sum + variant.stock);
 
-    // Mettre à jour le contrôleur du stock total
     _stockControllers[productId]?.text = totalStock.toString();
 
-    // Trouver et mettre à jour le produit correspondant
     final product = _products.firstWhere((p) => p.id == productId);
     if (product.stock != totalStock) {
       product.stock = totalStock;
@@ -177,15 +210,84 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
+  Future<void> _saveAllChanges() async {
+    if (!_hasUnsavedChanges) return;
+
+    try {
+      // Confirmation dialog
+      final shouldSave = await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirmer les modifications'),
+          content: Text(
+              'Vous êtes sur le point d\'enregistrer ${_pendingStockChanges.length + _pendingVariantChanges.length} modifications. Continuer ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Confirmer'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldSave != true) return;
+
+      // Save product stock changes
+      for (final entry in _pendingStockChanges.entries) {
+        final product = _products.firstWhere((p) => p.id == entry.key);
+        await _updateProductStock(product, entry.value);
+      }
+
+      // Save variant stock changes
+      for (final productEntry in _pendingVariantChanges.entries) {
+        final variants = _productVariants[productEntry.key] ?? [];
+        for (final variantEntry in productEntry.value.entries) {
+          final variant = variants.firstWhere((v) => v.id == variantEntry.key);
+          await _updateVariantStock(variant, variantEntry.value);
+        }
+      }
+
+      setState(() {
+        _pendingStockChanges.clear();
+        _pendingVariantChanges.clear();
+        _hasUnsavedChanges = false;
+      });
+
+      _showSuccess('Toutes les modifications ont été enregistrées');
+    } catch (e) {
+      _showError('Erreur lors de l\'enregistrement: ${e.toString()}');
+    }
+  }
+
+  void _discardAllChanges() {
+    setState(() {
+      _pendingStockChanges.clear();
+      _pendingVariantChanges.clear();
+      _hasUnsavedChanges = false;
+      _loadData(); // Recharger les données originales
+    });
+    _showSuccess('Modifications annulées');
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
     );
   }
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
@@ -265,51 +367,82 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestion de Stock'),
-        backgroundColor: const Color(0xFF0056A6),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadData,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Material(
-              elevation: 2,
-              borderRadius: BorderRadius.circular(12),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Rechercher...',
-                  hintText: 'Code, désignation ou catégorie',
-                  prefixIcon:
-                      const Icon(Icons.search, color: Color(0xFF0056A6)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Gestion de Stock'),
+          backgroundColor: const Color(0xFF0056A6),
+          foregroundColor: Colors.white,
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Material(
+                elevation: 2,
+                borderRadius: BorderRadius.circular(12),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'Rechercher...',
+                    hintText: 'Code, désignation ou catégorie',
+                    prefixIcon:
+                        const Icon(Icons.search, color: Color(0xFF0056A6)),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredProducts.isEmpty
-                    ? _buildEmptyState()
-                    : _buildProductTable(),
-          ),
-        ],
+            if (_hasUnsavedChanges)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Material(
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.orange[100],
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Text(
+                            '${_pendingStockChanges.length + _pendingVariantChanges.length} modifications non enregistrées'),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _discardAllChanges,
+                          child: const Text('Annuler tout'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _saveAllChanges,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          child: const Text('Enregistrer tout',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredProducts.isEmpty
+                      ? _buildEmptyState()
+                      : _buildProductTable(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -359,7 +492,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 2,
                       child: Text('Catégorie', style: _headerTextStyle())),
                   Expanded(
-                      flex: 2, child: Text('Stock', style: _headerTextStyle())),
+                      flex: 1, child: Text('Stock', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
                       child: Text('Statut', style: _headerTextStyle())),
@@ -392,10 +525,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 final variants = _productVariants[product.id] ?? [];
                 final totalStock = _getTotalStock(product);
                 final isExpiring = _isExpiringSoon(product.dateExpiration);
+                final hasPendingChanges =
+                    _pendingStockChanges.containsKey(product.id) ||
+                        _pendingVariantChanges.containsKey(product.id);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   elevation: 2,
+                  color: hasPendingChanges ? Colors.orange[50] : null,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -415,13 +552,12 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                 child: Text(product.categoryName ?? 'N/A',
                                     style: _cellTextStyle())),
                             Expanded(
-                              flex: 2,
+                              flex: 1,
                               child: product.hasVariants
                                   ? TextFormField(
                                       controller:
                                           _stockControllers[product.id!],
-                                      enabled:
-                                          false, // Désactivé pour les produits avec variantes
+                                      enabled: false,
                                       decoration: InputDecoration(
                                         isDense: true,
                                         contentPadding:
@@ -450,7 +586,11 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                       onChanged: (value) {
                                         final newStock = int.tryParse(value) ??
                                             product.stock;
-                                        _updateProductStock(product, newStock);
+                                        setState(() {
+                                          _pendingStockChanges[product.id!] =
+                                              newStock;
+                                          _hasUnsavedChanges = true;
+                                        });
                                       },
                                     ),
                             ),
@@ -520,9 +660,13 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                             ),
                                           ),
                                           SizedBox(
-                                            width: 100,
+                                            width: 80,
                                             child: TextFormField(
-                                              initialValue: v.stock.toString(),
+                                              initialValue:
+                                                  _pendingVariantChanges[
+                                                              product.id]?[v.id]
+                                                          ?.toString() ??
+                                                      v.stock.toString(),
                                               keyboardType:
                                                   TextInputType.number,
                                               decoration: InputDecoration(
@@ -541,8 +685,21 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                                 final newStock =
                                                     int.tryParse(value) ??
                                                         v.stock;
-                                                _updateVariantStock(
-                                                    v, newStock);
+                                                setState(() {
+                                                  if (v.id != null) {
+                                                    if (!_pendingVariantChanges
+                                                        .containsKey(
+                                                            product.id)) {
+                                                      _pendingVariantChanges[
+                                                          product.id!] = {};
+                                                    }
+                                                    _pendingVariantChanges[
+                                                            product
+                                                                .id!]![v.id!] =
+                                                        newStock;
+                                                    _hasUnsavedChanges = true;
+                                                  }
+                                                });
                                               },
                                             ),
                                           ),
@@ -551,7 +708,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                     )),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Stock total variantes: ${variants.fold(0, (sum, v) => sum + v.stock)}',
+                                  'Stock total variantes: ${variants.fold(0, (sum, v) => sum + (_pendingVariantChanges[product.id]?[v.id] ?? v.stock))}',
                                   style: const TextStyle(
                                       fontWeight: FontWeight.bold),
                                 ),
