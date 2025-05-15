@@ -41,7 +41,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    //await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -283,7 +283,57 @@ class SqlDb {
           print("Error creating tables: $e");
           rethrow;
         }
+        // Dans la méthode onCreate
+await db.execute('''
+  CREATE TABLE stock_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    movement_type TEXT NOT NULL, -- 'in', 'out', 'sale', 'loss', 'adjustment', 'transfer'
+    quantity INTEGER NOT NULL,
+    previous_stock INTEGER NOT NULL,
+    new_stock INTEGER NOT NULL,
+    movement_date TEXT NOT NULL,
+    reference_id TEXT, -- ID de commande ou autre référence
+    notes TEXT,
+    user_id INTEGER,
+    source_location TEXT, -- Pour les transferts entre magasins
+    destination_location TEXT, -- Pour les transferts entre magasins
+    reason_code TEXT, -- Pour les pertes/ajustements
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (variant_id) REFERENCES variants(id)
+  )
+''');
+
+
+await db.execute('''
+  CREATE TABLE stock_predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    prediction_date TEXT NOT NULL,
+    predicted_quantity INTEGER NOT NULL,
+    confidence REAL,
+    time_horizon TEXT NOT NULL, -- 'short', 'medium', 'long'
+    FOREIGN KEY (product_id) REFERENCES products(id)
+  )
+''');
+
+await db.execute('''
+  CREATE TABLE IF NOT EXISTS stock_prediction_stats (
+    product_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    last_movement_date TEXT NOT NULL,
+    avg_daily_sales REAL,
+    avg_weekly_sales REAL,
+    last_month_sales INTEGER,
+    PRIMARY KEY (product_id, variant_id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (variant_id) REFERENCES variants(id)
+  )
+''');
       },
+
+      
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('''
@@ -1049,4 +1099,73 @@ class SqlDb {
       whereArgs: [id],
     );
   }
+
+  // sqldb.dart (ajouts)
+Future<List<Map<String, dynamic>>> getProductMovementHistory(int productId, {String? timeHorizon}) async {
+  final db = await this.db;
+  
+  String whereClause = 'product_id = ?';
+  List<dynamic> whereArgs = [productId];
+  
+  if (timeHorizon != null) {
+    final cutoffDate = _getCutoffDate(timeHorizon);
+    whereClause += ' AND movement_date >= ?';
+    whereArgs.add(cutoffDate);
+  }
+  
+  return await db.query(
+    'stock_movements',
+    where: whereClause,
+    whereArgs: whereArgs,
+    orderBy: 'movement_date DESC',
+  );
+}
+
+Future<List<Map<String, dynamic>>> getVariantMovementHistory(int variantId, {String? timeHorizon}) async {
+  final db = await this.db;
+  
+  String whereClause = 'variant_id = ?';
+  List<dynamic> whereArgs = [variantId];
+  
+  if (timeHorizon != null) {
+    final cutoffDate = _getCutoffDate(timeHorizon);
+    whereClause += ' AND movement_date >= ?';
+    whereArgs.add(cutoffDate);
+  }
+  
+  return await db.query(
+    'stock_movements',
+    where: whereClause,
+    whereArgs: whereArgs,
+    orderBy: 'movement_date DESC',
+  );
+}
+
+String _getCutoffDate(String timeHorizon) {
+  final now = DateTime.now();
+  switch (timeHorizon) {
+    case 'short_term':
+      return now.subtract(Duration(days: 30)).toIso8601String();
+    case 'medium_term':
+      return now.subtract(Duration(days: 90)).toIso8601String();
+    case 'long_term':
+      return now.subtract(Duration(days: 365)).toIso8601String();
+    default:
+      return now.subtract(Duration(days: 30)).toIso8601String();
+  }
+}
+
+Future<List<Map<String, dynamic>>> getStockPredictions() async {
+  final db = await this.db;
+  return await db.query('stock_predictions');
+}
+
+Future<List<Map<String, dynamic>>> getProductPredictions(int productId) async {
+  final db = await this.db;
+  return await db.query(
+    'stock_predictions',
+    where: 'product_id = ?',
+    whereArgs: [productId],
+  );
+}
 }

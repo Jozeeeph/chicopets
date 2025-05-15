@@ -9,6 +9,7 @@ import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/voucher.dart';
+import 'package:caissechicopets/services/stock_movement_service.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
@@ -16,6 +17,7 @@ import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:caissechicopets/models/stock_movement.dart';
 
 class Addorder {
   static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -2372,6 +2374,41 @@ class Addorder {
     try {
       // Save order to database
       int orderId = await SqlDb().addOrder(order);
+      // Dans la méthode _confirmPlaceOrder, après la validation de la commande
+      final stockMovementService = StockMovementService(SqlDb());
+
+      for (int i = 0; i < selectedProducts.length; i++) {
+        final product = selectedProducts[i];
+        final quantity = quantityProducts[i];
+        final variant = selectedVariants[i];
+
+        if (product.hasVariants && variant != null) {
+          // Enregistrer le mouvement pour la variante
+          await stockMovementService.recordMovement(StockMovement(
+            productId: product.id!,
+            variantId: variant.id,
+            movementType: 'sale',
+            quantity: quantity,
+            previousStock: variant.stock,
+            newStock: variant.stock - quantity,
+            movementDate: DateTime.now(),
+            referenceId: orderId.toString(),
+            userId: user?.id,
+          ));
+        } else {
+          // Enregistrer le mouvement pour le produit
+          await stockMovementService.recordMovement(StockMovement(
+            productId: product.id!,
+            movementType: 'sale',
+            quantity: quantity,
+            previousStock: product.stock,
+            newStock: product.stock - quantity,
+            movementDate: DateTime.now(),
+            referenceId: orderId.toString(),
+            userId: user?.id,
+          ));
+        }
+      }
 
       if (orderId <= 0) {
         throw Exception("Failed to save order");
