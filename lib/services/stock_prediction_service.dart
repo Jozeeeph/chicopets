@@ -1,5 +1,3 @@
-import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/models/stock_movement.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:ml_algo/ml_algo.dart';

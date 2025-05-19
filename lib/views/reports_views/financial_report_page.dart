@@ -35,6 +35,11 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
   double _totalMixed = 0;
   double _totalAll = 0;
   double _totalDiscount = 0;
+  double _totalTicketRestaurant = 0;
+  double _totalGiftTicket = 0;
+  double _totalTraite = 0;
+  double _totalVirement = 0;
+  double _totalVoucher = 0;
   double _totalRemaining = 0;
   int _clientCount = 0;
   int _articleCount = 0;
@@ -458,6 +463,21 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
             if (_totalCheck > 0)
               _buildPaymentDetailItem(
                   'Chèque', _totalCheck, Icons.account_balance),
+            if (_totalTicketRestaurant > 0)
+              _buildPaymentDetailItem('Ticket Restaurant',
+                  _totalTicketRestaurant, Icons.restaurant),
+            if (_totalGiftTicket > 0)
+              _buildPaymentDetailItem(
+                  'Ticket cadeau', _totalGiftTicket, Icons.card_giftcard),
+            if (_totalTraite > 0)
+              _buildPaymentDetailItem(
+                  'Traite', _totalTraite, Icons.receipt_long),
+            if (_totalVirement > 0)
+              _buildPaymentDetailItem(
+                  'Virement', _totalVirement, Icons.account_balance_wallet),
+            if (_totalVoucher > 0)
+              _buildPaymentDetailItem(
+                  'Bon d\'achat', _totalVoucher, Icons.confirmation_number),
             if (_totalMixed > 0)
               _buildPaymentDetailItem('Mixtes', _totalMixed, Icons.blur_on),
           ],
@@ -760,6 +780,11 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
         cash_amount as cashAmount,
         card_amount as cardAmount,
         check_amount as checkAmount,
+        ticket_restaurant_amount as ticketRestaurantAmount,
+        gift_ticket_amount as giftTicketAmount,
+        traite_amount as traiteAmount,
+        virement_amount as virementAmount,
+        voucher_amount as voucherAmount,
         global_discount as discount,
         is_percentage_discount as isPercentageDiscount,
         remaining_amount as remainingAmount,
@@ -769,10 +794,16 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
       ORDER BY date DESC
     ''', [startDateStr, endDateStr]);
 
+      // Initialize all payment type totals
       double totalCash = 0;
       double totalCard = 0;
       double totalCheck = 0;
-      double totalMixed = 0; // Montant total des paiements mixtes
+      double totalTicketRestaurant = 0;
+      double totalGiftTicket = 0;
+      double totalTraite = 0;
+      double totalVirement = 0;
+      double totalVoucher = 0;
+      double totalMixed = 0;
       double totalPercentageDiscount = 0;
       double totalFixedDiscount = 0;
       double totalRemaining = 0;
@@ -780,7 +811,7 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
       int articleCount = 0;
       Set<int> uniqueClients = Set();
 
-      // Calcul des articles vendus
+      // Calculate sold articles
       final articlesResult = await db.rawQuery('''
       SELECT SUM(quantity) as total 
       FROM order_items oi
@@ -798,6 +829,16 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
         final cashAmount = (payment['cashAmount'] as num?)?.toDouble() ?? 0.0;
         final cardAmount = (payment['cardAmount'] as num?)?.toDouble() ?? 0.0;
         final checkAmount = (payment['checkAmount'] as num?)?.toDouble() ?? 0.0;
+        final ticketRestaurantAmount =
+            (payment['ticketRestaurantAmount'] as num?)?.toDouble() ?? 0.0;
+        final giftTicketAmount =
+            (payment['giftTicketAmount'] as num?)?.toDouble() ?? 0.0;
+        final traiteAmount =
+            (payment['traiteAmount'] as num?)?.toDouble() ?? 0.0;
+        final virementAmount =
+            (payment['virementAmount'] as num?)?.toDouble() ?? 0.0;
+        final voucherAmount =
+            (payment['voucherAmount'] as num?)?.toDouble() ?? 0.0;
         final discount = (payment['discount'] as num?)?.toDouble() ?? 0.0;
         final isPercentage = payment['isPercentageDiscount'] == 1;
         final remainingAmount =
@@ -807,18 +848,38 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
           uniqueClients.add(idClient);
         }
 
-        // Calcul des totaux par mode de paiement
-        if (modePaiement == 'Espèce') {
-          totalCash += amount;
-        } else if (modePaiement == 'TPE') {
-          totalCard += amount;
-        } else if (modePaiement == 'Chèque') {
-          totalCheck += amount;
-        } else if (modePaiement == 'Mixte') {
-          totalMixed += amount; // On garde le montant total du mixte
+        // Calculate totals by payment type
+        switch (modePaiement) {
+          case 'Espèce':
+            totalCash += amount;
+            break;
+          case 'TPE':
+            totalCard += amount;
+            break;
+          case 'Chèque':
+            totalCheck += amount;
+            break;
+          case 'Ticket Restaurant':
+            totalTicketRestaurant += amount;
+            break;
+          case 'Ticket cadeau':
+            totalGiftTicket += amount;
+            break;
+          case 'Traite':
+            totalTraite += amount;
+            break;
+          case 'Virement':
+            totalVirement += amount;
+            break;
+          case 'Bon d\'achat':
+            totalVoucher += amount;
+            break;
+          case 'Mixte':
+            totalMixed += amount;
+            break;
         }
 
-        // Calcul des remises
+        // Calculate discounts
         if (isPercentage) {
           totalPercentageDiscount += discount;
         } else {
@@ -830,16 +891,27 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
 
       clientCount = uniqueClients.length;
 
-      // Le total général est la somme de tout :
-      // - Paiements non mixtes (Espèce, Carte, Chèque)
-      // - Paiements mixtes (déjà comptés dans totalMixed)
-      double totalAll = totalCash + totalCard + totalCheck + totalMixed;
+      // Total is sum of all payment types
+      double totalAll = totalCash +
+          totalCard +
+          totalCheck +
+          totalTicketRestaurant +
+          totalGiftTicket +
+          totalTraite +
+          totalVirement +
+          totalVoucher +
+          totalMixed;
 
       setState(() {
         _paymentData = result;
         _totalCash = totalCash;
         _totalCard = totalCard;
         _totalCheck = totalCheck;
+        _totalTicketRestaurant = totalTicketRestaurant;
+        _totalGiftTicket = totalGiftTicket;
+        _totalTraite = totalTraite;
+        _totalVirement = totalVirement;
+        _totalVoucher = totalVoucher;
         _totalMixed = totalMixed;
         _totalAll = totalAll;
         _totalPercentageDiscount = totalPercentageDiscount;
@@ -860,116 +932,100 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
     }
   }
 
- Future<void> _exportToPDF() async {
-  final pdf = pw.Document();
+  Future<void> _exportToPDF() async {
+    final pdf = pw.Document();
 
-  const double pageWidth = 70 * PdfPageFormat.mm;
-  const double pageHeight = double.infinity;
-  const double margin = 4 * PdfPageFormat.mm;
-
-  pdf.addPage(
-    pw.Page(
-      pageFormat: PdfPageFormat(pageWidth, pageHeight),
-      build: (pw.Context context) {
-        return pw.Padding(
-          padding: pw.EdgeInsets.all(margin),
-          child: pw.Container(
-            width: pageWidth - 2 * margin,
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Padding(
+            padding: pw.EdgeInsets.all(20),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
-              mainAxisSize: pw.MainAxisSize.min,
               children: [
                 pw.Center(
-                  child: pw.Column(
-                    children: [
-                      pw.Text('CHICO PETS',
-                          style: pw.TextStyle(
-                            fontSize: 12,
-                            fontWeight: pw.FontWeight.bold,
-                          )),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Rapport Financier',
-                          style: pw.TextStyle(fontSize: 10)),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        '${DateFormat('dd/MM/yyyy').format(_startDate!)}'
-                        '${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
-                        style: pw.TextStyle(fontSize: 9),
-                      ),
-                    ],
-                  ),
+                  child: pw.Text('Rapport Financier',
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                      )),
                 ),
-                pw.SizedBox(height: 8),
-                pw.Divider(thickness: 0.5),
-                pw.SizedBox(height: 8),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'Période: ${DateFormat('dd/MM/yyyy').format(_startDate!)}'
+                  '${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+                pw.Divider(),
+                pw.SizedBox(height: 10),
 
+                // Total Sales
                 _buildPdfSummaryRow('TOTAL VENTES', _totalAll, isMain: true),
-                pw.SizedBox(height: 6),
+                pw.SizedBox(height: 10),
 
+                // Payment Details
                 if (_totalCash > 0) _buildPdfDetailRow('Espèces', _totalCash),
                 if (_totalCard > 0) _buildPdfDetailRow('Carte', _totalCard),
                 if (_totalCheck > 0) _buildPdfDetailRow('Chèque', _totalCheck),
+                if (_totalTicketRestaurant > 0)
+                  _buildPdfDetailRow(
+                      'Ticket Restaurant', _totalTicketRestaurant),
+                if (_totalGiftTicket > 0)
+                  _buildPdfDetailRow('Ticket cadeau', _totalGiftTicket),
+                if (_totalTraite > 0)
+                  _buildPdfDetailRow('Traite', _totalTraite),
+                if (_totalVirement > 0)
+                  _buildPdfDetailRow('Virement', _totalVirement),
+                if (_totalVoucher > 0)
+                  _buildPdfDetailRow('Bon d\'achat', _totalVoucher),
                 if (_totalMixed > 0) _buildPdfDetailRow('Mixtes', _totalMixed),
 
-                pw.SizedBox(height: 6),
-                pw.Divider(thickness: 0.2),
-                pw.SizedBox(height: 6),
+                pw.SizedBox(height: 10),
+                pw.Divider(),
 
+                // Discounts
                 if (_totalPercentageDiscount > 0)
-                  _buildPdfSummaryRow(
-                    'Remise (%)',
-                    _totalPercentageDiscount,
-                    isDiscount: true,
-                    suffix: '%',
-                  ),
+                  _buildPdfSummaryRow('Remise (%)', _totalPercentageDiscount,
+                      isDiscount: true, suffix: '%'),
                 if (_totalFixedDiscount > 0)
-                  _buildPdfSummaryRow(
-                    'Remise (DT)',
-                    _totalFixedDiscount,
-                    isDiscount: true,
-                  ),
+                  _buildPdfSummaryRow('Remise (DT)', _totalFixedDiscount,
+                      isDiscount: true),
 
-                pw.SizedBox(height: 6),
-                pw.Divider(thickness: 0.2),
-                pw.SizedBox(height: 6),
-
+                // Pending
                 if (_totalRemaining > 0)
-                  _buildPdfSummaryRow('À recevoir', _totalRemaining, isAlert: true),
+                  _buildPdfSummaryRow('À recevoir', _totalRemaining,
+                      isAlert: true),
 
-                pw.SizedBox(height: 6),
-                pw.Divider(thickness: 0.5),
-                pw.SizedBox(height: 6),
+                // Statistics
+                pw.SizedBox(height: 10),
+                _buildPdfSummaryRow('Clients', _clientCount.toDouble(),
+                    isCount: true),
+                _buildPdfSummaryRow('Articles', _articleCount.toDouble(),
+                    isCount: true),
 
-                _buildPdfSummaryRow('Clients', _clientCount.toDouble(), isCount: true),
-                _buildPdfSummaryRow('Articles', _articleCount.toDouble(), isCount: true),
-
-                pw.SizedBox(height: 12),
+                // Footer
+                pw.SizedBox(height: 20),
                 pw.Center(
                   child: pw.Text(
-                    DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
-                    style: pw.TextStyle(fontSize: 8),
-                  ),
-                ),
-                pw.Center(
-                  child: pw.Text(
-                    'Merci pour votre confiance',
-                    style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
+                    'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(DateTime.now())}',
+                    style: pw.TextStyle(fontSize: 10),
                   ),
                 ),
               ],
             ),
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
 
-  final bytes = await pdf.save();
-  await Printing.sharePdf(
-    bytes: bytes,
-    filename: 'rapport_financier.pdf',
-  );
-}
+    final bytes = await pdf.save();
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename:
+          'rapport_financier_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+    );
+  }
 
 // Méthodes helpers pour construire les lignes du PDF
   pw.Widget _buildPdfSummaryRow(

@@ -179,6 +179,28 @@ class Addorder {
     TextEditingController ticketTaxController = TextEditingController();
     TextEditingController ticketCommissionController = TextEditingController();
 
+    // Ticket cadeau
+    String giftTicketNumber = '';
+    String giftTicketIssuer = '';
+    double giftTicketAmount = 0.0;
+    TextEditingController giftTicketAmountController = TextEditingController();
+
+// Traite
+    String traiteNumber = '';
+    String traiteBank = '';
+    String traiteBeneficiary = '';
+    DateTime? traiteDate;
+    double traiteAmount = 0.0;
+    TextEditingController traiteAmountController = TextEditingController();
+
+// Virement
+    String virementReference = '';
+    String virementBank = '';
+    String virementSender = '';
+    DateTime? virementDate;
+    double virementAmount = 0.0;
+    TextEditingController virementAmountController = TextEditingController();
+
     TextEditingController clientPhoneController = TextEditingController();
     List<Voucher> clientVouchers = [];
     Voucher? selectedVoucher;
@@ -671,6 +693,46 @@ class Addorder {
                                         TextStyle(fontWeight: FontWeight.bold)),
                               ],
 
+                              if (selectedPaymentMethod == "Ticket cadeau") ...[
+                                Text("Mode: Ticket cadeau"),
+                                Text(
+                                    "Montant: ${giftTicketAmount.toStringAsFixed(2)} DT"),
+                                Text("N°: $giftTicketNumber"),
+                                Text("Émetteur: $giftTicketIssuer"),
+                              ],
+
+                              if (selectedPaymentMethod == "Traite") ...[
+                                Text("Mode: Traite"),
+                                Text(
+                                    "Montant: ${traiteAmount.toStringAsFixed(2)} DT"),
+                                Text("N°: $traiteNumber"),
+                                Text("Banque: $traiteBank"),
+                                Text("Bénéficiaire: $traiteBeneficiary"),
+                                if (traiteDate != null)
+                                  Text(
+                                      "Date d'échéance: ${DateFormat('dd/MM/yyyy').format(traiteDate!)}"),
+                              ],
+
+                              if (selectedPaymentMethod == "Virement") ...[
+                                Text("Mode: Virement"),
+                                Text(
+                                    "Montant: ${virementAmount.toStringAsFixed(2)} DT"),
+                                Text("Référence: $virementReference"),
+                                Text("Banque: $virementBank"),
+                                Text("Émetteur: $virementSender"),
+                                if (virementDate != null)
+                                  Text(
+                                      "Date: ${DateFormat('dd/MM/yyyy').format(virementDate!)}"),
+                              ],
+
+                              if (selectedPaymentMethod == "Bon d'achat") ...[
+                                Text("Mode: Bon d'achat"),
+                                Text(
+                                    "Montant: ${voucherAmount.toStringAsFixed(2)} DT"),
+                                if (selectedVoucher != null)
+                                  Text("N°: ${selectedVoucher?.id}"),
+                              ],
+
                               if (selectedPaymentMethod == "Mixte") ...[
                                 Text("Mode: Paiement mixte"),
                                 if (cashAmount > 0)
@@ -693,8 +755,33 @@ class Addorder {
                                     Text(
                                         "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
                                 ],
+                                if ((ticketRestaurantAmount) > 0) ...[
+                                  Text(
+                                      "- Ticket Restaurant: ${ticketRestaurantAmount.toStringAsFixed(2)} DT"),
+                                  Text("  Nombre: $numberOfTicketsRestaurant"),
+                                ],
+                                if ((giftTicketAmount) > 0) ...[
+                                  Text(
+                                      "- Ticket cadeau: ${giftTicketAmount.toStringAsFixed(2)} DT"),
+                                  Text("  N°: $giftTicketNumber"),
+                                ],
+                                if ((traiteAmount) > 0) ...[
+                                  Text(
+                                      "- Traite: ${traiteAmount.toStringAsFixed(2)} DT"),
+                                  Text("  N°: $traiteNumber"),
+                                ],
+                                if ((virementAmount) > 0) ...[
+                                  Text(
+                                      "- Virement: ${virementAmount.toStringAsFixed(2)} DT"),
+                                  Text("  Référence: $virementReference"),
+                                ],
+                                if ((voucherAmount ) > 0) ...[
+                                  Text(
+                                      "- Bon d'achat: ${voucherAmount.toStringAsFixed(2)} DT"),
+                                  if (selectedVoucher != null)
+                                    Text("  N°: ${selectedVoucher?.id}"),
+                                ],
                               ],
-
                               Divider(thickness: 1, color: Colors.black),
                               Row(
                                 mainAxisAlignment:
@@ -1643,6 +1730,245 @@ class Addorder {
                                     ],
                                   ),
 
+                                if (selectedPaymentMethod == "Ticket cadeau")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: giftTicketAmountController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              "Montant du ticket cadeau (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            giftTicketAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            giftTicketNumber = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Numéro du ticket cadeau",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            giftTicketIssuer = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Émetteur du ticket",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                // Traite payment fields
+                                if (selectedPaymentMethod == "Traite")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: traiteAmountController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              "Montant de la traite (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            traiteAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            traiteNumber = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Numéro de la traite",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            traiteBank = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Banque émettrice",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      InkWell(
+                                        onTap: () async {
+                                          final selectedDate =
+                                              await showDatePicker(
+                                            context: context,
+                                            initialDate: DateTime.now(),
+                                            firstDate: DateTime.now(),
+                                            lastDate: DateTime.now()
+                                                .add(Duration(days: 365)),
+                                          );
+                                          if (selectedDate != null) {
+                                            setState(() {
+                                              traiteDate = selectedDate;
+                                            });
+                                          }
+                                        },
+                                        child: InputDecorator(
+                                          decoration: InputDecoration(
+                                            labelText: "Date d'échéance",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(traiteDate != null
+                                                  ? "${traiteDate!.day}/${traiteDate!.month}/${traiteDate!.year}"
+                                                  : "Sélectionner une date"),
+                                              Icon(Icons.calendar_today),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            traiteBeneficiary = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Bénéficiaire",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                // Virement payment fields
+                                if (selectedPaymentMethod == "Virement")
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: virementAmountController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant du virement (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        "Veuillez entrer un nombre positif.")),
+                                              );
+                                              return;
+                                            }
+                                            virementAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            virementReference = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Référence du virement",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            virementBank = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Banque émettrice",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      InkWell(
+                                        onTap: () async {
+                                          final selectedDate =
+                                              await showDatePicker(
+                                            context: context,
+                                            initialDate: DateTime.now(),
+                                            firstDate: DateTime(2000),
+                                            lastDate: DateTime.now(),
+                                          );
+                                          if (selectedDate != null) {
+                                            setState(() {
+                                              virementDate = selectedDate;
+                                            });
+                                          }
+                                        },
+                                        child: InputDecorator(
+                                          decoration: InputDecoration(
+                                            labelText: "Date du virement",
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(virementDate != null
+                                                  ? "${virementDate!.day}/${virementDate!.month}/${virementDate!.year}"
+                                                  : "Sélectionner une date"),
+                                              Icon(Icons.calendar_today),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        onChanged: (value) =>
+                                            virementSender = value,
+                                        decoration: InputDecoration(
+                                          labelText: "Nom de l'émetteur",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
                                 // Mixte payment fields
                                 if (selectedPaymentMethod == "Mixte")
                                   Column(
@@ -2083,6 +2409,19 @@ class Addorder {
                         ticketCommission,
                         selectedVoucher,
                         voucherAmount,
+                        giftTicketNumber,
+                        giftTicketIssuer,
+                        giftTicketAmount,
+                        traiteNumber,
+                        traiteBank,
+                        traiteBeneficiary,
+                        traiteDate,
+                        traiteAmount,
+                        virementReference,
+                        virementBank,
+                        virementSender,
+                        virementDate,
+                        virementAmount,
                         useLoyaltyPoints,
                         pointsToUse,
                         pointsDiscount,
@@ -2148,6 +2487,19 @@ class Addorder {
       double? ticketCommission, // Add this
       Voucher? selectedVoucher, // Add this
       double voucherAmount,
+      String giftTicketNumber,
+      String giftTicketIssuer,
+      double giftTicketAmount,
+      String traiteNumber,
+      String traiteBank,
+      String traiteBeneficiary,
+      DateTime? traiteDate,
+      double traiteAmount,
+      String virementReference,
+      String virementBank,
+      String virementSender,
+      DateTime? virementDate,
+      double virementAmount,
       bool useLoyaltyPoints,
       int pointsToUse,
       double pointsDiscount,
@@ -2234,12 +2586,32 @@ class Addorder {
             ? 0.0
             : total - (ticketRestaurantAmount ?? 0);
         break;
+      case "Ticket cadeau":
+        totalAmountPaid = giftTicketAmount;
+        status = giftTicketAmount >= total ? "payée" : "semi-payée";
+        remainingAmount =
+            giftTicketAmount >= total ? 0.0 : total - giftTicketAmount;
+        break;
+      case "Traite":
+        totalAmountPaid = traiteAmount;
+        status = traiteAmount >= total ? "payée" : "semi-payée";
+        remainingAmount = traiteAmount >= total ? 0.0 : total - traiteAmount;
+        break;
+      case "Virement":
+        totalAmountPaid = virementAmount;
+        status = virementAmount >= total ? "payée" : "semi-payée";
+        remainingAmount =
+            virementAmount >= total ? 0.0 : total - virementAmount;
+        break;
       case "Mixte":
         totalAmountPaid = cashAmount +
             cardAmount +
             checkAmount +
             (ticketRestaurantAmount ?? 0) +
-            (voucherAmount ?? 0);
+            (voucherAmount) +
+            giftTicketAmount +
+            traiteAmount +
+            virementAmount;
         status = totalAmountPaid >= total ? "payée" : "semi-payée";
         remainingAmount =
             totalAmountPaid >= total ? 0.0 : total - totalAmountPaid;
@@ -2255,6 +2627,9 @@ class Addorder {
         (selectedPaymentMethod == "Espèce" && cashAmount <= 0) ||
         (selectedPaymentMethod == "Ticket Restaurant" &&
             (ticketRestaurantAmount == null || ticketRestaurantAmount <= 0)) ||
+        (selectedPaymentMethod == "Ticket cadeau" && giftTicketAmount <= 0) ||
+        (selectedPaymentMethod == "Traite" && traiteAmount <= 0) ||
+        (selectedPaymentMethod == "Virement" && virementAmount <= 0) ||
         (selectedPaymentMethod == "Mixte" &&
             (cashAmount + cardAmount + checkAmount) <= 0)) {
       Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
@@ -2315,50 +2690,82 @@ class Addorder {
       idClient: selectedClient?.id,
 
       // Payment amounts
-      cashAmount:
-          selectedPaymentMethod == "Espèce" || selectedPaymentMethod == "Mixte"
-              ? cashAmount
-              : null,
-      cardAmount:
-          selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
-              ? cardAmount
-              : null,
-      checkAmount:
-          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
-              ? checkAmount
-              : null,
-      ticketRestaurantAmount: selectedPaymentMethod == "Ticket Restaurant" ||
-              (selectedPaymentMethod == "Mixte" && ticketRestaurantAmount! > 0)
-          ? ticketRestaurantAmount
+      cashAmount: ["Espèce", "Mixte"].contains(selectedPaymentMethod)
+          ? cashAmount
           : null,
-      voucherAmount: selectedPaymentMethod == "Bon d'achat" ||
-              (selectedPaymentMethod == "Mixte" && voucherAmount > 0)
+      cardAmount:
+          ["TPE", "Mixte"].contains(selectedPaymentMethod) ? cardAmount : null,
+      checkAmount: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkAmount
+          : null,
+      ticketRestaurantAmount:
+          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+              ? ticketRestaurantAmount
+              : null,
+      voucherAmount: ["Bon d'achat", "Mixte"].contains(selectedPaymentMethod)
           ? voucherAmount
+          : null,
+      giftTicketAmount:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketAmount
+              : null,
+      traiteAmount: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteAmount
+          : null,
+      virementAmount: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementAmount
           : null,
 
       // Payment details
-      checkNumber:
-          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
-              ? checkNumber
-              : null,
-      cardTransactionId:
-          selectedPaymentMethod == "TPE" || selectedPaymentMethod == "Mixte"
-              ? cardTransactionId
-              : null,
-      checkDate:
-          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
-              ? checkDate
-              : null,
+      checkNumber: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkNumber
+          : null,
+      cardTransactionId: ["TPE", "Mixte"].contains(selectedPaymentMethod)
+          ? cardTransactionId
+          : null,
+      checkDate: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkDate
+          : null,
       bankName:
-          selectedPaymentMethod == "Chèque" || selectedPaymentMethod == "Mixte"
-              ? bankName
+          ["Chèque", "Mixte"].contains(selectedPaymentMethod) ? bankName : null,
+      giftTicketNumber:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketNumber
               : null,
+      giftTicketIssuer:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketIssuer
+              : null,
+      traiteNumber: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteNumber
+          : null,
+      traiteBank: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteBank
+          : null,
+      traiteBeneficiary: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteBeneficiary
+          : null,
+      traiteDate: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteDate
+          : null,
+      virementReference: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementReference
+          : null,
+      virementBank: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementBank
+          : null,
+      virementSender: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementSender
+          : null,
+      virementDate: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementDate
+          : null,
 
       // Ticket restaurant details
-      numberOfTicketsRestaurant: selectedPaymentMethod == "Ticket Restaurant" ||
-              (selectedPaymentMethod == "Mixte" && ticketRestaurantAmount! > 0)
-          ? numberOfTicketsRestaurant
-          : null,
+      numberOfTicketsRestaurant:
+          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+              ? numberOfTicketsRestaurant
+              : null,
       ticketValue: ticketValue,
       ticketTax: ticketTax,
       ticketCommission: ticketCommission,
