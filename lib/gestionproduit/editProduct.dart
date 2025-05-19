@@ -42,6 +42,14 @@ class _EditProductScreenState extends State<EditProductScreen> {
   final TextEditingController attributeNameController = TextEditingController();
   final TextEditingController attributeValuesController =
       TextEditingController();
+  final TextEditingController pointsEarnedController = TextEditingController();
+  final TextEditingController pointsCostController = TextEditingController();
+  final TextEditingController pointsDiscountPercentController = TextEditingController();
+  final TextEditingController maxPointsDiscountController = TextEditingController();
+
+  bool earnsFidelityPoints = false;
+  bool redeemableWithPoints = false;
+
 
   final SqlDb sqldb = SqlDb();
   double? selectedTax;
@@ -103,6 +111,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
     double remiseValeurMax = (profit * widget.product.remiseMax) / 100;
     remiseValeurMaxController.text = remiseValeurMax.toStringAsFixed(2);
     profitController.text = profit.toStringAsFixed(2);
+    earnsFidelityPoints = widget.product.earnsFidelityPoints;
+    redeemableWithPoints = widget.product.redeemableWithPoints;
+    pointsEarnedController.text = widget.product.fidelityPointsEarned?.toString() ?? '0';
+    pointsCostController.text = widget.product.fidelityPointsCost?.toString() ?? '0';
+    pointsDiscountPercentController.text = widget.product.pointsDiscountPercentage?.toString() ?? '0.0';
+    maxPointsDiscountController.text = widget.product.maxPointsDiscount?.toString() ?? '0.0';
   }
 
   void _setupListeners() {
@@ -740,6 +754,101 @@ class _EditProductScreenState extends State<EditProductScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 20),
+        const Text(
+          'Points de Fidélité',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0056A6),
+          ),
+        ),
+        const SizedBox(height: 10),
+        CheckboxListTile(
+          title: const Text('Ce produit rapporte des points de fidélité'),
+          value: earnsFidelityPoints,
+          onChanged: (value) {
+            setState(() {
+              earnsFidelityPoints = value ?? false;
+            });
+          },
+        ),
+        Visibility(
+          visible: earnsFidelityPoints,
+          child: _buildTextFormField(
+            controller: pointsEarnedController,
+            label: 'Points gagnés par unité',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (earnsFidelityPoints && (value == null || value.isEmpty)) {
+                return 'Veuillez entrer un nombre de points';
+              }
+              if (earnsFidelityPoints && int.tryParse(value ?? '0') == null) {
+                return 'Nombre invalide';
+              }
+              return null;
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        CheckboxListTile(
+          title: const Text('Peut être acheté avec des points'),
+          value: redeemableWithPoints,
+          onChanged: (value) {
+            setState(() {
+              redeemableWithPoints = value ?? false;
+            });
+          },
+        ),
+        Visibility(
+          visible: redeemableWithPoints,
+          child: Column(
+            children: [
+              _buildTextFormField(
+                controller: pointsCostController,
+                label: 'Points nécessaires',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (redeemableWithPoints && (value == null || value.isEmpty)) {
+                    return 'Veuillez entrer un nombre de points';
+                  }
+                  if (redeemableWithPoints && int.tryParse(value ?? '0') == null) {
+                    return 'Nombre invalide';
+                  }
+                  return null;
+                },
+              ),
+              _buildTextFormField(
+                controller: pointsDiscountPercentController,
+                label: 'Remise (%) avec points',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (redeemableWithPoints && (value == null || value.isEmpty)) {
+                    return 'Veuillez entrer un pourcentage';
+                  }
+                  if (redeemableWithPoints && double.tryParse(value ?? '0') == null) {
+                    return 'Nombre invalide';
+                  }
+                  return null;
+                },
+              ),
+              _buildTextFormField(
+                controller: maxPointsDiscountController,
+                label: 'Remise max (DT) avec points',
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (redeemableWithPoints && (value == null || value.isEmpty)) {
+                    return 'Veuillez entrer un montant';
+                  }
+                  if (redeemableWithPoints && double.tryParse(value ?? '0') == null) {
+                    return 'Nombre invalide';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
 
         // Variant management section
         if (hasVariants) _buildVariantSection(),
@@ -1214,7 +1323,6 @@ class _EditProductScreenState extends State<EditProductScreen> {
           );
   }
 
-  // ... [Keep all your existing methods like calculateValues, addAttribute, etc.]
 
   Future<void> _saveProduct() async {
     if (_formKey.currentState!.validate()) {
@@ -1243,6 +1351,13 @@ class _EditProductScreenState extends State<EditProductScreen> {
           hasVariants: hasVariants,
           variants: variants,
           sellable: sellable,
+          // Add fidelity points fields
+          earnsFidelityPoints: earnsFidelityPoints,
+          fidelityPointsEarned: int.parse(pointsEarnedController.text),
+          redeemableWithPoints: redeemableWithPoints,
+          fidelityPointsCost: int.parse(pointsCostController.text),
+          pointsDiscountPercentage: double.tryParse(pointsDiscountPercentController.text),
+          maxPointsDiscount: double.tryParse(maxPointsDiscountController.text),
         );
 
         final db = await sqldb.db;

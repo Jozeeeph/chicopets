@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:caissechicopets/controllers/attributController.dart';
 import 'package:caissechicopets/controllers/categoryController.dart';
@@ -41,7 +42,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -80,9 +81,15 @@ class SqlDb {
     sellable INTEGER DEFAULT 1,
     status TEXT DEFAULT 'En stock',
     image TEXT,
-    brand TEXT
-);
-''');
+    brand TEXT,
+    earns_fidelity_points INTEGER DEFAULT 0,
+    fidelity_points_earned INTEGER DEFAULT 0,
+    redeemable_with_points INTEGER DEFAULT 0,
+    fidelity_points_cost INTEGER DEFAULT 0,
+    max_points_discount REAL,
+    points_discount_percentage REAL
+    );
+    ''');
           print("Products table created");
 
           await db.execute('''
@@ -96,14 +103,51 @@ class SqlDb {
     id_client INTEGER,
     global_discount REAL DEFAULT 0.0,
     is_percentage_discount INTEGER DEFAULT 1,
+    user_id INTEGER,
+    
+    -- Payment amounts
     cash_amount REAL,
     card_amount REAL,
     check_amount REAL,
+    ticket_restaurant_amount REAL,
+    voucher_amount REAL,
+    gift_ticket_amount REAL,
+    traite_amount REAL,
+    virement_amount REAL,
+    
+    -- Payment details
     check_number TEXT,
     card_transaction_id TEXT,
     check_date TEXT,
     bank_name TEXT,
-    user_id INTEGER
+    gift_ticket_number TEXT,
+    gift_ticket_issuer TEXT,
+    traite_number TEXT,
+    traite_bank TEXT,
+    traite_beneficiary TEXT,
+    traite_date TEXT,
+    virement_reference TEXT,
+    virement_bank TEXT,
+    virement_sender TEXT,
+    virement_date TEXT,
+    
+    -- Ticket restaurant details
+    number_of_tickets_restaurant INTEGER,
+    ticket_value REAL,
+    ticket_tax REAL,
+    ticket_commission REAL,
+    
+    -- Voucher details
+    voucher_ids TEXT,
+    voucher_reference TEXT,
+    
+    -- Loyalty program
+    points_used INTEGER,
+    points_discount REAL,
+    
+    -- Foreign keys
+    FOREIGN KEY (id_client) REFERENCES clients(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 ''');
           print("Orders table created");
@@ -284,7 +328,7 @@ class SqlDb {
           rethrow;
         }
         // Dans la méthode onCreate
-await db.execute('''
+        await db.execute('''
   CREATE TABLE stock_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
@@ -305,8 +349,7 @@ await db.execute('''
   )
 ''');
 
-
-await db.execute('''
+        await db.execute('''
   CREATE TABLE stock_predictions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
@@ -318,7 +361,7 @@ await db.execute('''
   )
 ''');
 
-await db.execute('''
+        await db.execute('''
   CREATE TABLE IF NOT EXISTS stock_prediction_stats (
     product_id INTEGER NOT NULL,
     variant_id INTEGER,
@@ -332,8 +375,6 @@ await db.execute('''
   )
 ''');
       },
-
-      
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('''
@@ -354,6 +395,96 @@ await db.execute('''
   Future<List<Product>> getProducts() async {
     final dbClient = await db;
     return await ProductController().getProducts(dbClient);
+  }
+
+  Future<List<Map<String, dynamic>>> getProductsForExport() async {
+    final dbClient = await db;
+
+    // Get all products with their category/subcategory info
+    final List<Map<String, dynamic>> products = await dbClient.rawQuery('''
+    SELECT 
+      p.*, 
+      c.category_name,
+      sc.sub_category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id_category
+    LEFT JOIN sub_categories sc ON p.sub_category_id = sc.id_sub_category
+    WHERE p.is_deleted = 0
+  ''');
+
+    List<Map<String, dynamic>> exportData = [];
+
+    for (var product in products) {
+      // Get variants if product has variants
+      List<Map<String, dynamic>> variants = [];
+      if (product['has_variants'] == 1) {
+        variants = await dbClient.query(
+          'variants',
+          where: 'product_id = ?',
+          whereArgs: [product['id']],
+        );
+      }
+
+      // Convert to export format
+      exportData.add(_productToExportMap(product, variants));
+    }
+
+    return exportData;
+  }
+
+  Map<String, dynamic> _productToExportMap(
+      Map<String, dynamic> product, List<Map<String, dynamic>> variants) {
+    // Calculate cost price safely
+    double prixHT = (product['prix_ht'] ?? 0).toDouble();
+    double marge = (product['marge'] ?? 0).toDouble();
+
+    return {
+      'product': {
+        'name': product['designation'] ?? '',
+        'reference': product['code'] ?? '',
+        'category': product['category_name'] ?? 'Default',
+        'subCategory': product['sub_category_name'],
+        'brand': product['brand'],
+        'description': product['description'],
+        'costPrice': prixHT - marge,
+        'prixHT': prixHT,
+        'taxe': (product['taxe'] ?? 0).toDouble(),
+        'prixTTC': (product['prix_ttc'] ?? 0).toDouble(),
+        'stock': product['stock'] ?? 0,
+        'sellable': product['sellable'] == 1,
+        'simpleProduct':
+            product['has_variants'] == 0, // True for simple products
+        'image': product['image'],
+        'status': product['status'] ?? 'En stock',
+        'dateExpiration': product['date_expiration'],
+      },
+      'variants': product['has_variants'] == 1
+          ? variants.map((v) => _variantToExportMap(v)).toList()
+          : [], // Empty array for simple products
+    };
+  }
+
+  Map<String, dynamic> _variantToExportMap(Map<String, dynamic> variant) {
+    return {
+      'name': variant['combination_name'] ?? '',
+      'defaultVariant': variant['default_variant'] == 1,
+      'priceImpact': (variant['price_impact'] ?? 0).toDouble(),
+      'stock': variant['stock'] ?? 0,
+      'attributes': _parseVariantAttributes(variant['attributes']),
+    };
+  }
+
+  Map<String, String> _parseVariantAttributes(dynamic attributes) {
+    if (attributes == null) return {};
+    try {
+      if (attributes is String) {
+        return Map<String, String>.from(jsonDecode(attributes));
+      }
+      return {};
+    } catch (e) {
+      debugPrint('Error parsing variant attributes: $e');
+      return {};
+    }
   }
 
   Future<Product?> getProductByCode(String? code) async {
@@ -1101,71 +1232,74 @@ await db.execute('''
   }
 
   // sqldb.dart (ajouts)
-Future<List<Map<String, dynamic>>> getProductMovementHistory(int productId, {String? timeHorizon}) async {
-  final db = await this.db;
-  
-  String whereClause = 'product_id = ?';
-  List<dynamic> whereArgs = [productId];
-  
-  if (timeHorizon != null) {
-    final cutoffDate = _getCutoffDate(timeHorizon);
-    whereClause += ' AND movement_date >= ?';
-    whereArgs.add(cutoffDate);
+  Future<List<Map<String, dynamic>>> getProductMovementHistory(int productId,
+      {String? timeHorizon}) async {
+    final db = await this.db;
+
+    String whereClause = 'product_id = ?';
+    List<dynamic> whereArgs = [productId];
+
+    if (timeHorizon != null) {
+      final cutoffDate = _getCutoffDate(timeHorizon);
+      whereClause += ' AND movement_date >= ?';
+      whereArgs.add(cutoffDate);
+    }
+
+    return await db.query(
+      'stock_movements',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'movement_date DESC',
+    );
   }
-  
-  return await db.query(
-    'stock_movements',
-    where: whereClause,
-    whereArgs: whereArgs,
-    orderBy: 'movement_date DESC',
-  );
-}
 
-Future<List<Map<String, dynamic>>> getVariantMovementHistory(int variantId, {String? timeHorizon}) async {
-  final db = await this.db;
-  
-  String whereClause = 'variant_id = ?';
-  List<dynamic> whereArgs = [variantId];
-  
-  if (timeHorizon != null) {
-    final cutoffDate = _getCutoffDate(timeHorizon);
-    whereClause += ' AND movement_date >= ?';
-    whereArgs.add(cutoffDate);
+  Future<List<Map<String, dynamic>>> getVariantMovementHistory(int variantId,
+      {String? timeHorizon}) async {
+    final db = await this.db;
+
+    String whereClause = 'variant_id = ?';
+    List<dynamic> whereArgs = [variantId];
+
+    if (timeHorizon != null) {
+      final cutoffDate = _getCutoffDate(timeHorizon);
+      whereClause += ' AND movement_date >= ?';
+      whereArgs.add(cutoffDate);
+    }
+
+    return await db.query(
+      'stock_movements',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'movement_date DESC',
+    );
   }
-  
-  return await db.query(
-    'stock_movements',
-    where: whereClause,
-    whereArgs: whereArgs,
-    orderBy: 'movement_date DESC',
-  );
-}
 
-String _getCutoffDate(String timeHorizon) {
-  final now = DateTime.now();
-  switch (timeHorizon) {
-    case 'short_term':
-      return now.subtract(Duration(days: 30)).toIso8601String();
-    case 'medium_term':
-      return now.subtract(Duration(days: 90)).toIso8601String();
-    case 'long_term':
-      return now.subtract(Duration(days: 365)).toIso8601String();
-    default:
-      return now.subtract(Duration(days: 30)).toIso8601String();
+  String _getCutoffDate(String timeHorizon) {
+    final now = DateTime.now();
+    switch (timeHorizon) {
+      case 'short_term':
+        return now.subtract(Duration(days: 30)).toIso8601String();
+      case 'medium_term':
+        return now.subtract(Duration(days: 90)).toIso8601String();
+      case 'long_term':
+        return now.subtract(Duration(days: 365)).toIso8601String();
+      default:
+        return now.subtract(Duration(days: 30)).toIso8601String();
+    }
   }
-}
 
-Future<List<Map<String, dynamic>>> getStockPredictions() async {
-  final db = await this.db;
-  return await db.query('stock_predictions');
-}
+  Future<List<Map<String, dynamic>>> getStockPredictions() async {
+    final db = await this.db;
+    return await db.query('stock_predictions');
+  }
 
-Future<List<Map<String, dynamic>>> getProductPredictions(int productId) async {
-  final db = await this.db;
-  return await db.query(
-    'stock_predictions',
-    where: 'product_id = ?',
-    whereArgs: [productId],
-  );
-}
+  Future<List<Map<String, dynamic>>> getProductPredictions(
+      int productId) async {
+    final db = await this.db;
+    return await db.query(
+      'stock_predictions',
+      where: 'product_id = ?',
+      whereArgs: [productId],
+    );
+  }
 }

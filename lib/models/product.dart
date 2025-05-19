@@ -24,6 +24,12 @@ class Product {
   String status;
   String? image; // Added image attribute
   String? brand; // Added brand attribute
+  bool earnsFidelityPoints; // Whether product earns points
+  int fidelityPointsEarned; // Points earned when buying
+  bool redeemableWithPoints; // Can be bought with points
+  int fidelityPointsCost; // Points needed to redeem
+  double? maxPointsDiscount; // Max discount allowed with points
+  double? pointsDiscountPercentage; // Discount percentage when using points
 
   Product({
     this.id, // Changed from default 0 to nullable
@@ -49,6 +55,12 @@ class Product {
     this.status = 'En stock',
     this.image, // Added to constructor
     this.brand, // Added to constructor
+    this.earnsFidelityPoints = false,
+    this.fidelityPointsEarned = 0,
+    this.redeemableWithPoints = false,
+    this.fidelityPointsCost = 0,
+    this.maxPointsDiscount,
+    this.pointsDiscountPercentage,
   });
 
   String get productReferenceId => id?.toString() ?? 'new';
@@ -77,6 +89,12 @@ class Product {
     String? status,
     String? image,
     String? brand,
+    bool? earnsFidelityPoints,
+    int? fidelityPointsEarned,
+    bool? redeemableWithPoints,
+    int? fidelityPointsCost,
+    double? maxPointsDiscount,
+    double? pointsDiscountPercentage,
   }) {
     return Product(
       id: id ?? this.id,
@@ -102,6 +120,13 @@ class Product {
       status: status ?? this.status,
       image: image ?? this.image,
       brand: brand ?? this.brand,
+      earnsFidelityPoints: earnsFidelityPoints ?? this.earnsFidelityPoints,
+      fidelityPointsEarned: fidelityPointsEarned ?? this.fidelityPointsEarned,
+      redeemableWithPoints: redeemableWithPoints ?? this.redeemableWithPoints,
+      fidelityPointsCost: fidelityPointsCost ?? this.fidelityPointsCost,
+      maxPointsDiscount: maxPointsDiscount ?? this.maxPointsDiscount,
+      pointsDiscountPercentage:
+          pointsDiscountPercentage ?? this.pointsDiscountPercentage,
     );
   }
 
@@ -128,6 +153,12 @@ class Product {
       'status': status,
       'image': image, // Added to toMap
       'brand': brand, // Added to toMap
+      'earns_fidelity_points': earnsFidelityPoints ? 1 : 0,
+      'fidelity_points_earned': fidelityPointsEarned,
+      'redeemable_with_points': redeemableWithPoints ? 1 : 0,
+      'fidelity_points_cost': fidelityPointsCost,
+      'max_points_discount': maxPointsDiscount,
+      'points_discount_percentage': pointsDiscountPercentage,
     };
 
     // Only include ID if it's not null and not 0 (for updates)
@@ -162,6 +193,13 @@ class Product {
       status: map['status'] ?? 'En stock',
       image: map['image'], // Added to fromMap
       brand: map['brand'], // Added to fromMap
+      earnsFidelityPoints: map['earns_fidelity_points'] == 1,
+      fidelityPointsEarned: map['fidelity_points_earned'] ?? 0,
+      redeemableWithPoints: map['redeemable_with_points'] == 1,
+      fidelityPointsCost: map['fidelity_points_cost'] ?? 0,
+      maxPointsDiscount: (map['max_points_discount'] as num?)?.toDouble(),
+      pointsDiscountPercentage:
+          (map['points_discount_percentage'] as num?)?.toDouble(),
     );
   }
 
@@ -179,6 +217,66 @@ class Product {
       return variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
     }
     return prixHT;
+  }
+
+  // New method to calculate points earned for a quantity
+  int calculatePointsEarned(int quantity) {
+    if (!earnsFidelityPoints) return 0;
+    return fidelityPointsEarned * quantity;
+  }
+
+  // New method to check if product can be redeemed with points
+  bool canRedeemWithPoints(int customerPoints) {
+    if (!redeemableWithPoints) return false;
+    return customerPoints >= fidelityPointsCost;
+  }
+
+  // New method to calculate maximum discount from points
+  double calculatePointsDiscount(int pointsToUse) {
+    if (!redeemableWithPoints || pointsDiscountPercentage == null) return 0.0;
+
+    // Calculate discount based on percentage
+    double discount = prixTTC * (pointsDiscountPercentage! / 100);
+
+    // Apply maximum discount limit if set
+    if (maxPointsDiscount != null && discount > maxPointsDiscount!) {
+      return maxPointsDiscount!;
+    }
+    return discount;
+  }
+
+  Map<String, dynamic> toExportMap() {
+    return {
+      'product': {
+        'name': designation,
+        'reference': code ?? '',
+        'category': categoryName ?? 'Default',
+        'subCategory': subCategoryName,
+        'brand': brand,
+        'description': description,
+        'costPrice': prixHT - marge,
+        'prixHT': prixHT,
+        'taxe': taxe,
+        'prixTTC': prixTTC,
+        'stock': stock,
+        'sellable': sellable,
+        'simpleProduct': !hasVariants, // True for simple products
+        'image': image,
+        'status': status,
+        'dateExpiration': dateExpiration,
+        'fidelity': {
+          'earnsPoints': earnsFidelityPoints,
+          'pointsEarned': fidelityPointsEarned,
+          'redeemable': redeemableWithPoints,
+          'pointsCost': fidelityPointsCost,
+          'maxDiscount': maxPointsDiscount,
+          'discountPercentage': pointsDiscountPercentage,
+        },
+      },
+      'variants': hasVariants
+          ? variants.map((v) => v.toExportMap()).toList()
+          : [], // Empty array for simple products
+    };
   }
 
   @override

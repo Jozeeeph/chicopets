@@ -44,6 +44,7 @@ dependencies:
   syncfusion_flutter_charts: ^20.4.48
   ml_algo: ^16.5.0
   ml_dataframe: ^1.6.0
+  http: ^1.3.0
   flutter:
     sdk: flutter
     

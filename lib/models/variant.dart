@@ -68,6 +68,16 @@ class Variant {
     return map;
   }
 
+  Map<String, dynamic> toExportMap() {
+    return {
+      'name': combinationName,
+      'defaultVariant': defaultVariant,
+      'priceImpact': priceImpact,
+      'stock': stock,
+      'attributes': attributes.isNotEmpty ? attributes : {},
+    };
+  }
+
   factory Variant.fromMap(Map<String, dynamic> map) {
     return Variant(
       id: map['id'],
@@ -105,8 +115,6 @@ class Variant {
   }
 
   bool get isValid {
-    return combinationName.isNotEmpty &&
-        price >= 0 &&
-        stock >= 0;
+    return combinationName.isNotEmpty && price >= 0 && stock >= 0;
   }
 }
