@@ -10,7 +10,8 @@ class Searchprod {
     final TextEditingController searchController = TextEditingController();
     ValueNotifier<List<Product>> filteredProducts = ValueNotifier([]);
 
-    Future<void> searchProducts(String? selectedCategory, {bool lowStock = false}) async {
+    Future<void> searchProducts(String? selectedCategory,
+        {bool lowStock = false}) async {
       filteredProducts.notifyListeners(); // Met à jour l'état du chargement
 
       List<Product> results = await sqldb.searchProducts(
@@ -52,7 +53,7 @@ class Searchprod {
                     color: Color(0xFF0056A6)),
               ),
               content: SizedBox(
-                width: 800,
+                width: 900,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -63,7 +64,8 @@ class Searchprod {
                           child: TextField(
                             controller: searchController,
                             decoration: InputDecoration(
-                              labelText: 'Recherche Produit (code ou désignation)',
+                              labelText:
+                                  'Recherche Produit (code ou désignation)',
                               prefixIcon: const Icon(Icons.search,
                                   color: Color(0xFF0056A6)),
                               border: OutlineInputBorder(
@@ -75,7 +77,8 @@ class Searchprod {
                                   borderSide: const BorderSide(
                                       color: Color(0xFF0056A6), width: 2)),
                             ),
-                            onChanged: (value) => searchProducts(selectedCategory),
+                            onChanged: (value) =>
+                                searchProducts(selectedCategory),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -92,7 +95,8 @@ class Searchprod {
                     Row(
                       children: [
                         // Sélecteur de catégorie
-                        Expanded(
+                        Flexible(
+                          // Changed from Expanded to Flexible
                           child: DropdownButtonFormField<String>(
                             decoration: InputDecoration(
                               border: OutlineInputBorder(
@@ -118,34 +122,40 @@ class Searchprod {
                               setState(() {
                                 selectedCategory = value;
                               });
-                              searchProducts(selectedCategory, lowStock: showLowStock);
+                              searchProducts(selectedCategory,
+                                  lowStock: showLowStock);
                             },
+                            isExpanded:
+                                true, // Add this to handle long category names
                           ),
                         ),
                         const SizedBox(width: 10),
-                        
+
                         // Bouton pour les produits en rupture de stock
                         ElevatedButton.icon(
                           icon: const Icon(Icons.warning, color: Colors.white),
                           label: const Text('Stock < 10'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: showLowStock ? Colors.orange : Colors.grey,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            backgroundColor:
+                                showLowStock ? Colors.orange : Colors.grey,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
-                          ),
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
                               showLowStock = !showLowStock;
                             });
-                            searchProducts(selectedCategory, lowStock: showLowStock);
+                            searchProducts(selectedCategory,
+                                lowStock: showLowStock);
                           },
                         ),
                       ],
                     ),
                     const SizedBox(height: 15),
-                    
+
                     // Affichage des résultats dans un tableau défilable
                     Expanded(
                       child: ValueListenableBuilder<List<Product>>(
@@ -154,11 +164,12 @@ class Searchprod {
                           return currentProducts.isEmpty
                               ? const Text("Aucun produit trouvé",
                                   style: TextStyle(
-                                      fontSize: 16, fontWeight: FontWeight.w500))
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500))
                               : Expanded(
                                   child: SingleChildScrollView(
-                                    scrollDirection:
-                                        Axis.horizontal, // Défilement horizontal
+                                    scrollDirection: Axis
+                                        .horizontal, // Défilement horizontal
                                     child: SingleChildScrollView(
                                       scrollDirection:
                                           Axis.vertical, // Défilement vertical
@@ -167,7 +178,8 @@ class Searchprod {
                                         decoration: BoxDecoration(
                                           border: Border.all(
                                               color: Colors.grey.shade300),
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         columns: const [
                                           DataColumn(
@@ -199,27 +211,32 @@ class Searchprod {
                                         rows: currentProducts.map((product) {
                                           return DataRow(
                                             cells: [
-                                              DataCell(Text(product.designation)),
-                                              DataCell(Text(product.code ?? '')),
+                                              DataCell(
+                                                  Text(product.designation)),
+                                              DataCell(
+                                                  Text(product.code ?? '')),
                                               DataCell(Text(
                                                   product.stock.toString(),
                                                   style: TextStyle(
-                                                    color: product.stock < 10 
-                                                        ? Colors.red 
+                                                    color: product.stock < 10
+                                                        ? Colors.red
                                                         : Colors.black,
-                                                    fontWeight: product.stock < 10
-                                                        ? FontWeight.bold
-                                                        : FontWeight.normal,
+                                                    fontWeight:
+                                                        product.stock < 10
+                                                            ? FontWeight.bold
+                                                            : FontWeight.normal,
                                                   ))),
                                               DataCell(Text(
                                                   "${product.prixTTC.toStringAsFixed(2)} TND")),
                                               DataCell(Text(
-                                                  product.dateExpiration ?? "N/A")),
+                                                  product.dateExpiration ??
+                                                      "N/A")),
                                             ],
-                                            color: MaterialStateProperty.resolveWith<
-                                                Color>((states) {
+                                            color: MaterialStateProperty
+                                                .resolveWith<Color>((states) {
                                               // Alternating row colors
-                                              return currentProducts.indexOf(product) %
+                                              return currentProducts.indexOf(
+                                                              product) %
                                                           2 ==
                                                       0
                                                   ? Colors.grey.shade50
@@ -257,8 +274,8 @@ class Searchprod {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child:
-                      const Text('Réinitialiser', style: TextStyle(fontSize: 16)),
+                  child: const Text('Réinitialiser',
+                      style: TextStyle(fontSize: 16)),
                 ),
 
                 // Bouton Fermer (rouge)
