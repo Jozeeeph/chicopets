@@ -3,183 +3,268 @@ import 'dart:math';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
+import 'package:caissechicopets/models/orderline.dart';
+import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/sqldb.dart';
 import 'package:sqflite/sqflite.dart';
 
 class FidelityController {
+  static const String _pointsTable = 'client_points';
+  static const String _rulesTable = 'fidelity_rules';
+  static const String _clientsTable = 'clients';
+
   Future<FidelityRules> getFidelityRules(Database db) async {
-  final List<Map<String, dynamic>> maps = 
-      await db.query('fidelity_rules', limit: 1);
-  
-  if (maps.isEmpty) {
-    // Créer des règles par défaut si la table est vide
-    final defaultRules = FidelityRules();
-    await db.insert('fidelity_rules', defaultRules.toMap());
-    return defaultRules;
-  }
-  
-  return FidelityRules.fromMap(maps.first);
-}
+    try {
+      final List<Map<String, dynamic>> maps = 
+          await db.query(_rulesTable, limit: 1);
 
- Future<int> updateFidelityRules(FidelityRules rules, Database db) async {
-  // Vérifier d'abord si des règles existent
-  final count = Sqflite.firstIntValue(
-    await db.rawQuery('SELECT COUNT(*) FROM fidelity_rules')
-  ) ?? 0;
+      if (maps.isEmpty) {
+        final defaultRules = FidelityRules();
+        await db.insert(_rulesTable, defaultRules.toMap());
+        return defaultRules;
+      }
 
-  if (count == 0) {
-    // Insérer si aucune règle n'existe
-    return await db.insert('fidelity_rules', rules.toMap());
-  } else {
-    // Mettre à jour si des règles existent déjà
-    return await db.update(
-      'fidelity_rules',
-      rules.toMap(),
-      where: 'id = ?',
-      whereArgs: [1],
-    );
+      return FidelityRules.fromMap(maps.first);
+    } catch (e) {
+      print('Error getting fidelity rules: $e');
+      return FidelityRules(); // Return default rules on error
+    }
   }
-}
+
+  Future<int> updateFidelityRules(FidelityRules rules, Database db) async {
+    try {
+      final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM $_rulesTable')) ?? 0;
+
+      if (count == 0) {
+        return await db.insert(_rulesTable, rules.toMap());
+      } else {
+        return await db.update(
+          _rulesTable,
+          rules.toMap(),
+          where: 'id = ?',
+          whereArgs: [1],
+        );
+      }
+    } catch (e) {
+      print('Error updating fidelity rules: $e');
+      return 0;
+    }
+  }
+
+  Future<void> addPointsToClient({
+    required int clientId,
+    required int points,
+    required Database db,
+    required int orderId,
+    required String reason,
+  }) async {
+    try {
+      await db.insert(_pointsTable, {
+        'client_id': clientId,
+        'points': points,
+        'order_id': orderId,
+        'reason': reason,
+        'date_earned': DateTime.now().toIso8601String(),
+        'expiry_date': DateTime.now()
+            .add(const Duration(days: 365))
+            .toIso8601String(),
+        'is_used': 0,
+      });
+
+      await db.rawUpdate('''
+        UPDATE $_clientsTable 
+        SET loyalty_points = loyalty_points + ? 
+        WHERE id = ?
+      ''', [points, clientId]);
+    } catch (e) {
+      print('Error adding points to client: $e');
+      rethrow;
+    }
+  }
 
   Future<void> addPointsFromOrder(Order order, Database db) async {
     if (order.idClient == null) return;
 
-    final rules = await getFidelityRules(db);
+    try {
+      final rules = await getFidelityRules(db);
+      final client = await _getClientById(order.idClient!, db);
+      if (client == null) return;
 
-    // Récupérer le client directement depuis la base
-    final clientMaps = await db.query(
-      'clients',
-      where: 'id = ?',
-      whereArgs: [order.idClient],
-      limit: 1,
-    );
+      double orderTotal = order.orderLines.fold(
+        0, 
+        (sum, line) => sum + (line.prixUnitaire * line.quantity)
+      );
 
-    if (clientMaps.isEmpty) return;
+      int pointsEarned = (orderTotal * rules.pointsPerDinar).round();
+      if (pointsEarned <= 0) return;
 
-    // Calcul des points gagnés (sur le total AVANT remise)
-    double orderTotal = order.orderLines
-        .fold(0, (sum, line) => sum + (line.prixUnitaire * line.quantity));
-
-    int pointsEarned = (orderTotal * rules.pointsPerDinar).round();
-
-    if (pointsEarned <= 0) return;
-
-    // Mise à jour du client
-    await db.update(
-      'clients',
-      {
-        'loyalty_points':
-            (clientMaps.first['loyalty_points'] as int) + pointsEarned,
-        'last_purchase_date': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [order.idClient],
-    );
+      await db.update(
+        _clientsTable,
+        {
+          'loyalty_points': client.loyaltyPoints + pointsEarned,
+          'last_purchase_date': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [order.idClient],
+      );
+    } catch (e) {
+      print('Error adding points from order: $e');
+    }
   }
 
-  Future<bool> canUsePoints(
-      Client client, double orderTotal, Database db) async {
-    final rules = await getFidelityRules(db);
+  Future<bool> canUsePoints(Client client, double orderTotal, Database db) async {
+    try {
+      final rules = await getFidelityRules(db);
 
-    // Vérifier si le client a assez de points
-    if (client.loyaltyPoints < rules.minPointsToUse) {
-      return false;
-    }
-
-    // Vérifier si les points sont expirés
-    if (rules.pointsValidityMonths > 0 && client.lastPurchaseDate != null) {
-      final expirationDate = client.lastPurchaseDate!.add(
-        Duration(days: 30 * rules.pointsValidityMonths),
-      );
-      if (DateTime.now().isAfter(expirationDate)) {
+      if (client.loyaltyPoints < rules.minPointsToUse) {
         return false;
       }
-    }
 
-    return true;
+      if (rules.pointsValidityMonths > 0 && client.lastPurchaseDate != null) {
+        final expirationDate = client.lastPurchaseDate!.add(
+          Duration(days: 30 * rules.pointsValidityMonths),
+        );
+        if (DateTime.now().isAfter(expirationDate)) {
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('Error checking if points can be used: $e');
+      return false;
+    }
   }
 
   Future<double> calculateMaxPointsUsage(
       Client client, double orderTotal, Database db) async {
-    final rules = await getFidelityRules(db);
+    try {
+      final rules = await getFidelityRules(db);
+      double maxPointsValue = orderTotal * (rules.maxPercentageUse / 100);
+      double maxPoints = maxPointsValue / rules.dinarPerPoint;
 
-    // Calculer le maximum en points
-    double maxPointsValue = orderTotal * (rules.maxPercentageUse / 100);
-    double maxPoints = maxPointsValue / rules.dinarPerPoint;
-
-    // Ne pas dépasser les points disponibles
-    if (maxPoints > client.loyaltyPoints) {
-      maxPoints = client.loyaltyPoints.toDouble();
+      return min(maxPoints, client.loyaltyPoints.toDouble());
+    } catch (e) {
+      print('Error calculating max points usage: $e');
+      return 0.0;
     }
+  }
 
-    return maxPoints;
+  Future<int> calculateLoyaltyPoints({
+    required OrderLine orderLine,
+    required FidelityRules rules,
+    required Database db,
+  }) async {
+    try {
+      Product? product;
+      
+      if (orderLine.productData != null) {
+        product = Product.fromMap(orderLine.productData!);
+      } else if (orderLine.productId != null) {
+        product = await SqlDb().getProductById(orderLine.productId!);
+      }
+
+      if (product != null && product.earnsFidelityPoints) {
+        return (product.fidelityPointsEarned ?? 0) * orderLine.quantity;
+      } else {
+        return (orderLine.finalPrice * orderLine.quantity * 
+            (rules.pointsPerDinar / 100)).round();
+      }
+    } catch (e) {
+      print('Error calculating loyalty points: $e');
+      return 0;
+    }
   }
 
   Future<void> usePoints(Client client, int pointsUsed, Database db) async {
     if (pointsUsed <= 0) return;
 
-    await db.update(
-      'clients',
-      {
-        'loyalty_points': client.loyaltyPoints - pointsUsed,
-        'last_purchase_date': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [client.id],
-    );
+    try {
+      await db.update(
+        _clientsTable,
+        {
+          'loyalty_points': client.loyaltyPoints - pointsUsed,
+          'last_purchase_date': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [client.id],
+      );
+    } catch (e) {
+      print('Error using points: $e');
+      rethrow;
+    }
   }
 
   Future<void> cleanExpiredPoints(Database db) async {
-    final rules = await getFidelityRules(db);
-    if (rules.pointsValidityMonths == 0) return;
+    try {
+      final rules = await getFidelityRules(db);
+      if (rules.pointsValidityMonths == 0) return;
 
-    final thresholdDate = DateTime.now().subtract(
-      Duration(days: 30 * rules.pointsValidityMonths),
-    );
+      final thresholdDate = DateTime.now().subtract(
+        Duration(days: 30 * rules.pointsValidityMonths),
+      );
 
-    await db.update(
-      'clients',
-      {'loyalty_points': 0},
-      where: 'last_purchase_date < ? AND loyalty_points > 0',
-      whereArgs: [thresholdDate.toIso8601String()],
-    );
+      await db.update(
+        _clientsTable,
+        {'loyalty_points': 0},
+        where: 'last_purchase_date < ? AND loyalty_points > 0',
+        whereArgs: [thresholdDate.toIso8601String()],
+      );
+    } catch (e) {
+      print('Error cleaning expired points: $e');
+    }
   }
 
   Future<double> calculateMaxPointsDiscount(
       Client client, double orderTotal, Database db) async {
-    final rules = await getFidelityRules(db);
+    try {
+      final rules = await getFidelityRules(db);
+      double maxDinars = orderTotal * (rules.maxPercentageUse / 100);
+      double maxPoints = maxDinars / rules.dinarPerPoint;
 
-    // Calculer la valeur max en dinars qu'on peut utiliser
-    double maxDinars = orderTotal * (rules.maxPercentageUse / 100);
-
-    // Convertir en points
-    double maxPoints = maxDinars / rules.dinarPerPoint;
-
-    // Ne pas dépasser les points disponibles
-    if (maxPoints > client.loyaltyPoints) {
-      maxPoints = client.loyaltyPoints.toDouble();
+      return min(maxPoints, client.loyaltyPoints.toDouble());
+    } catch (e) {
+      print('Error calculating max points discount: $e');
+      return 0.0;
     }
-
-    return maxPoints;
   }
 
   Future<void> applyPointsToOrder(
       Order order, Client client, int pointsUsed, Database db) async {
-    final rules = await getFidelityRules(db);
-    double discountAmount = pointsUsed * rules.dinarPerPoint;
+    try {
+      final rules = await getFidelityRules(db);
+      double discountAmount = pointsUsed * rules.dinarPerPoint;
 
-    // Appliquer la réduction au total
-    order.total = max(0, order.total - discountAmount);
+      order.total = max(0, order.total - discountAmount);
 
-    // Mettre à jour le statut si le total est complètement payé
-    if (order.total <= 0) {
-      order.status = "payée";
-      order.remainingAmount = 0.0;
+      if (order.total <= 0) {
+        order.status = "payée";
+        order.remainingAmount = 0.0;
+      }
+
+      await usePoints(client, pointsUsed, db);
+      await addPointsFromOrder(order, db);
+    } catch (e) {
+      print('Error applying points to order: $e');
+      rethrow;
     }
+  }
 
-    // Mettre à jour le client
-    await usePoints(client, pointsUsed, db);
+  Future<Client?> _getClientById(int clientId, Database db) async {
+    try {
+      final clientMaps = await db.query(
+        _clientsTable,
+        where: 'id = ?',
+        whereArgs: [clientId],
+        limit: 1,
+      );
 
-    // Ajouter les points gagnés sur cette commande
-    await addPointsFromOrder(order, db);
+      if (clientMaps.isEmpty) return null;
+      return Client.fromMap(clientMaps.first);
+    } catch (e) {
+      print('Error getting client by ID: $e');
+      return null;
+    }
   }
 }

@@ -37,35 +37,16 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Formulaire pour ajouter un nouveau mode de paiement
-            Form(
-              key: _formKey,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _newMethodController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nouveau mode de paiement',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer un nom';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: _addPaymentMethod,
-                    child: const Text('Ajouter'),
-                  ),
-                ],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.restore),
+                  label: const Text('Restaurer les méthodes par défaut'),
+                  onPressed: _resetToDefaultMethods,
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
             // Liste des modes de paiement
             Expanded(
               child: FutureBuilder<List<PaymentMethod>>(
@@ -103,11 +84,6 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
                                     _toggleMethodStatus(method, value),
                                 activeColor: Colors.green,
                               ),
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deleteMethod(method),
-                              ),
                             ],
                           ),
                         ),
@@ -123,31 +99,54 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
     );
   }
 
-  Future<void> _addPaymentMethod() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _resetToDefaultMethods() async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirmer la réinitialisation'),
+            content: const Text(
+                'Cette action va supprimer tous les modes de paiement personnalisés et restaurer les méthodes par défaut. Continuer?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Confirmer',
+                    style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
 
-    final name = _newMethodController.text.trim();
-    try {
-      final method = PaymentMethod(
-        name: name,
-        isActive: true,
-        createdAt: DateTime.now(),
-      );
+    if (confirmed) {
+      try {
+        final sqlDb = SqlDb();
+        final db = await sqlDb.db;
 
-      await SqlDb().addPaymentMethod(method);
-      _newMethodController.clear();
-      _refreshPaymentMethods();
+        // Clear existing methods
+        await db.delete('payment_methods');
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mode de paiement ajouté avec succès')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
-        );
+        // Insert default methods
+        await sqlDb.insertDefaultPaymentMethods(db);
+
+        _refreshPaymentMethods();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Méthodes de paiement réinitialisées avec succès')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: ${e.toString()}')),
+          );
+        }
       }
     }
   }
@@ -160,43 +159,6 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Erreur lors de la mise à jour')),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteMethod(PaymentMethod method) async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Confirmer la suppression'),
-            content: Text('Supprimer le mode de paiement "${method.name}" ?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Supprimer',
-                    style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (confirmed && mounted) {
-      try {
-        await SqlDb().deletePaymentMethod(method.id!);
-        _refreshPaymentMethods();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mode de paiement supprimé')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}')),
         );
       }
     }

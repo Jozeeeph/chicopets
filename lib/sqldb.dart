@@ -42,7 +42,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -51,14 +51,12 @@ class SqlDb {
     }
 
     // Open the database
-    return await openDatabase(
-      dbPath,
-      version: 1,
-      onCreate: (Database db, int version) async {
-        try {
-          print("Creating tables...");
+    return await openDatabase(dbPath, version: 1,
+        onCreate: (Database db, int version) async {
+      try {
+        print("Creating tables...");
 
-          await db.execute('''
+        await db.execute('''
   CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT,
@@ -90,9 +88,9 @@ class SqlDb {
     points_discount_percentage REAL
     );
     ''');
-          print("Products table created");
+        print("Products table created");
 
-          await db.execute('''
+        await db.execute('''
   CREATE TABLE orders (
     id_order INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT,
@@ -150,9 +148,9 @@ class SqlDb {
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 ''');
-          print("Orders table created");
+        print("Orders table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE order_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             id_order INTEGER NOT NULL,
@@ -175,9 +173,9 @@ class SqlDb {
           );
 
         ''');
-          print("Order items table created");
+        print("Order items table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE categories (
             id_category INTEGER PRIMARY KEY AUTOINCREMENT,
             category_name TEXT NOT NULL,
@@ -185,9 +183,9 @@ class SqlDb {
             is_deleted INTEGER DEFAULT 0 CHECK (is_deleted IN (0, 1))
           );
         ''');
-          print("Categories table created");
+        print("Categories table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE sub_categories (
             id_sub_category INTEGER PRIMARY KEY AUTOINCREMENT,
             sub_category_name TEXT NOT NULL,
@@ -198,9 +196,9 @@ class SqlDb {
             FOREIGN KEY (category_id) REFERENCES categories (id_category) ON DELETE CASCADE
           );
         ''');
-          print("Sub-categories table created");
+        print("Sub-categories table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE variants (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT,
@@ -215,9 +213,9 @@ class SqlDb {
             FOREIGN KEY (product_id) REFERENCES products(id)
           );
         ''');
-          print("Variants table created");
+        print("Variants table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE gallery_images (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             image_path TEXT NOT NULL,
@@ -225,9 +223,9 @@ class SqlDb {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
           );
         ''');
-          print("Gallery images table created");
+        print("Gallery images table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
@@ -236,9 +234,9 @@ class SqlDb {
             is_active INTEGER DEFAULT 1
           );
         ''');
-          print("Users table created");
+        print("Users table created");
 
-          await db.execute('''
+        await db.execute('''
           CREATE TABLE clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -250,9 +248,24 @@ class SqlDb {
             last_purchase_date TEXT
           );
         ''');
-          print("Clients table created");
+        print("Clients table created");
 
-          await db.execute('''
+        await db.execute('''
+    CREATE TABLE IF NOT EXISTS client_points (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL,
+      points INTEGER NOT NULL,
+      order_id INTEGER,
+      reason TEXT,
+      date_earned TEXT NOT NULL,
+      expiry_date TEXT NOT NULL,
+      is_used INTEGER DEFAULT 0,
+      FOREIGN KEY (client_id) REFERENCES clients (id),
+      FOREIGN KEY (order_id) REFERENCES orders (id)
+    )
+  ''');
+
+        await db.execute('''
           CREATE TABLE attributes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -260,20 +273,20 @@ class SqlDb {
             UNIQUE(name) ON CONFLICT REPLACE
           );
         ''');
-          print("Attributes table created");
+        print("Attributes table created");
 
-          await db.execute('''
+        await db.execute('''
             CREATE TABLE payment_methods (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       icon TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL
 );
           ''');
-          print("payment_methods table created");
-          // Après la création des tables
-          await db.execute('''
+        print("payment_methods table created");
+        // Après la création des tables
+        await db.execute('''
             CREATE VIEW IF NOT EXISTS sales_report_view AS
               SELECT
     o.id_order,
@@ -296,7 +309,7 @@ class SqlDb {
   LEFT JOIN categories c ON p.category_id = c.id_category
   WHERE o.status IN ('payée', 'semi-payée')
 ''');
-          await db.execute('''
+        await db.execute('''
             CREATE TABLE fidelity_rules (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               points_per_dinar REAL NOT NULL DEFAULT 0.1,
@@ -306,8 +319,8 @@ class SqlDb {
               points_validity_months INTEGER NOT NULL DEFAULT 12
             );
         ''');
-          print("Fidelity rules table created");
-          await db.execute('''
+        print("Fidelity rules table created");
+        await db.execute('''
   CREATE TABLE vouchers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
@@ -323,12 +336,13 @@ class SqlDb {
     FOREIGN KEY (client_id) REFERENCES clients (id)
 );
 ''');
-        } catch (e) {
-          print("Error creating tables: $e");
-          rethrow;
-        }
-        // Dans la méthode onCreate
-        await db.execute('''
+        await _ensureDefaultPaymentMethods(db);
+      } catch (e) {
+        print("Error creating tables: $e");
+        rethrow;
+      }
+      // Dans la méthode onCreate
+      await db.execute('''
   CREATE TABLE stock_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
@@ -349,7 +363,7 @@ class SqlDb {
   )
 ''');
 
-        await db.execute('''
+      await db.execute('''
   CREATE TABLE stock_predictions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
@@ -361,7 +375,7 @@ class SqlDb {
   )
 ''');
 
-        await db.execute('''
+      await db.execute('''
   CREATE TABLE IF NOT EXISTS stock_prediction_stats (
     product_id INTEGER NOT NULL,
     variant_id INTEGER,
@@ -374,21 +388,26 @@ class SqlDb {
     FOREIGN KEY (variant_id) REFERENCES variants(id)
   )
 ''');
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('''
-          CREATE TABLE IF NOT EXISTS orders(
-            id_order INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            total REAL,
-            mode_paiement TEXT,
-            id_client INTEGER
-          );
+    }, onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 2) {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS payment_methods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            icon TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+          )
         ''');
+        print("Added payment_methods table in upgrade");
+
+        // Insert default payment methods only if the table is empty
+        final isEmpty = await _isTableEmpty(db, 'payment_methods');
+        if (isEmpty) {
+          await insertDefaultPaymentMethods(db);
         }
-      },
-    );
+      }
+    });
   }
 
   //PRODUCT Repository
@@ -1141,7 +1160,7 @@ class SqlDb {
   Future<void> createPaymentMethodsTable() async {
     final db = await this.db;
 
-    // Version simplifiée et corrigée
+    // Create the table if it doesn't exist
     await db.execute('''
     CREATE TABLE IF NOT EXISTS payment_methods (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1152,31 +1171,93 @@ class SqlDb {
     )
   ''');
 
-    // Vérifier si la table est vide
-    final count = Sqflite.firstIntValue(
-            await db.rawQuery('SELECT COUNT(*) FROM payment_methods')) ??
-        0;
+    // Check if table is empty
+    final isEmpty = await _isTableEmpty(db, 'payment_methods');
 
-    if (count == 0) {
-      // Insertion des méthodes par défaut en une seule transaction
-      await db.transaction((txn) async {
-        final defaultMethods = [
-          {'name': 'Espèce', 'is_active': 1},
-          {'name': 'TPE', 'is_active': 1},
-          {'name': 'Chèque', 'is_active': 1},
-          {'name': 'Ticket Restaurant', 'is_active': 1},
-          {'name': 'Bon d\'achat', 'is_active': 1},
-          {'name': 'Mixte', 'is_active': 1},
-        ];
-
-        for (final method in defaultMethods) {
-          await txn.insert('payment_methods', {
-            ...method,
-            'created_at': DateTime.now().toIso8601String(),
-          });
-        }
-      });
+    if (isEmpty) {
+      await insertDefaultPaymentMethods(db);
     }
+  }
+
+  Future<bool> _isTableEmpty(Database db, String tableName) async {
+    final count = await db.rawQuery('SELECT COUNT(*) FROM $tableName');
+    return Sqflite.firstIntValue(count) == 0;
+  }
+
+  Future<void> _ensureDefaultPaymentMethods(Database db) async {
+    final isEmpty = await _isTableEmpty(db, 'payment_methods');
+    if (isEmpty) {
+      await insertDefaultPaymentMethods(db);
+    }
+  }
+
+  Future<void> insertDefaultPaymentMethods(Database db) async {
+    final defaultMethods = [
+      {
+        'name': 'Espèce', // Cash
+        'icon': 'assets/icons/cash.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'TPE', // Credit/Debit Card
+        'icon': 'assets/icons/credit-card.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Chèque', // Check
+        'icon': 'assets/icons/check.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Ticket Restaurant', // Meal voucher
+        'icon': 'assets/icons/meal-voucher.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Ticket Cadeau',
+        'icon': 'assets/icons/meal-voucher.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Bon d\'achat', // Gift card
+        'icon': 'assets/icons/gift-card.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Virement', // Bank transfer
+        'icon': 'assets/icons/bank-transfer.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Traite', // Draft
+        'icon': 'assets/icons/draft.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+      {
+        'name': 'Mixte', // Mixed payment
+        'icon': 'assets/icons/mixed-payment.png',
+        'is_active': 1,
+        'created_at': DateTime.now().toIso8601String()
+      },
+    ];
+
+    await db.transaction((txn) async {
+      for (final method in defaultMethods) {
+        try {
+          await txn.insert('payment_methods', method);
+        } catch (e) {
+          debugPrint('Error inserting default payment method: $e');
+        }
+      }
+    });
   }
 
   Future<List<PaymentMethod>> getPaymentMethods(

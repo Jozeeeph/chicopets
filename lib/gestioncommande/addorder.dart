@@ -185,7 +185,7 @@ class Addorder {
     double giftTicketAmount = 0.0;
     TextEditingController giftTicketAmountController = TextEditingController();
 
-// Traite
+    // Traite
     String traiteNumber = '';
     String traiteBank = '';
     String traiteBeneficiary = '';
@@ -193,7 +193,7 @@ class Addorder {
     double traiteAmount = 0.0;
     TextEditingController traiteAmountController = TextEditingController();
 
-// Virement
+    // Virement
     String virementReference = '';
     String virementBank = '';
     String virementSender = '';
@@ -660,20 +660,12 @@ class Addorder {
                                 Text("Mode: Carte"),
                                 Text(
                                     "Montant: ${cardAmount.toStringAsFixed(2)} DT"),
-                                if (cardTransactionId != null)
-                                  Text("Transaction: $cardTransactionId"),
                               ],
 
                               if (selectedPaymentMethod == "Chèque") ...[
                                 Text("Mode: Chèque"),
                                 Text(
                                     "Montant: ${checkAmount.toStringAsFixed(2)} DT"),
-                                if (checkNumber != null)
-                                  Text("N°: $checkNumber"),
-                                if (bankName != null) Text("Banque: $bankName"),
-                                if (checkDate != null)
-                                  Text(
-                                      "Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
                               ],
 
                               if (selectedPaymentMethod ==
@@ -708,9 +700,6 @@ class Addorder {
                                 Text("N°: $traiteNumber"),
                                 Text("Banque: $traiteBank"),
                                 Text("Bénéficiaire: $traiteBeneficiary"),
-                                if (traiteDate != null)
-                                  Text(
-                                      "Date d'échéance: ${DateFormat('dd/MM/yyyy').format(traiteDate!)}"),
                               ],
 
                               if (selectedPaymentMethod == "Virement") ...[
@@ -720,17 +709,12 @@ class Addorder {
                                 Text("Référence: $virementReference"),
                                 Text("Banque: $virementBank"),
                                 Text("Émetteur: $virementSender"),
-                                if (virementDate != null)
-                                  Text(
-                                      "Date: ${DateFormat('dd/MM/yyyy').format(virementDate!)}"),
                               ],
 
                               if (selectedPaymentMethod == "Bon d'achat") ...[
                                 Text("Mode: Bon d'achat"),
                                 Text(
                                     "Montant: ${voucherAmount.toStringAsFixed(2)} DT"),
-                                if (selectedVoucher != null)
-                                  Text("N°: ${selectedVoucher?.id}"),
                               ],
 
                               if (selectedPaymentMethod == "Mixte") ...[
@@ -741,19 +725,10 @@ class Addorder {
                                 if (cardAmount > 0) ...[
                                   Text(
                                       "- Carte: ${cardAmount.toStringAsFixed(2)} DT"),
-                                  if (cardTransactionId != null)
-                                    Text("  Transaction: $cardTransactionId"),
                                 ],
                                 if (checkAmount > 0) ...[
                                   Text(
                                       "- Chèque: ${checkAmount.toStringAsFixed(2)} DT"),
-                                  if (checkNumber != null)
-                                    Text("  N°: $checkNumber"),
-                                  if (bankName != null)
-                                    Text("  Banque: $bankName"),
-                                  if (checkDate != null)
-                                    Text(
-                                        "  Date: ${DateFormat('dd/MM/yyyy').format(checkDate!)}"),
                                 ],
                                 if ((ticketRestaurantAmount) > 0) ...[
                                   Text(
@@ -775,11 +750,9 @@ class Addorder {
                                       "- Virement: ${virementAmount.toStringAsFixed(2)} DT"),
                                   Text("  Référence: $virementReference"),
                                 ],
-                                if ((voucherAmount ) > 0) ...[
+                                if ((voucherAmount) > 0) ...[
                                   Text(
                                       "- Bon d'achat: ${voucherAmount.toStringAsFixed(2)} DT"),
-                                  if (selectedVoucher != null)
-                                    Text("  N°: ${selectedVoucher?.id}"),
                                 ],
                               ],
                               Divider(thickness: 1, color: Colors.black),
@@ -1144,7 +1117,6 @@ class Addorder {
 
                             // Payment options
                             Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text("Mode de Paiement:",
                                     style:
@@ -1152,68 +1124,101 @@ class Addorder {
                                 if (paymentMethods.isEmpty)
                                   Text("Aucun mode de paiement configuré",
                                       style: TextStyle(color: Colors.red)),
-                                Row(
-                                  children: paymentMethods.map((method) {
-                                    return Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Radio<String>(
-                                          value: method.name,
-                                          groupValue: selectedPaymentMethod,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              selectedPaymentMethod = value;
-                                            });
-                                          },
-                                        ),
-                                        Text(method.name),
-                                        SizedBox(
-                                            width:
-                                                8), // Espacement entre les options
-                                      ],
+
+                                // Payment method dropdown
+                                DropdownButtonFormField<String>(
+                                  value: selectedPaymentMethod,
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                  ),
+                                  items: paymentMethods.map((method) {
+                                    return DropdownMenuItem<String>(
+                                      value: method.name,
+                                      child: Text(method.name),
                                     );
                                   }).toList(),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedPaymentMethod = value;
+                                      // Reset all amounts when changing payment method
+                                      cashAmount = 0.0;
+                                      cardAmount = 0.0;
+                                      checkAmount = 0.0;
+                                      ticketRestaurantAmount = 0.0;
+                                      voucherAmount = 0.0;
+                                      giftTicketAmount = 0.0;
+                                      traiteAmount = 0.0;
+                                      virementAmount = 0.0;
+                                      amountGivenController.text = '';
+                                      amountGivenTPEController.text = '';
+                                      amountGivenChequeController.text = '';
+                                      ticketValueController.text = '';
+                                      giftTicketAmountController.text = '';
+                                      traiteAmountController.text = '';
+                                      virementAmountController.text = '';
+                                      changeReturnedController.text = "0.00";
+                                    });
+                                  },
+                                  isExpanded: true,
                                 ),
+                                SizedBox(height: 16),
 
                                 // Espèce payment fields
                                 if (selectedPaymentMethod == "Espèce")
-                                  TextField(
-                                    controller: amountGivenController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      labelText: "Montant donné (DT)",
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        String cleanedValue = cleanInput(value);
-                                        if (cleanedValue == 'NEGATIVE') {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                  "Veuillez entrer un nombre positif."),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                          amountGivenController.text = '';
-                                          return;
-                                        }
-                                        amountGivenController.text =
-                                            cleanedValue;
-                                        amountGivenController.selection =
-                                            TextSelection.fromPosition(
-                                                TextPosition(
-                                                    offset:
-                                                        cleanedValue.length));
-                                        cashAmount =
-                                            double.tryParse(cleanedValue) ??
-                                                0.0;
-                                        changeReturned = cashAmount - total;
-                                        changeReturnedController.text =
-                                            changeReturned.toStringAsFixed(2);
-                                      });
-                                    },
+                                  Column(
+                                    children: [
+                                      TextField(
+                                        controller: amountGivenController,
+                                        keyboardType: TextInputType.number,
+                                        decoration: InputDecoration(
+                                          labelText: "Montant donné (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            String cleanedValue =
+                                                cleanInput(value);
+                                            if (cleanedValue == 'NEGATIVE') {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                      "Veuillez entrer un nombre positif."),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                              amountGivenController.text = '';
+                                              return;
+                                            }
+                                            amountGivenController.text =
+                                                cleanedValue;
+                                            amountGivenController.selection =
+                                                TextSelection.fromPosition(
+                                                    TextPosition(
+                                                        offset: cleanedValue
+                                                            .length));
+                                            cashAmount =
+                                                double.tryParse(cleanedValue) ??
+                                                    0.0;
+                                            changeReturned = cashAmount - total;
+                                            changeReturnedController.text =
+                                                changeReturned
+                                                    .toStringAsFixed(2);
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(height: 10),
+                                      TextField(
+                                        controller: changeReturnedController,
+                                        readOnly: true,
+                                        decoration: InputDecoration(
+                                          labelText: "Monnaie rendue (DT)",
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      ),
+                                    ],
                                   ),
 
                                 // TPE payment fields
@@ -1611,6 +1616,7 @@ class Addorder {
                                     ],
                                   ),
 
+                                // Bon d'achat payment fields
                                 if (selectedPaymentMethod == "Bon d'achat")
                                   Column(
                                     children: [
@@ -1730,6 +1736,7 @@ class Addorder {
                                     ],
                                   ),
 
+                                // Ticket cadeau payment fields
                                 if (selectedPaymentMethod == "Ticket cadeau")
                                   Column(
                                     children: [
@@ -2311,23 +2318,14 @@ class Addorder {
 
                                       SizedBox(height: 10),
                                       Text(
-                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount + (ticketRestaurantAmount ?? 0) + (voucherAmount ?? 0)).toStringAsFixed(2)} DT / ${total.toStringAsFixed(2)} DT",
+                                        "Total saisi: ${(cashAmount + cardAmount + checkAmount + ticketRestaurantAmount + (voucherAmount ?? 0)).toStringAsFixed(2)} DT",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
 
-                                SizedBox(height: 10),
-                                if (selectedPaymentMethod == "Espèce")
-                                  TextField(
-                                    controller: changeReturnedController,
-                                    readOnly: true,
-                                    decoration: InputDecoration(
-                                      labelText: "Monnaie rendue (DT)",
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
+                                // Number of tickets to print
                                 SizedBox(height: 16),
                                 Row(
                                   children: [
@@ -2850,16 +2848,70 @@ class Addorder {
       }
 
       // Handle loyalty points
-      if (selectedClient != null) {
-        final db = await SqlDb().db;
-        final fidelityController = FidelityController();
+      if (selectedClient != null && selectedClient.id != null) {
+        try {
+          final db = await SqlDb().db;
+          final fidelityController = FidelityController();
+          final fidelityRules = await fidelityController.getFidelityRules(db);
 
-        if (useLoyaltyPoints && pointsToUse > 0) {
-          await fidelityController.applyPointsToOrder(
-              order, selectedClient, pointsToUse, db);
+          // Debug print to verify we have a valid order ID
+          print('Order ID before points processing: $orderId');
+
+          if (orderId <= 0) {
+            throw Exception('Invalid order ID when processing loyalty points');
+          }
+
+          // 1. First apply points usage if any
+          if (useLoyaltyPoints && pointsToUse > 0) {
+            print('Applying $pointsToUse points to order $orderId');
+            await fidelityController.applyPointsToOrder(
+                order, selectedClient, pointsToUse, db);
+          }
+
+          // 2. Calculate points to add
+          int totalPointsToAdd = 0;
+
+          for (final orderLine in order.orderLines) {
+            final points = await fidelityController.calculateLoyaltyPoints(
+              orderLine: orderLine,
+              rules: fidelityRules,
+              db: db,
+            );
+            print('Adding $points points for product ${orderLine.productName}');
+            totalPointsToAdd += points;
+          }
+
+          // 3. Add points if any earned
+          if (totalPointsToAdd > 0) {
+            print(
+                'Adding total $totalPointsToAdd points to client ${selectedClient.id}');
+            await fidelityController.addPointsToClient(
+              clientId: selectedClient.id!,
+              points: totalPointsToAdd,
+              db: db,
+              orderId: orderId,
+              reason: 'Points from order #$orderId',
+            );
+
+            // Verify points were added
+            final updatedClient =
+                await SqlDb().getClientById(selectedClient.id!);
+            print(
+                'Client points after update: ${updatedClient?.loyaltyPoints}');
+          } else {
+            print('No points to add for this order');
+          }
+        } catch (e) {
+          print('Error in loyalty points processing: $e');
+          Addorder.scaffoldMessengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors du traitement des points de fidélité'),
+              backgroundColor: Colors.orange,
+            ),
+          );
         }
-
-        await fidelityController.addPointsFromOrder(order, db);
+      } else {
+        print('Cannot process loyalty points - no client or client ID');
       }
 
       // Update stock
