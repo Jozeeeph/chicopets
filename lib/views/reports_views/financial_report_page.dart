@@ -47,10 +47,14 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
   double _totalFixedDiscount = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _debugPrintAllOrders();
-  }
+void initState() {
+  super.initState();
+  // Initialiser avec la date actuelle
+  final now = DateTime.now();
+  _startDate = now;
+  _endDate = now;
+  _debugPrintAllOrders();
+}
 
   void _debugPrintAllOrders() async {
     final db = await SqlDb().db;

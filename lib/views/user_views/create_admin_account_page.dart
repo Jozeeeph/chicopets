@@ -20,7 +20,8 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
+  String? _codeError;
+  String? _confirmCodeError;
   // Couleurs
   final Color deepBlue = const Color(0xFF0056A6);
   final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
@@ -31,6 +32,19 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
   final Color warmRed = const Color(0xFFE53935);
 
   Future<void> _createAdminAccount() async {
+    setState(() {
+      _codeError = null;
+      _confirmCodeError = null;
+    });
+
+    // Validation du format du code
+    final codeRegex = RegExp(r'^\d{4}$');
+    if (!codeRegex.hasMatch(_codeController.text)) {
+      setState(() {
+        _codeError = 'Le code doit être composé de 4 chiffres';
+      });
+      return;
+    }
     if (_usernameController.text.isEmpty ||
         _codeController.text.isEmpty ||
         _confirmCodeController.text.isEmpty) {
@@ -207,9 +221,15 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                             ),
                             filled: true,
                             fillColor: lightGray.withOpacity(0.3),
+                            errorText: _codeError,
+                            errorStyle: GoogleFonts.poppins(
+                                color: warmRed, fontSize: 12),
                           ),
                           obscureText: _obscurePassword,
                           style: GoogleFonts.poppins(),
+                          keyboardType: TextInputType
+                              .number, // Pour afficher le clavier numérique
+                          maxLength: 4, // Limite à 4 caractères
                         ),
                         const SizedBox(height: 16),
 
@@ -244,9 +264,15 @@ class _CreateAdminAccountPageState extends State<CreateAdminAccountPage> {
                             ),
                             filled: true,
                             fillColor: lightGray.withOpacity(0.3),
+                            errorText: _confirmCodeError,
+                            errorStyle: GoogleFonts.poppins(
+                                color: warmRed, fontSize: 12),
                           ),
                           obscureText: _obscureConfirmPassword,
                           style: GoogleFonts.poppins(),
+                          keyboardType: TextInputType
+                              .number, // Pour afficher le clavier numérique
+                          maxLength: 4, // Limite à 4 caractères
                         ),
                         const SizedBox(height: 32),
 
