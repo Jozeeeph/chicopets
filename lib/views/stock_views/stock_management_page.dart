@@ -21,6 +21,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
   late final StockMovementService _stockMovementService;
   late final StockPredictionService _stockPredictionService;
   late final StockAnalysisService _stockAnalysisService;
+  final List<String> _stockAdjustmentReasons = [
+    'Retour client',
+    'Produit cassé',
+    'Produit volé',
+    'Erreur d\'inventaire',
+    'Ajustement manuel',
+    'Autre raison'
+  ];
 
   List<Product> _products = [];
   bool _isLoading = true;
@@ -151,7 +159,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  Future<void> _updateProductStock(Product product, int newStock) async {
+  Future<void> _updateProductStock(Product product, int newStock,
+      {String? reason}) async {
     try {
       final previousStock = product.stock;
       final quantity = (newStock - previousStock).abs();
@@ -159,7 +168,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
       await _sqlDb.updateProductStock(product.id!, newStock);
 
-      // Enregistrer le mouvement
+      // Enregistrer le mouvement avec la raison
       await _stockMovementService.recordMovement(StockMovement(
         productId: product.id!,
         movementType: movementType,
@@ -167,6 +176,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
         previousStock: previousStock,
         newStock: newStock,
         movementDate: DateTime.now(),
+        notes: reason ?? 'Ajustement manuel', // Include the reason
       ));
 
       setState(() {
@@ -211,7 +221,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  Future<void> _updateVariantStock(Variant variant, int newStock) async {
+  Future<void> _updateVariantStock(Variant variant, int newStock,
+      {String? reason}) async {
     try {
       final previousStock = variant.stock;
       final quantity = (newStock - previousStock).abs();
@@ -219,7 +230,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
       await _sqlDb.updateVariantStock(variant.id!, newStock);
 
-      // Enregistrer le mouvement
+      // Enregistrer le mouvement avec la raison
       await _stockMovementService.recordMovement(StockMovement(
         productId: variant.productId,
         variantId: variant.id,
@@ -228,6 +239,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
         previousStock: previousStock,
         newStock: newStock,
         movementDate: DateTime.now(),
+        notes: reason ?? 'Ajustement manuel', // Include the reason
       ));
 
       setState(() {
@@ -257,6 +269,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
     if (!_hasUnsavedChanges) return;
 
     try {
+      // Show reason selection dialog first
+      final reason = await _showReasonSelectionDialog(context);
+      if (reason == null) return; // User cancelled
+
       // Confirmation dialog
       final shouldSave = await showDialog(
         context: context,
@@ -282,7 +298,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
       // Save product stock changes
       for (final entry in _pendingStockChanges.entries) {
         final product = _products.firstWhere((p) => p.id == entry.key);
-        await _updateProductStock(product, entry.value);
+        await _updateProductStock(product, entry.value, reason: reason);
       }
 
       // Save variant stock changes
@@ -290,7 +306,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
         final variants = _productVariants[productEntry.key] ?? [];
         for (final variantEntry in productEntry.value.entries) {
           final variant = variants.firstWhere((v) => v.id == variantEntry.key);
-          await _updateVariantStock(variant, variantEntry.value);
+          await _updateVariantStock(variant, variantEntry.value,
+              reason: reason);
         }
       }
 
@@ -408,643 +425,678 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return product.stock;
   }
 
-// stock_management_page.dart (extrait)
- Widget _buildPredictionSection() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-    child: ElevatedButton.icon(
-      onPressed: () => _showPredictionsPopup(context),
-      icon: const Icon(Icons.analytics, size: 24),
-      label: const Text('Voir les prédictions IA'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF0056A6),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 3,
-      ),
-    ),
-  );
-}
+  Future<List<StockMovement>> _getProductMovements(int productId) async {
+    try {
+      return await _stockMovementService.getMovementsForProduct(productId);
+    } catch (e) {
+      _showError('Erreur de chargement des mouvements: ${e.toString()}');
+      return [];
+    }
+  }
 
-void _showPredictionsPopup(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 800,
-          maxHeight: 700,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header avec gradient
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0056A6), Color(0xFF003B7A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.3),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.auto_awesome, color: Colors.white, size: 28),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Prédictions Intelligentes',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+  Widget _buildMovementsDialog(
+      BuildContext context, List<StockMovement> movements) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Historique des mouvements',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: movements.isEmpty
+                  ? const Center(child: Text('Aucun mouvement enregistré'))
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: movements.length,
+                      itemBuilder: (context, index) {
+                        final movement = movements[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: _getMovementIcon(movement.movementType),
+                            title: Text(
+                              '${movement.quantity} unités',
+                              style: TextStyle(
+                                color: _getMovementColor(movement.movementType),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    'Type: ${_getMovementTypeLabel(movement.movementType)}'),
+                                Text(
+                                    'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(movement.movementDate)}'),
+                                Text(
+                                    'Stock: ${movement.previousStock} → ${movement.newStock}'),
+                                if (movement.notes != null &&
+                                    movement.notes!.isNotEmpty)
+                                  Text('Notes: ${movement.notes}'),
+                              ],
+                            ),
+                            trailing: Text(
+                              movement.referenceId ?? '',
+                              style: const TextStyle(fontSize: 12),
+                            ),
                           ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Icon _getMovementIcon(String movementType) {
+    switch (movementType) {
+      case 'in':
+        return const Icon(Icons.arrow_downward, color: Colors.green);
+      case 'out':
+        return const Icon(Icons.arrow_upward, color: Colors.red);
+      case 'sale':
+        return const Icon(Icons.shopping_cart, color: Colors.blue);
+      case 'loss':
+        return const Icon(Icons.warning, color: Colors.orange);
+      case 'adjustment':
+        return const Icon(Icons.tune, color: Colors.purple);
+      case 'transfer':
+        return const Icon(Icons.swap_horiz, color: Colors.teal);
+      default:
+        return const Icon(Icons.question_mark, color: Colors.grey);
+    }
+  }
+
+  Color _getMovementColor(String movementType) {
+    switch (movementType) {
+      case 'in':
+        return Colors.green;
+      case 'out':
+        return Colors.red;
+      case 'sale':
+        return Colors.blue;
+      case 'loss':
+        return Colors.orange;
+      case 'adjustment':
+        return Colors.purple;
+      case 'transfer':
+        return Colors.teal;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getMovementTypeLabel(String movementType) {
+    switch (movementType) {
+      case 'in':
+        return 'Entrée stock';
+      case 'out':
+        return 'Sortie stock';
+      case 'sale':
+        return 'Vente';
+      case 'loss':
+        return 'Perte';
+      case 'adjustment':
+        return 'Ajustement';
+      case 'transfer':
+        return 'Transfert';
+      default:
+        return movementType;
+    }
+  }
+
+  void _showAddMovementDialog(Product product) {
+    final _formKey = GlobalKey<FormState>();
+    String _movementType = 'in';
+    int _quantity = 0;
+    String? _notes;
+    int? _variantId;
+    String? _reason;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Nouveau mouvement',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Type de mouvement
+                    DropdownButtonFormField<String>(
+                      value: _movementType,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'in', child: Text('Entrée stock')),
+                        DropdownMenuItem(
+                            value: 'out', child: Text('Sortie stock')),
+                        DropdownMenuItem(value: 'sale', child: Text('Vente')),
+                        DropdownMenuItem(value: 'loss', child: Text('Perte')),
+                        DropdownMenuItem(
+                            value: 'adjustment', child: Text('Ajustement')),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _movementType = value!),
+                      decoration: const InputDecoration(
+                        labelText: 'Type de mouvement',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Variante (si le produit en a)
+                    if (_productVariants[product.id]?.isNotEmpty ?? false)
+                      Column(
+                        children: [
+                          DropdownButtonFormField<int>(
+                            value: _variantId,
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text('Produit principal'),
+                              ),
+                              ..._productVariants[product.id]!.map(
+                                (v) => DropdownMenuItem(
+                                  value: v.id,
+                                  child: Text('Variante: ${v.combinationName}'),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _variantId = value),
+                            decoration: const InputDecoration(
+                              labelText: 'Variante (optionnel)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+
+                    // Quantité
+                    TextFormField(
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantité',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'Champ obligatoire';
+                        if (int.tryParse(value) == null)
+                          return 'Nombre invalide';
+                        return null;
+                      },
+                      onSaved: (value) => _quantity = int.parse(value!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Raison
+                    DropdownButtonFormField<String>(
+                      value: _reason,
+                      items: _stockAdjustmentReasons
+                          .map((reason) => DropdownMenuItem(
+                                value: reason,
+                                child: Text(reason),
+                              ))
+                          .toList(),
+                      onChanged: (value) => setState(() => _reason = value),
+                      decoration: const InputDecoration(
+                        labelText: 'Raison',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => value == null
+                          ? 'Veuillez sélectionner une raison'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Notes
+                    TextFormField(
+                      decoration: const InputDecoration(
+                        labelText: 'Notes (optionnel)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                      onSaved: (value) => _notes = value,
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Annuler'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (_formKey.currentState!.validate()) {
+                              _formKey.currentState!.save();
+
+                              try {
+                                final previousStock = _variantId != null
+                                    ? _productVariants[product.id]!
+                                        .firstWhere((v) => v.id == _variantId)
+                                        .stock
+                                    : product.stock;
+
+                                final newStock = _movementType == 'in'
+                                    ? previousStock + _quantity
+                                    : previousStock - _quantity;
+
+                                final movement = StockMovement(
+                                  productId: product.id!,
+                                  variantId: _variantId,
+                                  movementType: _movementType,
+                                  quantity: _quantity,
+                                  previousStock: previousStock,
+                                  newStock: newStock,
+                                  movementDate: DateTime.now(),
+                                  notes: _reason != null
+                                      ? 'Raison: $_reason${_notes != null ? ' - $_notes' : ''}'
+                                      : _notes,
+                                );
+
+                                await _stockMovementService
+                                    .recordMovement(movement);
+
+                                // Mettre à jour le stock
+                                if (_variantId != null) {
+                                  await _updateVariantStock(
+                                    _productVariants[product.id]!
+                                        .firstWhere((v) => v.id == _variantId),
+                                    newStock,
+                                    reason: _reason,
+                                  );
+                                } else {
+                                  await _updateProductStock(product, newStock,
+                                      reason: _reason);
+                                }
+
+                                Navigator.pop(context);
+                                _showSuccess(
+                                    'Mouvement enregistré avec succès');
+                                _loadData(); // Rafraîchir les données
+                              } catch (e) {
+                                _showError('Erreur: ${e.toString()}');
+                              }
+                            }
+                          },
+                          child: const Text('Enregistrer'),
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 24),
-                      onPressed: () => Navigator.pop(context),
-                    ),
                   ],
                 ),
               ),
-              
-              // Contenu principal avec onglets
-              Expanded(
-                child: Padding(
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+// stock_management_page.dart (extrait)
+  Widget _buildPredictionSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: ElevatedButton.icon(
+        onPressed: () => _showPredictionsPopup(context),
+        icon: const Icon(Icons.analytics, size: 24),
+        label: const Text('Voir les prédictions IA'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0056A6),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 3,
+        ),
+      ),
+    );
+  }
+
+  void _showPredictionsPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 800,
+            maxHeight: 700,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header avec gradient
+                Container(
                   padding: const EdgeInsets.all(20),
-                  child: FutureBuilder<Map<String, Map<int, int>>>(
-                    future: _stockPredictionService.predictAllStockNeeds(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0056A6)),
-                              ),
-                              SizedBox(height: 20),
-                              Text(
-                                'Analyse des tendances en cours...',
-                                style: TextStyle(
-                                  color: Color(0xFF0056A6),
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 50),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Erreur d\'analyse',
-                                style: TextStyle(
-                                  color: Colors.red[800],
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                snapshot.error.toString(),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: () => setState(() {}),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0056A6),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: const Text('Réessayer', style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final predictions = snapshot.data ?? {
-                        'short_term': {},
-                        'medium_term': {},
-                        'long_term': {},
-                      };
-
-                      return Column(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0056A6), Color(0xFF003B7A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.3),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
                         children: [
-                          // Barre d'info et bouton d'actualisation
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F9FF),
-                              borderRadius: BorderRadius.circular(15),
-                              border: Border.all(
-                                color: const Color(0xFFE0ECFF),
-                                width: 1.5,
-                              ),
+                          const Icon(Icons.auto_awesome,
+                              color: Colors.white, size: 28),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Prédictions Intelligentes',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                            child: Row(
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close,
+                            color: Colors.white, size: 24),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Contenu principal avec onglets
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: FutureBuilder<Map<String, Map<int, int>>>(
+                      future: _stockPredictionService.predictAllStockNeeds(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.lightbulb_outline, color: Color(0xFFFFC107), size: 28),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Text(
-                                    'Les prédictions sont calculées en fonction des tendances de vente et des variations saisonnières',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF555555),
-                                    ),
-                                  ),
+                                CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF0056A6)),
                                 ),
-                                const SizedBox(width: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    try {
-                                      final predictions = await _stockPredictionService.predictAllStockNeeds();
-                                      await _stockPredictionService.savePredictions(
-                                        predictions['short_term']!, 
-                                        timeHorizon: 'short_term'
-                                      );
-                                      await _stockPredictionService.savePredictions(
-                                        predictions['medium_term']!, 
-                                        timeHorizon: 'medium_term'
-                                      );
-                                      await _stockPredictionService.savePredictions(
-                                        predictions['long_term']!, 
-                                        timeHorizon: 'long_term'
-                                      );
-                                      setState(() {});
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Prédictions actualisées avec succès'),
-                                          backgroundColor: Colors.green,
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Erreur: ${e.toString()}'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.refresh, size: 20),
-                                  label: const Text('Actualiser'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF0056A6),
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      side: const BorderSide(color: Color(0xFF0056A6), width: 1),
-                                    ),
-                                    elevation: 0,
+                                SizedBox(height: 20),
+                                Text(
+                                  'Analyse des tendances en cours...',
+                                  style: TextStyle(
+                                    color: Color(0xFF0056A6),
+                                    fontSize: 16,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Onglets
-                          Expanded(
-                            child: DefaultTabController(
-                              length: 3,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: TabBar(
-                                      labelColor: Colors.white,
-                                      unselectedLabelColor: const Color(0xFF0056A6),
-                                      indicator: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [Color(0xFF0056A6), Color(0xFF0075E1)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      tabs: const [
-                                        Tab(
-                                          icon: Icon(Icons.timelapse, size: 20),
-                                          text: 'Court Terme (30j)',
-                                        ),
-                                        Tab(
-                                          icon: Icon(Icons.calendar_today, size: 20),
-                                          text: 'Moyen Terme (90j)',
-                                        ),
-                                        Tab(
-                                          icon: Icon(Icons.date_range, size: 20),
-                                          text: 'Long Terme (1 an)',
-                                        ),
-                                      ],
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 50),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Erreur d\'analyse',
+                                  style: TextStyle(
+                                    color: Colors.red[800],
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  snapshot.error.toString(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                const SizedBox(height: 20),
+                                ElevatedButton(
+                                  onPressed: () => setState(() {}),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0056A6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 24, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
-                                  
-                                  // Contenu des onglets
-                                  Expanded(
-                                    child: TabBarView(
-                                      children: [
-                                        _buildPredictionContent(predictions['short_term']!, '30 jours'),
-                                        _buildPredictionContent(predictions['medium_term']!, '90 jours'),
-                                        _buildPredictionContent(predictions['long_term']!, '1 an'),
-                                      ],
+                                  child: const Text('Réessayer',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        final predictions = snapshot.data ??
+                            {
+                              'short_term': {},
+                              'medium_term': {},
+                              'long_term': {},
+                            };
+
+                        return Column(
+                          children: [
+                            // Barre d'info et bouton d'actualisation
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF5F9FF),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(
+                                  color: const Color(0xFFE0ECFF),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.lightbulb_outline,
+                                      color: Color(0xFFFFC107), size: 28),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Les prédictions sont calculées en fonction des tendances de vente et des variations saisonnières',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Color(0xFF555555),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      try {
+                                        final predictions =
+                                            await _stockPredictionService
+                                                .predictAllStockNeeds();
+                                        await _stockPredictionService
+                                            .savePredictions(
+                                                predictions['short_term']!,
+                                                timeHorizon: 'short_term');
+                                        await _stockPredictionService
+                                            .savePredictions(
+                                                predictions['medium_term']!,
+                                                timeHorizon: 'medium_term');
+                                        await _stockPredictionService
+                                            .savePredictions(
+                                                predictions['long_term']!,
+                                                timeHorizon: 'long_term');
+                                        setState(() {});
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Prédictions actualisées avec succès'),
+                                            backgroundColor: Colors.green,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content:
+                                                Text('Erreur: ${e.toString()}'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    icon: const Icon(Icons.refresh, size: 20),
+                                    label: const Text('Actualiser'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: const Color(0xFF0056A6),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 20, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        side: const BorderSide(
+                                            color: Color(0xFF0056A6), width: 1),
+                                      ),
+                                      elevation: 0,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
+                            const SizedBox(height: 20),
 
-Widget _buildPredictionContent(Map<int, int> predictions, String timeHorizon) {
-  if (_products.isEmpty) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inventory_2, size: 60, color: Colors.grey),
-          SizedBox(height: 20),
-          Text(
-            'Aucun produit disponible',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
+                            // Onglets
+                            Expanded(
+                              child: DefaultTabController(
+                                length: 3,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: TabBar(
+                                        labelColor: Colors.white,
+                                        unselectedLabelColor:
+                                            const Color(0xFF0056A6),
+                                        indicator: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xFF0056A6),
+                                              Color(0xFF0075E1)
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        tabs: const [
+                                          Tab(
+                                            icon:
+                                                Icon(Icons.timelapse, size: 20),
+                                            text: 'Court Terme (30j)',
+                                          ),
+                                          Tab(
+                                            icon: Icon(Icons.calendar_today,
+                                                size: 20),
+                                            text: 'Moyen Terme (90j)',
+                                          ),
+                                          Tab(
+                                            icon: Icon(Icons.date_range,
+                                                size: 20),
+                                            text: 'Long Terme (1 an)',
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
 
-  final productsWithPredictions = _products.where((p) => predictions.containsKey(p.id)).toList();
-
-  if (productsWithPredictions.isEmpty) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.analytics_outlined, size: 60, color: Colors.grey),
-          const SizedBox(height: 20),
-          Text(
-            'Pas de prédictions pour $timeHorizon',
-            style: const TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Les données historiques sont insuffisantes',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
-  return ListView.builder(
-    itemCount: productsWithPredictions.length,
-    itemBuilder: (context, index) {
-      final product = productsWithPredictions[index];
-      final prediction = predictions[product.id!] ?? 0;
-      final stockNeeded = prediction - product.stock;
-      final percentage = product.stock > 0 
-          ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
-          : 100;
-
-      // Déterminer le style en fonction du besoin
-      Color cardColor;
-      Color textColor;
-      IconData icon;
-      String status;
-      Color statusColor;
-      
-      if (stockNeeded > product.stock * 0.5) {
-        cardColor = const Color(0xFFFFF0F0);
-        textColor = const Color(0xFFD32F2F);
-        icon = Icons.warning_amber_rounded;
-        status = 'Urgent';
-        statusColor = const Color(0xFFD32F2F);
-      } else if (stockNeeded > 0) {
-        cardColor = const Color(0xFFFFF8E1);
-        textColor = const Color(0xFFF57C00);
-        icon = Icons.trending_up;
-        status = 'À surveiller';
-        statusColor = const Color(0xFFF57C00);
-      } else {
-        cardColor = const Color(0xFFE8F5E9);
-        textColor = const Color(0xFF388E3C);
-        icon = Icons.check_circle_outline;
-        status = 'OK';
-        statusColor = const Color(0xFF388E3C);
-      }
-
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Material(
-          borderRadius: BorderRadius.circular(15),
-          color: cardColor,
-          elevation: 0,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(15),
-            onTap: () => _showPredictionDetails(context, product, prediction, timeHorizon),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Icône
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: statusColor, size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  
-                  // Détails du produit
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.designation,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: textColor,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            _buildInfoChip(
-                              'Stock: ${product.stock}',
-                              Icons.inventory_2,
-                              const Color(0xFF0056A6),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildInfoChip(
-                              'Prédit: $prediction',
-                              Icons.analytics,
-                              const Color(0xFF5C6BC0),
+                                    // Contenu des onglets
+                                    Expanded(
+                                      child: TabBarView(
+                                        children: [
+                                          _buildPredictionContent(
+                                              predictions['short_term']!,
+                                              '30 jours'),
+                                          _buildPredictionContent(
+                                              predictions['medium_term']!,
+                                              '90 jours'),
+                                          _buildPredictionContent(
+                                              predictions['long_term']!,
+                                              '1 an'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
-                        ),
-                        if (stockNeeded > 0) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              _buildAlertChip(
-                                'Besoin: $stockNeeded',
-                                Icons.add_shopping_cart,
-                                statusColor,
-                              ),
-                              const SizedBox(width: 8),
-                              _buildAlertChip(
-                                '+$percentage%',
-                                percentage > 50 ? Icons.arrow_upward : Icons.trending_up,
-                                statusColor,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  
-                  // Statut
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildInfoChip(String text, IconData icon, Color color) {
-  return Chip(
-    backgroundColor: color.withOpacity(0.1),
-    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-    avatar: Icon(icon, size: 16, color: color),
-    label: Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        color: color,
-      ),
-    ),
-  );
-}
-
-Widget _buildAlertChip(String text, IconData icon, Color color) {
-  return Chip(
-    backgroundColor: color.withOpacity(0.2),
-    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-    avatar: Icon(icon, size: 16, color: color),
-    label: Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        color: color,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  );
-}
-Widget _buildPredictionCard(Map<int, int> predictions, String timeHorizon) {
-  if (_products.isEmpty) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inventory_2, size: 50, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Aucun produit disponible'),
-        ],
-      ),
-    );
-  }
-
-  final productsWithPredictions = _products.where((p) => predictions.containsKey(p.id)).toList();
-
-  if (productsWithPredictions.isEmpty) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.analytics_outlined, size: 50, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text('Aucune prédiction pour $timeHorizon'),
-        ],
-      ),
-    );
-  }
-
-  return ListView.builder(
-    itemCount: productsWithPredictions.length,
-    itemBuilder: (context, index) {
-      final product = productsWithPredictions[index];
-      final prediction = predictions[product.id!] ?? 0;
-      final stockNeeded = prediction - product.stock;
-      final percentage = product.stock > 0 
-          ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
-          : 100;
-
-      Color cardColor;
-      IconData icon;
-      String status;
-      
-      if (stockNeeded > product.stock * 0.5) {
-        cardColor = Colors.red[50]!;
-        icon = Icons.warning_amber_rounded;
-        status = 'Urgent';
-      } else if (stockNeeded > 0) {
-        cardColor = Colors.orange[50]!;
-        icon = Icons.trending_up;
-        status = 'À surveiller';
-      } else {
-        cardColor = Colors.green[50]!;
-        icon = Icons.check_circle_outline;
-        status = 'OK';
-      }
-
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        color: cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _showPredictionDetails(context, product, prediction, timeHorizon),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0056A6).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: const Color(0xFF0056A6)),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.designation,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Stock actuel: ${product.stock} | Prédit: $prediction',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      if (stockNeeded > 0) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Besoin estimé: $stockNeeded (+$percentage%)',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0056A6)),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Chip(
-                  backgroundColor: const Color(0xFF0056A6).withOpacity(0.1),
-                  label: Text(status,
-                    style: TextStyle(
-                      color: status == 'Urgent' 
-                        ? Colors.red[800]
-                        : status == 'À surveiller'
-                          ? Colors.orange[800]
-                          : Colors.green[800],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1052,141 +1104,365 @@ Widget _buildPredictionCard(Map<int, int> predictions, String timeHorizon) {
             ),
           ),
         ),
-      );
-    },
-  );
-}
-
-Widget _buildPredictionList(Map<int, int> predictions, String timeHorizon) {
-  if (_products.isEmpty) {
-    return const Center(child: Text('Aucun produit disponible'));
-  }
-
-  // Filtrer les produits qui ont une prédiction
-  final productsWithPredictions = _products.where((p) => predictions.containsKey(p.id)).toList();
-
-  if (productsWithPredictions.isEmpty) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.analytics_outlined, size: 50, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text('Aucune prédiction disponible pour $timeHorizon'),
-        ],
       ),
     );
   }
 
-  return ListView.builder(
-    itemCount: productsWithPredictions.length,
-    itemBuilder: (context, index) {
-      final product = productsWithPredictions[index];
-      final prediction = predictions[product.id!] ?? 0;
-      final stockNeeded = prediction - product.stock;
+  Future<String?> _showReasonSelectionDialog(BuildContext context) async {
+    String? selectedReason;
 
-      // Calculer le niveau d'urgence
-      Color color;
-      String status;
-      if (stockNeeded > product.stock * 0.5) {
-        color = Colors.red[100]!;
-        status = 'Urgent';
-      } else if (stockNeeded > 0) {
-        color = Colors.orange[100]!;
-        status = 'À surveiller';
-      } else {
-        color = Colors.green[100]!;
-        status = 'OK';
-      }
-
-      return Card(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        color: color,
-        child: ListTile(
-          title: Text(product.designation),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Stock actuel: ${product.stock}'),
-              Text('Ventes prédites: ${prediction}'),
-              if (stockNeeded > 0)
-                Text('Besoin: $stockNeeded', 
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Statut: $status'),
-            ],
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              _showPredictionDetails(context, product, prediction, timeHorizon);
-            },
-          ),
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sélectionner une raison'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ..._stockAdjustmentReasons
+                    .map((reason) => RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          onChanged: (value) {
+                            setState(() => selectedReason = value);
+                          },
+                        )),
+                if (selectedReason == 'Autre raison')
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Précisez la raison',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        selectedReason = value;
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
-      );
-    },
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (selectedReason != null) {
+                Navigator.pop(context, selectedReason);
+              }
+            },
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
 
-void _showPredictionDetails(BuildContext context, Product product, int prediction, String timeHorizon) {
-  final stockNeeded = prediction - product.stock;
-  final percentage = product.stock > 0 
-      ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
-      : 100;
-
-  // Détermination du niveau d'urgence
-  Color primaryColor;
-  IconData statusIcon;
-  String statusText;
-
-  if (stockNeeded > product.stock * 0.5) {
-    primaryColor = const Color(0xFFD32F2F); // Rouge
-    statusIcon = Icons.warning_rounded;
-    statusText = 'Niveau Critique';
-  } else if (stockNeeded > 0) {
-    primaryColor = const Color(0xFFF57C00); // Orange
-    statusIcon = Icons.trending_up_rounded;
-    statusText = 'Attention Requise';
-  } else {
-    primaryColor = const Color(0xFF388E3C); // Vert
-    statusIcon = Icons.check_circle_rounded;
-    statusText = 'Stock Suffisant';
+    return selectedReason;
   }
 
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
-        padding: const EdgeInsets.all(0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
+  Widget _buildPredictionContent(
+      Map<int, int> predictions, String timeHorizon) {
+    if (_products.isEmpty) {
+      return const Center(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // En-tête avec dégradé
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryColor, primaryColor.withOpacity(0.7)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+            Icon(Icons.inventory_2, size: 60, color: Colors.grey),
+            SizedBox(height: 20),
+            Text(
+              'Aucun produit disponible',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final productsWithPredictions =
+        _products.where((p) => predictions.containsKey(p.id)).toList();
+
+    if (productsWithPredictions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.analytics_outlined, size: 60, color: Colors.grey),
+            const SizedBox(height: 20),
+            Text(
+              'Pas de prédictions pour $timeHorizon',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Les données historiques sont insuffisantes',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: productsWithPredictions.length,
+      itemBuilder: (context, index) {
+        final product = productsWithPredictions[index];
+        final prediction = predictions[product.id!] ?? 0;
+        final stockNeeded = prediction - product.stock;
+        final percentage = product.stock > 0
+            ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
+            : 100;
+
+        // Déterminer le style en fonction du besoin
+        Color cardColor;
+        Color textColor;
+        IconData icon;
+        String status;
+        Color statusColor;
+
+        if (stockNeeded > product.stock * 0.5) {
+          cardColor = const Color(0xFFFFF0F0);
+          textColor = const Color(0xFFD32F2F);
+          icon = Icons.warning_amber_rounded;
+          status = 'Urgent';
+          statusColor = const Color(0xFFD32F2F);
+        } else if (stockNeeded > 0) {
+          cardColor = const Color(0xFFFFF8E1);
+          textColor = const Color(0xFFF57C00);
+          icon = Icons.trending_up;
+          status = 'À surveiller';
+          statusColor = const Color(0xFFF57C00);
+        } else {
+          cardColor = const Color(0xFFE8F5E9);
+          textColor = const Color(0xFF388E3C);
+          icon = Icons.check_circle_outline;
+          status = 'OK';
+          statusColor = const Color(0xFF388E3C);
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Material(
+            borderRadius: BorderRadius.circular(15),
+            color: cardColor,
+            elevation: 0,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(15),
+              onTap: () => _showPredictionDetails(
+                  context, product, prediction, timeHorizon),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Icône
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: statusColor, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Détails du produit
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.designation,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _buildInfoChip(
+                                'Stock: ${product.stock}',
+                                Icons.inventory_2,
+                                const Color(0xFF0056A6),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildInfoChip(
+                                'Prédit: $prediction',
+                                Icons.analytics,
+                                const Color(0xFF5C6BC0),
+                              ),
+                            ],
+                          ),
+                          if (stockNeeded > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _buildAlertChip(
+                                  'Besoin: $stockNeeded',
+                                  Icons.add_shopping_cart,
+                                  statusColor,
+                                ),
+                                const SizedBox(width: 8),
+                                _buildAlertChip(
+                                  '+$percentage%',
+                                  percentage > 50
+                                      ? Icons.arrow_upward
+                                      : Icons.trending_up,
+                                  statusColor,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // Statut
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: statusColor.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoChip(String text, IconData icon, Color color) {
+    return Chip(
+      backgroundColor: color.withOpacity(0.1),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlertChip(String text, IconData icon, Color color) {
+    return Chip(
+      backgroundColor: color.withOpacity(0.2),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPredictionCard(Map<int, int> predictions, String timeHorizon) {
+    if (_products.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory_2, size: 50, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Aucun produit disponible'),
+          ],
+        ),
+      );
+    }
+
+    final productsWithPredictions =
+        _products.where((p) => predictions.containsKey(p.id)).toList();
+
+    if (productsWithPredictions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.analytics_outlined, size: 50, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('Aucune prédiction pour $timeHorizon'),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: productsWithPredictions.length,
+      itemBuilder: (context, index) {
+        final product = productsWithPredictions[index];
+        final prediction = predictions[product.id!] ?? 0;
+        final stockNeeded = prediction - product.stock;
+        final percentage = product.stock > 0
+            ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
+            : 100;
+
+        Color cardColor;
+        IconData icon;
+        String status;
+
+        if (stockNeeded > product.stock * 0.5) {
+          cardColor = Colors.red[50]!;
+          icon = Icons.warning_amber_rounded;
+          status = 'Urgent';
+        } else if (stockNeeded > 0) {
+          cardColor = Colors.orange[50]!;
+          icon = Icons.trending_up;
+          status = 'À surveiller';
+        } else {
+          cardColor = Colors.green[50]!;
+          icon = Icons.check_circle_outline;
+          status = 'OK';
+        }
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          color: cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _showPredictionDetails(
+                context, product, prediction, timeHorizon),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(statusIcon, color: Colors.white, size: 30),
-                  const SizedBox(width: 15),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0056A6).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: const Color(0xFF0056A6)),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1194,220 +1470,410 @@ void _showPredictionDetails(BuildContext context, Product product, int predictio
                         Text(
                           product.designation,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                              fontWeight: FontWeight.bold, fontSize: 16),
                         ),
-                        const SizedBox(height: 5),
+                        const SizedBox(height: 4),
                         Text(
-                          statusText,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 16,
-                          ),
+                          'Stock actuel: ${product.stock} | Prédit: $prediction',
+                          style: const TextStyle(fontSize: 14),
                         ),
+                        if (stockNeeded > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Besoin estimé: $stockNeeded (+$percentage%)',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0056A6)),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                  Chip(
+                    backgroundColor: const Color(0xFF0056A6).withOpacity(0.1),
+                    label: Text(
+                      status,
+                      style: TextStyle(
+                        color: status == 'Urgent'
+                            ? Colors.red[800]
+                            : status == 'À surveiller'
+                                ? Colors.orange[800]
+                                : Colors.green[800],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
 
-            // Corps
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Détails principaux
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildDetailCard(
-                        title: 'Stock Actuel',
-                        value: product.stock.toString(),
-                        icon: Icons.inventory_2_rounded,
-                        color: const Color(0xFF0056A6),
-                      ),
-                      _buildDetailCard(
-                        title: 'Prédiction $timeHorizon',
-                        value: prediction.toString(),
-                        icon: Icons.analytics_rounded,
-                        color: const Color(0xFF673AB7),
-                      ),
-                      if (stockNeeded > 0)
-                        _buildDetailCard(
-                          title: 'Besoin Estimé',
-                          value: stockNeeded.toString(),
-                          icon: Icons.add_shopping_cart_rounded,
-                          color: primaryColor,
-                        ),
-                    ],
+  Widget _buildPredictionList(Map<int, int> predictions, String timeHorizon) {
+    if (_products.isEmpty) {
+      return const Center(child: Text('Aucun produit disponible'));
+    }
+
+    // Filtrer les produits qui ont une prédiction
+    final productsWithPredictions =
+        _products.where((p) => predictions.containsKey(p.id)).toList();
+
+    if (productsWithPredictions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.analytics_outlined, size: 50, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('Aucune prédiction disponible pour $timeHorizon'),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: productsWithPredictions.length,
+      itemBuilder: (context, index) {
+        final product = productsWithPredictions[index];
+        final prediction = predictions[product.id!] ?? 0;
+        final stockNeeded = prediction - product.stock;
+
+        // Calculer le niveau d'urgence
+        Color color;
+        String status;
+        if (stockNeeded > product.stock * 0.5) {
+          color = Colors.red[100]!;
+          status = 'Urgent';
+        } else if (stockNeeded > 0) {
+          color = Colors.orange[100]!;
+          status = 'À surveiller';
+        } else {
+          color = Colors.green[100]!;
+          status = 'OK';
+        }
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          color: color,
+          child: ListTile(
+            title: Text(product.designation),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Stock actuel: ${product.stock}'),
+                Text('Ventes prédites: ${prediction}'),
+                if (stockNeeded > 0)
+                  Text('Besoin: $stockNeeded',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Statut: $status'),
+              ],
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () {
+                _showPredictionDetails(
+                    context, product, prediction, timeHorizon);
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPredictionDetails(BuildContext context, Product product,
+      int prediction, String timeHorizon) {
+    final stockNeeded = prediction - product.stock;
+    final percentage = product.stock > 0
+        ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
+        : 100;
+
+    // Détermination du niveau d'urgence
+    Color primaryColor;
+    IconData statusIcon;
+    String statusText;
+
+    if (stockNeeded > product.stock * 0.5) {
+      primaryColor = const Color(0xFFD32F2F); // Rouge
+      statusIcon = Icons.warning_rounded;
+      statusText = 'Niveau Critique';
+    } else if (stockNeeded > 0) {
+      primaryColor = const Color(0xFFF57C00); // Orange
+      statusIcon = Icons.trending_up_rounded;
+      statusText = 'Attention Requise';
+    } else {
+      primaryColor = const Color(0xFF388E3C); // Vert
+      statusIcon = Icons.check_circle_rounded;
+      statusText = 'Stock Suffisant';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600),
+          padding: const EdgeInsets.all(0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // En-tête avec dégradé
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [primaryColor, primaryColor.withOpacity(0.7)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-
-                  const SizedBox(height: 25),
-
-                  // Historique des prévisions
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _stockPredictionService.getProductPredictions(product.id!),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: const Text(
-                            'Aucun historique de prédiction disponible',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        );
-                      }
-
-                      final predictions = snapshot.data!;
-                      return Column(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(statusIcon, color: Colors.white, size: 30),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Historique des Prévisions',
-                            style: TextStyle(
-                              color: primaryColor,
+                            product.designation,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
                               fontSize: 16,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          ...predictions.take(3).map((pred) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _getTimeHorizonIcon(pred['time_horizon']),
-                                  color: Colors.grey[600],
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  '${pred['time_horizon']}: ',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  '${pred['predicted_quantity']} unités',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  DateFormat('dd/MM/yyyy').format(
-                                    DateTime.parse(pred['prediction_date']),
-                                  ),
-                                  style: TextStyle(
-                                    color: Colors.grey[500],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
                         ],
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Pied de page
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Fermer'),
-                  ),
-                  const SizedBox(width: 10),
-                  
-                ],
+
+              // Corps
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Détails principaux
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildDetailCard(
+                          title: 'Stock Actuel',
+                          value: product.stock.toString(),
+                          icon: Icons.inventory_2_rounded,
+                          color: const Color(0xFF0056A6),
+                        ),
+                        _buildDetailCard(
+                          title: 'Prédiction $timeHorizon',
+                          value: prediction.toString(),
+                          icon: Icons.analytics_rounded,
+                          color: const Color(0xFF673AB7),
+                        ),
+                        if (stockNeeded > 0)
+                          _buildDetailCard(
+                            title: 'Besoin Estimé',
+                            value: stockNeeded.toString(),
+                            icon: Icons.add_shopping_cart_rounded,
+                            color: primaryColor,
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 25),
+
+                    // Historique des prévisions
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _stockPredictionService
+                          .getProductPredictions(product.id!),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError ||
+                            !snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: const Text(
+                              'Aucun historique de prédiction disponible',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          );
+                        }
+
+                        final predictions = snapshot.data!;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Historique des Prévisions',
+                              style: TextStyle(
+                                color: primaryColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ...predictions.take(3).map((pred) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _getTimeHorizonIcon(
+                                            pred['time_horizon']),
+                                        color: Colors.grey[600],
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        '${pred['time_horizon']}: ',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        '${pred['predicted_quantity']} unités',
+                                        style:
+                                            TextStyle(color: Colors.grey[700]),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        DateFormat('dd/MM/yyyy').format(
+                                          DateTime.parse(
+                                              pred['prediction_date']),
+                                        ),
+                                        style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              // Pied de page
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Fermer'),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-
-Widget _buildDetailCard({
-  required String title,
-  required String value,
-  required IconData icon,
-  required Color color,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: color.withOpacity(0.3)),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(height: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          value,
-          style: TextStyle(
-            color: color.withOpacity(0.9),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-IconData _getTimeHorizonIcon(String horizon) {
-  switch (horizon.toLowerCase()) {
-    case 'short_term':
-      return Icons.timelapse_rounded;
-    case 'medium_term':
-      return Icons.calendar_today_rounded;
-    case 'long_term':
-      return Icons.date_range_rounded;
-    default:
-      return Icons.timeline_rounded;
+    );
   }
-}
+
+  Widget _buildDetailCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: TextStyle(
+              color: color.withOpacity(0.9),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getTimeHorizonIcon(String horizon) {
+    switch (horizon.toLowerCase()) {
+      case 'short_term':
+        return Icons.timelapse_rounded;
+      case 'medium_term':
+        return Icons.calendar_today_rounded;
+      case 'long_term':
+        return Icons.date_range_rounded;
+      default:
+        return Icons.timeline_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1418,6 +1884,21 @@ IconData _getTimeHorizonIcon(String horizon) {
           title: const Text('Gestion de Stock'),
           backgroundColor: const Color(0xFF0056A6),
           foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadData,
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            if (_filteredProducts.isNotEmpty) {
+              _showAddMovementDialog(_filteredProducts.first);
+            }
+          },
+          child: const Icon(Icons.add),
+          backgroundColor: const Color(0xFF0056A6),
         ),
         body: Column(
           children: [
@@ -1538,6 +2019,8 @@ IconData _getTimeHorizonIcon(String horizon) {
                       child: Text('Catégorie', style: _headerTextStyle())),
                   Expanded(
                       flex: 1, child: Text('Stock', style: _headerTextStyle())),
+                  // Ajoutez ce Expanded dans la Row principale du produit:
+
                   Expanded(
                       flex: 2,
                       child: Text('Statut', style: _headerTextStyle())),
@@ -1559,6 +2042,7 @@ IconData _getTimeHorizonIcon(String horizon) {
                 ],
               ),
             ),
+
             const SizedBox(height: 8),
             // Contenu sous forme de cartes
             ListView.builder(
@@ -1566,7 +2050,8 @@ IconData _getTimeHorizonIcon(String horizon) {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _filteredProducts.length,
               itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
+                final product =
+                    _filteredProducts[index]; // Make sure this line exists
                 final variants = _productVariants[product.id] ?? [];
                 final totalStock = _getTotalStock(product);
                 final isExpiring = _isExpiringSoon(product.dateExpiration);
@@ -1671,11 +2156,70 @@ IconData _getTimeHorizonIcon(String horizon) {
                                 ),
                               ),
                             ),
+                            // Dans la Row principale du produit, ajoutez ce Expanded:
+                            Expanded(
+                              flex: 1,
+                              child: IconButton(
+                                icon: const Icon(Icons.history,
+                                    color: Color(0xFF0056A6)),
+                                onPressed: () async {
+                                  final movements =
+                                      await _getProductMovements(product.id!);
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => _buildMovementsDialog(
+                                        context, movements),
+                                  );
+                                },
+                              ),
+                            ),
                             Expanded(
                               flex: 2,
                               child: Text(
                                   '${_productSales[product.id]?.toStringAsFixed(2) ?? '0.00'} DT',
                                   style: _cellTextStyle()),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: FutureBuilder<List<StockMovement>>(
+                                future: _getProductMovements(product.id!),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                    return const Center(
+                                        child: CircularProgressIndicator());
+                                  }
+
+                                  final lastMovement =
+                                      snapshot.data?.firstOrNull;
+                                  if (lastMovement == null) {
+                                    return const Text('Aucun mouvement',
+                                        style: TextStyle(fontSize: 12));
+                                  }
+
+                                  return Tooltip(
+                                    message:
+                                        '${_getMovementTypeLabel(lastMovement.movementType)}\n'
+                                        '${lastMovement.quantity} unités\n'
+                                        '${DateFormat('dd/MM/yyyy').format(lastMovement.movementDate)}',
+                                    child: Row(
+                                      children: [
+                                        _getMovementIcon(
+                                            lastMovement.movementType),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${lastMovement.quantity} ${_getMovementTypeLabel(lastMovement.movementType).substring(0, 1).toLowerCase()}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: _getMovementColor(
+                                                lastMovement.movementType),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
                           ],
                         ),

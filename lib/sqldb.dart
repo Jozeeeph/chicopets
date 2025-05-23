@@ -14,6 +14,7 @@ import 'package:caissechicopets/models/attribut.dart';
 import 'package:caissechicopets/models/category.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
+import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/paymentMode.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
@@ -648,6 +649,26 @@ class SqlDb {
   Future<void> cancelOrderLine(int idOrder, String idProduct) async {
     final dbClient = await db;
     await Orderlinecontroller().cancelOrderLine(idOrder, idProduct, dbClient);
+  }
+
+  // Add these methods to your SqlDb class
+
+  Future<void> deleteOrderLines(int orderId) async {
+    final db = await this.db;
+    await db.delete(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
+  }
+
+  Future<int> insertOrderLine(OrderLine orderLine) async {
+    final db = await this.db;
+    return await db.insert(
+      'order_items',
+      orderLine.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> deleteOrderLine(

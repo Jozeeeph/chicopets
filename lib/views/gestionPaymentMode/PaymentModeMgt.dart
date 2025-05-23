@@ -2,6 +2,15 @@ import 'package:caissechicopets/models/paymentMode.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/sqldb.dart';
 
+// Couleurs de la palette
+final Color deepBlue = const Color(0xFF0056A6);
+final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+final Color white = Colors.white;
+final Color lightGray = const Color(0xFFE0E0E0);
+final Color tealGreen = const Color(0xFF009688);
+final Color softOrange = const Color(0xFFFF9800);
+final Color warmRed = const Color(0xFFE53935);
+
 class PaymentMethodManagement extends StatefulWidget {
   const PaymentMethodManagement({super.key});
 
@@ -12,8 +21,6 @@ class PaymentMethodManagement extends StatefulWidget {
 
 class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
   late Future<List<PaymentMethod>> _paymentMethodsFuture;
-  final TextEditingController _newMethodController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -30,24 +37,29 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: lightGray,
       appBar: AppBar(
         title: const Text('Gestion des Modes de Paiement'),
+        backgroundColor: deepBlue,
+        foregroundColor: white,
+        elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  icon: const Icon(Icons.restore),
-                  label: const Text('Restaurer les méthodes par défaut'),
-                  onPressed: _resetToDefaultMethods,
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: Icon(Icons.restore, color: warmRed),
+                label: Text(
+                  'Restaurer les méthodes par défaut',
+                  style: TextStyle(color: warmRed),
                 ),
-              ],
+                onPressed: _resetToDefaultMethods,
+              ),
             ),
-            // Liste des modes de paiement
+            const SizedBox(height: 10),
             Expanded(
               child: FutureBuilder<List<PaymentMethod>>(
                 future: _paymentMethodsFuture,
@@ -63,28 +75,79 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
                   final methods = snapshot.data ?? [];
 
                   if (methods.isEmpty) {
-                    return const Center(
-                        child: Text('Aucun mode de paiement trouvé'));
+                    return Center(
+                      child: Text(
+                        'Aucun mode de paiement trouvé',
+                        style: TextStyle(color: darkBlue),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
                     itemCount: methods.length,
                     itemBuilder: (context, index) {
                       final method = methods[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          title: Text(method.name),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Switch(
-                                value: method.isActive,
-                                onChanged: (value) =>
-                                    _toggleMethodStatus(method, value),
-                                activeColor: Colors.green,
-                              ),
-                            ],
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 8),
+                        child: Card(
+                          color: white,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: deepBlue.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.payment,
+                                      color: deepBlue, size: 24),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        method.name,
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: darkBlue,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        method.isActive
+                                            ? 'Activé'
+                                            : 'Désactivé',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: method.isActive
+                                              ? tealGreen
+                                              : warmRed,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch(
+                                  value: method.isActive,
+                                  onChanged: (value) =>
+                                      _toggleMethodStatus(method, value),
+                                  activeColor: tealGreen,
+                                  inactiveTrackColor: lightGray,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -109,12 +172,11 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler'),
+                child: Text('Annuler', style: TextStyle(color: deepBlue)),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Confirmer',
-                    style: TextStyle(color: Colors.red)),
+                child: Text('Confirmer', style: TextStyle(color: warmRed)),
               ),
             ],
           ),
@@ -126,25 +188,27 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
         final sqlDb = SqlDb();
         final db = await sqlDb.db;
 
-        // Clear existing methods
         await db.delete('payment_methods');
-
-        // Insert default methods
         await sqlDb.insertDefaultPaymentMethods(db);
 
         _refreshPaymentMethods();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content:
-                    Text('Méthodes de paiement réinitialisées avec succès')),
+            SnackBar(
+              content:
+                  const Text('Méthodes de paiement réinitialisées avec succès'),
+              backgroundColor: softOrange,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur: ${e.toString()}')),
+            SnackBar(
+              content: Text('Erreur: ${e.toString()}'),
+              backgroundColor: warmRed,
+            ),
           );
         }
       }
@@ -158,7 +222,10 @@ class _PaymentMethodManagementState extends State<PaymentMethodManagement> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la mise à jour')),
+          SnackBar(
+            content: const Text('Erreur lors de la mise à jour'),
+            backgroundColor: warmRed,
+          ),
         );
       }
     }

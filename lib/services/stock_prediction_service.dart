@@ -37,11 +37,11 @@ class StockPredictionService {
     }
   }
 
-Future<void> _trainModel() async {
-  final db = await _sqlDb.db;
-  
-  try {
-    final data = await db.rawQuery('''
+  Future<void> _trainModel() async {
+    final db = await _sqlDb.db;
+
+    try {
+      final data = await db.rawQuery('''
       SELECT 
         p.id as product_id,
         COALESCE(SUM(CASE WHEN sm.movement_type = 'in' THEN sm.quantity ELSE 0 END), 0) as stock_in,
@@ -62,163 +62,170 @@ Future<void> _trainModel() async {
       ORDER BY p.id, month
     ''');
 
-    if (data.isEmpty) {
-      debugPrint("Aucune donnée valide pour l'entraînement");
-      // Ajoutez des données par défaut minimales pour éviter un modèle vide
-      final defaultData = [
-        {
-          'product_id': 0,
-          'stock_in': 0,
-          'current_stock': 0,
-          'month': DateTime.now().month,
-          'weekday': DateTime.now().weekday,
-          'avg_sale': 0,
-          'sales': 0
-        }
-      ];
-      _createModel(defaultData);
-      return;
+      if (data.isEmpty) {
+        debugPrint("Aucune donnée valide pour l'entraînement");
+        // Ajoutez des données par défaut minimales pour éviter un modèle vide
+        final defaultData = [
+          {
+            'product_id': 0,
+            'stock_in': 0,
+            'current_stock': 0,
+            'month': DateTime.now().month,
+            'weekday': DateTime.now().weekday,
+            'avg_sale': 0,
+            'sales': 0
+          }
+        ];
+        _createModel(defaultData);
+        return;
+      }
+
+      _createModel(data);
+    } catch (e) {
+      debugPrint("Erreur lors de l'entraînement du modèle: $e");
+      rethrow;
     }
-
-    _createModel(data);
-  } catch (e) {
-    debugPrint("Erreur lors de l'entraînement du modèle: $e");
-    rethrow;
   }
-}
 
-void _createModel(List<Map<String, dynamic>> data) {
-  // Préparation des données
-  final rows = data.map((row) {
-    return [
-      row['product_id'] ?? 0,
-      row['stock_in'] ?? 0,
-      row['current_stock'] ?? 0,
-      row['month'] ?? DateTime.now().month,
-      row['weekday'] ?? DateTime.now().weekday,
-      row['avg_sale'] ?? 0,
-      row['sales'] ?? 0 // Target variable
-    ];
-  }).toList();
+  void _createModel(List<Map<String, dynamic>> data) {
+    // Préparation des données
+    final rows = data.map((row) {
+      return [
+        row['product_id'] ?? 0,
+        row['stock_in'] ?? 0,
+        row['current_stock'] ?? 0,
+        row['month'] ?? DateTime.now().month,
+        row['weekday'] ?? DateTime.now().weekday,
+        row['avg_sale'] ?? 0,
+        row['sales'] ?? 0 // Target variable
+      ];
+    }).toList();
 
-  final dataframe = DataFrame(
-    rows,
-    header: [..._featureNames, 'sales'],
-  );
+    final dataframe = DataFrame(
+      rows,
+      header: [..._featureNames, 'sales'],
+    );
 
-  // Séparation des features et de la target
-  final features = dataframe.dropSeries(names: ['sales']);
-  final target = dataframe['sales'];
+    // Séparation des features et de la target
+    final features = dataframe.dropSeries(names: ['sales']);
+    final target = dataframe['sales'];
 
-  // Normalisation des features
-  _standardizer = Standardizer(features);
-  final normalizedFeatures = _standardizer!.process(features);
+    // Normalisation des features
+    _standardizer = Standardizer(features);
+    final normalizedFeatures = _standardizer!.process(features);
 
-  // Combinaison des features normalisées avec la target
-  final processedData = DataFrame(
-    normalizedFeatures.rows.toList().asMap().entries.map((entry) {
-      final index = entry.key;
-      final row = entry.value;
-      return [...row, target.data.elementAt(index)];
-    }).toList(),
-    header: [..._featureNames, 'sales'],
-  );
+    // Combinaison des features normalisées avec la target
+    final processedData = DataFrame(
+      normalizedFeatures.rows.toList().asMap().entries.map((entry) {
+        final index = entry.key;
+        final row = entry.value;
+        return [...row, target.data.elementAt(index)];
+      }).toList(),
+      header: [..._featureNames, 'sales'],
+    );
 
-  // Entraînement du modèle
-  _model = LinearRegressor(
-    processedData,
-    'sales',
-    optimizerType: LinearOptimizerType.coordinate,
-    iterationsLimit: 100,
-    fitIntercept: true,
-  );
-}
+    // Entraînement du modèle
+    _model = LinearRegressor(
+      processedData,
+      'sales',
+      optimizerType: LinearOptimizerType.coordinate,
+      iterationsLimit: 100,
+      fitIntercept: true,
+    );
+  }
 
-Future<Map<int, int>> predictStockNeeds({int timeHorizon = 30}) async {
-  try {
-    await _ensureModelReady();
+  Future<Map<int, int>> predictStockNeeds({int timeHorizon = 30}) async {
+    try {
+      await _ensureModelReady();
 
-    if (_model == null || _standardizer == null) {
-      debugPrint("Modèle non initialisé - utilisation de la méthode simplifiée");
+      if (_model == null || _standardizer == null) {
+        debugPrint(
+            "Modèle non initialisé - utilisation de la méthode simplifiée");
+        return await _simpleStockPrediction(timeHorizon);
+      }
+
+      final products = await _sqlDb.getProducts();
+      final avgSales = await _getAverageSalesPerProduct();
+      final predictions = <int, int>{};
+      final now = DateTime.now();
+
+      for (final product in products) {
+        try {
+          final productId = product.id ?? 0;
+          final currentStock = product.stock;
+          final avgSale = avgSales[productId] ?? 0;
+
+          // Vérification des données de base
+          if (productId == 0 || currentStock < 0) {
+            predictions[productId] = 0;
+            continue;
+          }
+
+          // Préparation des features
+          final features = [
+            [
+              productId.toDouble(),
+              0.0, // stock_in
+              currentStock.toDouble(),
+              now.month.toDouble(),
+              now.weekday.toDouble(),
+              avgSale,
+            ]
+          ];
+
+          final featuresDf = DataFrame(features, header: _featureNames);
+
+          // Vérification du dataframe
+          if (featuresDf.rows.isEmpty) {
+            debugPrint(
+                "DataFrame vide pour le produit $productId - utilisation de la méthode simplifiée");
+            final simplePrediction =
+                await _simplePredictionForProduct(productId, timeHorizon);
+            predictions[productId] = simplePrediction;
+            continue;
+          }
+
+          // Prédiction
+          final predictedValue = _model!.predict(featuresDf).rows.first.first;
+          final predictedSales = (predictedValue as num).toInt();
+          final stockNeeded =
+              (predictedSales * (timeHorizon / 30)).round() - currentStock;
+
+          predictions[productId] = stockNeeded > 0 ? stockNeeded : 0;
+        } catch (e) {
+          debugPrint("Erreur de prédiction pour le produit ${product.id}: $e");
+          final simplePrediction =
+              await _simplePredictionForProduct(product.id ?? 0, timeHorizon);
+          predictions[product.id ?? 0] = simplePrediction;
+        }
+      }
+
+      return predictions;
+    } catch (e) {
+      debugPrint(
+          "Erreur majeure dans predictStockNeeds: $e - Utilisation de la méthode simplifiée");
       return await _simpleStockPrediction(timeHorizon);
     }
+  }
 
+  Future<Map<int, int>> _simpleStockPrediction(int timeHorizon) async {
     final products = await _sqlDb.getProducts();
-    final avgSales = await _getAverageSalesPerProduct();
     final predictions = <int, int>{};
-    final now = DateTime.now();
 
     for (final product in products) {
-      try {
-        final productId = product.id ?? 0;
-        final currentStock = product.stock ?? 0;
-        final avgSale = avgSales[productId] ?? 0;
-
-        // Vérification des données de base
-        if (productId == 0 || currentStock < 0) {
-          predictions[productId] = 0;
-          continue;
-        }
-
-        // Préparation des features
-        final features = [
-          [
-            productId.toDouble(),
-            0.0, // stock_in
-            currentStock.toDouble(),
-            now.month.toDouble(),
-            now.weekday.toDouble(),
-            avgSale,
-          ]
-        ];
-
-        final featuresDf = DataFrame(features, header: _featureNames);
-        
-        // Vérification du dataframe
-        if (featuresDf.rows.isEmpty) {
-          debugPrint("DataFrame vide pour le produit $productId - utilisation de la méthode simplifiée");
-          final simplePrediction = await _simplePredictionForProduct(productId, timeHorizon);
-          predictions[productId] = simplePrediction;
-          continue;
-        }
-
-        // Prédiction
-        final predictedValue = _model!.predict(featuresDf).rows.first.first;
-        final predictedSales = (predictedValue as num).toInt();
-        final stockNeeded = (predictedSales * (timeHorizon / 30)).round() - currentStock;
-        
-        predictions[productId] = stockNeeded > 0 ? stockNeeded : 0;
-      } catch (e) {
-        debugPrint("Erreur de prédiction pour le produit ${product.id}: $e");
-        final simplePrediction = await _simplePredictionForProduct(product.id ?? 0, timeHorizon);
-        predictions[product.id ?? 0] = simplePrediction;
-      }
+      final productId = product.id ?? 0;
+      predictions[productId] =
+          await _simplePredictionForProduct(productId, timeHorizon);
     }
 
     return predictions;
-  } catch (e) {
-    debugPrint("Erreur majeure dans predictStockNeeds: $e - Utilisation de la méthode simplifiée");
-    return await _simpleStockPrediction(timeHorizon);
-  }
-}
-
-Future<Map<int, int>> _simpleStockPrediction(int timeHorizon) async {
-  final products = await _sqlDb.getProducts();
-  final predictions = <int, int>{};
-  final db = await _sqlDb.db;
-
-  for (final product in products) {
-    final productId = product.id ?? 0;
-    predictions[productId] = await _simplePredictionForProduct(productId, timeHorizon);
   }
 
-  return predictions;
-}
-
-Future<int> _simplePredictionForProduct(int productId, int timeHorizon) async {
-  final db = await _sqlDb.db;
-  try {
-    final result = await db.rawQuery('''
+  Future<int> _simplePredictionForProduct(
+      int productId, int timeHorizon) async {
+    final db = await _sqlDb.db;
+    try {
+      final result = await db.rawQuery('''
       SELECT AVG(quantity) as avg_sales 
       FROM stock_movements 
       WHERE product_id = ? 
@@ -226,18 +233,18 @@ Future<int> _simplePredictionForProduct(int productId, int timeHorizon) async {
       AND movement_date >= date('now', '-3 months')
     ''', [productId]);
 
-    final avgSales = result.first['avg_sales'] as double? ?? 0;
-    final product = await _sqlDb.getProductById(productId);
-    final currentStock = product?.stock ?? 0;
-    final predictedSales = (avgSales * (timeHorizon / 30)).round();
-    final stockNeeded = predictedSales - currentStock;
-    
-    return stockNeeded > 0 ? stockNeeded : 0;
-  } catch (e) {
-    debugPrint("Erreur dans simplePredictionForProduct: $e");
-    return 0;
+      final avgSales = result.first['avg_sales'] as double? ?? 0;
+      final product = await _sqlDb.getProductById(productId);
+      final currentStock = product?.stock ?? 0;
+      final predictedSales = (avgSales * (timeHorizon / 30)).round();
+      final stockNeeded = predictedSales - currentStock;
+
+      return stockNeeded > 0 ? stockNeeded : 0;
+    } catch (e) {
+      debugPrint("Erreur dans simplePredictionForProduct: $e");
+      return 0;
+    }
   }
-}
 
   Future<Map<String, Map<int, int>>> predictAllStockNeeds() async {
     final shortTerm = await predictStockNeeds(timeHorizon: 30);
@@ -251,9 +258,9 @@ Future<int> _simplePredictionForProduct(int productId, int timeHorizon) async {
     };
   }
 
-Future<Map<int, double>> _getAverageSalesPerProduct() async {
-  final db = await _sqlDb.db;
-  final result = await db.rawQuery('''
+  Future<Map<int, double>> _getAverageSalesPerProduct() async {
+    final db = await _sqlDb.db;
+    final result = await db.rawQuery('''
     SELECT 
       product_id,
       COALESCE(AVG(quantity), 0) as avg_sale
@@ -263,21 +270,22 @@ Future<Map<int, double>> _getAverageSalesPerProduct() async {
     GROUP BY product_id
   ''');
 
-  final avgSales = <int, double>{};
-  for (final row in result) {
-    avgSales[row['product_id'] as int] = (row['avg_sale'] as num).toDouble();
-  }
-  
-  // Ajouter une valeur par défaut pour tous les produits
-  final products = await _sqlDb.getProducts();
-  for (final product in products) {
-    avgSales.putIfAbsent(product.id ?? 0, () => 0.0);
-  }
-  
-  return avgSales;
-}
+    final avgSales = <int, double>{};
+    for (final row in result) {
+      avgSales[row['product_id'] as int] = (row['avg_sale'] as num).toDouble();
+    }
 
-  Future<void> savePredictions(Map<int, int> predictions, {String timeHorizon = 'short_term'}) async {
+    // Ajouter une valeur par défaut pour tous les produits
+    final products = await _sqlDb.getProducts();
+    for (final product in products) {
+      avgSales.putIfAbsent(product.id ?? 0, () => 0.0);
+    }
+
+    return avgSales;
+  }
+
+  Future<void> savePredictions(Map<int, int> predictions,
+      {String timeHorizon = 'short_term'}) async {
     final db = await _sqlDb.db;
     final now = DateTime.now().toIso8601String();
 

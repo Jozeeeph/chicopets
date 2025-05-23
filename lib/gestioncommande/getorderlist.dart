@@ -1,12 +1,12 @@
 import 'dart:io';
+import 'package:caissechicopets/gestioncommande/ediorder.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/orderline.dart';
-import 'package:caissechicopets/models/variant.dart';
+import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/models/order.dart';
 import 'package:pdf/pdf.dart';
-import 'package:caissechicopets/models/product.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -350,6 +350,7 @@ class Getorderlist {
                                 ),
                               );
                             }).toList(),
+                            // In the ExpansionTile children where you have other buttons:
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(vertical: 8.0),
@@ -384,6 +385,18 @@ class Getorderlist {
                                       backgroundColor: Colors.red,
                                     ),
                                   ),
+                                  // Add this new edit button
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      _editOrder(context, order);
+                                    },
+                                    icon: Icon(Icons.edit, color: Colors.white),
+                                    label: Text("Modifier",
+                                        style: TextStyle(color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  ),
                                   if (isSemiPaid)
                                     IconButton(
                                       icon: Icon(Icons.update,
@@ -412,6 +425,56 @@ class Getorderlist {
           ],
         );
       },
+    );
+  }
+
+  static void _editOrder(BuildContext context, Order order) async {
+    final SqlDb sqldb = SqlDb();
+
+    // Get all products from the order lines
+    List<Product> products = [];
+    List<int> quantities = [];
+    List<double> discounts = [];
+    List<bool> discountTypes = [];
+
+    for (var line in order.orderLines) {
+      Product? product;
+
+      if (line.variantId != null) {
+        // Get variant product
+        final variant = await sqldb.getVariantById(line.variantId!);
+        if (variant != null) {
+          product = await sqldb.getProductById(variant.productId);
+          if (product != null) {
+            product.variants = [variant];
+          }
+        }
+      } else {
+        product = await sqldb.getProductById(line.productId!);
+      }
+
+      if (product != null) {
+        products.add(product);
+        quantities.add(line.quantity);
+        discounts.add(line.discount);
+        discountTypes.add(line.isPercentage);
+      }
+    }
+
+    // Navigate to the TableCmd page with the order data
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderEditPage(
+          order: order,
+          products: products,
+          quantities: quantities,
+          discounts: discounts,
+          discountTypes: discountTypes,
+          globalDiscount: order.globalDiscount,
+          isPercentageDiscount: order.isPercentageDiscount,
+        ),
+      ),
     );
   }
 
