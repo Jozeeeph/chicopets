@@ -15,7 +15,7 @@ class FidelityController {
 
   Future<FidelityRules> getFidelityRules(Database db) async {
     try {
-      final List<Map<String, dynamic>> maps = 
+      final List<Map<String, dynamic>> maps =
           await db.query(_rulesTable, limit: 1);
 
       if (maps.isEmpty) {
@@ -34,7 +34,8 @@ class FidelityController {
   Future<int> updateFidelityRules(FidelityRules rules, Database db) async {
     try {
       final count = Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM $_rulesTable')) ?? 0;
+              await db.rawQuery('SELECT COUNT(*) FROM $_rulesTable')) ??
+          0;
 
       if (count == 0) {
         return await db.insert(_rulesTable, rules.toMap());
@@ -66,9 +67,8 @@ class FidelityController {
         'order_id': orderId,
         'reason': reason,
         'date_earned': DateTime.now().toIso8601String(),
-        'expiry_date': DateTime.now()
-            .add(const Duration(days: 365))
-            .toIso8601String(),
+        'expiry_date':
+            DateTime.now().add(const Duration(days: 365)).toIso8601String(),
         'is_used': 0,
       });
 
@@ -91,10 +91,8 @@ class FidelityController {
       final client = await _getClientById(order.idClient!, db);
       if (client == null) return;
 
-      double orderTotal = order.orderLines.fold(
-        0, 
-        (sum, line) => sum + (line.prixUnitaire * line.quantity)
-      );
+      double orderTotal = order.orderLines
+          .fold(0, (sum, line) => sum + (line.prixUnitaire * line.quantity));
 
       int pointsEarned = (orderTotal * rules.pointsPerDinar).round();
       if (pointsEarned <= 0) return;
@@ -113,7 +111,8 @@ class FidelityController {
     }
   }
 
-  Future<bool> canUsePoints(Client client, double orderTotal, Database db) async {
+  Future<bool> canUsePoints(
+      Client client, double orderTotal, Database db) async {
     try {
       final rules = await getFidelityRules(db);
 
@@ -158,21 +157,32 @@ class FidelityController {
   }) async {
     try {
       Product? product;
-      
+
+      // 1. Récupérer les informations du produit
       if (orderLine.productData != null) {
         product = Product.fromMap(orderLine.productData!);
       } else if (orderLine.productId != null) {
         product = await SqlDb().getProductById(orderLine.productId!);
       }
 
-      if (product != null && product.earnsFidelityPoints) {
-        return (product.fidelityPointsEarned ?? 0) * orderLine.quantity;
-      } else {
-        return (orderLine.finalPrice * orderLine.quantity * 
-            (rules.pointsPerDinar / 100)).round();
+      // 2. Si le produit n'existe pas ou n'accumule pas de points, retourner 0
+      if (product == null || !product.earnsFidelityPoints) {
+        return 0;
       }
+
+      // 3. Si le produit a des points prédéfinis, les utiliser
+      if (product.fidelityPointsEarned != null &&
+          product.fidelityPointsEarned! > 0) {
+        return product.fidelityPointsEarned! * orderLine.quantity;
+      }
+
+      // 4. Sinon, calculer selon les règles de fidélité
+      final points =
+          (orderLine.finalPrice * orderLine.quantity * rules.pointsPerDinar)
+              .round();
+      return points > 0 ? points : 0;
     } catch (e) {
-      print('Error calculating loyalty points: $e');
+      print('Erreur dans le calcul des points de fidélité: $e');
       return 0;
     }
   }

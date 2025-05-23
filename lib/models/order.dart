@@ -10,24 +10,24 @@ class Order {
   double remainingAmount;
   String status;
   final int? idClient;
-  final double globalDiscount;
-  final bool isPercentageDiscount;
+  double globalDiscount;
+  bool isPercentageDiscount;
   final int? userId;
 
   // Payment details
-  final double? cashAmount;
-  final double? cardAmount;
-  final double? checkAmount;
+  double? cashAmount;
+  double? cardAmount;
+  double? checkAmount;
   final double? ticketRestaurantAmount;
-  final double? voucherAmount;
-  final List<int>? voucherIds;
-  final String? voucherReference;
+  double? voucherAmount;
+  List<int>? voucherIds;
+  String? voucherReference;
 
   // Payment metadata
-  final String? checkNumber;
-  final String? cardTransactionId;
-  final DateTime? checkDate;
-  final String? bankName;
+  String? checkNumber;
+  String? cardTransactionId;
+  DateTime? checkDate;
+  String? bankName;
 
   // Ticket restaurant details
   final int? numberOfTicketsRestaurant;

@@ -15,7 +15,6 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:caissechicopets/models/stock_movement.dart';
 
