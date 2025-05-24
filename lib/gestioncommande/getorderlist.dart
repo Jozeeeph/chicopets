@@ -1,9 +1,14 @@
 import 'dart:io';
-import 'package:caissechicopets/gestioncommande/ediorder.dart';
+// import 'package:caissechicopets/gestioncommande/addorder.dart';
+import 'package:caissechicopets/gestioncommande/addorder.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/passagecommande/applyDiscount.dart';
+import 'package:caissechicopets/passagecommande/deleteline.dart';
+import 'package:caissechicopets/passagecommande/modifyquantity.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/views/cashdesk_views/components/tableCmd.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:caissechicopets/models/order.dart';
 import 'package:pdf/pdf.dart';
@@ -428,6 +433,31 @@ class Getorderlist {
     );
   }
 
+  // This should be placed outside any class to make it reusable
+  static double calculateOrderTotal(
+    List<Product> products,
+    List<int> quantities,
+    List<double> discounts,
+    List<bool> discountTypes,
+    double globalDiscount,
+    bool isPercentageDiscount,
+  ) {
+    double total = 0.0;
+    for (int i = 0; i < products.length; i++) {
+      double price = products[i].hasVariants && products[i].variants.isNotEmpty
+          ? products[i].variants.first.finalPrice
+          : products[i].prixTTC;
+      double lineTotal = discountTypes[i]
+          ? price * quantities[i] * (1 - discounts[i] / 100)
+          : (price * quantities[i]) - discounts[i];
+      total += lineTotal.clamp(0, double.infinity);
+    }
+    total = isPercentageDiscount
+        ? total * (1 - globalDiscount / 100)
+        : total - globalDiscount;
+    return total.clamp(0, double.infinity);
+  }
+
   static void _editOrder(BuildContext context, Order order) async {
     final SqlDb sqldb = SqlDb();
 
@@ -441,7 +471,6 @@ class Getorderlist {
       Product? product;
 
       if (line.variantId != null) {
-        // Get variant product
         final variant = await sqldb.getVariantById(line.variantId!);
         if (variant != null) {
           product = await sqldb.getProductById(variant.productId);
@@ -461,18 +490,147 @@ class Getorderlist {
       }
     }
 
-    // Navigate to the TableCmd page with the order data
+    // Navigate to a new page that contains the Scaffold and TableCmd
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderEditPage(
-          order: order,
-          products: products,
-          quantities: quantities,
-          discounts: discounts,
-          discountTypes: discountTypes,
-          globalDiscount: order.globalDiscount,
-          isPercentageDiscount: order.isPercentageDiscount,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) {
+            return Scaffold(
+              appBar: AppBar(
+                title: Text('Modifier Commande #${order.idOrder}'),
+              ),
+              body: TableCmd(
+                total: order.total,
+                selectedProducts: products,
+                quantityProducts: quantities,
+                discounts: discounts,
+                typeDiscounts: discountTypes,
+                globalDiscount: order.globalDiscount,
+                isPercentageDiscount: order.isPercentageDiscount,
+                onApplyDiscount: (index) {
+                  Applydiscount.showDiscountInput(
+                    context,
+                    index,
+                    discounts,
+                    discountTypes,
+                    products,
+                    () => setState(() {}),
+                  );
+                },
+                onDeleteProduct: (index) {
+                  Deleteline.showDeleteConfirmation(
+                    index,
+                    context,
+                    products,
+                    quantities,
+                    discounts,
+                    discountTypes,
+                    () => setState(() {}),
+                  );
+                },
+                onAddProduct: () {
+                  // Implement product addition logic
+                },
+                onSearchProduct: () {
+                  // Implement product search logic
+                },
+                onQuantityChange: (index) {
+                  ModifyQt.showQuantityInput(
+                    context,
+                    index,
+                    quantities,
+                    () => setState(() {}),
+                  );
+                },
+                calculateTotal: calculateOrderTotal,
+                onFetchOrders: () {
+                  Navigator.pop(context);
+                },
+                onPlaceOrder: () async {
+                  if (products.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text("Aucun produit sélectionné")),
+                    );
+                    return;
+                  }
+
+                  // Update the existing order with new values
+                  order.total = calculateOrderTotal(
+                    products,
+                    quantities,
+                    discounts,
+                    discountTypes,
+                    order.globalDiscount,
+                    order.isPercentageDiscount,
+                  );
+
+                  // Update order lines
+                  order.orderLines = products.map((product) {
+                    return OrderLine(
+                      idOrder: order.idOrder!,
+                      productId: product.id,
+                      productCode: product.code,
+                      productName: product.designation,
+                      variantId: product.variants.isNotEmpty
+                          ? product.variants.first.id
+                          : null,
+                      variantName: product.variants.isNotEmpty
+                          ? product.variants.first.combinationName
+                          : null,
+                      quantity: quantities[products.indexOf(product)],
+                      prixUnitaire: product.variants.isNotEmpty
+                          ? product.variants.first.finalPrice
+                          : product.prixTTC,
+                      discount: discounts[products.indexOf(product)],
+                      isPercentage: discountTypes[products.indexOf(product)],
+                    );
+                  }).toList();
+
+                  // Show payment dialog to complete the order update
+                  final shouldUpdate = await Addorder.showPlaceOrderPopup(
+                    context,
+                    order,
+                    products,
+                    quantities,
+                    discounts,
+                    discountTypes,
+                    isUpdating: true,
+                  );
+
+                  if (shouldUpdate == true) {
+                    try {
+                      await sqldb.updateOrderInDatabase(order);
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Commande mise à jour")),
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Erreur: ${e.toString()}")),
+                      );
+                    }
+                  }
+                },
+                onProductSelected: (index) {
+                  // Implement product selection logic
+                },
+                onGlobalDiscountChanged: (value) {
+                  setState(() {
+                    order.globalDiscount = value;
+                  });
+                },
+                onIsPercentageDiscountChanged: (value) {
+                  setState(() {
+                    order.isPercentageDiscount = value;
+                  });
+                },
+              ),
+            );
+          },
         ),
       ),
     );

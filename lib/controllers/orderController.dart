@@ -3,64 +3,66 @@ import 'dart:convert';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:sqflite/sqflite.dart';
 
 class OrderController {
   Future<int> addOrder(Order order, dbClient) async {
-  try {
-    int orderId = await dbClient.insert(
-      'orders',
-      {
-        'date': order.date,
-        'total': order.total,
-        'mode_paiement': order.modePaiement,
-        'status': order.status,
-        'remaining_amount': order.remainingAmount,
-        'id_client': order.idClient,
-        'user_id': order.userId,
-        'global_discount': order.globalDiscount,
-        'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
-      },
-    );
-
-    // Insert order lines with product data
-    for (var orderLine in order.orderLines) {
-      // Get product data if product exists
-      Map<String, dynamic>? productData;
-      if (orderLine.productId != null) {
-        final product = await dbClient.query(
-          'products',
-          where: 'id = ?',
-          whereArgs: [orderLine.productId],
-        );
-        if (product.isNotEmpty) {
-          productData = product.first;
-        }
-      }
-
-      await dbClient.insert(
-        'order_items',
+    try {
+      int orderId = await dbClient.insert(
+        'orders',
         {
-          'id_order': orderId,
-          'product_code': orderLine.productCode,
-          'product_id': orderLine.productId,
-          'product_name': orderLine.productName,
-          'quantity': orderLine.quantity,
-          'prix_unitaire': orderLine.prixUnitaire,
-          'discount': orderLine.discount,
-          'isPercentage': orderLine.isPercentage ? 1 : 0,
-          'variant_id': orderLine.variantId,
-          'variant_name': orderLine.variantName,
-          'product_data': productData != null ? jsonEncode(productData) : null,
+          'date': order.date,
+          'total': order.total,
+          'mode_paiement': order.modePaiement,
+          'status': order.status,
+          'remaining_amount': order.remainingAmount,
+          'id_client': order.idClient,
+          'user_id': order.userId,
+          'global_discount': order.globalDiscount,
+          'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
         },
       );
-    }
 
-    return orderId;
-  } catch (e) {
-    print('Error in addOrder: $e');
-    rethrow;
+      // Insert order lines with product data
+      for (var orderLine in order.orderLines) {
+        // Get product data if product exists
+        Map<String, dynamic>? productData;
+        if (orderLine.productId != null) {
+          final product = await dbClient.query(
+            'products',
+            where: 'id = ?',
+            whereArgs: [orderLine.productId],
+          );
+          if (product.isNotEmpty) {
+            productData = product.first;
+          }
+        }
+
+        await dbClient.insert(
+          'order_items',
+          {
+            'id_order': orderId,
+            'product_code': orderLine.productCode,
+            'product_id': orderLine.productId,
+            'product_name': orderLine.productName,
+            'quantity': orderLine.quantity,
+            'prix_unitaire': orderLine.prixUnitaire,
+            'discount': orderLine.discount,
+            'isPercentage': orderLine.isPercentage ? 1 : 0,
+            'variant_id': orderLine.variantId,
+            'variant_name': orderLine.variantName,
+            'product_data':
+                productData != null ? jsonEncode(productData) : null,
+          },
+        );
+      }
+
+      return orderId;
+    } catch (e) {
+      print('Error in addOrder: $e');
+      rethrow;
+    }
   }
-}
 
   Future<void> updateOrderStatus(int idOrder, String status, dbClient) async {
     await dbClient.update(
@@ -109,17 +111,58 @@ class OrderController {
   }
 
   Future<List<OrderLine>> _buildOrderLines(
-    dbClient, List<Map<String, dynamic>> orderLinesData) async {
-  final orderLines = <OrderLine>[];
+      dbClient, List<Map<String, dynamic>> orderLinesData) async {
+    final orderLines = <OrderLine>[];
 
-  for (final line in orderLinesData) {
-    // Try to use product_data first if available
-    if (line['product_data'] != null) {
-      final productData = jsonDecode(line['product_data'] as String);
+    for (final line in orderLinesData) {
+      // Try to use product_data first if available
+      if (line['product_data'] != null) {
+        final productData = jsonDecode(line['product_data'] as String);
+        orderLines.add(OrderLine(
+          idOrder: line['id_order'] as int,
+          productCode: line['product_code']?.toString() ?? productData['code'],
+          productName:
+              line['product_name']?.toString() ?? productData['designation'],
+          productId: line['product_id'] as int?,
+          variantId: line['variant_id'] as int?,
+          variantName: line['variant_name'] as String?,
+          quantity: line['quantity'] as int,
+          prixUnitaire: (line['prix_unitaire'] as num).toDouble(),
+          discount: (line['discount'] as num).toDouble(),
+          isPercentage: (line['isPercentage'] as int) == 1,
+          productData: productData,
+        ));
+        continue;
+      }
+
+      // Fallback to querying product if product_data not available
+      Product? product;
+      if (line['product_id'] != null) {
+        final productMaps = await dbClient.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [line['product_id']],
+        );
+        if (productMaps.isNotEmpty) {
+          product = Product.fromMap(productMaps.first);
+        }
+      }
+
+      if (product == null && line['product_code'] != null) {
+        final productMaps = await dbClient.query(
+          'products',
+          where: 'code = ?',
+          whereArgs: [line['product_code']],
+        );
+        if (productMaps.isNotEmpty) {
+          product = Product.fromMap(productMaps.first);
+        }
+      }
+
       orderLines.add(OrderLine(
         idOrder: line['id_order'] as int,
-        productCode: line['product_code']?.toString() ?? productData['code'],
-        productName: line['product_name']?.toString() ?? productData['designation'],
+        productCode: line['product_code']?.toString(),
+        productName: line['product_name']?.toString() ?? product?.designation,
         productId: line['product_id'] as int?,
         variantId: line['variant_id'] as int?,
         variantName: line['variant_name'] as String?,
@@ -127,52 +170,12 @@ class OrderController {
         prixUnitaire: (line['prix_unitaire'] as num).toDouble(),
         discount: (line['discount'] as num).toDouble(),
         isPercentage: (line['isPercentage'] as int) == 1,
-        productData: productData,
+        productData: product?.toMap(),
       ));
-      continue;
     }
 
-    // Fallback to querying product if product_data not available
-    Product? product;
-    if (line['product_id'] != null) {
-      final productMaps = await dbClient.query(
-        'products',
-        where: 'id = ?',
-        whereArgs: [line['product_id']],
-      );
-      if (productMaps.isNotEmpty) {
-        product = Product.fromMap(productMaps.first);
-      }
-    }
-
-    if (product == null && line['product_code'] != null) {
-      final productMaps = await dbClient.query(
-        'products',
-        where: 'code = ?',
-        whereArgs: [line['product_code']],
-      );
-      if (productMaps.isNotEmpty) {
-        product = Product.fromMap(productMaps.first);
-      }
-    }
-
-    orderLines.add(OrderLine(
-      idOrder: line['id_order'] as int,
-      productCode: line['product_code']?.toString(),
-      productName: line['product_name']?.toString() ?? product?.designation,
-      productId: line['product_id'] as int?,
-      variantId: line['variant_id'] as int?,
-      variantName: line['variant_name'] as String?,
-      quantity: line['quantity'] as int,
-      prixUnitaire: (line['prix_unitaire'] as num).toDouble(),
-      discount: (line['discount'] as num).toDouble(),
-      isPercentage: (line['isPercentage'] as int) == 1,
-      productData: product?.toMap(),
-    ));
+    return orderLines;
   }
-
-  return orderLines;
-}
 
   Future<int> deleteOrder(int orderId, dbClient) async {
     // First delete all order items
@@ -208,50 +211,50 @@ class OrderController {
     );
   }
 
-  Future<void> updateOrderInDatabase(Order order, dbClient) async {
-    try {
-      await dbClient.update(
-        'orders',
-        {
-          'remaining_amount': order.remainingAmount,
-          'status': order.status,
-          'global_discount': order.globalDiscount,
-          'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
-        },
-        where: 'id_order = ?',
-        whereArgs: [order.idOrder],
-      );
+  Future<int> updateOrderInDatabase(Order order, Database db) async {
+    // First update the order itself
+    await db.update(
+      'orders',
+      order.toMap(),
+      where: 'id_order = ?',
+      whereArgs: [order.idOrder],
+    );
 
-      // Update order lines if needed
-      await _updateOrderLines(order, dbClient);
-    } catch (e) {
-      print('Error updating order: $e');
-      throw Exception('Error updating order');
-    }
+    // Then update the order items
+    await _updateOrderItems(order, db);
+
+    return order.idOrder!;
   }
 
-  Future<void> _updateOrderLines(Order order, dbClient) async {
-    // First delete existing order lines
-    await dbClient.delete(
-      'order_items',
-      where: 'id_order = ?',
+  Future<void> _updateOrderItems(Order order, Database db) async {
+    // First delete existing order items
+    await db.delete(
+      'order_items', // Matches your schema
+      where: 'id_order = ?', // Matches your schema
       whereArgs: [order.idOrder],
     );
 
     // Then insert the updated ones
     for (final orderLine in order.orderLines) {
-      await dbClient.insert(
-        'order_items',
+      await db.insert(
+        'order_items', // Matches your schema
         {
           'id_order': order.idOrder,
           'product_code': orderLine.productCode,
           'product_name': orderLine.productName,
           'product_id': orderLine.productId,
+          'variant_id': orderLine.variantId,
+          'variant_code': orderLine.variantCode,
+          'variant_name': orderLine.variantName,
           'quantity': orderLine.quantity,
           'prix_unitaire': orderLine.prixUnitaire,
           'discount': orderLine.discount,
-          'isPercentage': orderLine.isPercentage ? 1 : 0,
+          'isPercentage': orderLine.isPercentage ? 1 : 0, // Matches your schema
+          'product_data': orderLine.productData != null
+              ? jsonEncode(orderLine.productData)
+              : null,
         },
+        conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
   }

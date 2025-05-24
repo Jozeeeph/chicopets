@@ -90,14 +90,15 @@ class Addorder {
     );
   }
 
-  static void showPlaceOrderPopup(
+  static Future<bool?> showPlaceOrderPopup(
     BuildContext context,
     Order order,
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
-    List<bool> typeDiscounts,
-  ) async {
+    List<bool> typeDiscounts, {
+    bool isUpdating = false,
+  }) async {
     Client? selectedClient;
     int numberOfTickets = 1;
     bool useLoyaltyPoints = false;
@@ -144,7 +145,7 @@ class Addorder {
           ),
         ),
       );
-      return;
+      return false; // Changed from return; to return false
     }
 
     String cleanInput(String input) {
@@ -2422,6 +2423,7 @@ class Addorder {
                         useLoyaltyPoints,
                         pointsToUse,
                         pointsDiscount,
+                        isUpdating,
                         selectedVariants);
                   },
                   child: Text(
@@ -2435,6 +2437,7 @@ class Addorder {
         );
       },
     );
+    return null;
   }
 
   static double _calculateMaxGlobalDiscountPercentage(
@@ -2500,6 +2503,7 @@ class Addorder {
       bool useLoyaltyPoints,
       int pointsToUse,
       double pointsDiscount,
+      bool isUpdating,
       List<Variant?> selectedVariants) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
@@ -2776,8 +2780,14 @@ class Addorder {
     );
 
     try {
-      // Save order to database
-      int orderId = await SqlDb().addOrder(order);
+      int orderId = 0;
+      if (isUpdating) {
+        orderId = await SqlDb().updateOrderInDatabase(order);
+      } else {
+        // Save order to database
+        orderId = await SqlDb().addOrder(order);
+      }
+
       // Dans la méthode _confirmPlaceOrder, après la validation de la commande
       final stockMovementService = StockMovementService(SqlDb());
 

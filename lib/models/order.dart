@@ -4,7 +4,7 @@ class Order {
   // Primary fields
   final int? idOrder;
   final String date;
-  final List<OrderLine> orderLines;
+  List<OrderLine> orderLines;
   final String modePaiement;
   double total;
   double remainingAmount;
