@@ -969,96 +969,55 @@ class Getorderlist {
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF000000)),
                   ),
-                  if (order.modePaiement == "Espèce" &&
-                      order.cashAmount != null) ...[
-                    SizedBox(height: 5),
-                    Text(
-                      "Montant espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    if ((order.cashAmount! - order.total) > 0)
-                      Text(
-                        "Monnaie rendue: ${(order.cashAmount! - order.total).toStringAsFixed(2)} DT",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                  ],
-                  if (order.modePaiement == "TPE" &&
-                      order.cardAmount != null) ...[
-                    SizedBox(height: 5),
-                    Text(
-                      "Montant carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    if (order.cardTransactionId != null)
-                      Text(
-                        "Transaction: ${order.cardTransactionId}",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                  ],
-                  if (order.modePaiement == "Chèque" &&
-                      order.checkAmount != null) ...[
-                    SizedBox(height: 5),
-                    Text(
-                      "Montant chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    if (order.checkNumber != null)
-                      Text(
-                        "N° chèque: ${order.checkNumber}",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    if (order.bankName != null)
-                      Text(
-                        "Banque: ${order.bankName}",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    if (order.checkDate != null)
-                      Text(
-                        "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                  ],
-                  if (order.modePaiement == "Mixte") ...[
-                    SizedBox(height: 5),
-                    if (order.cashAmount != null && order.cashAmount! > 0)
-                      Text(
-                        "Espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    if (order.cardAmount != null && order.cardAmount! > 0) ...[
-                      Text(
-                        "Carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      if (order.cardTransactionId != null)
-                        Text(
-                          "Transaction: ${order.cardTransactionId}",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                    ],
-                    if (order.checkAmount != null &&
-                        order.checkAmount! > 0) ...[
-                      Text(
-                        "Chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      if (order.checkNumber != null)
-                        Text(
-                          "N°: ${order.checkNumber}",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      if (order.bankName != null)
-                        Text(
-                          "Banque: ${order.bankName}",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      if (order.checkDate != null)
-                        Text(
-                          "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                    ],
-                  ],
+                  // Remplacer toute la section des détails de paiement par :
+if (order.modePaiement == "Espèce" && order.paymentDetails.cashAmount != null) ...[
+  SizedBox(height: 5),
+  Text(
+    "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
+    style: TextStyle(fontSize: 14),
+  ),
+  if ((order.paymentDetails.cashAmount! - order.total) > 0)
+    Text(
+      "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
+      style: TextStyle(fontSize: 14),
+    ),
+],
+
+if (order.modePaiement == "TPE" && order.paymentDetails.cardAmount != null) ...[
+  SizedBox(height: 5),
+  Text(
+    "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
+    style: TextStyle(fontSize: 14),
+  ),
+  if (order.paymentDetails.cardTransactionId != null)
+    Text(
+      "Transaction: ${order.paymentDetails.cardTransactionId}",
+      style: TextStyle(fontSize: 14),
+    ),
+],
+
+if (order.modePaiement == "Chèque" && order.paymentDetails.checkAmount != null) ...[
+  SizedBox(height: 5),
+  Text(
+    "Montant chèque: ${order.paymentDetails.checkAmount!.toStringAsFixed(2)} DT",
+    style: TextStyle(fontSize: 14),
+  ),
+  if (order.paymentDetails.checkNumber != null)
+    Text(
+      "N° chèque: ${order.paymentDetails.checkNumber}",
+      style: TextStyle(fontSize: 14),
+    ),
+  if (order.paymentDetails.bankName != null)
+    Text(
+      "Banque: ${order.paymentDetails.bankName}",
+      style: TextStyle(fontSize: 14),
+    ),
+  if (order.paymentDetails.checkDate != null)
+    Text(
+      "Date: ${DateFormat('dd/MM/yyyy').format(order.paymentDetails.checkDate!)}",
+      style: TextStyle(fontSize: 14),
+    ),
+],
                   if (order.remainingAmount > 0) ...[
                     SizedBox(height: 5),
                     Text(
@@ -1486,96 +1445,35 @@ class Getorderlist {
             ),
 
             // Payment details
-            if (order.modePaiement == "Espèce" && order.cashAmount != null) ...[
-              pw.SizedBox(height: 5),
-              pw.Text(
-                "Montant espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(font: ttf, fontSize: 8),
-              ),
-              if ((order.cashAmount! - order.total) > 0)
-                pw.Text(
-                  "Monnaie rendue: ${(order.cashAmount! - order.total).toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-            ],
+            // Dans generateAndSavePDF, mettre à jour les sections de paiement :
 
-            if (order.modePaiement == "TPE" && order.cardAmount != null) ...[
-              pw.SizedBox(height: 5),
-              pw.Text(
-                "Montant carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(font: ttf, fontSize: 8),
-              ),
-              if (order.cardTransactionId != null)
-                pw.Text(
-                  "Transaction: ${order.cardTransactionId}",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-            ],
+// Espèces
+if (order.modePaiement == "Espèce" && order.paymentDetails.cashAmount != null) ...[
+  pw.SizedBox(height: 5),
+  pw.Text(
+    "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
+    style: pw.TextStyle(font: ttf, fontSize: 8),
+  ),
+  if ((order.paymentDetails.cashAmount! - order.total) > 0)
+    pw.Text(
+      "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
+      style: pw.TextStyle(font: ttf, fontSize: 8),
+    ),
+],
 
-            if (order.modePaiement == "Chèque" &&
-                order.checkAmount != null) ...[
-              pw.SizedBox(height: 5),
-              pw.Text(
-                "Montant chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                style: pw.TextStyle(font: ttf, fontSize: 8),
-              ),
-              if (order.checkNumber != null)
-                pw.Text(
-                  "N° chèque: ${order.checkNumber}",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-              if (order.bankName != null)
-                pw.Text(
-                  "Banque: ${order.bankName}",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-              if (order.checkDate != null)
-                pw.Text(
-                  "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-            ],
-
-            if (order.modePaiement == "Mixte") ...[
-              pw.SizedBox(height: 5),
-              if (order.cashAmount != null && order.cashAmount! > 0)
-                pw.Text(
-                  "Espèces: ${order.cashAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-              if (order.cardAmount != null && order.cardAmount! > 0) ...[
-                pw.Text(
-                  "Carte: ${order.cardAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-                if (order.cardTransactionId != null)
-                  pw.Text(
-                    "Transaction: ${order.cardTransactionId}",
-                    style: pw.TextStyle(font: ttf, fontSize: 8),
-                  ),
-              ],
-              if (order.checkAmount != null && order.checkAmount! > 0) ...[
-                pw.Text(
-                  "Chèque: ${order.checkAmount!.toStringAsFixed(2)} DT",
-                  style: pw.TextStyle(font: ttf, fontSize: 8),
-                ),
-                if (order.checkNumber != null)
-                  pw.Text(
-                    "N°: ${order.checkNumber}",
-                    style: pw.TextStyle(font: ttf, fontSize: 8),
-                  ),
-                if (order.bankName != null)
-                  pw.Text(
-                    "Banque: ${order.bankName}",
-                    style: pw.TextStyle(font: ttf, fontSize: 8),
-                  ),
-                if (order.checkDate != null)
-                  pw.Text(
-                    "Date: ${DateFormat('dd/MM/yyyy').format(order.checkDate!)}",
-                    style: pw.TextStyle(font: ttf, fontSize: 8),
-                  ),
-              ],
-            ],
+// Carte
+if (order.modePaiement == "TPE" && order.paymentDetails.cardAmount != null) ...[
+  pw.SizedBox(height: 5),
+  pw.Text(
+    "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
+    style: pw.TextStyle(font: ttf, fontSize: 8),
+  ),
+  if (order.paymentDetails.cardTransactionId != null)
+    pw.Text(
+      "Transaction: ${order.paymentDetails.cardTransactionId}",
+      style: pw.TextStyle(font: ttf, fontSize: 8),
+    ),
+],
 
             // Remaining amount
             if (order.remainingAmount > 0) ...[
