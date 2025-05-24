@@ -6,6 +6,7 @@ import 'package:caissechicopets/views/gestionPaymentMode/PaymentModeMgt.dart';
 import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
+import 'package:caissechicopets/views/stock_views/stock_prediction_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
@@ -17,6 +18,7 @@ import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -199,6 +201,13 @@ class _DashboardPageState extends State<DashboardPage> {
                       icon: Icons.loyalty,
                       page: FidelityRulesPage(),
                       color: Color(0xFF9C27B0),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Prédictions avec IA',
+                      icon: Icons.batch_prediction,
+                      page: StockPredictionPage(),
+                      color: Color.fromARGB(255, 1, 166, 249),
                     ),
                   ],
                 ),
