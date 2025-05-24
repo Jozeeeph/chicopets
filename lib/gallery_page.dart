@@ -54,8 +54,7 @@ class _GalleryPageState extends State<GalleryPage> {
 
   String _generateDefaultName(String path) {
     final fileName = path.split('/').last;
-    final date = DateTime.now().toString().split(' ')[0];
-    return 'Image_${fileName.hashCode.toString().substring(0, 4)}_$date';
+    return 'Image_${fileName.hashCode.toString().substring(0, 4)}';
   }
 
   Future<void> _pickImages() async {
@@ -110,33 +109,6 @@ class _GalleryPageState extends State<GalleryPage> {
     );
   }
 
-  Future<void> _pickFromCamera() async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.rear,
-      maxWidth: 1920,
-      maxHeight: 1080,
-      imageQuality: 90,
-    );
-
-    if (pickedFile != null) {
-      setState(() => _isImporting = true);
-
-      try {
-        await SqlDb().insertImage(pickedFile.path,
-            'Photo_${DateTime.now().toString().replaceAll(RegExp(r'[^0-9]'), '').substring(0, 8)}');
-
-        _showSnackbar(
-            "Photo importée avec succès", Colors.green, Icons.check_circle);
-      } catch (e) {
-        _showSnackbar("Erreur lors de l'importation: ${e.toString()}",
-            Colors.red, Icons.error);
-      } finally {
-        setState(() => _isImporting = false);
-        await _loadImagesFromDatabase();
-      }
-    }
-  }
 
   void _showSnackbar(String message, Color color, IconData icon) {
     ScaffoldMessenger.of(context).showSnackBar(
