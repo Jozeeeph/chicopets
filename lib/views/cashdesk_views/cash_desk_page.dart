@@ -15,6 +15,7 @@ import 'package:caissechicopets/gestionproduit/addprod.dart';
 import 'package:caissechicopets/gestionproduit/searchprod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:caissechicopets/models/paymentDetails.dart';
 
 class CashDeskPage extends StatefulWidget {
   const CashDeskPage({super.key});
@@ -101,28 +102,33 @@ class _CashDeskPageState extends State<CashDeskPage> {
     );
   }
 
-  double _calculateTotal() {
-    double total = 0.0;
-    for (int i = 0; i < _selectedProducts.length; i++) {
-      double productTotal = _selectedProducts[i].prixTTC * _quantityProducts[i];
+double _calculateTotal() {
+  double total = 0.0;
+  
+  for (int i = 0; i < _selectedProducts.length; i++) {
+    double basePrice = _selectedProducts[i].variants.isNotEmpty
+        ? _selectedProducts[i].variants.first.finalPrice
+        : _selectedProducts[i].prixTTC;
+    
+    double productTotal = basePrice * _quantityProducts[i];
 
-      if (_typeDiscounts[i]) {
-        productTotal *= (1 - _discounts[i] / 100);
-      } else {
-        productTotal -= _discounts[i];
-      }
-
-      total += productTotal.clamp(0, double.infinity);
-    }
-
-    if (_isPercentageDiscount) {
-      total *= (1 - _globalDiscount / 100);
+    if (_typeDiscounts[i]) {
+      productTotal *= (1 - _discounts[i] / 100);
     } else {
-      total -= _globalDiscount;
+      productTotal -= _discounts[i];
     }
 
-    return total.clamp(0, double.infinity);
+    total += productTotal.clamp(0, double.infinity);
   }
+
+  if (_isPercentageDiscount) {
+    total *= (1 - _globalDiscount / 100);
+  } else {
+    total -= _globalDiscount;
+  }
+
+  return total.clamp(0, double.infinity);
+}
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -180,14 +186,24 @@ class _CashDeskPageState extends State<CashDeskPage> {
       return;
     }
 
-    final order = Order(
-      date: DateTime.now().toIso8601String(),
-      orderLines: [],
-      total: _calculateTotal(),
-      modePaiement: "Espèces",
-      globalDiscount: _globalDiscount,
-      isPercentageDiscount: _isPercentageDiscount,
-    );
+    final paymentDetails = PaymentDetails(
+    // Initialize with default/empty values
+    cashAmount: 0.0,
+    cardAmount: 0.0,
+    checkAmount: 0.0,
+    // ... other payment details fields initialized as needed
+  );
+
+  // Create the order with required paymentDetails
+  final order = Order(
+    date: DateTime.now().toIso8601String(),
+    orderLines: [],
+    total: _calculateTotal(),
+    modePaiement: "Espèces",
+    globalDiscount: _globalDiscount,
+    isPercentageDiscount: _isPercentageDiscount,
+    paymentDetails: paymentDetails, // Now providing the required parameter
+  );
 
     Addorder.showPlaceOrderPopup(
       context,
@@ -227,45 +243,31 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void _handleProductSelected(Product product, [Variant? variant]) {
-    setState(() {
-      // Create a unique identifier for this product+variant combination
-      String uniqueId = '${product.id}';
-      if (variant != null) {
-        uniqueId += '_${variant.id}';
-      }
-
-      // Check if this exact combination already exists
-      int existingIndex = -1;
-      for (int i = 0; i < _selectedProducts.length; i++) {
-        String currentId = '${_selectedProducts[i].id}';
-        if (_selectedProducts[i].variants.isNotEmpty) {
-          currentId += '_${_selectedProducts[i].variants.first.id}';
-        }
-        if (currentId == uniqueId) {
-          existingIndex = i;
-          break;
-        }
-      }
-
-      if (existingIndex >= 0) {
-        // Increment quantity if same product+variant exists
-        _quantityProducts[existingIndex]++;
-        _selectedProductIndex = existingIndex;
-      } else {
-        // Create a new product instance with only the selected variant
-        final productToAdd = product.copyWith(
-          variants: variant != null ? [variant] : [],
-          prixTTC: variant?.finalPrice ?? product.prixTTC,
-        );
-
-        _selectedProducts.add(productToAdd);
-        _quantityProducts.add(1);
-        _discounts.add(0.0);
-        _typeDiscounts.add(true);
-        _selectedProductIndex = _selectedProducts.length - 1;
-      }
+  setState(() {
+    String uniqueId = '${product.id}${variant?.id ?? ''}';
+    
+    int existingIndex = _selectedProducts.indexWhere((p) {
+      String currentId = '${p.id}${p.variants.isNotEmpty ? p.variants.first.id : ''}';
+      return currentId == uniqueId;
     });
-  }
+
+    if (existingIndex >= 0) {
+      _quantityProducts[existingIndex]++;
+      _selectedProductIndex = existingIndex;
+    } else {
+      final productToAdd = product.copyWith(
+        variants: variant != null ? [variant] : [],
+        prixTTC: variant?.finalPrice ?? product.prixTTC,
+      );
+
+      _selectedProducts.add(productToAdd);
+      _quantityProducts.add(1);
+      _discounts.add(0.0);
+      _typeDiscounts.add(true);
+      _selectedProductIndex = _selectedProducts.length - 1;
+    }
+  });
+}
 
   void _handleGlobalDiscountChange(double newValue) {
     setState(() {

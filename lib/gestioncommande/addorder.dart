@@ -17,6 +17,8 @@ import 'package:caissechicopets/views/client_views/client_management.dart';
 import 'package:caissechicopets/gestioncommande/getorderlist.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:caissechicopets/models/stock_movement.dart';
+import 'package:caissechicopets/models/paymentDetails.dart';
+
 
 class Addorder {
   static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -2678,106 +2680,111 @@ class Addorder {
     final user = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
 
     // Create order
-    Order order = Order(
-      date: DateTime.now().toIso8601String(),
-      orderLines: orderLines,
-      total: total,
-      modePaiement: selectedPaymentMethod,
-      status: status,
-      remainingAmount: remainingAmount,
-      globalDiscount: globalDiscount,
-      isPercentageDiscount: isPercentageDiscount,
-      userId: user?.id,
-      idClient: selectedClient?.id,
+    // Dans la méthode _confirmPlaceOrder, remplacer la création de Order par :
 
-      // Payment amounts
-      cashAmount: ["Espèce", "Mixte"].contains(selectedPaymentMethod)
-          ? cashAmount
+// Créer d'abord les PaymentDetails
+final paymentDetails = PaymentDetails(
+  // Payment amounts
+  cashAmount: ["Espèce", "Mixte"].contains(selectedPaymentMethod)
+      ? cashAmount
+      : null,
+  cardAmount:
+      ["TPE", "Mixte"].contains(selectedPaymentMethod) ? cardAmount : null,
+  checkAmount: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+      ? checkAmount
+      : null,
+  ticketRestaurantAmount:
+      ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+          ? ticketRestaurantAmount
           : null,
-      cardAmount:
-          ["TPE", "Mixte"].contains(selectedPaymentMethod) ? cardAmount : null,
-      checkAmount: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-          ? checkAmount
-          : null,
-      ticketRestaurantAmount:
-          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
-              ? ticketRestaurantAmount
-              : null,
-      voucherAmount: ["Bon d'achat", "Mixte"].contains(selectedPaymentMethod)
-          ? voucherAmount
-          : null,
-      giftTicketAmount:
-          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-              ? giftTicketAmount
-              : null,
-      traiteAmount: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-          ? traiteAmount
-          : null,
-      virementAmount: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-          ? virementAmount
-          : null,
+  voucherAmount: ["Bon d'achat", "Mixte"].contains(selectedPaymentMethod)
+      ? voucherAmount
+      : null,
+  voucherIds: selectedVoucher != null ? [selectedVoucher.id] : null,
+  voucherReference: null,
+  giftTicketAmount: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+      ? giftTicketAmount
+      : null,
+  traiteAmount: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+      ? traiteAmount
+      : null,
+  virementAmount: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+      ? virementAmount
+      : null,
 
-      // Payment details
-      checkNumber: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-          ? checkNumber
-          : null,
-      cardTransactionId: ["TPE", "Mixte"].contains(selectedPaymentMethod)
-          ? cardTransactionId
-          : null,
-      checkDate: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-          ? checkDate
-          : null,
-      bankName:
-          ["Chèque", "Mixte"].contains(selectedPaymentMethod) ? bankName : null,
-      giftTicketNumber:
-          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-              ? giftTicketNumber
-              : null,
-      giftTicketIssuer:
-          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-              ? giftTicketIssuer
-              : null,
-      traiteNumber: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-          ? traiteNumber
-          : null,
-      traiteBank: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-          ? traiteBank
-          : null,
-      traiteBeneficiary: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-          ? traiteBeneficiary
-          : null,
-      traiteDate: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-          ? traiteDate
-          : null,
-      virementReference: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-          ? virementReference
-          : null,
-      virementBank: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-          ? virementBank
-          : null,
-      virementSender: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-          ? virementSender
-          : null,
-      virementDate: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-          ? virementDate
-          : null,
+  // Payment details
+  checkNumber: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+      ? checkNumber
+      : null,
+  cardTransactionId: ["TPE", "Mixte"].contains(selectedPaymentMethod)
+      ? cardTransactionId
+      : null,
+  checkDate: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+      ? checkDate
+      : null,
+  bankName:
+      ["Chèque", "Mixte"].contains(selectedPaymentMethod) ? bankName : null,
 
-      // Ticket restaurant details
-      numberOfTicketsRestaurant:
-          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
-              ? numberOfTicketsRestaurant
-              : null,
-      ticketValue: ticketValue,
-      ticketTax: ticketTax,
-      ticketCommission: ticketCommission,
+  // Ticket restaurant details
+  numberOfTicketsRestaurant:
+      ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+          ? numberOfTicketsRestaurant
+          : null,
+  ticketValue: ticketValue,
+  ticketTax: ticketTax,
+  ticketCommission: ticketCommission,
 
-      // Voucher details
-      voucherIds: selectedVoucher != null ? [selectedVoucher.id] : null,
+  // New payment details
+  giftTicketNumber: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+      ? giftTicketNumber
+      : null,
+  giftTicketIssuer: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+      ? giftTicketIssuer
+      : null,
+  traiteNumber: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+      ? traiteNumber
+      : null,
+  traiteBank: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+      ? traiteBank
+      : null,
+  traiteBeneficiary: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+      ? traiteBeneficiary
+      : null,
+  traiteDate: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+      ? traiteDate
+      : null,
+  virementReference: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+      ? virementReference
+      : null,
+  virementBank: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+      ? virementBank
+      : null,
+  virementSender: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+      ? virementSender
+      : null,
+  virementDate: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+      ? virementDate
+      : null,
 
-      // Loyalty points
-      pointsUsed: useLoyaltyPoints ? pointsToUse : null,
-      pointsDiscount: useLoyaltyPoints ? pointsDiscount : null,
-    );
+  // Loyalty program
+  pointsUsed: useLoyaltyPoints ? pointsToUse : null,
+  pointsDiscount: useLoyaltyPoints ? pointsDiscount : null,
+);
+
+// Créer ensuite l'Order avec les PaymentDetails
+Order order = Order(
+  date: DateTime.now().toIso8601String(),
+  orderLines: orderLines,
+  total: total,
+  modePaiement: selectedPaymentMethod,
+  status: status,
+  remainingAmount: remainingAmount,
+  globalDiscount: globalDiscount,
+  isPercentageDiscount: isPercentageDiscount,
+  userId: user?.id,
+  idClient: selectedClient?.id,
+  paymentDetails: paymentDetails,
+);
 
     try {
       int orderId = 0;

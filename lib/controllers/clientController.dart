@@ -4,6 +4,8 @@ import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:caissechicopets/models/paymentDetails.dart';
+
 
 class Clientcontroller {
   Future<int> addClient(Client client, dbClient) async {
@@ -63,78 +65,88 @@ class Clientcontroller {
     return result.map((map) => Client.fromMap(map)).toList();
   }
 
-  Future<List<Order>> getClientOrders(int clientId, dbClient) async {
-    final List<Map<String, dynamic>> orderMaps = await dbClient.query(
-      'orders',
-      where: 'id_client = ?',
-      whereArgs: [clientId],
-      orderBy: 'date DESC',
-    );
+// Update the getClientOrders method to include PaymentDetails
+Future<List<Order>> getClientOrders(int clientId, dbClient) async {
+  final List<Map<String, dynamic>> orderMaps = await dbClient.query(
+    'orders',
+    where: 'id_client = ?',
+    whereArgs: [clientId],
+    orderBy: 'date DESC',
+  );
 
-    List<Order> orders = [];
-    for (var orderMap in orderMaps) {
-      int orderId = orderMap['id_order'];
-      List<Map<String, dynamic>> itemMaps = await dbClient.query(
-        'order_items',
-        where: 'id_order = ?',
-        whereArgs: [orderId],
-      );
-
-      List<OrderLine> orderLines = itemMaps.map((itemMap) {
-        return OrderLine(
-          idOrder: orderId,
-          productCode: itemMap['product_code'],
-          productId: itemMap['product_id'],
-          productName: itemMap['product_name'],
-          quantity: itemMap['quantity'],
-          prixUnitaire: itemMap['prix_unitaire'],
-          discount: itemMap['discount'],
-          isPercentage: itemMap['isPercentage'] == 1,
-        );
-      }).toList();
-
-      orders.add(Order(
-        idOrder: orderId,
-        date: orderMap['date'],
-        orderLines: orderLines,
-        total: orderMap['total'],
-        modePaiement: orderMap['mode_paiement'],
-        status: orderMap['status'],
-        remainingAmount: orderMap['remaining_amount'],
-        globalDiscount: orderMap['global_discount'],
-        isPercentageDiscount: orderMap['is_percentage_discount'] == 1,
-        idClient: clientId,
-      ));
-    }
-
-    return orders;
-  }
-
-  Future<void> addOrderToClient(int clientId, int orderId, dbClient) async {
-    print('Adding order $orderId to client $clientId'); // Debug
-
-    // Méthode 1: Mettre à jour la liste des commandes du client
-    final client = await getClientById(clientId, dbClient);
-    if (client != null) {
-      client.idOrders.add(orderId);
-      await dbClient.update(
-        'clients',
-        {'id_orders': client.idOrders.join(',')},
-        where: 'id = ?',
-        whereArgs: [clientId],
-      );
-      print('Updated client orders: ${client.idOrders}'); // Debug
-    }
-
-    // Méthode 2: Alternative plus simple
-    await dbClient.update(
-      'orders',
-      {'id_client': clientId},
+  List<Order> orders = [];
+  for (var orderMap in orderMaps) {
+    int orderId = orderMap['id_order'];
+    
+    // Get order items
+    List<Map<String, dynamic>> itemMaps = await dbClient.query(
+      'order_items',
       where: 'id_order = ?',
       whereArgs: [orderId],
     );
-    print('Updated order with client ID'); // Debug
+
+    List<OrderLine> orderLines = itemMaps.map((itemMap) {
+      return OrderLine(
+        idOrder: orderId,
+        productCode: itemMap['product_code'],
+        productId: itemMap['product_id'],
+        productName: itemMap['product_name'],
+        variantId: itemMap['variant_id'],
+        variantName: itemMap['variant_name'],
+        quantity: itemMap['quantity'],
+        prixUnitaire: itemMap['prix_unitaire'],
+        discount: itemMap['discount'],
+        isPercentage: itemMap['isPercentage'] == 1,
+      );
+    }).toList();
+
+    // Create PaymentDetails from the order map
+    final paymentDetails = PaymentDetails.fromMap(orderMap);
+
+    orders.add(Order(
+      idOrder: orderId,
+      date: orderMap['date'],
+      orderLines: orderLines,
+      total: orderMap['total'],
+      modePaiement: orderMap['mode_paiement'],
+      status: orderMap['status'],
+      remainingAmount: orderMap['remaining_amount'],
+      globalDiscount: orderMap['global_discount'],
+      isPercentageDiscount: orderMap['is_percentage_discount'] == 1,
+      idClient: clientId,
+      paymentDetails: paymentDetails, // Add payment details
+    ));
   }
+
+  return orders;
+}
+
+// Update the addOrderToClient method
+Future<void> addOrderToClient(int clientId, int orderId, dbClient) async {
+  print('Adding order $orderId to client $clientId');
+
+  // Method 1: Update client's order list
+  final client = await getClientById(clientId, dbClient);
+  if (client != null) {
+    client.idOrders.add(orderId);
+    await dbClient.update(
+      'clients',
+      {'id_orders': client.idOrders.join(',')},
+      where: 'id = ?',
+      whereArgs: [clientId],
+    );
+    print('Updated client orders: ${client.idOrders}');
+  }
+
+  // Method 2: Update the order directly
+  await dbClient.update(
+    'orders',
+    {'id_client': clientId},
+    where: 'id_order = ?',
+    whereArgs: [orderId],
+  );
+  print('Updated order with client ID');
+}
 
   Future<int> updateClientDebt(int clientId, double newDebt, db) async {
     return await db.update(

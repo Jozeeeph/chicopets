@@ -2,42 +2,21 @@ import 'dart:convert';
 
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
+import 'package:caissechicopets/models/paymentDetails.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:sqflite/sqflite.dart';
 
 class OrderController {
   Future<int> addOrder(Order order, dbClient) async {
     try {
+      // First insert the order with payment details
       int orderId = await dbClient.insert(
         'orders',
-        {
-          'date': order.date,
-          'total': order.total,
-          'mode_paiement': order.modePaiement,
-          'status': order.status,
-          'remaining_amount': order.remainingAmount,
-          'id_client': order.idClient,
-          'user_id': order.userId,
-          'global_discount': order.globalDiscount,
-          'is_percentage_discount': order.isPercentageDiscount ? 1 : 0,
-        },
+        order.toMap(), // Use the Order's toMap method which includes payment details
       );
 
       // Insert order lines with product data
       for (var orderLine in order.orderLines) {
-        // Get product data if product exists
-        Map<String, dynamic>? productData;
-        if (orderLine.productId != null) {
-          final product = await dbClient.query(
-            'products',
-            where: 'id = ?',
-            whereArgs: [orderLine.productId],
-          );
-          if (product.isNotEmpty) {
-            productData = product.first;
-          }
-        }
-
         await dbClient.insert(
           'order_items',
           {
@@ -51,8 +30,9 @@ class OrderController {
             'isPercentage': orderLine.isPercentage ? 1 : 0,
             'variant_id': orderLine.variantId,
             'variant_name': orderLine.variantName,
-            'product_data':
-                productData != null ? jsonEncode(productData) : null,
+            'product_data': orderLine.productData != null 
+                ? jsonEncode(orderLine.productData) 
+                : null,
           },
         );
       }
@@ -73,15 +53,12 @@ class OrderController {
     );
   }
 
-  Future<List<Order>> getOrdersWithOrderLines(dbClient) async {
+Future<List<Order>> getOrdersWithOrderLines(dbClient) async {
     final ordersData = await dbClient.query("orders");
     final orders = <Order>[];
 
     for (final orderMap in ordersData) {
       final orderId = orderMap['id_order'] as int;
-
-      // Debug print to verify data
-      print('Order ID: $orderId, User ID: ${orderMap['user_id']}');
 
       // Fetch order lines
       final orderLinesData = await dbClient.query(
@@ -91,6 +68,9 @@ class OrderController {
       );
 
       final orderLines = await _buildOrderLines(dbClient, orderLinesData);
+
+      // Create PaymentDetails from the order map
+      final paymentDetails = PaymentDetails.fromMap(orderMap);
 
       orders.add(Order(
         idOrder: orderId,
@@ -103,7 +83,8 @@ class OrderController {
         globalDiscount: (orderMap['global_discount'] as num).toDouble(),
         isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
         idClient: orderMap['id_client'] as int?,
-        userId: orderMap['user_id'] as int?, // Make sure this line is included
+        userId: orderMap['user_id'] as int?,
+        paymentDetails: paymentDetails, // Add payment details
       ));
     }
 
@@ -211,11 +192,11 @@ class OrderController {
     );
   }
 
-  Future<int> updateOrderInDatabase(Order order, Database db) async {
-    // First update the order itself
+    Future<int> updateOrderInDatabase(Order order, Database db) async {
+    // First update the order itself including payment details
     await db.update(
       'orders',
-      order.toMap(),
+      order.toMap(), // Use the Order's toMap method which includes payment details
       where: 'id_order = ?',
       whereArgs: [order.idOrder],
     );
@@ -259,36 +240,41 @@ class OrderController {
     }
   }
 
-  Future<List<Order>> getOrders(dbClient) async {
-    final orderMaps = await dbClient.query('orders');
-    final orders = <Order>[];
+Future<List<Order>> getOrders(dbClient) async {
+  final orderMaps = await dbClient.query('orders');
+  final orders = <Order>[];
 
-    for (final orderMap in orderMaps) {
-      final orderId = orderMap['id_order'] as int;
-      final orderLinesData = await dbClient.query(
-        'order_items',
-        where: 'id_order = ?',
-        whereArgs: [orderId],
-      );
+  for (final orderMap in orderMaps) {
+    final orderId = orderMap['id_order'] as int;
+    final orderLinesData = await dbClient.query(
+      'order_items',
+      where: 'id_order = ?',
+      whereArgs: [orderId],
+    );
 
-      final orderLines = await _buildOrderLines(dbClient, orderLinesData);
+    final orderLines = await _buildOrderLines(dbClient, orderLinesData);
+    
+    // Create PaymentDetails from the order map
+    final paymentDetails = PaymentDetails.fromMap(orderMap);
 
-      orders.add(Order(
-          date: orderMap['date'],
-          total: (orderMap['total'] as num).toDouble(),
-          modePaiement: orderMap['mode_paiement'] as String,
-          status: orderMap['status'] as String,
-          orderLines: orderLines,
-          remainingAmount: (orderMap['remaining_amount'] as num).toDouble(),
-          globalDiscount: (orderMap['global_discount'] as num).toDouble(),
-          isPercentageDiscount:
-              (orderMap['is_percentage_discount'] as int) == 1,
-          idClient: orderMap['id_client'] as int?,
-          userId: orderMap['user_id'] as int?));
-    }
-
-    return orders;
+    orders.add(Order(
+      idOrder: orderId,
+      date: orderMap['date'] as String,
+      total: (orderMap['total'] as num).toDouble(),
+      modePaiement: orderMap['mode_paiement'] as String,
+      status: orderMap['status'] as String,
+      orderLines: orderLines,
+      remainingAmount: (orderMap['remaining_amount'] as num).toDouble(),
+      globalDiscount: (orderMap['global_discount'] as num).toDouble(),
+      isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
+      idClient: orderMap['id_client'] as int?,
+      userId: orderMap['user_id'] as int?,
+      paymentDetails: paymentDetails, // Add payment details here
+    ));
   }
+
+  return orders;
+}
 
   Future<void> debugCheckOrder(int orderId, dbClient) async {
     final order = await dbClient.query(
