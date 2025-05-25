@@ -88,6 +88,21 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return shouldPop ?? false;
   }
 
+  Future<List<Map<String, dynamic>>> getReturnedProductsHistory() async {
+  final db = await SqlDb().db;
+  
+  // Requête pour récupérer les mouvements de type 'return' (retours)
+  return await db.query(
+    'stock_movements',
+    where: 'movement_type = ?',
+    whereArgs: [StockMovement.movementTypeReturn],
+    orderBy: 'movement_date DESC',
+  );
+}
+
+
+
+
   void _onSearchChanged() {
     setState(() {
       _searchQuery = _searchController.text.toLowerCase();
@@ -639,29 +654,81 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       },
                     ),
             ),
-
-            // Bouton de fermeture (optionnel - déjà dans l'en-tête)
-            // const SizedBox(height: 16),
-            // ElevatedButton(
-            //   style: ElevatedButton.styleFrom(
-            //     backgroundColor: const Color(0xFF0056A6),
-            //     shape: RoundedRectangleBorder(
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     padding: const EdgeInsets.symmetric(vertical: 16),
-            //   ),
-            //   onPressed: () => Navigator.pop(context),
-            //   child: const Text(
-            //     'Fermer',
-            //     style: TextStyle(color: Colors.white),
-            //   ),
-            // ),
           ],
         ),
       ),
     );
   }
 
+void showStockMovementHistory(BuildContext context, int productId, int? variantId) async {
+  final movements = variantId != null 
+      ? await SqlDb().getVariantMovementHistory(variantId)
+      : await SqlDb().getProductMovementHistory(productId);
+  
+  // Récupérer aussi les retours
+  final returns = await getReturnedProductsHistory();
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Historique des mouvements'),
+      content: Container(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Mouvements normaux
+              if (movements.isNotEmpty) ...[
+                Text('Mouvements:', style: TextStyle(fontWeight: FontWeight.bold)),
+                ...movements.map((movement) => _buildMovementTile(movement)).toList(),
+              ],
+              
+              // Retours
+              if (returns.isNotEmpty) ...[
+                SizedBox(height: 20),
+                Text('Produits retournés:', 
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                ...returns.map((returnItem) => _buildReturnTile(returnItem)).toList(),
+              ],
+              
+              if (movements.isEmpty && returns.isEmpty)
+                Text('Aucun mouvement enregistré'),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Fermer'),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildMovementTile(Map<String, dynamic> movement) {
+  return ListTile(
+    title: Text('${movement['quantity']} unités - ${movement['movement_type']}'),
+    subtitle: Text('Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(movement['movement_date']))}'),
+    trailing: Text('Stock: ${movement['previous_stock']} → ${movement['new_stock']}'),
+  );
+}
+
+Widget _buildReturnTile(Map<String, dynamic> returnItem) {
+  return ListTile(
+    title: Text('${returnItem['quantity']} unités retournées'),
+    subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Commande: ${returnItem['reference_id'] ?? 'N/A'}'),
+        Text('Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(returnItem['movement_date']))}'),
+      ],
+    ),
+    trailing: Text('Stock: ${returnItem['previous_stock']} → ${returnItem['new_stock']}'),
+    tileColor: Colors.red[50],
+  );
+}
   Icon _getMovementIcon(String movementType) {
     switch (movementType) {
       case 'in':
