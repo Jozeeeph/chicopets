@@ -4,9 +4,12 @@ import 'package:caissechicopets/gestioncommande/addorder.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/stock_movement.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/passagecommande/applyDiscount.dart';
 import 'package:caissechicopets/passagecommande/deleteline.dart';
 import 'package:caissechicopets/passagecommande/modifyquantity.dart';
+import 'package:caissechicopets/services/stock_movement_service.dart';
 import 'package:caissechicopets/sqldb.dart';
 import 'package:caissechicopets/views/cashdesk_views/components/tableCmd.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -100,43 +103,58 @@ class Getorderlist {
       },
     );
 
-    if (confirmCancel == true) {
-      await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
+// Dans la méthode cancelOrder de getorderlist.dart
+if (confirmCancel == true) {
+  await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
+  
+  final stockMovementService = StockMovementService(SqlDb());
+  final dbClient = await sqlDb.db;
+  
+  // Restock products from canceled order
+  final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
+    'order_items',
+    where: 'id_order = ?',
+    whereArgs: [order.idOrder],
+  );
 
-      // Restock products from canceled order
-      final dbClient = await sqlDb.db;
-      final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
-        'order_items',
-        where: 'id_order = ?',
-        whereArgs: [order.idOrder],
-      );
+  for (var line in orderLinesData) {
+    String productCode = line['product_code'].toString();
+    int canceledQuantity = line['quantity'] as int;
+    int? variantId = line['variant_id'];
 
-      for (var line in orderLinesData) {
-        String productCode = line['product_code'].toString();
-        int canceledQuantity = line['quantity'] as int;
-
-        final List<Map<String, dynamic>> productData = await dbClient.query(
-          'products',
-          where: 'code = ?',
-          whereArgs: [productCode],
-        );
-
-        if (productData.isNotEmpty) {
-          int currentStock = productData.first['stock'] as int;
-          int newStock = currentStock + canceledQuantity;
-
-          await dbClient.update(
-            'products',
-            {'stock': newStock},
-            where: 'code = ?',
-            whereArgs: [productCode],
-          );
-        }
-      }
-
-      // Call callback to update UI
-      onOrderCanceled();
+    // Get current stock
+    int currentStock;
+    if (variantId != null) {
+      final variant = await sqlDb.getVariantById(variantId);
+      currentStock = variant?.stock ?? 0;
+    } else {
+      final product = await sqlDb.getProductByCode(productCode);
+      currentStock = product?.stock ?? 0;
     }
+
+    // Enregistrer le mouvement de retour
+    await stockMovementService.recordMovement(StockMovement(
+      productId: line['product_id'],
+      variantId: variantId,
+      movementType: StockMovement.movementTypeReturn,
+      quantity: canceledQuantity,
+      previousStock: currentStock,
+      newStock: currentStock + canceledQuantity,
+      movementDate: DateTime.now(),
+      referenceId: order.idOrder.toString(),
+      notes: 'Annulation commande #${order.idOrder}',
+    ));
+
+    // Update stock
+    if (variantId != null) {
+      await sqlDb.updateVariantStock(variantId, currentStock + canceledQuantity);
+    } else {
+      await sqlDb.updateProductStock(line['product_id'], currentStock + canceledQuantity);
+    }
+  }
+
+  onOrderCanceled();
+}
   }
 
   static double calculateTotalBeforeDiscount(Order order) {
@@ -1059,100 +1077,179 @@ if (order.modePaiement == "Chèque" && order.paymentDetails.checkAmount != null)
   }
 
   // In your Getorderlist class
-  static Future<void> deleteOrderLine(
-    BuildContext context,
-    Order order,
-    OrderLine orderLine,
-    Function() onOrderLineDeleted,
-  ) async {
-    final bool? confirmDelete = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text(
-            'Voulez-vous vraiment supprimer cet article de la commande?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+static Future<void> deleteOrderLine(
+  BuildContext context,
+  Order order,
+  OrderLine orderLine,
+  Function() onOrderLineDeleted,
+) async {
+  final bool? confirmDelete = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: const Text('Confirmer la suppression'),
+      content: const Text('Voulez-vous vraiment supprimer cet article de la commande?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Annuler'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmDelete != true) return;
+
+  try {
+    final SqlDb sqldb = SqlDb();
+    final dbClient = await sqldb.db;
+
+    // Calculate new total
+    final double lineTotal = orderLine.finalPrice * orderLine.quantity;
+    final double newTotal = order.total - lineTotal;
+
+    // Transaction with proper error handling
+    await dbClient.transaction((txn) async {
+      // 1. Delete the order line and verify deletion
+      final deletedCount = await _deleteOrderLineWithVerification(
+        txn,
+        order.idOrder!,
+        orderLine,
+      );
+
+      if (deletedCount == 0) {
+        throw Exception('Failed to delete order line - no rows affected');
+      }
+
+      // 2. Restock the item and record movement - TOUT doit utiliser txn
+      await _restockItemAndRecordMovement(
+        txn,
+        orderLine,
+        StockMovementService(sqldb),
+        order.idOrder!,
+      );
+
+      // 3. Update order total or delete if empty
+      if (order.orderLines.length == 1) {
+        await txn.delete(
+          'orders',
+          where: 'id_order = ?',
+          whereArgs: [order.idOrder],
+        );
+      } else {
+        await txn.update(
+          'orders',
+          {'total': newTotal},
+          where: 'id_order = ?',
+          whereArgs: [order.idOrder],
+        );
+      }
+    });
+
+    // Update local state
+    order.orderLines.removeWhere((line) =>
+        line.productId == orderLine.productId &&
+        line.variantId == orderLine.variantId);
+    order.total = newTotal;
+
+    // Show success message
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      order.orderLines.isEmpty
+          ? const SnackBar(
+              content: Text('Commande vide supprimée'),
+              backgroundColor: Colors.green,
+            )
+          : const SnackBar(
+              content: Text('Article supprimé avec succès'),
+              backgroundColor: Colors.green,
+            ),
+    );
+
+    onOrderLineDeleted();
+  } catch (e) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text('Erreur lors de la suppression: ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+static Future<void> _restockItemAndRecordMovement(
+  DatabaseExecutor txn,
+  OrderLine orderLine,
+  StockMovementService stockMovementService,
+  int orderId,
+) async {
+  if (orderLine.variantId != null) {
+    // Get current stock of variant - utiliser txn au lieu de SqlDb()
+    final result = await txn.query(
+      'variants',
+      where: 'id = ?',
+      whereArgs: [orderLine.variantId],
+    );
+    
+    if (result.isEmpty) return;
+    final variant = Variant.fromMap(result.first);
+
+    // Record stock movement for return
+    await stockMovementService.recordMovementWithTransaction(
+      txn,
+      StockMovement(
+        productId: orderLine.productId!,
+        variantId: orderLine.variantId,
+        movementType: StockMovement.movementTypeReturn,
+        quantity: orderLine.quantity,
+        previousStock: variant.stock,
+        newStock: variant.stock + orderLine.quantity,
+        movementDate: DateTime.now(),
+        referenceId: orderId.toString(),
+        notes: 'Suppression ligne commande #$orderId',
       ),
     );
 
-    if (confirmDelete != true) return;
+    // Update variant stock
+    await txn.rawUpdate(
+      'UPDATE variants SET stock = stock + ? WHERE id = ?',
+      [orderLine.quantity, orderLine.variantId],
+    );
+  } else if (orderLine.productId != null) {
+    // Get current stock of product - utiliser txn au lieu de SqlDb()
+    final result = await txn.query(
+      'products',
+      where: 'id = ?',
+      whereArgs: [orderLine.productId],
+    );
+    
+    if (result.isEmpty) return;
+    final product = Product.fromMap(result.first);
 
-    try {
-      final SqlDb sqldb = SqlDb();
-      final dbClient = await sqldb.db;
+    // Record stock movement for return
+    await stockMovementService.recordMovementWithTransaction(
+      txn,
+      StockMovement(
+        productId: orderLine.productId!,
+        movementType: StockMovement.movementTypeReturn,
+        quantity: orderLine.quantity,
+        previousStock: product.stock,
+        newStock: product.stock + orderLine.quantity,
+        movementDate: DateTime.now(),
+        referenceId: orderId.toString(),
+        notes: 'Suppression ligne commande #$orderId',
+      ),
+    );
 
-      // Calculate new total
-      final double lineTotal = orderLine.finalPrice * orderLine.quantity;
-      final double newTotal = order.total - lineTotal;
-
-      // Transaction with proper error handling
-      await dbClient.transaction((txn) async {
-        // 1. Delete the order line and verify deletion
-        final deletedCount = await _deleteOrderLineWithVerification(
-          txn,
-          order.idOrder!,
-          orderLine,
-        );
-
-        if (deletedCount == 0) {
-          throw Exception('Failed to delete order line - no rows affected');
-        }
-
-        // 2. Restock the item
-        await _restockItem(txn, orderLine);
-
-        // 3. Update order total or delete if empty
-        if (order.orderLines.length == 1) {
-          await txn.delete('orders',
-              where: 'id_order = ?', whereArgs: [order.idOrder]);
-        } else {
-          await txn.update(
-            'orders',
-            {'total': newTotal},
-            where: 'id_order = ?',
-            whereArgs: [order.idOrder],
-          );
-        }
-      });
-
-      // Update local state
-      order.orderLines.removeWhere((line) =>
-          line.productId == orderLine.productId &&
-          line.variantId == orderLine.variantId);
-      order.total = newTotal;
-
-      // Show success message
-      scaffoldMessengerKey.currentState?.showSnackBar(
-        order.orderLines.isEmpty
-            ? const SnackBar(
-                content: Text('Commande vide supprimée'),
-                backgroundColor: Colors.green,
-              )
-            : const SnackBar(
-                content: Text('Article supprimé avec succès'),
-                backgroundColor: Colors.green,
-              ),
-      );
-
-      onOrderLineDeleted();
-    } catch (e) {
-      scaffoldMessengerKey.currentState?.showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la suppression: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    // Update product stock
+    await txn.rawUpdate(
+      'UPDATE products SET stock = stock + ? WHERE id = ?',
+      [orderLine.quantity, orderLine.productId],
+    );
   }
+}
 
   static Future<int> _deleteOrderLineWithVerification(
     DatabaseExecutor dbClient,

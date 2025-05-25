@@ -1,6 +1,7 @@
 // stock_movement_service.dart
 import 'package:caissechicopets/models/stock_movement.dart';
 import 'package:caissechicopets/sqldb.dart';
+import 'package:sqflite/sqflite.dart';
 
 class StockMovementService {
   final SqlDb _sqlDb;
@@ -250,5 +251,16 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     ''', [thresholdRatio]);
   }
 
+
+Future<void> recordMovementWithTransaction(
+  DatabaseExecutor txn,
+  StockMovement movement,
+) async {
+  await txn.insert(
+    'stock_movements',
+    movement.toMap(),
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
   
 }

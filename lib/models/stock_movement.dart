@@ -3,7 +3,8 @@ class StockMovement {
   final int? id;
   final int productId;
   final int? variantId;
-  final String movementType; // 'in', 'out', 'sale', 'loss', 'adjustment', 'transfer'
+  final String
+      movementType; // 'in', 'out', 'sale', 'loss', 'adjustment', 'transfer'
   final int quantity;
   final int previousStock;
   final int newStock;
@@ -14,6 +15,7 @@ class StockMovement {
   final String? sourceLocation; // Pour les transferts entre magasins
   final String? destinationLocation; // Pour les transferts entre magasins
   final String? reasonCode; // Code raison pour les pertes/ajustements
+  static const String movementTypeReturn = 'return'; // Ajoutez ce type
 
   StockMovement({
     this.id,
@@ -33,9 +35,13 @@ class StockMovement {
   }) {
     // Validation
     if (quantity <= 0) throw ArgumentError("Quantity must be positive");
-    if (movementType != 'in' && movementType != 'out' && 
-        movementType != 'sale' && movementType != 'loss' && 
-        movementType != 'adjustment' && movementType != 'transfer') {
+    if (movementType != 'in' &&
+        movementType != 'out' &&
+        movementType != 'sale' &&
+        movementType != 'loss' &&
+        movementType != 'adjustment' &&
+        movementType != 'transfer' &&
+        movementType != movementTypeReturn) {
       throw ArgumentError("Invalid movement type");
     }
   }
@@ -79,14 +85,16 @@ class StockMovement {
   }
 
   // Méthode utilitaire pour déterminer si le mouvement est une entrée
-  bool get isIncoming => movementType == 'in' || movementType == 'transfer' && 
-                        (destinationLocation?.isNotEmpty ?? false);
+  bool get isIncoming =>
+      movementType == 'in' ||
+      movementType == 'transfer' && (destinationLocation?.isNotEmpty ?? false);
 
   // Méthode utilitaire pour déterminer si le mouvement est une sortie
-  bool get isOutgoing => movementType == 'out' || movementType == 'sale' || 
-                        movementType == 'loss' || 
-                        (movementType == 'transfer' && 
-                        (sourceLocation?.isNotEmpty ?? false));
+  bool get isOutgoing =>
+      movementType == 'out' ||
+      movementType == 'sale' ||
+      movementType == 'loss' ||
+      (movementType == 'transfer' && (sourceLocation?.isNotEmpty ?? false));
 
   @override
   String toString() {
