@@ -1,4 +1,5 @@
 import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/stock.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/services/stock_analysis_service.dart';
 import 'package:caissechicopets/services/stock_movement_service.dart';
@@ -89,19 +90,16 @@ class _StockManagementPageState extends State<StockManagementPage> {
   }
 
   Future<List<Map<String, dynamic>>> getReturnedProductsHistory() async {
-  final db = await SqlDb().db;
-  
-  // Requête pour récupérer les mouvements de type 'return' (retours)
-  return await db.query(
-    'stock_movements',
-    where: 'movement_type = ?',
-    whereArgs: [StockMovement.movementTypeReturn],
-    orderBy: 'movement_date DESC',
-  );
-}
+    final db = await SqlDb().db;
 
-
-
+    // Requête pour récupérer les mouvements de type 'return' (retours)
+    return await db.query(
+      'stock_movements',
+      where: 'movement_type = ?',
+      whereArgs: [StockMovement.movementTypeReturn],
+      orderBy: 'movement_date DESC',
+    );
+  }
 
   void _onSearchChanged() {
     setState(() {
@@ -171,29 +169,36 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  Future<void> _updateProductStock(Product product, int newStock,
-      {String? reason}) async {
+  Future<void> _updateProductStock({
+    required Product product,
+    required int newStock,
+    required String reason,
+  }) async {
     try {
-      final previousStock = product.stock;
-      final quantity = (newStock - previousStock).abs();
-      final movementType = newStock > previousStock ? 'in' : 'out';
+      // Calculate the actual quantity change
+      final quantityChange = newStock - product.stock;
 
+      // Create a Stock record with the change
+      final stockChange = Stock(
+        productId: product.id!,
+        productName: product.designation,
+        reason: reason,
+        quantity: newStock,
+        lastUpdated: DateTime.now(),
+        isSynced: false,
+      );
+
+      // Save to local database
+      await _sqlDb.createStock(stockChange);
+
+      // Also update the product in the products table
       await _sqlDb.updateProductStock(product.id!, newStock);
 
-      // Enregistrer le mouvement avec la raison
-      await _stockMovementService.recordMovement(StockMovement(
-        productId: product.id!,
-        movementType: movementType,
-        quantity: quantity,
-        previousStock: previousStock,
-        newStock: newStock,
-        movementDate: DateTime.now(),
-        notes: reason ?? 'Ajustement manuel', // Include the reason
-      ));
-
+      // Update the product's stock in memory
       setState(() {
         product.stock = newStock;
         _stockControllers[product.id!]?.text = newStock.toString();
+        _pendingStockChanges.remove(product.id!);
         _updateStatusBasedOnStock(product);
       });
     } catch (e) {
@@ -233,8 +238,12 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
-  Future<void> _updateVariantStock(Variant variant, int newStock,
-      {String? reason}) async {
+  Future<void> _updateVariantStock({
+    required Product product,
+    required Variant variant,
+    required int newStock,
+    required String reason,
+  }) async {
     try {
       final previousStock = variant.stock;
       final quantity = (newStock - previousStock).abs();
@@ -285,20 +294,21 @@ class _StockManagementPageState extends State<StockManagementPage> {
       final reason = await _showReasonSelectionDialog(context);
       if (reason == null) return; // User cancelled
 
-      // Confirmation dialog
+      // Confirmation dialog without asking for reason again
       final shouldSave = await showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Confirmer les modifications'),
           content: Text(
-              'Vous êtes sur le point d\'enregistrer ${_pendingStockChanges.length + _pendingVariantChanges.length} modifications. Continuer ?'),
+            'Vous êtes sur le point d\'enregistrer ${_pendingStockChanges.length + _pendingVariantChanges.values.fold(0, (sum, map) => sum + map.length)} modifications. Continuer ?',
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text('Annuler'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => Navigator.pop(context, true),
               child: const Text('Confirmer'),
             ),
           ],
@@ -310,16 +320,26 @@ class _StockManagementPageState extends State<StockManagementPage> {
       // Save product stock changes
       for (final entry in _pendingStockChanges.entries) {
         final product = _products.firstWhere((p) => p.id == entry.key);
-        await _updateProductStock(product, entry.value, reason: reason);
+        await _updateProductStock(
+          product: product,
+          newStock: entry.value,
+          reason: reason, // Use the same reason for all changes
+        );
       }
 
       // Save variant stock changes
       for (final productEntry in _pendingVariantChanges.entries) {
+        final product = _products.firstWhere((p) => p.id == productEntry.key);
         final variants = _productVariants[productEntry.key] ?? [];
+
         for (final variantEntry in productEntry.value.entries) {
           final variant = variants.firstWhere((v) => v.id == variantEntry.key);
-          await _updateVariantStock(variant, variantEntry.value,
-              reason: reason);
+          await _updateVariantStock(
+            product: product,
+            variant: variant,
+            newStock: variantEntry.value,
+            reason: reason, // Use the same reason for all changes
+          );
         }
       }
 
@@ -660,75 +680,88 @@ class _StockManagementPageState extends State<StockManagementPage> {
     );
   }
 
-void showStockMovementHistory(BuildContext context, int productId, int? variantId) async {
-  final movements = variantId != null 
-      ? await SqlDb().getVariantMovementHistory(variantId)
-      : await SqlDb().getProductMovementHistory(productId);
-  
-  // Récupérer aussi les retours
-  final returns = await getReturnedProductsHistory();
-  
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text('Historique des mouvements'),
-      content: Container(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Mouvements normaux
-              if (movements.isNotEmpty) ...[
-                Text('Mouvements:', style: TextStyle(fontWeight: FontWeight.bold)),
-                ...movements.map((movement) => _buildMovementTile(movement)).toList(),
+  void showStockMovementHistory(
+      BuildContext context, int productId, int? variantId) async {
+    final movements = variantId != null
+        ? await SqlDb().getVariantMovementHistory(variantId)
+        : await SqlDb().getProductMovementHistory(productId);
+
+    // Récupérer aussi les retours
+    final returns = await getReturnedProductsHistory();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Historique des mouvements'),
+        content: Container(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Mouvements normaux
+                if (movements.isNotEmpty) ...[
+                  Text('Mouvements:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  ...movements
+                      .map((movement) => _buildMovementTile(movement))
+                      .toList(),
+                ],
+
+                // Retours
+                if (returns.isNotEmpty) ...[
+                  SizedBox(height: 20),
+                  Text('Produits retournés:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.red)),
+                  ...returns
+                      .map((returnItem) => _buildReturnTile(returnItem))
+                      .toList(),
+                ],
+
+                if (movements.isEmpty && returns.isEmpty)
+                  Text('Aucun mouvement enregistré'),
               ],
-              
-              // Retours
-              if (returns.isNotEmpty) ...[
-                SizedBox(height: 20),
-                Text('Produits retournés:', 
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                ...returns.map((returnItem) => _buildReturnTile(returnItem)).toList(),
-              ],
-              
-              if (movements.isEmpty && returns.isEmpty)
-                Text('Aucun mouvement enregistré'),
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Fermer'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Fermer'),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
-Widget _buildMovementTile(Map<String, dynamic> movement) {
-  return ListTile(
-    title: Text('${movement['quantity']} unités - ${movement['movement_type']}'),
-    subtitle: Text('Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(movement['movement_date']))}'),
-    trailing: Text('Stock: ${movement['previous_stock']} → ${movement['new_stock']}'),
-  );
-}
+  Widget _buildMovementTile(Map<String, dynamic> movement) {
+    return ListTile(
+      title:
+          Text('${movement['quantity']} unités - ${movement['movement_type']}'),
+      subtitle: Text(
+          'Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(movement['movement_date']))}'),
+      trailing: Text(
+          'Stock: ${movement['previous_stock']} → ${movement['new_stock']}'),
+    );
+  }
 
-Widget _buildReturnTile(Map<String, dynamic> returnItem) {
-  return ListTile(
-    title: Text('${returnItem['quantity']} unités retournées'),
-    subtitle: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Commande: ${returnItem['reference_id'] ?? 'N/A'}'),
-        Text('Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(returnItem['movement_date']))}'),
-      ],
-    ),
-    trailing: Text('Stock: ${returnItem['previous_stock']} → ${returnItem['new_stock']}'),
-    tileColor: Colors.red[50],
-  );
-}
+  Widget _buildReturnTile(Map<String, dynamic> returnItem) {
+    return ListTile(
+      title: Text('${returnItem['quantity']} unités retournées'),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Commande: ${returnItem['reference_id'] ?? 'N/A'}'),
+          Text(
+              'Le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(returnItem['movement_date']))}'),
+        ],
+      ),
+      trailing: Text(
+          'Stock: ${returnItem['previous_stock']} → ${returnItem['new_stock']}'),
+      tileColor: Colors.red[50],
+    );
+  }
+
   Icon _getMovementIcon(String movementType) {
     switch (movementType) {
       case 'in':
@@ -794,6 +827,18 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
     int? _variantId;
     String? _reason;
 
+    // List of predefined reasons
+    final List<String> _stockAdjustmentReasons = [
+      'Réapprovisionnement',
+      'Inventaire',
+      'Retour client',
+      'Défectueux',
+      'Vente',
+      'Ajustement manuel',
+      'Perte',
+      'Cadeau/Don',
+    ];
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -815,7 +860,7 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                     ),
                     const SizedBox(height: 16),
 
-                    // Type de mouvement
+                    // Movement Type
                     DropdownButtonFormField<String>(
                       value: _movementType,
                       items: const [
@@ -834,10 +879,12 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                         labelText: 'Type de mouvement',
                         border: OutlineInputBorder(),
                       ),
+                      validator: (value) =>
+                          value == null ? 'Sélectionnez un type' : null,
                     ),
                     const SizedBox(height: 16),
 
-                    // Variante (si le produit en a)
+                    // Variant Selection (if product has variants)
                     if (_productVariants[product.id]?.isNotEmpty ?? false)
                       Column(
                         children: [
@@ -866,7 +913,7 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                         ],
                       ),
 
-                    // Quantité
+                    // Quantity
                     TextFormField(
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
@@ -878,21 +925,28 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                           return 'Champ obligatoire';
                         if (int.tryParse(value) == null)
                           return 'Nombre invalide';
+                        if (int.parse(value) <= 0) return 'Doit être > 0';
                         return null;
                       },
                       onSaved: (value) => _quantity = int.parse(value!),
                     ),
                     const SizedBox(height: 16),
 
-                    // Raison
+                    // Reason
                     DropdownButtonFormField<String>(
                       value: _reason,
-                      items: _stockAdjustmentReasons
-                          .map((reason) => DropdownMenuItem(
-                                value: reason,
-                                child: Text(reason),
-                              ))
-                          .toList(),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Sélectionnez une raison'),
+                        ),
+                        ..._stockAdjustmentReasons.map(
+                          (reason) => DropdownMenuItem(
+                            value: reason,
+                            child: Text(reason),
+                          ),
+                        ),
+                      ],
                       onChanged: (value) => setState(() => _reason = value),
                       decoration: const InputDecoration(
                         labelText: 'Raison',
@@ -915,6 +969,7 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                     ),
                     const SizedBox(height: 24),
 
+                    // Action Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -928,16 +983,25 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                               _formKey.currentState!.save();
 
                               try {
+                                // Get current stock
                                 final previousStock = _variantId != null
                                     ? _productVariants[product.id]!
                                         .firstWhere((v) => v.id == _variantId)
                                         .stock
                                     : product.stock;
 
+                                // Calculate new stock
                                 final newStock = _movementType == 'in'
                                     ? previousStock + _quantity
                                     : previousStock - _quantity;
 
+                                // Validate stock doesn't go negative
+                                if (newStock < 0) {
+                                  _showError('Stock ne peut pas être négatif');
+                                  return;
+                                }
+
+                                // Create movement record
                                 final movement = StockMovement(
                                   productId: product.id!,
                                   variantId: _variantId,
@@ -946,31 +1010,35 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                                   previousStock: previousStock,
                                   newStock: newStock,
                                   movementDate: DateTime.now(),
-                                  notes: _reason != null
-                                      ? 'Raison: $_reason${_notes != null ? ' - $_notes' : ''}'
-                                      : _notes,
+                                  notes:
+                                      '${_reason ?? 'Aucune raison'}${_notes != null ? ' - $_notes' : ''}',
                                 );
 
+                                // Save movement
                                 await _stockMovementService
                                     .recordMovement(movement);
 
-                                // Mettre à jour le stock
+                                // Update stock
                                 if (_variantId != null) {
                                   await _updateVariantStock(
-                                    _productVariants[product.id]!
+                                    product: product,
+                                    variant: _productVariants[product.id]!
                                         .firstWhere((v) => v.id == _variantId),
-                                    newStock,
-                                    reason: _reason,
+                                    newStock: newStock,
+                                    reason: _reason ?? 'Mouvement sans raison',
                                   );
                                 } else {
-                                  await _updateProductStock(product, newStock,
-                                      reason: _reason);
+                                  await _updateProductStock(
+                                    product: product,
+                                    newStock: newStock,
+                                    reason: _reason ?? 'Mouvement sans raison',
+                                  );
                                 }
 
                                 Navigator.pop(context);
                                 _showSuccess(
                                     'Mouvement enregistré avec succès');
-                                _loadData(); // Rafraîchir les données
+                                _loadData(); // Refresh data
                               } catch (e) {
                                 _showError('Erreur: ${e.toString()}');
                               }
@@ -992,210 +1060,213 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
 
 // stock_management_page.dart (extrait)
 
- Future<String?> _showReasonSelectionDialog(BuildContext context) async {
-  String? selectedReason;
-  final TextEditingController _customReasonController = TextEditingController();
+  Future<String?> _showReasonSelectionDialog(BuildContext context) async {
+    String? selectedReason;
+    final TextEditingController _customReasonController =
+        TextEditingController();
 
-  return await showDialog<String>(
-    context: context,
-    builder: (context) => Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width < 400
-              ? MediaQuery.of(context).size.width * 0.9
-              : 400,
-        ),
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // En-tête
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Sélectionnez une raison',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0056A6),
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width < 400
+                ? MediaQuery.of(context).size.width * 0.9
+                : 400,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // En-tête
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Sélectionnez une raison',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0056A6),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 22),
-                      onPressed: () => Navigator.pop(context),
-                      color: Colors.grey[600],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Liste des raisons
-                Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.4,
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                        color: Colors.grey[600],
+                      ),
+                    ],
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: _stockAdjustmentReasons.map((reason) {
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setState(() {
-                              selectedReason = reason;
-                              if (reason != 'Autre raison') {
-                                _customReasonController.clear();
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: selectedReason == reason
-                                  ? const Color(0xFF0056A6).withOpacity(0.1)
-                                  : Colors.grey[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
+
+                  const SizedBox(height: 16),
+
+                  // Liste des raisons
+                  Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: _stockAdjustmentReasons.map((reason) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setState(() {
+                                selectedReason = reason;
+                                if (reason != 'Autre raison') {
+                                  _customReasonController.clear();
+                                }
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
                                 color: selectedReason == reason
-                                    ? const Color(0xFF0056A6)
-                                    : Colors.grey[200]!,
-                                width: 1.5,
+                                    ? const Color(0xFF0056A6).withOpacity(0.1)
+                                    : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selectedReason == reason
+                                      ? const Color(0xFF0056A6)
+                                      : Colors.grey[200]!,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: selectedReason == reason
+                                            ? const Color(0xFF0056A6)
+                                            : Colors.grey[400]!,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: selectedReason == reason
+                                        ? const Icon(Icons.check,
+                                            size: 14, color: Color(0xFF0056A6))
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      reason,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: selectedReason == reason
+                                            ? const Color(0xFF0056A6)
+                                            : Colors.grey[800],
+                                        fontWeight: selectedReason == reason
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: selectedReason == reason
-                                          ? const Color(0xFF0056A6)
-                                          : Colors.grey[400]!,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: selectedReason == reason
-                                      ? const Icon(Icons.check, size: 14, color: Color(0xFF0056A6))
-                                      : null,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    reason,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: selectedReason == reason
-                                          ? const Color(0xFF0056A6)
-                                          : Colors.grey[800],
-                                      fontWeight: selectedReason == reason
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
 
-                // Champ personnalisé
-                if (selectedReason == 'Autre raison') ...[
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _customReasonController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Décrivez la raison',
-                      hintText: 'Entrez la raison de l\'ajustement...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF0056A6)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF0056A6), width: 1.5),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                    ),
-                    onChanged: (value) {
-                      selectedReason = value;
-                    },
-                  ),
-                ],
-
-                const SizedBox(height: 20),
-
-                // Boutons d'action
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  // Champ personnalisé
+                  if (selectedReason == 'Autre raison') ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _customReasonController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Décrivez la raison',
+                        hintText: 'Entrez la raison de l\'ajustement...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF0056A6)),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF0056A6), width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                       ),
-                      child: const Text(
-                        'Annuler',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (selectedReason != null &&
-                            (selectedReason != 'Autre raison' ||
-                                _customReasonController.text.isNotEmpty)) {
-                          Navigator.pop(
-                              context,
-                              selectedReason == 'Autre raison'
-                                  ? _customReasonController.text
-                                  : selectedReason);
-                        }
+                      onChanged: (value) {
+                        selectedReason = value;
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0056A6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Confirmer',
-                        style: TextStyle(color: Colors.white),
-                      ),
                     ),
                   ],
-                ),
-              ],
-            );
-          },
+
+                  const SizedBox(height: 20),
+
+                  // Boutons d'action
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Annuler',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (selectedReason != null &&
+                              (selectedReason != 'Autre raison' ||
+                                  _customReasonController.text.isNotEmpty)) {
+                            Navigator.pop(
+                                context,
+                                selectedReason == 'Autre raison'
+                                    ? _customReasonController.text
+                                    : selectedReason);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0056A6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Confirmer',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1564,19 +1635,15 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
                                                     int.tryParse(value) ??
                                                         v.stock;
                                                 setState(() {
-                                                  if (v.id != null) {
-                                                    if (!_pendingVariantChanges
-                                                        .containsKey(
-                                                            product.id)) {
-                                                      _pendingVariantChanges[
-                                                          product.id!] = {};
-                                                    }
+                                                  if (!_pendingVariantChanges
+                                                      .containsKey(
+                                                          product.id)) {
                                                     _pendingVariantChanges[
-                                                            product
-                                                                .id!]![v.id!] =
-                                                        newStock;
-                                                    _hasUnsavedChanges = true;
+                                                        product.id!] = {};
                                                   }
+                                                  _pendingVariantChanges[product
+                                                      .id!]![v.id!] = newStock;
+                                                  _hasUnsavedChanges = true;
                                                 });
                                               },
                                             ),
@@ -1602,6 +1669,37 @@ Widget _buildReturnTile(Map<String, dynamic> returnItem) {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<String?> _showReasonDialog(BuildContext context) async {
+    final reasonController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Raison de modification'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(
+            labelText: 'Pourquoi modifiez-vous ce stock?',
+            hintText: 'Ex: Vente, Réapprovisionnement, Correction...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (reasonController.text.isNotEmpty) {
+                Navigator.pop(context, reasonController.text);
+              }
+            },
+            child: const Text('Confirmer'),
+          ),
+        ],
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_prediction_page.dart';
+import 'package:caissechicopets/views/synchronisation/synchronisation_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/gallery_page.dart';
 import 'package:caissechicopets/gestioncommande/managecommande.dart';
@@ -207,6 +208,13 @@ class _DashboardPageState extends State<DashboardPage> {
                       label: 'Prédictions avec IA',
                       icon: Icons.batch_prediction,
                       page: StockPredictionPage(),
+                      color: Color.fromARGB(255, 1, 166, 249),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Synchronisation',
+                      icon: Icons.batch_prediction,
+                      page: SynchronisationPage(),
                       color: Color.fromARGB(255, 1, 166, 249),
                     ),
                   ],

@@ -16,6 +16,7 @@ import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/paymentMode.dart';
+import 'package:caissechicopets/models/stock.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/order.dart';
@@ -337,6 +338,17 @@ class SqlDb {
     FOREIGN KEY (client_id) REFERENCES clients (id)
 );
 ''');
+        await db.execute('''
+      CREATE TABLE stocks(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER,
+        product_name TEXT,
+        reason TEXT,
+        quantity INTEGER,
+        last_updated TEXT,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
         await _ensureDefaultPaymentMethods(db);
       } catch (e) {
         print("Error creating tables: $e");
@@ -1403,5 +1415,55 @@ class SqlDb {
       where: 'product_id = ?',
       whereArgs: [productId],
     );
+  }
+
+  //STOCKKKK
+  Future<int> createStock(Stock stock) async {
+    final db = await this.db;
+
+    // Insert without ID
+    return await db.insert('stocks', {
+      'product_id': stock.productId,
+      'product_name': stock.productName,
+      'reason': stock.reason,
+      'quantity': stock.quantity,
+      'last_updated': stock.lastUpdated.toIso8601String(),
+      'is_synced': stock.isSynced ? 1 : 0,
+    });
+  }
+
+  Future<List<Stock>> getUnsyncedStocks() async {
+    final db = await this.db;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'stocks',
+      where: 'is_synced = ?',
+      whereArgs: [0], // Assuming 0 means not synced
+    );
+    return List.generate(maps.length, (i) => Stock.fromMap(maps[i]));
+  }
+
+  Future<int> updateStock(Stock stock) async {
+    final db = await this.db;
+    return await db.update(
+      'stocks',
+      stock.toMap(),
+      where: 'product_id = ?',
+      whereArgs: [stock.productId],
+    );
+  }
+
+  Future<void> markAsSynced(int productId) async {
+    final db = await this.db;
+    await db.update(
+      'stocks',
+      {'is_synced': 1},
+      where: 'productId = ?',
+      whereArgs: [productId],
+    );
+  }
+
+  Future close() async {
+    final db = await this.db;
+    db.close();
   }
 }
