@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:caissechicopets/views/analytics_views/stock_analysis_page.dart';
 import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
 import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
 import 'package:caissechicopets/views/gestionPaymentMode/PaymentModeMgt.dart';
@@ -185,7 +186,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Statistiques',
                         icon: Icons.show_chart,
-                        page: null,
+                        page: StockAnalysisPage(),
                         color: const Color(0xFFF44336),
                       ),
                     ],

@@ -75,13 +75,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Quitter'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              _saveAllChanges();
-              Navigator.of(context).pop(true);
-            },
-            child: const Text('Enregistrer et quitter'),
-          ),
         ],
       ),
     );
@@ -287,73 +280,75 @@ class _StockManagementPageState extends State<StockManagementPage> {
   }
 
   Future<void> _saveAllChanges() async {
-    if (!_hasUnsavedChanges) return;
+  if (!_hasUnsavedChanges) return;
 
-    try {
-      // Show reason selection dialog first
-      final reason = await _showReasonSelectionDialog(context);
-      if (reason == null) return; // User cancelled
+  try {
+    final reason = await _showReasonSelectionDialog(context);
+    if (reason == null) return;
 
-      // Confirmation dialog without asking for reason again
-      final shouldSave = await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirmer les modifications'),
-          content: Text(
-            'Vous êtes sur le point d\'enregistrer ${_pendingStockChanges.length + _pendingVariantChanges.values.fold(0, (sum, map) => sum + map.length)} modifications. Continuer ?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirmer'),
-            ),
-          ],
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer les modifications'),
+        content: Text(
+          'Vous êtes sur le point d\'enregistrer ${_pendingStockChanges.length + _pendingVariantChanges.values.fold(0, (sum, map) => sum + map.length)} modifications. Continuer ?',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave != true) return;
+
+    // Créer des copies des Maps pour éviter la modification concurrente
+    final pendingStockChangesCopy = Map<int, int>.from(_pendingStockChanges);
+    final pendingVariantChangesCopy = Map<int, Map<int, int>>.from(_pendingVariantChanges);
+
+    // Sauvegarder les changements de stock produits
+    for (final entry in pendingStockChangesCopy.entries) {
+      final product = _products.firstWhere((p) => p.id == entry.key);
+      await _updateProductStock(
+        product: product,
+        newStock: entry.value,
+        reason: reason,
       );
+    }
 
-      if (shouldSave != true) return;
+    // Sauvegarder les changements de variantes
+    for (final productEntry in pendingVariantChangesCopy.entries) {
+      final product = _products.firstWhere((p) => p.id == productEntry.key);
+      final variants = _productVariants[productEntry.key] ?? [];
 
-      // Save product stock changes
-      for (final entry in _pendingStockChanges.entries) {
-        final product = _products.firstWhere((p) => p.id == entry.key);
-        await _updateProductStock(
+      for (final variantEntry in productEntry.value.entries) {
+        final variant = variants.firstWhere((v) => v.id == variantEntry.key);
+        await _updateVariantStock(
           product: product,
-          newStock: entry.value,
-          reason: reason, // Use the same reason for all changes
+          variant: variant,
+          newStock: variantEntry.value,
+          reason: reason,
         );
       }
-
-      // Save variant stock changes
-      for (final productEntry in _pendingVariantChanges.entries) {
-        final product = _products.firstWhere((p) => p.id == productEntry.key);
-        final variants = _productVariants[productEntry.key] ?? [];
-
-        for (final variantEntry in productEntry.value.entries) {
-          final variant = variants.firstWhere((v) => v.id == variantEntry.key);
-          await _updateVariantStock(
-            product: product,
-            variant: variant,
-            newStock: variantEntry.value,
-            reason: reason, // Use the same reason for all changes
-          );
-        }
-      }
-
-      setState(() {
-        _pendingStockChanges.clear();
-        _pendingVariantChanges.clear();
-        _hasUnsavedChanges = false;
-      });
-
-      _showSuccess('Toutes les modifications ont été enregistrées');
-    } catch (e) {
-      _showError('Erreur lors de l\'enregistrement: ${e.toString()}');
     }
+
+    setState(() {
+      _pendingStockChanges.clear();
+      _pendingVariantChanges.clear();
+      _hasUnsavedChanges = false;
+    });
+
+    _showSuccess('Toutes les modifications ont été enregistrées');
+  } catch (e) {
+    _showError('Erreur lors de l\'enregistrement: ${e.toString()}');
   }
+}
 
   void _discardAllChanges() {
     setState(() {
@@ -878,6 +873,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       decoration: const InputDecoration(
                         labelText: 'Type de mouvement',
                         border: OutlineInputBorder(),
+                        isDense: true, // Ajoutez cette ligne
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12), // Ajustez si nécessaire
                       ),
                       validator: (value) =>
                           value == null ? 'Sélectionnez un type' : null,
