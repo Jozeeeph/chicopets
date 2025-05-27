@@ -19,7 +19,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:caissechicopets/models/stock_movement.dart';
 import 'package:caissechicopets/models/paymentDetails.dart';
 
-
 class Addorder {
   static late final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -2383,50 +2382,56 @@ class Addorder {
                   onPressed: () async {
                     if (!validateDiscounts()) return;
                     Navigator.of(context).pop();
-                    await _confirmPlaceOrder(
-                        selectedProducts,
-                        quantityProducts,
-                        discounts,
-                        typeDiscounts,
-                        isPercentageDiscount
-                            ? globalDiscount
-                            : globalDiscountValue,
-                        isPercentageDiscount,
-                        selectedClient,
-                        numberOfTickets,
-                        selectedPaymentMethod!,
-                        cashAmount,
-                        cardAmount,
-                        checkAmount,
-                        checkNumber,
-                        cardTransactionId,
-                        checkDate,
-                        bankName,
-                        ticketRestaurantAmount,
-                        numberOfTicketsRestaurant,
-                        ticketValue,
-                        ticketTax,
-                        ticketCommission,
-                        selectedVoucher,
-                        voucherAmount,
-                        giftTicketNumber,
-                        giftTicketIssuer,
-                        giftTicketAmount,
-                        traiteNumber,
-                        traiteBank,
-                        traiteBeneficiary,
-                        traiteDate,
-                        traiteAmount,
-                        virementReference,
-                        virementBank,
-                        virementSender,
-                        virementDate,
-                        virementAmount,
-                        useLoyaltyPoints,
-                        pointsToUse,
-                        pointsDiscount,
-                        isUpdating,
-                        selectedVariants);
+                    List<int> originalQuantities =
+                        order.orderLines.map((line) => line.quantity).toList();
+
+                    await confirmPlaceOrder(
+                      selectedProducts,
+                      quantityProducts,
+                      discounts,
+                      typeDiscounts,
+                      isPercentageDiscount
+                          ? globalDiscount
+                          : globalDiscountValue,
+                      isPercentageDiscount,
+                      selectedClient,
+                      numberOfTickets,
+                      selectedPaymentMethod!,
+                      cashAmount,
+                      cardAmount,
+                      checkAmount,
+                      checkNumber,
+                      cardTransactionId,
+                      checkDate,
+                      bankName,
+                      ticketRestaurantAmount,
+                      numberOfTicketsRestaurant,
+                      ticketValue,
+                      ticketTax,
+                      ticketCommission,
+                      selectedVoucher,
+                      voucherAmount,
+                      giftTicketNumber,
+                      giftTicketIssuer,
+                      giftTicketAmount,
+                      traiteNumber,
+                      traiteBank,
+                      traiteBeneficiary,
+                      traiteDate,
+                      traiteAmount,
+                      virementReference,
+                      virementBank,
+                      virementSender,
+                      virementDate,
+                      virementAmount,
+                      useLoyaltyPoints,
+                      pointsToUse,
+                      pointsDiscount,
+                      isUpdating,
+                      order,
+                      selectedVariants,
+                      originalQuantities, // Pass the original quantities
+                    );
                   },
                   child: Text(
                     "Confirmer",
@@ -2465,48 +2470,51 @@ class Addorder {
     return maxDiscountValue;
   }
 
-  static Future<void> _confirmPlaceOrder(
-      List<Product> selectedProducts,
-      List<int> quantityProducts,
-      List<double> discounts,
-      List<bool> typeDiscounts,
-      double globalDiscount,
-      bool isPercentageDiscount,
-      Client? selectedClient,
-      int numberOfTickets,
-      String selectedPaymentMethod,
-      double cashAmount,
-      double cardAmount,
-      double checkAmount,
-      String? checkNumber,
-      String? cardTransactionId,
-      DateTime? checkDate,
-      String? bankName,
-      double? ticketRestaurantAmount,
-      int? numberOfTicketsRestaurant, // Add this
-      double? ticketValue, // Add this
-      double? ticketTax, // Add this
-      double? ticketCommission, // Add this
-      Voucher? selectedVoucher, // Add this
-      double voucherAmount,
-      String giftTicketNumber,
-      String giftTicketIssuer,
-      double giftTicketAmount,
-      String traiteNumber,
-      String traiteBank,
-      String traiteBeneficiary,
-      DateTime? traiteDate,
-      double traiteAmount,
-      String virementReference,
-      String virementBank,
-      String virementSender,
-      DateTime? virementDate,
-      double virementAmount,
-      bool useLoyaltyPoints,
-      int pointsToUse,
-      double pointsDiscount,
-      bool isUpdating,
-      List<Variant?> selectedVariants) async {
+  static Future<void> confirmPlaceOrder(
+    List<Product> selectedProducts,
+    List<int> quantityProducts,
+    List<double> discounts,
+    List<bool> typeDiscounts,
+    double globalDiscount,
+    bool isPercentageDiscount,
+    Client? selectedClient,
+    int numberOfTickets,
+    String selectedPaymentMethod,
+    double cashAmount,
+    double cardAmount,
+    double checkAmount,
+    String? checkNumber,
+    String? cardTransactionId,
+    DateTime? checkDate,
+    String? bankName,
+    double? ticketRestaurantAmount,
+    int? numberOfTicketsRestaurant, // Add this
+    double? ticketValue, // Add this
+    double? ticketTax, // Add this
+    double? ticketCommission, // Add this
+    Voucher? selectedVoucher, // Add this
+    double voucherAmount,
+    String giftTicketNumber,
+    String giftTicketIssuer,
+    double giftTicketAmount,
+    String traiteNumber,
+    String traiteBank,
+    String traiteBeneficiary,
+    DateTime? traiteDate,
+    double traiteAmount,
+    String virementReference,
+    String virementBank,
+    String virementSender,
+    DateTime? virementDate,
+    double virementAmount,
+    bool useLoyaltyPoints,
+    int pointsToUse,
+    double pointsDiscount,
+    bool isUpdating,
+    existingOrder,
+    List<Variant?> selectedVariants,
+    List<int> originalQuantities,
+  ) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
         globalDiscount >
@@ -2679,156 +2687,230 @@ class Addorder {
     final userJson = prefs.getString('current_user');
     final user = userJson != null ? User.fromMap(jsonDecode(userJson)) : null;
 
-    // Create order
-    // Dans la méthode _confirmPlaceOrder, remplacer la création de Order par :
-
 // Créer d'abord les PaymentDetails
-final paymentDetails = PaymentDetails(
-  // Payment amounts
-  cashAmount: ["Espèce", "Mixte"].contains(selectedPaymentMethod)
-      ? cashAmount
-      : null,
-  cardAmount:
-      ["TPE", "Mixte"].contains(selectedPaymentMethod) ? cardAmount : null,
-  checkAmount: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-      ? checkAmount
-      : null,
-  ticketRestaurantAmount:
-      ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
-          ? ticketRestaurantAmount
+    final paymentDetails = PaymentDetails(
+      // Payment amounts
+      cashAmount: ["Espèce", "Mixte"].contains(selectedPaymentMethod)
+          ? cashAmount
           : null,
-  voucherAmount: ["Bon d'achat", "Mixte"].contains(selectedPaymentMethod)
-      ? voucherAmount
-      : null,
-  voucherIds: selectedVoucher != null ? [selectedVoucher.id] : null,
-  voucherReference: null,
-  giftTicketAmount: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-      ? giftTicketAmount
-      : null,
-  traiteAmount: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-      ? traiteAmount
-      : null,
-  virementAmount: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-      ? virementAmount
-      : null,
-
-  // Payment details
-  checkNumber: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-      ? checkNumber
-      : null,
-  cardTransactionId: ["TPE", "Mixte"].contains(selectedPaymentMethod)
-      ? cardTransactionId
-      : null,
-  checkDate: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
-      ? checkDate
-      : null,
-  bankName:
-      ["Chèque", "Mixte"].contains(selectedPaymentMethod) ? bankName : null,
-
-  // Ticket restaurant details
-  numberOfTicketsRestaurant:
-      ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
-          ? numberOfTicketsRestaurant
+      cardAmount:
+          ["TPE", "Mixte"].contains(selectedPaymentMethod) ? cardAmount : null,
+      checkAmount: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkAmount
           : null,
-  ticketValue: ticketValue,
-  ticketTax: ticketTax,
-  ticketCommission: ticketCommission,
+      ticketRestaurantAmount:
+          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+              ? ticketRestaurantAmount
+              : null,
+      voucherAmount: ["Bon d'achat", "Mixte"].contains(selectedPaymentMethod)
+          ? voucherAmount
+          : null,
+      voucherIds: selectedVoucher != null ? [selectedVoucher.id] : null,
+      voucherReference: null,
+      giftTicketAmount:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketAmount
+              : null,
+      traiteAmount: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteAmount
+          : null,
+      virementAmount: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementAmount
+          : null,
 
-  // New payment details
-  giftTicketNumber: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-      ? giftTicketNumber
-      : null,
-  giftTicketIssuer: ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
-      ? giftTicketIssuer
-      : null,
-  traiteNumber: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-      ? traiteNumber
-      : null,
-  traiteBank: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-      ? traiteBank
-      : null,
-  traiteBeneficiary: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-      ? traiteBeneficiary
-      : null,
-  traiteDate: ["Traite", "Mixte"].contains(selectedPaymentMethod)
-      ? traiteDate
-      : null,
-  virementReference: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-      ? virementReference
-      : null,
-  virementBank: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-      ? virementBank
-      : null,
-  virementSender: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-      ? virementSender
-      : null,
-  virementDate: ["Virement", "Mixte"].contains(selectedPaymentMethod)
-      ? virementDate
-      : null,
+      // Payment details
+      checkNumber: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkNumber
+          : null,
+      cardTransactionId: ["TPE", "Mixte"].contains(selectedPaymentMethod)
+          ? cardTransactionId
+          : null,
+      checkDate: ["Chèque", "Mixte"].contains(selectedPaymentMethod)
+          ? checkDate
+          : null,
+      bankName:
+          ["Chèque", "Mixte"].contains(selectedPaymentMethod) ? bankName : null,
 
-  // Loyalty program
-  pointsUsed: useLoyaltyPoints ? pointsToUse : null,
-  pointsDiscount: useLoyaltyPoints ? pointsDiscount : null,
-);
+      // Ticket restaurant details
+      numberOfTicketsRestaurant:
+          ["Ticket Restaurant", "Mixte"].contains(selectedPaymentMethod)
+              ? numberOfTicketsRestaurant
+              : null,
+      ticketValue: ticketValue,
+      ticketTax: ticketTax,
+      ticketCommission: ticketCommission,
+
+      // New payment details
+      giftTicketNumber:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketNumber
+              : null,
+      giftTicketIssuer:
+          ["Ticket cadeau", "Mixte"].contains(selectedPaymentMethod)
+              ? giftTicketIssuer
+              : null,
+      traiteNumber: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteNumber
+          : null,
+      traiteBank: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteBank
+          : null,
+      traiteBeneficiary: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteBeneficiary
+          : null,
+      traiteDate: ["Traite", "Mixte"].contains(selectedPaymentMethod)
+          ? traiteDate
+          : null,
+      virementReference: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementReference
+          : null,
+      virementBank: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementBank
+          : null,
+      virementSender: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementSender
+          : null,
+      virementDate: ["Virement", "Mixte"].contains(selectedPaymentMethod)
+          ? virementDate
+          : null,
+
+      // Loyalty program
+      pointsUsed: useLoyaltyPoints ? pointsToUse : null,
+      pointsDiscount: useLoyaltyPoints ? pointsDiscount : null,
+    );
 
 // Créer ensuite l'Order avec les PaymentDetails
-Order order = Order(
-  date: DateTime.now().toIso8601String(),
-  orderLines: orderLines,
-  total: total,
-  modePaiement: selectedPaymentMethod,
-  status: status,
-  remainingAmount: remainingAmount,
-  globalDiscount: globalDiscount,
-  isPercentageDiscount: isPercentageDiscount,
-  userId: user?.id,
-  idClient: selectedClient?.id,
-  paymentDetails: paymentDetails,
-);
+    Order order;
+    if (isUpdating && existingOrder != null) {
+      // Update existing order
+      order = existingOrder.copyWith(
+        orderLines: orderLines,
+        total: total,
+        modePaiement: selectedPaymentMethod,
+        status: status,
+        remainingAmount: remainingAmount,
+        globalDiscount: globalDiscount,
+        isPercentageDiscount: isPercentageDiscount,
+        paymentDetails: paymentDetails,
+        // Preserve other existing fields
+        date: existingOrder.date,
+        userId: existingOrder.userId,
+        idClient: existingOrder.idClient,
+      );
+    } else {
+      // Create new order
+      order = Order(
+        date: DateTime.now().toIso8601String(),
+        orderLines: orderLines,
+        total: total,
+        modePaiement: selectedPaymentMethod,
+        status: status,
+        remainingAmount: remainingAmount,
+        globalDiscount: globalDiscount,
+        isPercentageDiscount: isPercentageDiscount,
+        userId: user?.id,
+        idClient: selectedClient?.id,
+        paymentDetails: paymentDetails,
+      );
+    }
 
     try {
-      int orderId = 0;
+      int orderId;
       if (isUpdating) {
+        // Update existing order
         orderId = await SqlDb().updateOrderInDatabase(order);
+        if (orderId <= 0) {
+          throw Exception("Failed to update order");
+        }
       } else {
-        // Save order to database
+        // Add new order
         orderId = await SqlDb().addOrder(order);
+        if (orderId <= 0) {
+          throw Exception("Failed to save order");
+        }
       }
 
       // Dans la méthode _confirmPlaceOrder, après la validation de la commande
       final stockMovementService = StockMovementService(SqlDb());
-
       for (int i = 0; i < selectedProducts.length; i++) {
+        if (i >= originalQuantities.length) break;
         final product = selectedProducts[i];
         final quantity = quantityProducts[i];
+        final originalQuantity = originalQuantities[i];
         final variant = selectedVariants[i];
 
-        if (product.hasVariants && variant != null) {
-          // Enregistrer le mouvement pour la variante
-          await stockMovementService.recordMovement(StockMovement(
-            productId: product.id!,
-            variantId: variant.id,
-            movementType: 'sale',
-            quantity: quantity,
-            previousStock: variant.stock,
-            newStock: variant.stock - quantity,
-            movementDate: DateTime.now(),
-            referenceId: orderId.toString(),
-            userId: user?.id,
-          ));
-        } else {
-          // Enregistrer le mouvement pour le produit
-          await stockMovementService.recordMovement(StockMovement(
-            productId: product.id!,
-            movementType: 'sale',
-            quantity: quantity,
-            previousStock: product.stock,
-            newStock: product.stock - quantity,
-            movementDate: DateTime.now(),
-            referenceId: orderId.toString(),
-            userId: user?.id,
-          ));
+        // Calculate quantity difference
+        final quantityDifference = (originalQuantity ?? 0) - (quantity ?? 0);
+
+        if (quantityDifference > 0) {
+          // Quantity was decreased - create return movement
+          if (product.hasVariants && variant != null) {
+            await stockMovementService.recordMovement(StockMovement(
+              productId: product.id!,
+              variantId: variant.id,
+              movementType: 'return',
+              quantity: quantityDifference,
+              previousStock: variant.stock,
+              newStock: variant.stock + quantityDifference,
+              movementDate: DateTime.now(),
+              referenceId: orderId.toString(),
+              userId: user?.id,
+              notes: 'Retour client - commande #$orderId',
+            ));
+
+            await SqlDb().updateVariantStock(
+                variant.id!, variant.stock + quantityDifference);
+          } else {
+            await stockMovementService.recordMovement(StockMovement(
+              productId: product.id!,
+              movementType: 'return',
+              quantity: quantityDifference,
+              previousStock: product.stock,
+              newStock: product.stock + quantityDifference,
+              movementDate: DateTime.now(),
+              referenceId: orderId.toString(),
+              userId: user?.id,
+              notes: 'Retour client - commande #$orderId',
+            ));
+
+            await SqlDb().updateProductStock(
+                product.id!, product.stock + quantityDifference);
+          }
+        } else if (quantityDifference < 0) {
+          // Quantity was increased - normal sale movement
+          final quantityToAdd = -quantityDifference;
+          if (product.hasVariants && variant != null) {
+            await stockMovementService.recordMovement(StockMovement(
+              productId: product.id!,
+              variantId: variant.id,
+              movementType: 'sale',
+              quantity: quantityToAdd,
+              previousStock: variant.stock,
+              newStock: variant.stock - quantityToAdd,
+              movementDate: DateTime.now(),
+              referenceId: orderId.toString(),
+              userId: user?.id,
+            ));
+
+            await SqlDb()
+                .updateVariantStock(variant.id!, variant.stock - quantityToAdd);
+          } else {
+            await stockMovementService.recordMovement(StockMovement(
+              productId: product.id!,
+              movementType: 'sale',
+              quantity: quantityToAdd,
+              previousStock: product.stock,
+              newStock: product.stock - quantityToAdd,
+              movementDate: DateTime.now(),
+              referenceId: orderId.toString(),
+              userId: user?.id,
+            ));
+
+            await SqlDb()
+                .updateProductStock(product.id!, product.stock - quantityToAdd);
+          }
         }
+        // If quantityDifference == 0, no stock movement needed
       }
 
       if (orderId <= 0) {

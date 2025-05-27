@@ -104,57 +104,59 @@ class Getorderlist {
     );
 
 // Dans la méthode cancelOrder de getorderlist.dart
-if (confirmCancel == true) {
-  await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
-  
-  final stockMovementService = StockMovementService(SqlDb());
-  final dbClient = await sqlDb.db;
-  
-  // Restock products from canceled order
-  final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
-    'order_items',
-    where: 'id_order = ?',
-    whereArgs: [order.idOrder],
-  );
+    if (confirmCancel == true) {
+      await sqlDb.updateOrderStatus(order.idOrder!, 'annulée');
 
-  for (var line in orderLinesData) {
-    String productCode = line['product_code'].toString();
-    int canceledQuantity = line['quantity'] as int;
-    int? variantId = line['variant_id'];
+      final stockMovementService = StockMovementService(SqlDb());
+      final dbClient = await sqlDb.db;
 
-    // Get current stock
-    int currentStock;
-    if (variantId != null) {
-      final variant = await sqlDb.getVariantById(variantId);
-      currentStock = variant?.stock ?? 0;
-    } else {
-      final product = await sqlDb.getProductByCode(productCode);
-      currentStock = product?.stock ?? 0;
+      // Restock products from canceled order
+      final List<Map<String, dynamic>> orderLinesData = await dbClient.query(
+        'order_items',
+        where: 'id_order = ?',
+        whereArgs: [order.idOrder],
+      );
+
+      for (var line in orderLinesData) {
+        String productCode = line['product_code'].toString();
+        int canceledQuantity = line['quantity'] as int;
+        int? variantId = line['variant_id'];
+
+        // Get current stock
+        int currentStock;
+        if (variantId != null) {
+          final variant = await sqlDb.getVariantById(variantId);
+          currentStock = variant?.stock ?? 0;
+        } else {
+          final product = await sqlDb.getProductByCode(productCode);
+          currentStock = product?.stock ?? 0;
+        }
+
+        // Enregistrer le mouvement de retour
+        await stockMovementService.recordMovement(StockMovement(
+          productId: line['product_id'],
+          variantId: variantId,
+          movementType: StockMovement.movementTypeReturn,
+          quantity: canceledQuantity,
+          previousStock: currentStock,
+          newStock: currentStock + canceledQuantity,
+          movementDate: DateTime.now(),
+          referenceId: order.idOrder.toString(),
+          notes: 'Annulation commande #${order.idOrder}',
+        ));
+
+        // Update stock
+        if (variantId != null) {
+          await sqlDb.updateVariantStock(
+              variantId, currentStock + canceledQuantity);
+        } else {
+          await sqlDb.updateProductStock(
+              line['product_id'], currentStock + canceledQuantity);
+        }
+      }
+
+      onOrderCanceled();
     }
-
-    // Enregistrer le mouvement de retour
-    await stockMovementService.recordMovement(StockMovement(
-      productId: line['product_id'],
-      variantId: variantId,
-      movementType: StockMovement.movementTypeReturn,
-      quantity: canceledQuantity,
-      previousStock: currentStock,
-      newStock: currentStock + canceledQuantity,
-      movementDate: DateTime.now(),
-      referenceId: order.idOrder.toString(),
-      notes: 'Annulation commande #${order.idOrder}',
-    ));
-
-    // Update stock
-    if (variantId != null) {
-      await sqlDb.updateVariantStock(variantId, currentStock + canceledQuantity);
-    } else {
-      await sqlDb.updateProductStock(line['product_id'], currentStock + canceledQuantity);
-    }
-  }
-
-  onOrderCanceled();
-}
   }
 
   static double calculateTotalBeforeDiscount(Order order) {
@@ -509,7 +511,7 @@ if (confirmCancel == true) {
     }
 
     // Navigate to a new page that contains the Scaffold and TableCmd
-    Navigator.pushReplacement(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => StatefulBuilder(
@@ -574,6 +576,22 @@ if (confirmCancel == true) {
                     return;
                   }
 
+                  // Get original quantities before changes
+                  final originalQuantities = <int>[];
+                  for (var line in order.orderLines) {
+                    originalQuantities.add(line.quantity);
+                  }
+
+                  // Then when calling confirmPlaceOrder, verify lengths match:
+                  if (originalQuantities.length != products.length) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(
+                              "Mismatch between products and original quantities")),
+                    );
+                    return;
+                  }
+
                   // Update the existing order with new values
                   order.total = calculateOrderTotal(
                     products,
@@ -585,6 +603,7 @@ if (confirmCancel == true) {
                   );
 
                   // Update order lines
+                  print("idd order ${order.idOrder}");
                   order.orderLines = products.map((product) {
                     return OrderLine(
                       idOrder: order.idOrder!,
@@ -614,12 +633,79 @@ if (confirmCancel == true) {
                     quantities,
                     discounts,
                     discountTypes,
-                    isUpdating: true,
+                    isUpdating: true, // Set this to true for editing
                   );
 
                   if (shouldUpdate == true) {
                     try {
-                      await sqldb.updateOrderInDatabase(order);
+                      await Addorder.confirmPlaceOrder(
+                        products, // selectedProducts
+                        quantities, // quantityProducts
+                        discounts, // discounts
+                        discountTypes, // typeDiscounts
+                        order.globalDiscount, // globalDiscount
+                        order.isPercentageDiscount, // isPercentageDiscount
+                        order.idClient != null
+                            ? await sqldb.getClientById(order.idClient!)
+                            : null, // selectedClient
+                        1, // numberOfTickets (default to 1 for edit)
+                        order.modePaiement ?? 'Espèce', // selectedPaymentMethod
+                        order.paymentDetails.cashAmount ?? 0.0, // cashAmount
+                        order.paymentDetails.cardAmount ?? 0.0, // cardAmount
+                        order.paymentDetails.checkAmount ?? 0.0, // checkAmount
+                        order.paymentDetails.checkNumber, // checkNumber
+                        order.paymentDetails
+                            .cardTransactionId, // cardTransactionId
+                        order.paymentDetails.checkDate, // checkDate
+                        order.paymentDetails.bankName, // bankName
+                        order.paymentDetails
+                            .ticketRestaurantAmount, // ticketRestaurantAmount
+                        order.paymentDetails
+                            .numberOfTicketsRestaurant, // numberOfTicketsRestaurant
+                        order.paymentDetails.ticketValue, // ticketValue
+                        order.paymentDetails.ticketTax, // ticketTax
+                        order.paymentDetails
+                            .ticketCommission, // ticketCommission
+                        null, // selectedVoucher (you may need to retrieve this from order)
+                        order.paymentDetails.voucherAmount ??
+                            0.0, // voucherAmount
+                        order.paymentDetails.giftTicketNumber ??
+                            '', // giftTicketNumber
+                        order.paymentDetails?.giftTicketIssuer ??
+                            '', // giftTicketIssuer
+                        order.paymentDetails?.giftTicketAmount ??
+                            0.0, // giftTicketAmount
+                        order.paymentDetails?.traiteNumber ??
+                            '', // traiteNumber
+                        order.paymentDetails?.traiteBank ?? '', // traiteBank
+                        order.paymentDetails?.traiteBeneficiary ??
+                            '', // traiteBeneficiary
+                        order.paymentDetails?.traiteDate, // traiteDate
+                        order.paymentDetails?.traiteAmount ??
+                            0.0, // traiteAmount
+                        order.paymentDetails?.virementReference ??
+                            '', // virementReference
+                        order.paymentDetails?.virementBank ??
+                            '', // virementBank
+                        order.paymentDetails?.virementSender ??
+                            '', // virementSender
+                        order.paymentDetails?.virementDate, // virementDate
+                        order.paymentDetails?.virementAmount ??
+                            0.0, // virementAmount
+                        order.paymentDetails?.pointsUsed !=
+                            null, // useLoyaltyPoints
+                        order.paymentDetails?.pointsUsed ?? 0, // pointsToUse
+                        order.paymentDetails?.pointsDiscount ??
+                            0.0, // pointsDiscount
+                        true,
+                        order, // isUpdating (set to true for edit)
+                        products
+                            .map((p) =>
+                                p.variants.isNotEmpty ? p.variants.first : null)
+                            .toList(),
+                        originalQuantities, // selectedVariants
+                      );
+
                       if (context.mounted) {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -988,54 +1074,57 @@ if (confirmCancel == true) {
                         color: Color(0xFF000000)),
                   ),
                   // Remplacer toute la section des détails de paiement par :
-if (order.modePaiement == "Espèce" && order.paymentDetails.cashAmount != null) ...[
-  SizedBox(height: 5),
-  Text(
-    "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
-    style: TextStyle(fontSize: 14),
-  ),
-  if ((order.paymentDetails.cashAmount! - order.total) > 0)
-    Text(
-      "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
-      style: TextStyle(fontSize: 14),
-    ),
-],
+                  if (order.modePaiement == "Espèce" &&
+                      order.paymentDetails.cashAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if ((order.paymentDetails.cashAmount! - order.total) > 0)
+                      Text(
+                        "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
 
-if (order.modePaiement == "TPE" && order.paymentDetails.cardAmount != null) ...[
-  SizedBox(height: 5),
-  Text(
-    "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
-    style: TextStyle(fontSize: 14),
-  ),
-  if (order.paymentDetails.cardTransactionId != null)
-    Text(
-      "Transaction: ${order.paymentDetails.cardTransactionId}",
-      style: TextStyle(fontSize: 14),
-    ),
-],
+                  if (order.modePaiement == "TPE" &&
+                      order.paymentDetails.cardAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if (order.paymentDetails.cardTransactionId != null)
+                      Text(
+                        "Transaction: ${order.paymentDetails.cardTransactionId}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
 
-if (order.modePaiement == "Chèque" && order.paymentDetails.checkAmount != null) ...[
-  SizedBox(height: 5),
-  Text(
-    "Montant chèque: ${order.paymentDetails.checkAmount!.toStringAsFixed(2)} DT",
-    style: TextStyle(fontSize: 14),
-  ),
-  if (order.paymentDetails.checkNumber != null)
-    Text(
-      "N° chèque: ${order.paymentDetails.checkNumber}",
-      style: TextStyle(fontSize: 14),
-    ),
-  if (order.paymentDetails.bankName != null)
-    Text(
-      "Banque: ${order.paymentDetails.bankName}",
-      style: TextStyle(fontSize: 14),
-    ),
-  if (order.paymentDetails.checkDate != null)
-    Text(
-      "Date: ${DateFormat('dd/MM/yyyy').format(order.paymentDetails.checkDate!)}",
-      style: TextStyle(fontSize: 14),
-    ),
-],
+                  if (order.modePaiement == "Chèque" &&
+                      order.paymentDetails.checkAmount != null) ...[
+                    SizedBox(height: 5),
+                    Text(
+                      "Montant chèque: ${order.paymentDetails.checkAmount!.toStringAsFixed(2)} DT",
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    if (order.paymentDetails.checkNumber != null)
+                      Text(
+                        "N° chèque: ${order.paymentDetails.checkNumber}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    if (order.paymentDetails.bankName != null)
+                      Text(
+                        "Banque: ${order.paymentDetails.bankName}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    if (order.paymentDetails.checkDate != null)
+                      Text(
+                        "Date: ${DateFormat('dd/MM/yyyy').format(order.paymentDetails.checkDate!)}",
+                        style: TextStyle(fontSize: 14),
+                      ),
+                  ],
                   if (order.remainingAmount > 0) ...[
                     SizedBox(height: 5),
                     Text(
@@ -1077,179 +1166,180 @@ if (order.modePaiement == "Chèque" && order.paymentDetails.checkAmount != null)
   }
 
   // In your Getorderlist class
-static Future<void> deleteOrderLine(
-  BuildContext context,
-  Order order,
-  OrderLine orderLine,
-  Function() onOrderLineDeleted,
-) async {
-  final bool? confirmDelete = await showDialog<bool>(
-    context: context,
-    builder: (BuildContext context) => AlertDialog(
-      title: const Text('Confirmer la suppression'),
-      content: const Text('Voulez-vous vraiment supprimer cet article de la commande?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-        ),
-      ],
-    ),
-  );
+  static Future<void> deleteOrderLine(
+    BuildContext context,
+    Order order,
+    OrderLine orderLine,
+    Function() onOrderLineDeleted,
+  ) async {
+    final bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: const Text(
+            'Voulez-vous vraiment supprimer cet article de la commande?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
 
-  if (confirmDelete != true) return;
+    if (confirmDelete != true) return;
 
-  try {
-    final SqlDb sqldb = SqlDb();
-    final dbClient = await sqldb.db;
+    try {
+      final SqlDb sqldb = SqlDb();
+      final dbClient = await sqldb.db;
 
-    // Calculate new total
-    final double lineTotal = orderLine.finalPrice * orderLine.quantity;
-    final double newTotal = order.total - lineTotal;
+      // Calculate new total
+      final double lineTotal = orderLine.finalPrice * orderLine.quantity;
+      final double newTotal = order.total - lineTotal;
 
-    // Transaction with proper error handling
-    await dbClient.transaction((txn) async {
-      // 1. Delete the order line and verify deletion
-      final deletedCount = await _deleteOrderLineWithVerification(
-        txn,
-        order.idOrder!,
-        orderLine,
+      // Transaction with proper error handling
+      await dbClient.transaction((txn) async {
+        // 1. Delete the order line and verify deletion
+        final deletedCount = await _deleteOrderLineWithVerification(
+          txn,
+          order.idOrder!,
+          orderLine,
+        );
+
+        if (deletedCount == 0) {
+          throw Exception('Failed to delete order line - no rows affected');
+        }
+
+        // 2. Restock the item and record movement - TOUT doit utiliser txn
+        await _restockItemAndRecordMovement(
+          txn,
+          orderLine,
+          StockMovementService(sqldb),
+          order.idOrder!,
+        );
+
+        // 3. Update order total or delete if empty
+        if (order.orderLines.length == 1) {
+          await txn.delete(
+            'orders',
+            where: 'id_order = ?',
+            whereArgs: [order.idOrder],
+          );
+        } else {
+          await txn.update(
+            'orders',
+            {'total': newTotal},
+            where: 'id_order = ?',
+            whereArgs: [order.idOrder],
+          );
+        }
+      });
+
+      // Update local state
+      order.orderLines.removeWhere((line) =>
+          line.productId == orderLine.productId &&
+          line.variantId == orderLine.variantId);
+      order.total = newTotal;
+
+      // Show success message
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        order.orderLines.isEmpty
+            ? const SnackBar(
+                content: Text('Commande vide supprimée'),
+                backgroundColor: Colors.green,
+              )
+            : const SnackBar(
+                content: Text('Article supprimé avec succès'),
+                backgroundColor: Colors.green,
+              ),
       );
 
-      if (deletedCount == 0) {
-        throw Exception('Failed to delete order line - no rows affected');
-      }
+      onOrderLineDeleted();
+    } catch (e) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
-      // 2. Restock the item and record movement - TOUT doit utiliser txn
-      await _restockItemAndRecordMovement(
-        txn,
-        orderLine,
-        StockMovementService(sqldb),
-        order.idOrder!,
+  static Future<void> _restockItemAndRecordMovement(
+    DatabaseExecutor txn,
+    OrderLine orderLine,
+    StockMovementService stockMovementService,
+    int orderId,
+  ) async {
+    if (orderLine.variantId != null) {
+      // Get current stock of variant - utiliser txn au lieu de SqlDb()
+      final result = await txn.query(
+        'variants',
+        where: 'id = ?',
+        whereArgs: [orderLine.variantId],
       );
 
-      // 3. Update order total or delete if empty
-      if (order.orderLines.length == 1) {
-        await txn.delete(
-          'orders',
-          where: 'id_order = ?',
-          whereArgs: [order.idOrder],
-        );
-      } else {
-        await txn.update(
-          'orders',
-          {'total': newTotal},
-          where: 'id_order = ?',
-          whereArgs: [order.idOrder],
-        );
-      }
-    });
+      if (result.isEmpty) return;
+      final variant = Variant.fromMap(result.first);
 
-    // Update local state
-    order.orderLines.removeWhere((line) =>
-        line.productId == orderLine.productId &&
-        line.variantId == orderLine.variantId);
-    order.total = newTotal;
+      // Record stock movement for return
+      await stockMovementService.recordMovementWithTransaction(
+        txn,
+        StockMovement(
+          productId: orderLine.productId!,
+          variantId: orderLine.variantId,
+          movementType: StockMovement.movementTypeReturn,
+          quantity: orderLine.quantity,
+          previousStock: variant.stock,
+          newStock: variant.stock + orderLine.quantity,
+          movementDate: DateTime.now(),
+          referenceId: orderId.toString(),
+          notes: 'Suppression ligne commande #$orderId',
+        ),
+      );
 
-    // Show success message
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      order.orderLines.isEmpty
-          ? const SnackBar(
-              content: Text('Commande vide supprimée'),
-              backgroundColor: Colors.green,
-            )
-          : const SnackBar(
-              content: Text('Article supprimé avec succès'),
-              backgroundColor: Colors.green,
-            ),
-    );
+      // Update variant stock
+      await txn.rawUpdate(
+        'UPDATE variants SET stock = stock + ? WHERE id = ?',
+        [orderLine.quantity, orderLine.variantId],
+      );
+    } else if (orderLine.productId != null) {
+      // Get current stock of product - utiliser txn au lieu de SqlDb()
+      final result = await txn.query(
+        'products',
+        where: 'id = ?',
+        whereArgs: [orderLine.productId],
+      );
 
-    onOrderLineDeleted();
-  } catch (e) {
-    scaffoldMessengerKey.currentState?.showSnackBar(
-      SnackBar(
-        content: Text('Erreur lors de la suppression: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+      if (result.isEmpty) return;
+      final product = Product.fromMap(result.first);
+
+      // Record stock movement for return
+      await stockMovementService.recordMovementWithTransaction(
+        txn,
+        StockMovement(
+          productId: orderLine.productId!,
+          movementType: StockMovement.movementTypeReturn,
+          quantity: orderLine.quantity,
+          previousStock: product.stock,
+          newStock: product.stock + orderLine.quantity,
+          movementDate: DateTime.now(),
+          referenceId: orderId.toString(),
+          notes: 'Suppression ligne commande #$orderId',
+        ),
+      );
+
+      // Update product stock
+      await txn.rawUpdate(
+        'UPDATE products SET stock = stock + ? WHERE id = ?',
+        [orderLine.quantity, orderLine.productId],
+      );
+    }
   }
-}
-
-static Future<void> _restockItemAndRecordMovement(
-  DatabaseExecutor txn,
-  OrderLine orderLine,
-  StockMovementService stockMovementService,
-  int orderId,
-) async {
-  if (orderLine.variantId != null) {
-    // Get current stock of variant - utiliser txn au lieu de SqlDb()
-    final result = await txn.query(
-      'variants',
-      where: 'id = ?',
-      whereArgs: [orderLine.variantId],
-    );
-    
-    if (result.isEmpty) return;
-    final variant = Variant.fromMap(result.first);
-
-    // Record stock movement for return
-    await stockMovementService.recordMovementWithTransaction(
-      txn,
-      StockMovement(
-        productId: orderLine.productId!,
-        variantId: orderLine.variantId,
-        movementType: StockMovement.movementTypeReturn,
-        quantity: orderLine.quantity,
-        previousStock: variant.stock,
-        newStock: variant.stock + orderLine.quantity,
-        movementDate: DateTime.now(),
-        referenceId: orderId.toString(),
-        notes: 'Suppression ligne commande #$orderId',
-      ),
-    );
-
-    // Update variant stock
-    await txn.rawUpdate(
-      'UPDATE variants SET stock = stock + ? WHERE id = ?',
-      [orderLine.quantity, orderLine.variantId],
-    );
-  } else if (orderLine.productId != null) {
-    // Get current stock of product - utiliser txn au lieu de SqlDb()
-    final result = await txn.query(
-      'products',
-      where: 'id = ?',
-      whereArgs: [orderLine.productId],
-    );
-    
-    if (result.isEmpty) return;
-    final product = Product.fromMap(result.first);
-
-    // Record stock movement for return
-    await stockMovementService.recordMovementWithTransaction(
-      txn,
-      StockMovement(
-        productId: orderLine.productId!,
-        movementType: StockMovement.movementTypeReturn,
-        quantity: orderLine.quantity,
-        previousStock: product.stock,
-        newStock: product.stock + orderLine.quantity,
-        movementDate: DateTime.now(),
-        referenceId: orderId.toString(),
-        notes: 'Suppression ligne commande #$orderId',
-      ),
-    );
-
-    // Update product stock
-    await txn.rawUpdate(
-      'UPDATE products SET stock = stock + ? WHERE id = ?',
-      [orderLine.quantity, orderLine.productId],
-    );
-  }
-}
 
   static Future<int> _deleteOrderLineWithVerification(
     DatabaseExecutor dbClient,
@@ -1545,32 +1635,34 @@ static Future<void> _restockItemAndRecordMovement(
             // Dans generateAndSavePDF, mettre à jour les sections de paiement :
 
 // Espèces
-if (order.modePaiement == "Espèce" && order.paymentDetails.cashAmount != null) ...[
-  pw.SizedBox(height: 5),
-  pw.Text(
-    "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
-    style: pw.TextStyle(font: ttf, fontSize: 8),
-  ),
-  if ((order.paymentDetails.cashAmount! - order.total) > 0)
-    pw.Text(
-      "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
-      style: pw.TextStyle(font: ttf, fontSize: 8),
-    ),
-],
+            if (order.modePaiement == "Espèce" &&
+                order.paymentDetails.cashAmount != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Montant espèces: ${order.paymentDetails.cashAmount!.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(font: ttf, fontSize: 8),
+              ),
+              if ((order.paymentDetails.cashAmount! - order.total) > 0)
+                pw.Text(
+                  "Monnaie rendue: ${(order.paymentDetails.cashAmount! - order.total).toStringAsFixed(2)} DT",
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
+                ),
+            ],
 
 // Carte
-if (order.modePaiement == "TPE" && order.paymentDetails.cardAmount != null) ...[
-  pw.SizedBox(height: 5),
-  pw.Text(
-    "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
-    style: pw.TextStyle(font: ttf, fontSize: 8),
-  ),
-  if (order.paymentDetails.cardTransactionId != null)
-    pw.Text(
-      "Transaction: ${order.paymentDetails.cardTransactionId}",
-      style: pw.TextStyle(font: ttf, fontSize: 8),
-    ),
-],
+            if (order.modePaiement == "TPE" &&
+                order.paymentDetails.cardAmount != null) ...[
+              pw.SizedBox(height: 5),
+              pw.Text(
+                "Montant carte: ${order.paymentDetails.cardAmount!.toStringAsFixed(2)} DT",
+                style: pw.TextStyle(font: ttf, fontSize: 8),
+              ),
+              if (order.paymentDetails.cardTransactionId != null)
+                pw.Text(
+                  "Transaction: ${order.paymentDetails.cardTransactionId}",
+                  style: pw.TextStyle(font: ttf, fontSize: 8),
+                ),
+            ],
 
             // Remaining amount
             if (order.remainingAmount > 0) ...[
