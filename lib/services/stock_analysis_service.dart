@@ -1,4 +1,4 @@
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 
 class StockAnalysisService {
   final SqlDb _sqlDb;

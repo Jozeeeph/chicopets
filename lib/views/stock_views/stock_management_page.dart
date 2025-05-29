@@ -1,12 +1,10 @@
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/variant.dart';
-import 'package:caissechicopets/services/stock_analysis_service.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/services/stock_movement_service.dart';
-import 'package:caissechicopets/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:caissechicopets/models/stock_movement.dart';
-import 'dart:math' as math;
 
 class StockManagementPage extends StatefulWidget {
   const StockManagementPage({super.key});
@@ -18,7 +16,6 @@ class StockManagementPage extends StatefulWidget {
 class _StockManagementPageState extends State<StockManagementPage> {
   final SqlDb _sqlDb = SqlDb();
   late final StockMovementService _stockMovementService;
-  late final StockAnalysisService _stockAnalysisService;
   final List<String> _stockAdjustmentReasons = [
     'Retour client',
     'Produit cassé',
@@ -43,7 +40,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
   void initState() {
     super.initState();
     _stockMovementService = StockMovementService(_sqlDb);
-    _stockAnalysisService = StockAnalysisService(_sqlDb);
     _loadData();
     _searchController.addListener(_onSearchChanged);
   }
@@ -73,13 +69,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Quitter'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _saveAllChanges();
-              Navigator.of(context).pop(true);
-            },
-            child: const Text('Enregistrer et quitter'),
           ),
         ],
       ),
@@ -295,7 +284,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
       // Save product stock changes
       for (final entry in _pendingStockChanges.entries) {
         final product = _products.firstWhere((p) => p.id == entry.key);
-        await _updateProductStock(product, entry.value, reason: reason);
+        final newStock = entry.value;
+        final previousStock = product.stock;
+
+        // Vérifiez que la quantité est positive
+        final quantity = (newStock - previousStock).abs();
+        if (quantity <= 0) continue; // Ignore les changements nuls
+
+        await _updateProductStock(product, newStock, reason: reason);
       }
 
       // Save variant stock changes
@@ -303,8 +299,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
         final variants = _productVariants[productEntry.key] ?? [];
         for (final variantEntry in productEntry.value.entries) {
           final variant = variants.firstWhere((v) => v.id == variantEntry.key);
-          await _updateVariantStock(variant, variantEntry.value,
-              reason: reason);
+          final newStock = variantEntry.value;
+          final previousStock = variant.stock;
+
+          // Vérifiez que la quantité est positive
+          final quantity = (newStock - previousStock).abs();
+          if (quantity <= 0) continue; // Ignore les changements nuls
+
+          await _updateVariantStock(variant, newStock, reason: reason);
         }
       }
 
@@ -414,13 +416,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }).toList();
   }
 
-  int _getTotalStock(Product product) {
-    final variants = _productVariants[product.id] ?? [];
-    if (variants.isNotEmpty) {
-      return variants.fold(0, (sum, variant) => sum + variant.stock);
-    }
-    return product.stock;
-  }
+
 
   Future<List<StockMovement>> _getProductMovements(int productId) async {
     try {
@@ -639,46 +635,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       },
                     ),
             ),
-
-            // Bouton de fermeture (optionnel - déjà dans l'en-tête)
-            // const SizedBox(height: 16),
-            // ElevatedButton(
-            //   style: ElevatedButton.styleFrom(
-            //     backgroundColor: const Color(0xFF0056A6),
-            //     shape: RoundedRectangleBorder(
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     padding: const EdgeInsets.symmetric(vertical: 16),
-            //   ),
-            //   onPressed: () => Navigator.pop(context),
-            //   child: const Text(
-            //     'Fermer',
-            //     style: TextStyle(color: Colors.white),
-            //   ),
-            // ),
           ],
         ),
       ),
     );
-  }
-
-  Icon _getMovementIcon(String movementType) {
-    switch (movementType) {
-      case 'in':
-        return const Icon(Icons.arrow_downward, color: Colors.green);
-      case 'out':
-        return const Icon(Icons.arrow_upward, color: Colors.red);
-      case 'sale':
-        return const Icon(Icons.shopping_cart, color: Colors.blue);
-      case 'loss':
-        return const Icon(Icons.warning, color: Colors.orange);
-      case 'adjustment':
-        return const Icon(Icons.tune, color: Colors.purple);
-      case 'transfer':
-        return const Icon(Icons.swap_horiz, color: Colors.teal);
-      default:
-        return const Icon(Icons.question_mark, color: Colors.grey);
-    }
   }
 
   Color _getMovementColor(String movementType) {
@@ -925,210 +885,213 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
 // stock_management_page.dart (extrait)
 
- Future<String?> _showReasonSelectionDialog(BuildContext context) async {
-  String? selectedReason;
-  final TextEditingController _customReasonController = TextEditingController();
+  Future<String?> _showReasonSelectionDialog(BuildContext context) async {
+    String? selectedReason;
+    final TextEditingController _customReasonController =
+        TextEditingController();
 
-  return await showDialog<String>(
-    context: context,
-    builder: (context) => Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width < 400
-              ? MediaQuery.of(context).size.width * 0.9
-              : 400,
-        ),
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // En-tête
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Sélectionnez une raison',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0056A6),
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width < 400
+                ? MediaQuery.of(context).size.width * 0.9
+                : 400,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // En-tête
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Sélectionnez une raison',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0056A6),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 22),
-                      onPressed: () => Navigator.pop(context),
-                      color: Colors.grey[600],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Liste des raisons
-                Container(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.4,
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                        color: Colors.grey[600],
+                      ),
+                    ],
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: _stockAdjustmentReasons.map((reason) {
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            setState(() {
-                              selectedReason = reason;
-                              if (reason != 'Autre raison') {
-                                _customReasonController.clear();
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: selectedReason == reason
-                                  ? const Color(0xFF0056A6).withOpacity(0.1)
-                                  : Colors.grey[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
+
+                  const SizedBox(height: 16),
+
+                  // Liste des raisons
+                  Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: _stockAdjustmentReasons.map((reason) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setState(() {
+                                selectedReason = reason;
+                                if (reason != 'Autre raison') {
+                                  _customReasonController.clear();
+                                }
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
                                 color: selectedReason == reason
-                                    ? const Color(0xFF0056A6)
-                                    : Colors.grey[200]!,
-                                width: 1.5,
+                                    ? const Color(0xFF0056A6).withOpacity(0.1)
+                                    : Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selectedReason == reason
+                                      ? const Color(0xFF0056A6)
+                                      : Colors.grey[200]!,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: selectedReason == reason
+                                            ? const Color(0xFF0056A6)
+                                            : Colors.grey[400]!,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: selectedReason == reason
+                                        ? const Icon(Icons.check,
+                                            size: 14, color: Color(0xFF0056A6))
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      reason,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: selectedReason == reason
+                                            ? const Color(0xFF0056A6)
+                                            : Colors.grey[800],
+                                        fontWeight: selectedReason == reason
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: selectedReason == reason
-                                          ? const Color(0xFF0056A6)
-                                          : Colors.grey[400]!,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: selectedReason == reason
-                                      ? const Icon(Icons.check, size: 14, color: Color(0xFF0056A6))
-                                      : null,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    reason,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: selectedReason == reason
-                                          ? const Color(0xFF0056A6)
-                                          : Colors.grey[800],
-                                      fontWeight: selectedReason == reason
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ),
 
-                // Champ personnalisé
-                if (selectedReason == 'Autre raison') ...[
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _customReasonController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Décrivez la raison',
-                      hintText: 'Entrez la raison de l\'ajustement...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF0056A6)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: Color(0xFF0056A6), width: 1.5),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                    ),
-                    onChanged: (value) {
-                      selectedReason = value;
-                    },
-                  ),
-                ],
-
-                const SizedBox(height: 20),
-
-                // Boutons d'action
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  // Champ personnalisé
+                  if (selectedReason == 'Autre raison') ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _customReasonController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Décrivez la raison',
+                        hintText: 'Entrez la raison de l\'ajustement...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF0056A6)),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF0056A6), width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                       ),
-                      child: const Text(
-                        'Annuler',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (selectedReason != null &&
-                            (selectedReason != 'Autre raison' ||
-                                _customReasonController.text.isNotEmpty)) {
-                          Navigator.pop(
-                              context,
-                              selectedReason == 'Autre raison'
-                                  ? _customReasonController.text
-                                  : selectedReason);
-                        }
+                      onChanged: (value) {
+                        selectedReason = value;
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0056A6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Confirmer',
-                        style: TextStyle(color: Colors.white),
-                      ),
                     ),
                   ],
-                ),
-              ],
-            );
-          },
+
+                  const SizedBox(height: 20),
+
+                  // Boutons d'action
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Annuler',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (selectedReason != null &&
+                              (selectedReason != 'Autre raison' ||
+                                  _customReasonController.text.isNotEmpty)) {
+                            Navigator.pop(
+                                context,
+                                selectedReason == 'Autre raison'
+                                    ? _customReasonController.text
+                                    : selectedReason);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0056A6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Confirmer',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1310,7 +1273,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 final product =
                     _filteredProducts[index]; // Make sure this line exists
                 final variants = _productVariants[product.id] ?? [];
-                final totalStock = _getTotalStock(product);
                 final isExpiring = _isExpiringSoon(product.dateExpiration);
                 final hasPendingChanges =
                     _pendingStockChanges.containsKey(product.id) ||

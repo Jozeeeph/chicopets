@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/controllers/fidelity_controller.dart';
 
 class FidelityRulesPage extends StatefulWidget {

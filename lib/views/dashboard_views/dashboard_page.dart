@@ -1,19 +1,20 @@
 import 'dart:convert';
 
+import 'package:caissechicopets/views/analysis_views/stock_movement_analysis_page.dart';
 import 'package:caissechicopets/views/fidelity_views/fidelity_rules_page.dart';
-import 'package:caissechicopets/views/gestionAttributs/listAttributs.dart';
-import 'package:caissechicopets/views/gestionPaymentMode/PaymentModeMgt.dart';
+import 'package:caissechicopets/views/attribute_views/listAttributs.dart';
+import 'package:caissechicopets/views/paymentmode_views/PaymentModeMgt.dart';
 import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_prediction_page.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
-import 'package:caissechicopets/gallery_page.dart';
-import 'package:caissechicopets/gestioncommande/managecommande.dart';
-import 'package:caissechicopets/gestionproduit/manage_categorie.dart';
-import 'package:caissechicopets/gestionproduit/manage_product.dart';
-import 'package:caissechicopets/home_page.dart';
-import 'package:caissechicopets/gestionproduit/import_product.dart';
+import 'package:caissechicopets/views/gallery_views/gallery_page.dart';
+import 'package:caissechicopets/views/order_views/managecommande.dart';
+import 'package:caissechicopets/views/category_views/manage_categorie.dart';
+import 'package:caissechicopets/views/product_views/manage_product.dart';
+import 'package:caissechicopets/views/home_views/home_page.dart';
+import 'package:caissechicopets/views/product_views/import_product.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -184,7 +185,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Statistiques',
                         icon: Icons.show_chart,
-                        page: null,
+                        page: StockMovementAnalysisPage(),
                         color: const Color(0xFFF44336),
                       ),
                     ],

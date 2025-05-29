@@ -4,8 +4,6 @@ import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/fidelity_rules.dart';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
-import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/sqldb.dart';
 import 'package:sqflite/sqflite.dart';
 
 class FidelityController {
@@ -156,27 +154,6 @@ class FidelityController {
     required Database db,
   }) async {
     try {
-      Product? product;
-
-      // 1. Récupérer les informations du produit
-      if (orderLine.productData != null) {
-        product = Product.fromMap(orderLine.productData!);
-      } else if (orderLine.productId != null) {
-        product = await SqlDb().getProductById(orderLine.productId!);
-      }
-
-      // 2. Si le produit n'existe pas ou n'accumule pas de points, retourner 0
-      if (product == null || !product.earnsFidelityPoints) {
-        return 0;
-      }
-
-      // 3. Si le produit a des points prédéfinis, les utiliser
-      if (product.fidelityPointsEarned != null &&
-          product.fidelityPointsEarned! > 0) {
-        return product.fidelityPointsEarned! * orderLine.quantity;
-      }
-
-      // 4. Sinon, calculer selon les règles de fidélité
       final points =
           (orderLine.finalPrice * orderLine.quantity * rules.pointsPerDinar)
               .round();
