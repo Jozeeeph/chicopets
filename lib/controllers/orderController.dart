@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 
 class OrderController {
@@ -212,49 +213,72 @@ class OrderController {
   }
 
   Future<int> updateOrderInDatabase(Order order, Database db) async {
-    // First update the order itself
-    await db.update(
-      'orders',
-      order.toMap(),
-      where: 'id_order = ?',
-      whereArgs: [order.idOrder],
-    );
+    debugPrint('''[updateOrderInDatabase] 
+    Order ID: ${order.idOrder}
+    Order toString: ${order.toString()}
+    Stack trace: ${StackTrace.current}''');
+    // Validate order ID exists
+    if (order.idOrder == null) {
+      throw ArgumentError('Order ID cannot be null when updating');
+    }
 
-    // Then update the order items
-    await _updateOrderItems(order, db);
+    // Use transaction for atomic operations
+    return await db.transaction((txn) async {
+      // Update the order
+      final updated = await txn.update(
+        'orders',
+        order.toMap(),
+        where: 'id_order = ?',
+        whereArgs: [order.idOrder],
+      );
 
-    return order.idOrder!;
+      if (updated == 0) {
+        throw Exception('Order not found with ID: ${order.idOrder}');
+      }
+
+      // Update order items
+      await _updateOrderItems(order, txn);
+
+      return order.idOrder!;
+    });
   }
 
-  Future<void> _updateOrderItems(Order order, Database db) async {
+  Future<void> _updateOrderItems(Order order, DatabaseExecutor db) async {
+    print(
+        'Updating items for order ${order.idOrder} with ${order.orderLines.length} items');
     // First delete existing order items
     await db.delete(
-      'order_items', // Matches your schema
-      where: 'id_order = ?', // Matches your schema
+      'order_items',
+      where: 'id_order = ?',
       whereArgs: [order.idOrder],
     );
 
     // Then insert the updated ones
     for (final orderLine in order.orderLines) {
+      // Validate required fields
+      if (orderLine.productCode == null && orderLine.productId == null) {
+        throw ArgumentError(
+            'Order line must have either productCode or productId');
+      }
+
       await db.insert(
-        'order_items', // Matches your schema
+        'order_items',
         {
-          'id_order': order.idOrder,
+          'id_order': order.idOrder, // This should never be null here
           'product_code': orderLine.productCode,
           'product_name': orderLine.productName,
           'product_id': orderLine.productId,
           'variant_id': orderLine.variantId,
           'variant_code': orderLine.variantCode,
           'variant_name': orderLine.variantName,
-          'quantity': orderLine.quantity,
-          'prix_unitaire': orderLine.prixUnitaire,
-          'discount': orderLine.discount,
-          'isPercentage': orderLine.isPercentage ? 1 : 0, // Matches your schema
+          'quantity': orderLine.quantity, // Default if null
+          'prix_unitaire': orderLine.prixUnitaire, // Default if null
+          'discount': orderLine.discount, // Default if null
+          'isPercentage': (orderLine.isPercentage) ? 1 : 0,
           'product_data': orderLine.productData != null
               ? jsonEncode(orderLine.productData)
               : null,
         },
-        conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
   }
