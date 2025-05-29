@@ -11,29 +11,29 @@ class StockMovementService {
   StockMovementService(this._sqlDb);
 
   Future<void> recordMovement(StockMovement movement) async {
-  final db = await _sqlDb.db;
-  
-  // Enregistrement du mouvement
-  await db.insert('stock_movements', movement.toMap());
-  
-  // Mise à jour du cache
-  if (movement.variantId != null) {
-    _variantMovementCache[movement.variantId!] ??= [];
-    _variantMovementCache[movement.variantId!]!.add(movement);
-  } else {
-    _productMovementCache[movement.productId] ??= [];
-    _productMovementCache[movement.productId]!.add(movement);
-  }
-  
-  // Enregistrement des statistiques pour l'IA
-  await _updatePredictionData(movement);
-}
+    final db = await _sqlDb.db;
 
-Future<void> _updatePredictionData(StockMovement movement) async {
-  final db = await _sqlDb.db;
-  
-  // Calcul des moyennes pour l'IA
-  await db.rawInsert('''
+    // Enregistrement du mouvement
+    await db.insert('stock_movements', movement.toMap());
+
+    // Mise à jour du cache
+    if (movement.variantId != null) {
+      _variantMovementCache[movement.variantId!] ??= [];
+      _variantMovementCache[movement.variantId!]!.add(movement);
+    } else {
+      _productMovementCache[movement.productId] ??= [];
+      _productMovementCache[movement.productId]!.add(movement);
+    }
+
+    // Enregistrement des statistiques pour l'IA
+    await _updatePredictionData(movement);
+  }
+
+  Future<void> _updatePredictionData(StockMovement movement) async {
+    final db = await _sqlDb.db;
+
+    // Calcul des moyennes pour l'IA
+    await db.rawInsert('''
     INSERT OR REPLACE INTO stock_prediction_stats (
       product_id, 
       variant_id,
@@ -68,27 +68,28 @@ Future<void> _updatePredictionData(StockMovement movement) async {
       )
     )
   ''', [
-    movement.productId,
-    movement.variantId,
-    movement.productId,
-    movement.productId,
-    movement.productId,
-    movement.productId
-  ]);
-}
-
-Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHorizon}) async {
-  final db = await _sqlDb.db;
-  
-  String whereClause = 'product_id = ? AND movement_type = "sale"';
-  List<dynamic> whereArgs = [productId];
-  
-  if (timeHorizon != null) {
-    whereClause += ' AND movement_date >= ?';
-    whereArgs.add(_getDateCutoff(timeHorizon));
+      movement.productId,
+      movement.variantId,
+      movement.productId,
+      movement.productId,
+      movement.productId,
+      movement.productId
+    ]);
   }
-  
-  return await db.rawQuery('''
+
+  Future<List<Map<String, dynamic>>> getSalesTrends(int productId,
+      {String? timeHorizon}) async {
+    final db = await _sqlDb.db;
+
+    String whereClause = 'product_id = ? AND movement_type = "sale"';
+    List<dynamic> whereArgs = [productId];
+
+    if (timeHorizon != null) {
+      whereClause += ' AND movement_date >= ?';
+      whereArgs.add(_getDateCutoff(timeHorizon));
+    }
+
+    return await db.rawQuery('''
     SELECT 
       strftime('%Y-%m', movement_date) as month,
       SUM(quantity) as total_sales
@@ -97,49 +98,24 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     GROUP BY month
     ORDER BY month
   ''', whereArgs);
-}
-  Future<List<StockMovement>> getMovementsForProduct(int productId, {int? limit, String? timeHorizon}) async {
-  if (_productMovementCache.containsKey(productId)) { 
-    return _filterByTimeHorizon(_productMovementCache[productId]!, timeHorizon, limit);
   }
 
-  final db = await _sqlDb.db;
-  final whereClause = timeHorizon != null 
-    ? 'product_id = ? AND movement_date >= ?'
-    : 'product_id = ?';
-
-  final whereArgs = timeHorizon != null
-    ? [productId, _getDateCutoff(timeHorizon)]
-    : [productId];
-
-  final result = await db.query(
-    'stock_movements',
-    where: whereClause,
-    whereArgs: whereArgs,
-    orderBy: 'movement_date DESC',
-    limit: limit,
-  );
-
-  final movements = result.map((map) => StockMovement.fromMap(map)).toList();
-  _productMovementCache[productId] = movements;
-  return movements;
-}
-
-
-  Future<List<StockMovement>> getMovementsForVariant(int variantId, {int? limit, String? timeHorizon}) async {
-    if (_variantMovementCache.containsKey(variantId)) {
-      return _filterByTimeHorizon(_variantMovementCache[variantId]!, timeHorizon, limit);
+  Future<List<StockMovement>> getMovementsForProduct(int productId,
+      {int? limit, String? timeHorizon}) async {
+    if (_productMovementCache.containsKey(productId)) {
+      return _filterByTimeHorizon(
+          _productMovementCache[productId]!, timeHorizon, limit);
     }
-    
+
     final db = await _sqlDb.db;
-    final whereClause = timeHorizon != null 
-      ? 'variant_id = ? AND movement_date >= ?'
-      : 'variant_id = ?';
-    
+    final whereClause = timeHorizon != null
+        ? 'product_id = ? AND movement_date >= ?'
+        : 'product_id = ?';
+
     final whereArgs = timeHorizon != null
-      ? [variantId, _getDateCutoff(timeHorizon)]
-      : [variantId];
-    
+        ? [productId, _getDateCutoff(timeHorizon)]
+        : [productId];
+
     final result = await db.query(
       'stock_movements',
       where: whereClause,
@@ -147,7 +123,36 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
       orderBy: 'movement_date DESC',
       limit: limit,
     );
-    
+
+    final movements = result.map((map) => StockMovement.fromMap(map)).toList();
+    _productMovementCache[productId] = movements;
+    return movements;
+  }
+
+  Future<List<StockMovement>> getMovementsForVariant(int variantId,
+      {int? limit, String? timeHorizon}) async {
+    if (_variantMovementCache.containsKey(variantId)) {
+      return _filterByTimeHorizon(
+          _variantMovementCache[variantId]!, timeHorizon, limit);
+    }
+
+    final db = await _sqlDb.db;
+    final whereClause = timeHorizon != null
+        ? 'variant_id = ? AND movement_date >= ?'
+        : 'variant_id = ?';
+
+    final whereArgs = timeHorizon != null
+        ? [variantId, _getDateCutoff(timeHorizon)]
+        : [variantId];
+
+    final result = await db.query(
+      'stock_movements',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'movement_date DESC',
+      limit: limit,
+    );
+
     final movements = result.map((map) => StockMovement.fromMap(map)).toList();
     _variantMovementCache[variantId] = movements;
     return movements;
@@ -167,13 +172,16 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     }
   }
 
-  List<StockMovement> _filterByTimeHorizon(List<StockMovement> movements, String? timeHorizon, int? limit) {
+  List<StockMovement> _filterByTimeHorizon(
+      List<StockMovement> movements, String? timeHorizon, int? limit) {
     if (timeHorizon == null) {
       return limit != null ? movements.take(limit).toList() : movements;
     }
-    
+
     final cutoff = _getDateCutoff(timeHorizon);
-    final filtered = movements.where((m) => m.movementDate.isAfter(DateTime.parse(cutoff))).toList();
+    final filtered = movements
+        .where((m) => m.movementDate.isAfter(DateTime.parse(cutoff)))
+        .toList();
     return limit != null ? filtered.take(limit).toList() : filtered;
   }
 
@@ -189,7 +197,7 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
       FROM stock_movements
       WHERE product_id = ?
     ''', [productId]);
-    
+
     return result.first;
   }
 
@@ -215,7 +223,8 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     ''');
   }
 
-  Future<List<Map<String, dynamic>>> getSlowMovingProducts({int thresholdDays = 90}) async {
+  Future<List<Map<String, dynamic>>> getSlowMovingProducts(
+      {int thresholdDays = 90}) async {
     final db = await _sqlDb.db;
     return await db.rawQuery('''
       SELECT 
@@ -233,7 +242,8 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     ''', [thresholdDays]);
   }
 
-  Future<List<Map<String, dynamic>>> getFastMovingProducts({double thresholdRatio = 0.5}) async {
+  Future<List<Map<String, dynamic>>> getFastMovingProducts(
+      {double thresholdRatio = 0.5}) async {
     final db = await _sqlDb.db;
     return await db.rawQuery('''
       SELECT 
@@ -251,14 +261,100 @@ Future<List<Map<String, dynamic>>> getSalesTrends(int productId, {String? timeHo
     ''', [thresholdRatio]);
   }
 
-Future<void> recordMovementWithTransaction(
-  DatabaseExecutor txn,
-  StockMovement movement,
-) async {
-  await txn.insert(
+  Future<void> recordMovementWithTransaction(
+    DatabaseExecutor txn,
+    StockMovement movement,
+  ) async {
+    await txn.insert(
+      'stock_movements',
+      movement.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+// stock_movement_service.dart
+
+Future<List<StockMovement>> getPendingCollections() async {
+  final db = await _sqlDb.db;
+  final result = await db.query(
     'stock_movements',
-    movement.toMap(),
-    conflictAlgorithm: ConflictAlgorithm.replace,
+    where: 'movement_date > ? AND movement_type = ?',
+    whereArgs: [DateTime.now().toIso8601String(), 'in'],
+    orderBy: 'movement_date ASC',
+  );
+  return result.map((map) => StockMovement.fromMap(map)).toList();
+}
+
+Future<void> processPendingCollections() async {
+  final now = DateTime.now();
+  final pendingCollections = await getPendingCollections();
+  final db = await _sqlDb.db;
+
+  for (var movement in pendingCollections) {
+    if (movement.movementDate.isBefore(now) || movement.movementDate.isAtSameMomentAs(now)) {
+      // Update product stock
+      await _sqlDb.updateProductStock(movement.productId, movement.newStock);
+      // Update the movement date to now to mark it as processed
+      await db.update(
+        'stock_movements',
+        {'movement_date': now.toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [movement.id],
+      );
+    }
+  }
+}
+
+// stock_movement_service.dart
+
+// Récupérer les collectes planifiées pour un produit
+Future<List<StockMovement>> getPlannedCollectionsForProduct(int productId) async {
+  final db = await _sqlDb.db;
+  final result = await db.query(
+    'stock_movements',
+    where: 'product_id = ? AND movement_type = ? AND movement_date > ?',
+    whereArgs: [productId, 'in', DateTime.now().toIso8601String()],
+    orderBy: 'movement_date ASC',
+  );
+  return result.map((map) => StockMovement.fromMap(map)).toList();
+}
+
+// Confirmer une collecte planifiée
+Future<void> confirmCollection(StockMovement movement, int? updatedQuantity) async {
+  final db = await _sqlDb.db;
+  final now = DateTime.now();
+  
+  // Mettre à jour le stock si la collecte est confirmée
+  await _sqlDb.updateProductStock(movement.productId, movement.newStock);
+  
+  // Mettre à jour la date du mouvement à maintenant et ajuster la quantité si modifiée
+  await db.update(
+    'stock_movements',
+    {
+      'movement_date': now.toIso8601String(),
+      'quantity': updatedQuantity ?? movement.quantity,
+      'new_stock': updatedQuantity != null
+          ? movement.previousStock + updatedQuantity
+          : movement.newStock,
+    },
+    where: 'id = ?',
+    whereArgs: [movement.id],
+  );
+}
+
+// Modifier une collecte planifiée
+Future<void> updatePlannedCollection(StockMovement movement, int newQuantity, DateTime newDate, String? newNotes) async {
+  final db = await _sqlDb.db;
+  await db.update(
+    'stock_movements',
+    {
+      'quantity': newQuantity,
+      'new_stock': movement.previousStock + newQuantity,
+      'movement_date': newDate.toIso8601String(),
+      'notes': newNotes,
+    },
+    where: 'id = ?',
+    whereArgs: [movement.id],
   );
 }
   
