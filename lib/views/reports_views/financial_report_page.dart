@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:caissechicopets/sqldb.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
-import 'package:syncfusion_flutter_datepicker/datepicker.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-
 import 'package:printing/printing.dart';
 
 class FinancialReportPage extends StatefulWidget {
@@ -34,7 +31,6 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
   double _totalCheck = 0;
   double _totalMixed = 0;
   double _totalAll = 0;
-  double _totalDiscount = 0;
   double _totalTicketRestaurant = 0;
   double _totalGiftTicket = 0;
   double _totalTraite = 0;
@@ -47,14 +43,14 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
   double _totalFixedDiscount = 0;
 
   @override
-void initState() {
-  super.initState();
-  // Initialiser avec la date actuelle
-  final now = DateTime.now();
-  _startDate = now;
-  _endDate = now;
-  _debugPrintAllOrders();
-}
+  void initState() {
+    super.initState();
+    // Initialiser avec la date actuelle
+    final now = DateTime.now();
+    _startDate = now;
+    _endDate = now;
+    _debugPrintAllOrders();
+  }
 
   void _debugPrintAllOrders() async {
     final db = await SqlDb().db;
@@ -588,162 +584,7 @@ void initState() {
     );
   }
 
-// Méthode pour les lignes principales de paiement
-  Widget _buildPaymentRow(String label, double value, IconData icon,
-      {bool hasMixed = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 20, color: darkBlue),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: darkBlue,
-                    ),
-                  ),
-                  if (hasMixed) ...[
-                    const SizedBox(width: 4),
-                    Tooltip(
-                      message: 'Inclut les paiements mixtes',
-                      child: Icon(Icons.info_outline,
-                          size: 16, color: Colors.grey),
-                    ),
-                  ],
-                ],
-              ),
-              Text(
-                '${value.toStringAsFixed(2)} DT',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: darkBlue,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
 // Méthode pour les sous-lignes de détail
-  Widget _buildPaymentSubRow(String label, double value) {
-    return Padding(
-      padding: const EdgeInsets.only(
-          left: 32, top: 4, bottom: 4), // Augmentez le padding left
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: darkBlue.withOpacity(0.8),
-            ),
-          ),
-          Text(
-            '${value.toStringAsFixed(2)} DT',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500, // Ajoutez un peu de gras
-              color: darkBlue.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// Méthode pour les lignes de résumé
-  Widget _buildSummaryRow(
-    String label,
-    double value,
-    IconData icon, {
-    bool isMain = false,
-    bool isDiscount = false,
-    bool isCount = false,
-    bool isAlert = false,
-    String suffix = '',
-  }) {
-    Color textColor = darkBlue;
-    if (isDiscount) textColor = warmRed;
-    if (isAlert) textColor = softOrange;
-    if (isMain) textColor = deepBlue;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: textColor,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: isMain ? 16 : 15,
-                  color: textColor,
-                  fontWeight: isMain ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            isCount
-                ? '${value.toInt()}$suffix'
-                : '${value.toStringAsFixed(2)}$suffix',
-            style: TextStyle(
-              fontSize: isMain ? 18 : 16,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentDetails(Map<String, dynamic> payment) {
-    String details = '';
-
-    if (payment['modePaiement'] == 'Espèce') {
-      details =
-          'Espèces: ${payment['cashAmount']?.toStringAsFixed(2) ?? '0.00'} DT';
-    } else if (payment['modePaiement'] == 'TPE') {
-      details =
-          'Carte: ${payment['cardAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
-          'Transaction: ${payment['cardTransactionId'] ?? 'N/A'}';
-    } else if (payment['modePaiement'] == 'Chèque') {
-      details =
-          'Chèque: ${payment['checkAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
-          'N°: ${payment['checkNumber'] ?? 'N/A'}\n'
-          'Banque: ${payment['bankName'] ?? 'N/A'}\n'
-          'Date: ${payment['checkDate'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(payment['checkDate'])) : 'N/A'}';
-    } else if (payment['modePaiement'] == 'Mixte') {
-      details =
-          'Espèces: ${payment['cashAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
-          'Carte: ${payment['cardAmount']?.toStringAsFixed(2) ?? '0.00'} DT\n'
-          'Chèque: ${payment['checkAmount']?.toStringAsFixed(2) ?? '0.00'} DT';
-    }
-
-    return Tooltip(
-      message: details,
-      child: Icon(Icons.info_outline, color: deepBlue),
-    );
-  }
 
   Widget _buildExportButton() {
     return Center(
@@ -830,19 +671,7 @@ void initState() {
         final idClient = payment['idClient'] as int?;
         final modePaiement = payment['modePaiement'] as String?;
         final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-        final cashAmount = (payment['cashAmount'] as num?)?.toDouble() ?? 0.0;
-        final cardAmount = (payment['cardAmount'] as num?)?.toDouble() ?? 0.0;
-        final checkAmount = (payment['checkAmount'] as num?)?.toDouble() ?? 0.0;
-        final ticketRestaurantAmount =
-            (payment['ticketRestaurantAmount'] as num?)?.toDouble() ?? 0.0;
-        final giftTicketAmount =
-            (payment['giftTicketAmount'] as num?)?.toDouble() ?? 0.0;
-        final traiteAmount =
-            (payment['traiteAmount'] as num?)?.toDouble() ?? 0.0;
-        final virementAmount =
-            (payment['virementAmount'] as num?)?.toDouble() ?? 0.0;
-        final voucherAmount =
-            (payment['voucherAmount'] as num?)?.toDouble() ?? 0.0;
+
         final discount = (payment['discount'] as num?)?.toDouble() ?? 0.0;
         final isPercentage = payment['isPercentageDiscount'] == 1;
         final remainingAmount =

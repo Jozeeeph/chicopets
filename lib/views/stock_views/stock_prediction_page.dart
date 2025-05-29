@@ -1,6 +1,6 @@
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/services/stock_prediction_service.dart';
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

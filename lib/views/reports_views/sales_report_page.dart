@@ -1,11 +1,8 @@
 import 'package:caissechicopets/models/variant.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/models/user.dart';
-import 'package:caissechicopets/models/category.dart';
-import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/models/order.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -122,8 +119,32 @@ class _SalesReportPageState extends State<SalesReportPage> {
             'total': 0.0,
             'totalDiscount': 0.0,
             'totalBeforeDiscount': 0.0,
+            'totalAfterDiscount': 0.0, 
+            'globalDiscount': 0.0,
             'products': <String, Map<String, dynamic>>{},
+            'discountDetails':
+                [], // Pour stocker les détails des remises globales
           };
+        }
+
+        
+
+        // Ajouter la remise globale si elle existe
+        if (order.globalDiscount > 0) {
+          double globalDiscountAmount = order.isPercentageDiscount
+              ? (line.finalPrice * line.quantity) * (order.globalDiscount / 100)
+              : (order.globalDiscount *
+                  (line.finalPrice * line.quantity) /
+                  order.total);
+
+          reportData[categoryName]!['globalDiscount'] += globalDiscountAmount;
+          reportData[categoryName]!['discountDetails'].add({
+            'type': 'Globale',
+            'amount': globalDiscountAmount,
+            'isPercentage': order.isPercentageDiscount,
+            'value': order.globalDiscount,
+            'orderId': order.idOrder,
+          });
         }
 
         // Get variant details if available
@@ -132,13 +153,10 @@ class _SalesReportPageState extends State<SalesReportPage> {
           variant = await db.getVariantById(line.variantId!);
         }
 
-        // Use variant price if available, otherwise use product price
         final unitPrice = variant?.finalPrice ?? line.prixUnitaire;
-
-        // Calculate line total before discount
         final lineTotalBeforeDiscount = unitPrice * line.quantity;
 
-        // Calculate discount amount
+        // Calcul des remises ligne
         double discountAmount = 0;
         if (line.isPercentage) {
           discountAmount = lineTotalBeforeDiscount * (line.discount / 100);
@@ -146,34 +164,42 @@ class _SalesReportPageState extends State<SalesReportPage> {
           discountAmount = line.discount * line.quantity;
         }
 
-        // Calculate final line total
         final lineTotal = lineTotalBeforeDiscount - discountAmount;
-
-        final productsMap = reportData[categoryName]!['products']
-            as Map<String, Map<String, dynamic>>;
-
-        // Create a unique key for the product with variant
-        final variantName =
-            variant?.combinationName ?? line.variantName ?? 'Standard';
         final productKey = "${line.productName}";
 
-        if (!productsMap.containsKey(productKey)) {
-          productsMap[productKey] = {
+        if (!reportData[categoryName]!['products'].containsKey(productKey)) {
+          reportData[categoryName]!['products'][productKey] = {
             'quantity': 0,
             'total': 0.0,
             'totalBeforeDiscount': 0.0,
             'discount': 0.0,
             'isPercentage': line.isPercentage,
-            'variant': variantName,
+            'variant':
+                variant?.combinationName ?? line.variantName ?? 'Standard',
             'unitPrice': unitPrice,
+            'discountDetails': [], // Pour stocker les détails des remises ligne
           };
         }
 
-        productsMap[productKey]!['quantity'] += line.quantity;
-        productsMap[productKey]!['total'] += lineTotal;
-        productsMap[productKey]!['totalBeforeDiscount'] +=
-            lineTotalBeforeDiscount;
-        productsMap[productKey]!['discount'] += discountAmount;
+        // Mise à jour des totaux
+        reportData[categoryName]!['products'][productKey]!['quantity'] +=
+            line.quantity;
+        reportData[categoryName]!['products'][productKey]!['total'] +=
+            lineTotal;
+        reportData[categoryName]!['products']
+            [productKey]!['totalBeforeDiscount'] += lineTotalBeforeDiscount;
+        reportData[categoryName]!['products'][productKey]!['discount'] +=
+            discountAmount;
+
+        // Ajout des détails de remise ligne
+        reportData[categoryName]!['products'][productKey]!['discountDetails']
+            .add({
+          'type': 'Ligne',
+          'amount': discountAmount,
+          'isPercentage': line.isPercentage,
+          'value': line.discount,
+          'orderId': order.idOrder,
+        });
 
         reportData[categoryName]!['total'] += lineTotal;
         reportData[categoryName]!['totalDiscount'] += discountAmount;
@@ -187,12 +213,14 @@ class _SalesReportPageState extends State<SalesReportPage> {
         'category': entry.key,
         'total': entry.value['total'],
         'totalDiscount': entry.value['totalDiscount'],
+        'globalDiscount': entry.value['globalDiscount'],
         'totalBeforeDiscount': entry.value['totalBeforeDiscount'],
+        'discountDetails': entry.value['discountDetails'],
         'products': (entry.value['products'] as Map<String, dynamic>)
             .entries
             .map((product) {
           return <String, dynamic>{
-            'name': product.key.split(' (')[0],
+            'name': product.key,
             'quantity': product.value['quantity'],
             'total': product.value['total'],
             'totalBeforeDiscount': product.value['totalBeforeDiscount'],
@@ -200,6 +228,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
             'isPercentage': product.value['isPercentage'],
             'variant': product.value['variant'],
             'unitPrice': product.value['unitPrice'],
+            'discountDetails': product.value['discountDetails'],
           };
         }).toList(),
       };
@@ -385,219 +414,213 @@ class _SalesReportPageState extends State<SalesReportPage> {
   }
 
   Future<void> _downloadPdfReport() async {
-    final pdf = pw.Document();
-    final now = DateTime.now();
+  final pdf = pw.Document();
+  final now = DateTime.now();
 
-    // Configuration pour ticket (70mm de large)
-    final pageFormat = PdfPageFormat(
-      70 * PdfPageFormat.mm,
-      double.infinity,
-      marginAll: 2,
-    );
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Center(
+              child: pw.Text('Rapport des ventes',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                  )),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text(
+              'Période: ${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)}'
+              ' - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
+              style: pw.TextStyle(fontSize: 12),
+            ),
+            pw.Divider(),
+            pw.SizedBox(height: 10),
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: pageFormat,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // En-tête avec le nom de l'utilisateur si filtré par user
-              pw.Center(
-                child: pw.Column(
-                  children: [
-                    pw.Text('CHICO PETS',
-                        style: pw.TextStyle(
-                          fontSize: 12,
-                          fontWeight: pw.FontWeight.bold,
-                        )),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      _groupByUser
-                          ? 'Rapport des ventes par utilisateur'
-                          : 'Rapport des ventes',
-                      style: pw.TextStyle(fontSize: 10),
-                    ),
-                    pw.SizedBox(height: 2),
-                    if (_groupByUser && _selectedUser != null)
-                      pw.Text(
-                        'Caissier: ${_selectedUser!.username}',
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      'Période: ${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)}'
-                      ' - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
-                      style: pw.TextStyle(fontSize: 8),
-                    ),
-                  ],
-                ),
-              ),
-
-              pw.SizedBox(height: 4),
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 4),
-
-              // Détails des ventes
-              for (final category in _salesData)
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      (category['category'] ?? 'Non catégorisé')
-                          .toString()
-                          .toUpperCase(),
-                      style: pw.TextStyle(
-                        fontSize: 8,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 2),
-
-                    // Tableau des produits
-                    pw.Table(
-                      columnWidths: {
-                        0: pw.FlexColumnWidth(2.5), // Produit
-                        1: pw.FlexColumnWidth(0.8), // Qté
-                        2: pw.FlexColumnWidth(1.2), // PU
-                        3: pw.FlexColumnWidth(1.5), // Total
-                      },
-                      border: pw.TableBorder.all(width: 0.2),
-                      children: [
-                        // En-tête
-                        pw.TableRow(
-                          children: [
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(1),
-                              child: pw.Text('Produit',
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold)),
-                            ),
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(1),
-                              child: pw.Text('Qté',
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold),
-                                  textAlign: pw.TextAlign.center),
-                            ),
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(1),
-                              child: pw.Text('P.U',
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold),
-                                  textAlign: pw.TextAlign.right),
-                            ),
-                            pw.Padding(
-                              padding: const pw.EdgeInsets.all(1),
-                              child: pw.Text('Total',
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold),
-                                  textAlign: pw.TextAlign.right),
-                            ),
-                          ],
-                        ),
-
-                        // Lignes produits
-                        for (final product
-                            in category['products'] as List<dynamic>)
-                          pw.TableRow(
-                            children: [
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(1),
-                                child: pw.Text(
-                                  '${product['name']}\n(${product['variant']})',
-                                  style: const pw.TextStyle(fontSize: 6),
-                                  maxLines: 2,
-                                ),
-                              ),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(1),
-                                child: pw.Text(
-                                  product['quantity'].toString(),
-                                  style: const pw.TextStyle(fontSize: 6),
-                                  textAlign: pw.TextAlign.center,
-                                ),
-                              ),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(1),
-                                child: pw.Text(
-                                  (product['unitPrice'] as num)
-                                      .toStringAsFixed(2),
-                                  style: const pw.TextStyle(fontSize: 6),
-                                  textAlign: pw.TextAlign.right,
-                                ),
-                              ),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(1),
-                                child: pw.Text(
-                                  (product['total'] as num).toStringAsFixed(2),
-                                  style: const pw.TextStyle(fontSize: 6),
-                                  textAlign: pw.TextAlign.right,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-
-                    // Total par catégorie
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          'Total: ${(category['total'] as num).toStringAsFixed(2)} DT',
-                          style: pw.TextStyle(
-                            fontSize: 7,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.SizedBox(height: 4),
-                  ],
-                ),
-
-              // Total général
-              pw.Divider(thickness: 0.5),
-              pw.SizedBox(height: 4),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
+            // Détails des ventes
+            for (final category in _salesData)
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    'TOTAL GÉNÉRAL: ${_salesData.fold(0.0, (sum, category) => sum + (category['total'] as num)).toStringAsFixed(2)} DT',
+                    (category['category'] ?? 'Non catégorisé').toString().toUpperCase(),
                     style: pw.TextStyle(
-                      fontSize: 9,
+                      fontSize: 14,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
+                  pw.SizedBox(height: 5),
+                  
+                  // Produits
+                  for (final product in category['products'] as List<dynamic>)
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Text(
+                              '${product['name']} (${product['variant']})',
+                              style: const pw.TextStyle(fontSize: 12),
+                            ),
+                            pw.Text(
+                              '${product['quantity']} x ${product['unitPrice'].toStringAsFixed(2)} DT',
+                              style: const pw.TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Text(
+                              'Total avant remise:',
+                              style: const pw.TextStyle(fontSize: 11),
+                            ),
+                            pw.Text(
+                              '${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                              style: const pw.TextStyle(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                        
+                        // Détails des remises produit
+                        if ((product['discount'] as num) > 0)
+                          pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(
+                                'Remises:',
+                                style: pw.TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                              ...(product['discountDetails'] as List).map((discount) {
+                                return pw.Padding(
+                                  padding: const pw.EdgeInsets.only(left: 10),
+                                  child: pw.Text(
+                                    '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
+                                    style: const pw.TextStyle(fontSize: 10),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Text(
+                              'Total:',
+                              style: pw.TextStyle(
+                                fontSize: 12,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Text(
+                              '${product['total'].toStringAsFixed(2)} DT',
+                              style: pw.TextStyle(
+                                fontSize: 12,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        pw.Divider(),
+                      ],
+                    ),
+                  
+                  // Remises globales
+                  if ((category['globalDiscount'] as num) > 0)
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'Remises globales:',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        ...(category['discountDetails'] as List).map((discount) {
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(left: 10),
+                            child: pw.Text(
+                              '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
+                              style: const pw.TextStyle(fontSize: 11),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  
+                  // Total catégorie
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Total catégorie:',
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        '${category['total'].toStringAsFixed(2)} DT',
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.Divider(thickness: 1),
                 ],
               ),
-
-              // Pied de page
-              pw.SizedBox(height: 6),
-              pw.Center(
-                child: pw.Text(
-                  'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
-                  style: const pw.TextStyle(fontSize: 6),
+            
+            // Total général
+            pw.SizedBox(height: 10),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'TOTAL GÉNÉRAL:',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
+                pw.Text(
+                  '${_salesData.fold(0.0, (sum, category) => sum + (category['total'] as num)).toStringAsFixed(2)} DT',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            
+            // Pied de page
+            pw.SizedBox(height: 20),
+            pw.Center(
+              child: pw.Text(
+                'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
+                style: const pw.TextStyle(fontSize: 10),
               ),
-            ],
-          );
-        },
-      ),
-    );
+            ),
+          ],
+        );
+      },
+    ),
+  );
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
-  }
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -889,17 +912,24 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Total: ${categoryData['total'].toStringAsFixed(2)} DT',
+                                      'Total avant remise: ${categoryData['totalBeforeDiscount'].toStringAsFixed(2)} DT',
                                       style: TextStyle(
                                         color: deepBlue,
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12,
                                       ),
                                     ),
                                     Text(
-                                      'Remise totale: ${categoryData['totalDiscount'].toStringAsFixed(2)} DT',
+                                      'Remises: ${(categoryData['totalDiscount'] + categoryData['globalDiscount']).toStringAsFixed(2)} DT',
                                       style: TextStyle(
                                         color: warmRed,
-                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Total: ${categoryData['total'].toStringAsFixed(2)} DT',
+                                      style: TextStyle(
+                                        color: deepBlue,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ],
@@ -907,48 +937,108 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                 children: [
                                   ...(categoryData['products'] as List)
                                       .map((product) {
-                                    return ListTile(
-                                      leading: Icon(Icons.shopping_bag,
-                                          color: softOrange.withOpacity(0.7)),
-                                      title: Text(
-                                        '${product['name']} (${product['variant']})',
-                                        style: TextStyle(color: darkBlue),
-                                      ),
-                                      subtitle: Column(
+                                    return Column(
+                                      children: [
+                                        ListTile(
+                                          leading: Icon(Icons.shopping_bag,
+                                              color:
+                                                  softOrange.withOpacity(0.7)),
+                                          title: Text(
+                                            '${product['name']} (${product['variant']})',
+                                            style: TextStyle(color: darkBlue),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  'Quantité: ${product['quantity']}'),
+                                              Text(
+                                                'Prix unitaire: ${product['unitPrice'].toStringAsFixed(2)} DT',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                              Text(
+                                                'Total avant remise: ${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Affichage des détails des remises pour ce produit
+                                        if ((product['discount'] as num) > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16.0),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Détails des remises:',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: darkBlue,
+                                                  ),
+                                                ),
+                                                ...(product['discountDetails']
+                                                        as List)
+                                                    .map((discount) {
+                                                  return Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            left: 8.0),
+                                                    child: Text(
+                                                      '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: warmRed,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ],
+                                            ),
+                                          ),
+                                        Divider(height: 1),
+                                      ],
+                                    );
+                                  }).toList(),
+                                  // Affichage des remises globales pour cette catégorie
+                                  if ((categoryData['globalDiscount'] as num) >
+                                      0)
+                                    Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                              'Quantité: ${product['quantity']}'),
-                                          Text(
-                                            'Prix avant remise: ${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '${product['total'].toStringAsFixed(2)} DT',
+                                            'Remises globales appliquées:',
                                             style: TextStyle(
-                                              color: deepBlue,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            'Remise: ${product['discount'].toStringAsFixed(2)} DT',
-                                            style: TextStyle(
-                                              color: warmRed,
                                               fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: darkBlue,
                                             ),
                                           ),
+                                          ...(categoryData['discountDetails']
+                                                  as List)
+                                              .map((discount) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                  left: 8.0),
+                                              child: Text(
+                                                '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: warmRed,
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
                                         ],
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
                                 ],
                               ),
                             );

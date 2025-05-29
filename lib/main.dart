@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'package:caissechicopets/gestioncommande/addorder.dart';
-import 'package:caissechicopets/gestioncommande/getorderlist.dart';
-import 'package:caissechicopets/views/cashdesk_views/cash_desk_page.dart';
+import 'package:caissechicopets/views/cashdesk_views/placeOrder/addorder.dart';
+import 'package:caissechicopets/views/cashdesk_views/placeOrder/cash_desk_page.dart';
 import 'package:caissechicopets/views/dashboard_views/dashboard_page.dart';
 import 'package:flutter/material.dart';
-import 'package:caissechicopets/home_page.dart';
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/views/home_views/home_page.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart' hide Category;

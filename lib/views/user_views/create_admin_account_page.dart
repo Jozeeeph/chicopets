@@ -1,5 +1,5 @@
-import 'package:caissechicopets/home_page.dart';
-import 'package:caissechicopets/sqldb.dart';
+import 'package:caissechicopets/views/home_views/home_page.dart';
+import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
