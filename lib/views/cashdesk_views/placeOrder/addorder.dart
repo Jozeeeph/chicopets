@@ -251,10 +251,6 @@ class Addorder {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setState) {
-        
-
-           
-
             void updateTotalAndChange() {
               setState(() {
                 totalBeforeDiscount = calculateTotalBeforeDiscount(
@@ -307,8 +303,6 @@ class Addorder {
               }
 
               if (!hasProductDiscount) {
-               
-
                 if (isPercentageDiscount &&
                     globalDiscount >
                         _calculateMaxGlobalDiscountPercentage(
@@ -506,7 +500,7 @@ class Addorder {
                                                             .combinationName
                                                         : "Aucune variante sélectionnée",
                                                     overflow:
-                                                      TextOverflow.ellipsis,
+                                                        TextOverflow.ellipsis,
                                                   )
                                               ],
                                             ),
@@ -2401,6 +2395,7 @@ class Addorder {
                         pointsToUse,
                         pointsDiscount,
                         isUpdating,
+                        order,
                         selectedVariants);
                   },
                   child: Text(
@@ -2505,6 +2500,7 @@ class Addorder {
       int pointsToUse,
       double pointsDiscount,
       bool isUpdating,
+      Order orderExisting,
       List<Variant?> selectedVariants) async {
     // Validate discount limits
     if (!isPercentageDiscount &&
@@ -2641,7 +2637,6 @@ class Addorder {
       return;
     }
 
-    // Create order lines with proper variant handling
     // Dans la méthode _confirmPlaceOrder, lors de la création des OrderLines
     List<OrderLine> orderLines = [];
     for (int i = 0; i < selectedProducts.length; i++) {
@@ -2678,6 +2673,7 @@ class Addorder {
 
     // Create order
     Order order = Order(
+      idOrder: orderExisting.idOrder ?? 0,
       date: DateTime.now().toIso8601String(),
       orderLines: orderLines,
       total: total,
@@ -2779,13 +2775,16 @@ class Addorder {
     );
 
     try {
-      int orderId = 0;
+      int orderId;
+      print("Before saving - Order ID: ${order.idOrder}");
       if (isUpdating) {
+        print("Updating existing order");
         orderId = await SqlDb().updateOrderInDatabase(order);
       } else {
-        // Save order to database
+        print("Creating new order");
         orderId = await SqlDb().addOrder(order);
       }
+      print("After saving - Order ID: $orderId");
 
       // Dans la méthode _confirmPlaceOrder, après la validation de la commande
       final stockMovementService = StockMovementService(SqlDb());
