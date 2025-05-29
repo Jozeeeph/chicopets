@@ -16,6 +16,11 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
   late final StockPredictionService _stockPredictionService;
   bool _isLoading = true;
   List<Product> _products = [];
+  Map<String, Map<int, int>> _allPredictions = {
+    'short_term': {},
+    'medium_term': {},
+    'long_term': {},
+  };
 
   @override
   void initState() {
@@ -27,8 +32,10 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
   Future<void> _loadData() async {
     try {
       final products = await _sqlDb.getProducts();
+      final predictions = await _stockPredictionService.predictAllStockNeeds();
       setState(() {
         _products = products;
+        _allPredictions = predictions;
         _isLoading = false;
       });
     } catch (e) {
@@ -121,21 +128,20 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
         ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
         : 100;
 
-    // Détermination du niveau d'urgence
     Color primaryColor;
     IconData statusIcon;
     String statusText;
 
     if (stockNeeded > product.stock * 0.5) {
-      primaryColor = const Color(0xFFD32F2F); // Rouge
+      primaryColor = const Color(0xFFD32F2F);
       statusIcon = Icons.warning_rounded;
       statusText = 'Niveau Critique';
     } else if (stockNeeded > 0) {
-      primaryColor = const Color(0xFFF57C00); // Orange
+      primaryColor = const Color(0xFFF57C00);
       statusIcon = Icons.trending_up_rounded;
       statusText = 'Attention Requise';
     } else {
-      primaryColor = const Color(0xFF388E3C); // Vert
+      primaryColor = const Color(0xFF388E3C);
       statusIcon = Icons.check_circle_rounded;
       statusText = 'Stock Suffisant';
     }
@@ -157,7 +163,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // En-tête avec dégradé
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -207,14 +212,11 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                   ],
                 ),
               ),
-
-              // Corps
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Détails principaux
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -239,10 +241,7 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                           ),
                       ],
                     ),
-
                     const SizedBox(height: 25),
-
-                    // Historique des prévisions
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: _stockPredictionService
                           .getProductPredictions(product.id!),
@@ -252,7 +251,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                           return const Center(
                               child: CircularProgressIndicator());
                         }
-
                         if (snapshot.hasError ||
                             !snapshot.hasData ||
                             snapshot.data!.isEmpty) {
@@ -268,7 +266,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                             ),
                           );
                         }
-
                         final predictions = snapshot.data!;
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,8 +321,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                   ],
                 ),
               ),
-
-              // Pied de page
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -400,7 +395,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
   Widget _buildPredictionContent() {
     return Column(
       children: [
-        // Barre d'info
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -440,7 +434,9 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                     await _stockPredictionService.savePredictions(
                         predictions['long_term']!,
                         timeHorizon: 'long_term');
-                    setState(() {});
+                    setState(() {
+                      _allPredictions = predictions;
+                    });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Prédictions actualisées avec succès'),
@@ -475,8 +471,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Onglets
         Expanded(
           child: DefaultTabController(
             length: 3,
@@ -515,8 +509,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Contenu des onglets
                 Expanded(
                   child: TabBarView(
                     children: [
@@ -535,85 +527,7 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
   }
 
   Widget _buildPredictionList(String timeHorizon, String horizonLabel) {
-    return FutureBuilder<Map<String, Map<int, int>>>(
-      future: _stockPredictionService.predictAllStockNeeds(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0056A6)),
-                ),
-                SizedBox(height: 20),
-                Text(
-                  'Analyse des tendances en cours...',
-                  style: TextStyle(
-                    color: Color(0xFF0056A6),
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 50),
-                const SizedBox(height: 16),
-                Text(
-                  'Erreur d\'analyse',
-                  style: TextStyle(
-                    color: Colors.red[800],
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => setState(() {}),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0056A6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Réessayer',
-                      style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final predictions = snapshot.data ??
-            {
-              'short_term': {},
-              'medium_term': {},
-              'long_term': {},
-            };
-
-        return _buildPredictionContentForHorizon(
-            predictions[timeHorizon]!, horizonLabel);
-      },
-    );
-  }
-
-  Widget _buildPredictionContentForHorizon(
-      Map<int, int> predictions, String timeHorizon) {
+    final predictions = _allPredictions[timeHorizon] ?? {};
     final productsWithPredictions =
         _products.where((p) => predictions.containsKey(p.id)).toList();
 
@@ -648,7 +562,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
             ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
             : 100;
 
-        // Déterminer le style en fonction du besoin
         Color cardColor;
         Color textColor;
         IconData icon;
@@ -689,7 +602,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    // Icône
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -699,8 +611,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                       child: Icon(icon, color: statusColor, size: 24),
                     ),
                     const SizedBox(width: 16),
-
-                    // Détails du produit
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,8 +662,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
                         ],
                       ),
                     ),
-
-                    // Statut
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -781,11 +689,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
     );
   }
 
-  // Copiez ici toutes les méthodes auxiliaires que vous aviez dans stock_management_page.dart :
-  // _buildInfoChip, _buildAlertChip, _showPredictionDetails, _buildDetailCard, etc.
-  // ... (toutes les méthodes que vous aviez pour la partie prédiction)
-
-  // Exemple d'une méthode auxiliaire :
   Widget _buildInfoChip(String text, IconData icon, Color color) {
     return Chip(
       backgroundColor: color.withOpacity(0.1),
@@ -800,6 +703,4 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
       ),
     );
   }
-
-  // ... ajoutez toutes les autres méthodes nécessaires
 }
