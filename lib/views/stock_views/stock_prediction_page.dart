@@ -16,7 +16,20 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
   late final StockPredictionService _stockPredictionService;
   bool _isLoading = true;
   List<Product> _products = [];
-  Map<String, Map<int, int>> _allPredictions = {
+   Map<String, dynamic> _allPredictions = {
+    'products': {
+      'short_term': {},
+      'medium_term': {},
+      'long_term': {},
+    },
+    'variants': {
+      'short_term': {},
+      'medium_term': {},
+      'long_term': {},
+    }
+  };
+  
+ Map<String, Map<int, Map<int, int>>> _variantPredictions = {
     'short_term': {},
     'medium_term': {},
     'long_term': {},
@@ -29,20 +42,29 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    try {
-      final products = await _sqlDb.getProducts();
-      final predictions = await _stockPredictionService.predictAllStockNeeds();
-      setState(() {
-        _products = products;
-        _allPredictions = predictions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('Erreur de chargement: ${e.toString()}');
+Future<void> _loadData() async {
+  try {
+    final products = await _sqlDb.getProducts();
+    
+    // Charger les variantes pour chaque produit
+    for (var product in products) {
+      if (product.hasVariants) {
+        product.variants = await _sqlDb.getVariantsByProductId(product.id!);
+      }
     }
+    
+    final predictions = await _stockPredictionService.predictAllStockNeeds();
+    
+    setState(() {
+      _products = products;
+      _allPredictions = predictions; // Maintenant les types correspondent
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() => _isLoading = false);
+    _showError('Erreur de chargement: ${e.toString()}');
   }
+}
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -121,16 +143,22 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
     );
   }
 
-  void _showPredictionDetails(BuildContext context, Product product,
-      int prediction, String timeHorizon) {
-    final stockNeeded = prediction - product.stock;
-    final percentage = product.stock > 0
-        ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
-        : 100;
+ void _showPredictionDetails(BuildContext context, Product product,
+    int prediction, String timeHorizon) async {
+  // Chargez les variantes si nécessaire
+  if (product.hasVariants && product.variants.isEmpty) {
+    product.variants = await _sqlDb.getVariantsByProductId(product.id!);
+  }
+
+  final stockNeeded = prediction - product.stock;
+  final percentage = product.stock > 0
+      ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
+      : 100;
 
     Color primaryColor;
     IconData statusIcon;
     String statusText;
+  
 
     if (stockNeeded > product.stock * 0.5) {
       primaryColor = const Color(0xFFD32F2F);
@@ -526,169 +554,197 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
     );
   }
 
-  Widget _buildPredictionList(String timeHorizon, String horizonLabel) {
-    final predictions = _allPredictions[timeHorizon] ?? {};
-    final productsWithPredictions =
-        _products.where((p) => predictions.containsKey(p.id)).toList();
+ Widget _buildPredictionList(String timeHorizon, String horizonLabel) {
+    final productPredictions = _allPredictions['products'][timeHorizon] ?? {};
+  final variantPredictions = _allPredictions['variants'][timeHorizon] ?? {};
 
-    if (productsWithPredictions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.analytics_outlined, size: 60, color: Colors.grey),
-            const SizedBox(height: 20),
-            Text(
-              'Pas de prédictions pour $timeHorizon',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Les données historiques sont insuffisantes',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-        ),
-      );
+  // Créez une liste qui inclut à la fois les produits et leurs variantes
+  final items = <dynamic>[];
+
+  for (final product in _products) {
+    if (product.hasVariants && product.variants.isNotEmpty) {
+      // Ajouter chaque variante
+      for (final variant in product.variants) {
+        final variantPrediction = variantPredictions[product.id!]?[variant.id] ?? 0;
+        items.add({
+          'type': 'variant',
+          'product': product,
+          'variant': variant,
+          'prediction': variantPrediction,
+          'stock': variant.stock,
+          'name': '${product.designation} - ${variant.combinationName}',
+        });
+      }
+    } else {
+      // Ajouter le produit simple
+      final prediction = productPredictions[product.id!] ?? 0;
+      items.add({
+        'type': 'product',
+        'product': product,
+        'prediction': prediction,
+        'stock': product.stock,
+        'name': product.designation,
+      });
     }
+  }
 
-    return ListView.builder(
-      itemCount: productsWithPredictions.length,
-      itemBuilder: (context, index) {
-        final product = productsWithPredictions[index];
-        final prediction = predictions[product.id!] ?? 0;
-        final stockNeeded = prediction - product.stock;
-        final percentage = product.stock > 0
-            ? (stockNeeded / product.stock * 100).clamp(0, 200).toInt()
-            : 100;
-
-        Color cardColor;
-        Color textColor;
-        IconData icon;
-        String status;
-        Color statusColor;
-
-        if (stockNeeded > product.stock * 0.5) {
-          cardColor = const Color(0xFFFFF0F0);
-          textColor = const Color(0xFFD32F2F);
-          icon = Icons.warning_amber_rounded;
-          status = 'Urgent';
-          statusColor = const Color(0xFFD32F2F);
-        } else if (stockNeeded > 0) {
-          cardColor = const Color(0xFFFFF8E1);
-          textColor = const Color(0xFFF57C00);
-          icon = Icons.trending_up;
-          status = 'À surveiller';
-          statusColor = const Color(0xFFF57C00);
-        } else {
-          cardColor = const Color(0xFFE8F5E9);
-          textColor = const Color(0xFF388E3C);
-          icon = Icons.check_circle_outline;
-          status = 'OK';
-          statusColor = const Color(0xFF388E3C);
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Material(
-            borderRadius: BorderRadius.circular(15),
-            color: cardColor,
-            elevation: 0,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(15),
-              onTap: () => _showPredictionDetails(
-                  context, product, prediction, timeHorizon),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: statusColor, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.designation,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: textColor,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              _buildInfoChip(
-                                'Stock: ${product.stock}',
-                                Icons.inventory_2,
-                                const Color(0xFF0056A6),
-                              ),
-                              const SizedBox(width: 8),
-                              _buildInfoChip(
-                                'Prédit: $prediction',
-                                Icons.analytics,
-                                const Color(0xFF5C6BC0),
-                              ),
-                            ],
-                          ),
-                          if (stockNeeded > 0) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _buildAlertChip(
-                                  'Besoin: $stockNeeded',
-                                  Icons.add_shopping_cart,
-                                  statusColor,
-                                ),
-                                const SizedBox(width: 8),
-                                _buildAlertChip(
-                                  '+$percentage%',
-                                  percentage > 50
-                                      ? Icons.arrow_upward
-                                      : Icons.trending_up,
-                                  statusColor,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: statusColor.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+  if (items.isEmpty) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.analytics_outlined, size: 60, color: Colors.grey),
+          const SizedBox(height: 20),
+          Text(
+            'Pas de prédictions pour $horizonLabel',
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
+  return ListView.builder(
+    itemCount: items.length,
+    itemBuilder: (context, index) {
+      final item = items[index];
+      final isVariant = item['type'] == 'variant';
+      final product = item['product'] as Product;
+      final stock = item['stock'] as int;
+      final prediction = item['prediction'] as int;
+      final name = item['name'] as String;
+      
+      final stockNeeded = prediction - stock;
+      final percentage = stock > 0 
+          ? (stockNeeded / stock * 100).clamp(0, 200).toInt()
+          : 100;
+
+      Color cardColor;
+      Color textColor;
+      IconData icon;
+      String status;
+      Color statusColor;
+
+      if (stockNeeded > stock * 0.5) {
+        cardColor = const Color(0xFFFFF0F0);
+        textColor = const Color(0xFFD32F2F);
+        icon = Icons.warning_amber_rounded;
+        status = 'Urgent';
+        statusColor = const Color(0xFFD32F2F);
+      } else if (stockNeeded > 0) {
+        cardColor = const Color(0xFFFFF8E1);
+        textColor = const Color(0xFFF57C00);
+        icon = Icons.trending_up;
+        status = 'À surveiller';
+        statusColor = const Color(0xFFF57C00);
+      } else {
+        cardColor = const Color(0xFFE8F5E9);
+        textColor = const Color(0xFF388E3C);
+        icon = Icons.check_circle_outline;
+        status = 'OK';
+        statusColor = const Color(0xFF388E3C);
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          borderRadius: BorderRadius.circular(15),
+          color: cardColor,
+          elevation: 0,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () => _showPredictionDetails(
+                context, product, prediction, horizonLabel),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: statusColor, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            _buildInfoChip(
+                              'Stock: $stock',
+                              Icons.inventory_2,
+                              const Color(0xFF0056A6),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildInfoChip(
+                              'Prédit: $prediction',
+                              Icons.analytics,
+                              const Color(0xFF5C6BC0),
+                            ),
+                          ],
+                        ),
+                        if (stockNeeded > 0) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _buildAlertChip(
+                                'Besoin: $stockNeeded',
+                                Icons.add_shopping_cart,
+                                statusColor,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildAlertChip(
+                                '+$percentage%',
+                                percentage > 50
+                                    ? Icons.arrow_upward
+                                    : Icons.trending_up,
+                                statusColor,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: statusColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
   Widget _buildInfoChip(String text, IconData icon, Color color) {
     return Chip(
       backgroundColor: color.withOpacity(0.1),

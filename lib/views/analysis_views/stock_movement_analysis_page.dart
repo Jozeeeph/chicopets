@@ -1,4 +1,6 @@
 import 'package:caissechicopets/models/product.dart';
+import 'package:caissechicopets/models/stock_movement.dart';
+import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/services/stock_movement_service.dart';
 import 'package:flutter/material.dart';
@@ -44,90 +46,145 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
   }
 
   Future<void> _loadData({String? timeHorizon}) async {
-    try {
-      setState(() => _isLoading = true);
-      final products = await _sqlDb.getProducts();
-      final patterns = await _analyzeMovementPatterns(products, timeHorizon ?? _selectedTimeHorizon);
-      setState(() {
-        _products = products;
-        _movementPatterns = patterns;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('Erreur de chargement: ${e.toString()}');
+  try {
+    setState(() => _isLoading = true);
+    final products = await _sqlDb.getProducts();
+    
+    // Charger les variantes pour chaque produit
+    for (final product in products) {
+      if (product.hasVariants) {
+        product.variants = await _sqlDb.getVariantsByProductId(product.id!);
+      }
     }
+    
+    final patterns = await _analyzeMovementPatterns(products, timeHorizon ?? _selectedTimeHorizon);
+    setState(() {
+      _products = products;
+      _movementPatterns = patterns;
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() => _isLoading = false);
+    _showError('Erreur de chargement: ${e.toString()}');
   }
+}
 
   // Analyse des patterns de mouvement avec prise en compte de tous les types
-  Future<List<MovementPattern>> _analyzeMovementPatterns(List<Product> products, String timeHorizon) async {
-    List<MovementPattern> patterns = [];
+ Future<List<MovementPattern>> _analyzeMovementPatterns(List<Product> products, String timeHorizon) async {
+  List<MovementPattern> patterns = [];
 
-    for (final product in products) {
-      // Récupérer les mouvements avec le filtre de période
-      final movements = await _stockMovementService.getMovementsForProduct(
-        product.id!,
-        timeHorizon: timeHorizon != 'all' ? timeHorizon : null,
-      );
-
-      // Compter chaque type de mouvement
-      final movementCounts = {
-        'sale': 0,
-        'return': 0,
-        'loss': 0,
-        'in': 0,
-        'out': 0,
-        'adjustment': 0,
-        'transfer': 0,
-      };
-
-      for (final movement in movements) {
-        if (movementCounts.containsKey(movement.movementType)) {
-          movementCounts[movement.movementType] = movementCounts[movement.movementType]! + movement.quantity;
-        }
-      }
-
-      // Calcul d'un score d'activité (pondération pour chaque type)
-      final totalMovements = movementCounts.values.reduce((a, b) => a + b);
-      final movementScore = (
-        movementCounts['sale']! * 1.0 +
-        movementCounts['return']! * 0.8 +
-        movementCounts['loss']! * 0.5 +
-        movementCounts['in']! * 0.3 +
-        movementCounts['out']! * 0.3 +
-        movementCounts['adjustment']! * 0.2 +
-        movementCounts['transfer']! * 0.2
-      ) / (totalMovements == 0 ? 1 : totalMovements);
-
-      // Classification des patterns
-      String patternCategory;
-      if (movementCounts['sale']! > 20 && movementCounts['return']! < 5 && movementCounts['loss']! < 5) {
-        patternCategory = 'Ventes Élevées, Faibles Retours';
-      } else if (movementCounts['return']! > movementCounts['sale']! * 0.3) {
-        patternCategory = 'Retours Fréquents';
-      } else if (movementCounts['loss']! > movementCounts['sale']! * 0.2) {
-        patternCategory = 'Pertes Élevées';
-      } else if (movementCounts['in']! > movementCounts['sale']! * 1.5 && movementCounts['sale']! > 0) {
-        patternCategory = 'Sur-Approvisionnement';
-      } else if (movementCounts['sale']! > 10) {
-        patternCategory = 'Activité Modérée';
-      } else {
-        patternCategory = 'Activité Faible';
-      }
-
-      patterns.add(MovementPattern(
-        productId: product.id!,
-        productName: product.designation,
-        movementCounts: movementCounts,
-        patternCategory: patternCategory,
-        movementScore: movementScore,
-      ));
+  for (final product in products) {
+    // Analyser le produit principal seulement s'il n'a pas de variantes
+    if (!product.hasVariants) {
+      final pattern = await _analyzeProductMovement(product, timeHorizon);
+      patterns.add(pattern);
     }
-
-    // Trier par score d'activité
-    patterns.sort((a, b) => b.movementScore.compareTo(a.movementScore));
-    return patterns;
+    
+    // Analyser chaque variante si le produit en a
+    if (product.hasVariants && product.variants.isNotEmpty) {
+      for (final variant in product.variants) {
+        final pattern = await _analyzeVariantMovement(product, variant, timeHorizon);
+        patterns.add(pattern);
+      }
+    }
   }
+
+  // Trier par score d'activité
+  patterns.sort((a, b) => b.movementScore.compareTo(a.movementScore));
+  return patterns;
+}
+
+Future<MovementPattern> _analyzeProductMovement(Product product, String timeHorizon) async {
+  final movements = await _stockMovementService.getMovementsForProduct(
+    product.id!,
+    timeHorizon: timeHorizon != 'all' ? timeHorizon : null,
+  );
+
+  return _createMovementPattern(
+    id: product.id!,
+    name: product.designation,
+    movements: movements,
+  );
+}
+
+Future<MovementPattern> _analyzeVariantMovement(Product product, Variant variant, String timeHorizon) async {
+  final movements = await _stockMovementService.getMovementsForVariant(
+    variant.id!,
+    timeHorizon: timeHorizon != 'all' ? timeHorizon : null,
+  );
+
+  return _createMovementPattern(
+    id: variant.id!,
+    name: '${product.designation} - ${variant.combinationName}',
+    movements: movements,
+    isVariant: true,
+  );
+}
+
+MovementPattern _createMovementPattern({
+  required int id,
+  required String name,
+  required List<StockMovement> movements,
+  bool isVariant = false,
+}) {
+  // Compter chaque type de mouvement
+  final movementCounts = {
+    'sale': 0,
+    'return': 0,
+    'loss': 0,
+    'in': 0,
+    'out': 0,
+    'adjustment': 0,
+    'transfer': 0,
+  };
+
+  for (final movement in movements) {
+    if (movementCounts.containsKey(movement.movementType)) {
+      movementCounts[movement.movementType] = movementCounts[movement.movementType]! + movement.quantity;
+    }
+  }
+
+  // Calcul d'un score d'activité
+  final totalMovements = movementCounts.values.reduce((a, b) => a + b);
+  final movementScore = (
+    movementCounts['sale']! * 1.0 +
+    movementCounts['return']! * 0.8 +
+    movementCounts['loss']! * 0.5 +
+    movementCounts['in']! * 0.3 +
+    movementCounts['out']! * 0.3 +
+    movementCounts['adjustment']! * 0.2 +
+    movementCounts['transfer']! * 0.2
+  ) / (totalMovements == 0 ? 1 : totalMovements);
+
+  // Classification des patterns
+  String patternCategory;
+  if (movementCounts['sale']! > 20 && movementCounts['return']! < 5 && movementCounts['loss']! < 5) {
+    patternCategory = 'Ventes Élevées, Faibles Retours';
+  } else if (movementCounts['return']! > movementCounts['sale']! * 0.3) {
+    patternCategory = 'Retours Fréquents';
+  } else if (movementCounts['loss']! > movementCounts['sale']! * 0.2) {
+    patternCategory = 'Pertes Élevées';
+  } else if (movementCounts['in']! > movementCounts['sale']! * 1.5 && movementCounts['sale']! > 0) {
+    patternCategory = 'Sur-Approvisionnement';
+  } else if (movementCounts['sale']! > 10) {
+    patternCategory = 'Activité Modérée';
+  } else {
+    patternCategory = 'Activité Faible';
+  }
+
+  // Ajouter un tag pour les variantes
+  if (isVariant) {
+    patternCategory = '[Variante] $patternCategory';
+  }
+
+  return MovementPattern(
+    productId: id,
+    productName: name,
+    movementCounts: movementCounts,
+    patternCategory: patternCategory,
+    movementScore: movementScore,
+  );
+}
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -304,39 +361,59 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
     );
   }
 
-  void _showMovementDetails(BuildContext context, MovementPattern pattern) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          padding: const EdgeInsets.all(24), // Légèrement augmenté pour un meilleur espacement
-          constraints: const BoxConstraints(
-            maxWidth: 800, // Agrandi de 600 à 800 pixels
-            maxHeight: 700, // Ajout d'une hauteur maximale pour éviter un débordement
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      pattern.productName,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0056A6),
+void _showMovementDetails(BuildContext context, MovementPattern pattern) {
+  final isVariant = pattern.patternCategory.startsWith('[Variante]');
+  
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        constraints: const BoxConstraints(
+          maxWidth: 800,
+          maxHeight: 700,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pattern.productName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0056A6),
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
+                      if (isVariant)
+                        Text(
+                          'Variante de produit',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.purple,
+                          ),
+                        ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildPatternChip(
+                pattern.patternCategory.replaceAll('[Variante] ', ''),
+                const Color(0xFF0056A6),
+              ),
                 const SizedBox(height: 16),
                 _buildPatternChip(pattern.patternCategory, const Color(0xFF0056A6)),
                 const SizedBox(height: 16),
@@ -444,104 +521,125 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
   }
 
   Widget _buildAnalysisContent() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _movementPatterns.length,
-      itemBuilder: (context, index) {
-        final pattern = _movementPatterns[index];
-        Color cardColor = Colors.white;
-        Color textColor = const Color(0xFF0056A6);
+  return ListView.builder(
+    padding: const EdgeInsets.all(16),
+    itemCount: _movementPatterns.length,
+    itemBuilder: (context, index) {
+      final pattern = _movementPatterns[index];
+      final isVariant = pattern.patternCategory.startsWith('[Variante]');
+      
+      Color cardColor = Colors.white;
+      Color textColor = const Color(0xFF0056A6);
+      IconData icon = Icons.analytics;
 
-        // Couleur basée sur la catégorie de pattern
-        if (pattern.patternCategory.contains('Ventes Élevées')) {
-          cardColor = const Color(0xFFE8F5E9);
-          textColor = const Color(0xFF388E3C);
-        } else if (pattern.patternCategory.contains('Retours Fréquents') ||
-                   pattern.patternCategory.contains('Pertes Élevées')) {
-          cardColor = const Color(0xFFFFF0F0);
-          textColor = const Color(0xFFD32F2F);
-        } else if (pattern.patternCategory.contains('Sur-Approvisionnement')) {
-          cardColor = const Color(0xFFFFF8E1);
-          textColor = const Color(0xFFF57C00);
-        }
+      // Couleur basée sur la catégorie de pattern
+      if (pattern.patternCategory.contains('Ventes Élevées')) {
+        cardColor = const Color(0xFFE8F5E9);
+        textColor = const Color(0xFF388E3C);
+        icon = Icons.trending_up;
+      } else if (pattern.patternCategory.contains('Retours Fréquents')) {
+        cardColor = const Color(0xFFFFF0F0);
+        textColor = const Color(0xFFD32F2F);
+        icon = Icons.undo;
+      } else if (pattern.patternCategory.contains('Pertes Élevées')) {
+        cardColor = const Color(0xFFFFF0F0);
+        textColor = const Color(0xFFD32F2F);
+        icon = Icons.warning;
+      } else if (pattern.patternCategory.contains('Sur-Approvisionnement')) {
+        cardColor = const Color(0xFFFFF8E1);
+        textColor = const Color(0xFFF57C00);
+        icon = Icons.inventory;
+      }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Material(
+      // Style spécial pour les variantes
+      if (isVariant) {
+        cardColor = cardColor.withOpacity(0.7);
+        textColor = Colors.purple;
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          borderRadius: BorderRadius.circular(15),
+          color: cardColor,
+          elevation: 2,
+          child: InkWell(
             borderRadius: BorderRadius.circular(15),
-            color: cardColor,
-            elevation: 2,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(15),
-              onTap: () => _showMovementDetails(context, pattern),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: textColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        pattern.patternCategory.contains('Ventes') ? Icons.trending_up :
-                        pattern.patternCategory.contains('Retours') ? Icons.undo :
-                        pattern.patternCategory.contains('Pertes') ? Icons.warning :
-                        Icons.analytics,
-                        color: textColor,
-                        size: 24,
-                      ),
+            onTap: () => _showMovementDetails(context, pattern),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: textColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    child: Icon(icon, color: textColor, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pattern.productName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: textColor,
+                          ),
+                        ),
+                        if (isVariant) 
+                          const SizedBox(height: 4),
+                        if (isVariant)
                           Text(
-                            pattern.productName,
+                            'Variante de produit',
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: textColor,
+                              fontSize: 12,
+                              color: Colors.purple.withOpacity(0.7),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          _buildPatternChip(pattern.patternCategory, textColor),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              _buildStatChip('Ventes: ${pattern.movementCounts['sale']}', Colors.blue),
-                              _buildStatChip('Retours: ${pattern.movementCounts['return']}', Colors.orange),
-                              _buildStatChip('Pertes: ${pattern.movementCounts['loss']}', Colors.red),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Score: ${pattern.movementScore.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          color: Colors.teal,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                        const SizedBox(height: 8),
+                        _buildPatternChip(
+                          pattern.patternCategory.replaceAll('[Variante] ', ''),
+                          textColor,
                         ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            _buildStatChip('Ventes: ${pattern.movementCounts['sale']}', Colors.blue),
+                            _buildStatChip('Retours: ${pattern.movementCounts['return']}', Colors.orange),
+                            _buildStatChip('Pertes: ${pattern.movementCounts['loss']}', Colors.red),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Score: ${pattern.movementScore.toStringAsFixed(1)}',
+                      style: const TextStyle(
+                        color: Colors.teal,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

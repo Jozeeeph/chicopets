@@ -108,4 +108,37 @@ class StockMovement {
         'date: ${movementDate.toIso8601String()}, '
         'ref: $referenceId)';
   }
+  StockMovement copyWith({
+  int? id,
+  int? productId,
+  int? variantId,
+  String? movementType,
+  int? quantity,
+  int? previousStock,
+  int? newStock,
+  DateTime? movementDate,
+  String? referenceId,
+  String? notes,
+  int? userId,
+  String? sourceLocation,
+  String? destinationLocation,
+  String? reasonCode,
+}) {
+  return StockMovement(
+    id: id ?? this.id,
+    productId: productId ?? this.productId,
+    variantId: variantId ?? this.variantId,
+    movementType: movementType ?? this.movementType,
+    quantity: quantity ?? this.quantity,
+    previousStock: previousStock ?? this.previousStock,
+    newStock: newStock ?? this.newStock,
+    movementDate: movementDate ?? this.movementDate,
+    referenceId: referenceId ?? this.referenceId,
+    notes: notes ?? this.notes,
+    userId: userId ?? this.userId,
+    sourceLocation: sourceLocation ?? this.sourceLocation,
+    destinationLocation: destinationLocation ?? this.destinationLocation,
+    reasonCode: reasonCode ?? this.reasonCode,
+  );
+}
 }

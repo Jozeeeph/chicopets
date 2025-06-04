@@ -1,3 +1,4 @@
+import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/services/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:ml_algo/ml_algo.dart';
@@ -246,18 +247,28 @@ class StockPredictionService {
     }
   }
 
-  Future<Map<String, Map<int, int>>> predictAllStockNeeds() async {
-    final shortTerm = await predictStockNeeds(timeHorizon: 30);
-    final mediumTerm = await predictStockNeeds(timeHorizon: 90);
-    final longTerm = await predictStockNeeds(timeHorizon: 365);
+Future<Map<String, dynamic>> predictAllStockNeeds() async {
+  final shortTermProducts = await predictStockNeeds(timeHorizon: 30);
+  final mediumTermProducts = await predictStockNeeds(timeHorizon: 90);
+  final longTermProducts = await predictStockNeeds(timeHorizon: 365);
+  
+  final shortTermVariants = await predictVariantStockNeeds(timeHorizon: 30);
+  final mediumTermVariants = await predictVariantStockNeeds(timeHorizon: 90);
+  final longTermVariants = await predictVariantStockNeeds(timeHorizon: 365);
 
-    return {
-      'short_term': shortTerm,
-      'medium_term': mediumTerm,
-      'long_term': longTerm,
-    };
-  }
-
+  return {
+    'products': {
+      'short_term': shortTermProducts,
+      'medium_term': mediumTermProducts,
+      'long_term': longTermProducts,
+    },
+    'variants': {
+      'short_term': shortTermVariants,
+      'medium_term': mediumTermVariants,
+      'long_term': longTermVariants,
+    },
+  };
+}
   Future<Map<int, double>> _getAverageSalesPerProduct() async {
     final db = await _sqlDb.db;
     final result = await db.rawQuery('''
@@ -318,4 +329,69 @@ class StockPredictionService {
       orderBy: 'prediction_date DESC',
     );
   }
+
+  Future<Map<int, Map<int, int>>> predictVariantStockNeeds({int timeHorizon = 30}) async {
+  try {
+    // Utilisez la méthode simplifiée pour les variantes
+    return await _simpleVariantStockPrediction(timeHorizon);
+  } catch (e) {
+    debugPrint("Erreur dans predictVariantStockNeeds: $e");
+    return {};
+  }
+}
+
+Future<Map<int, Map<int, int>>> _simpleVariantStockPrediction(int timeHorizon) async {
+  final variants = await _getAllVariantsWithSales();
+  final predictions = <int, Map<int, int>>{};
+
+  for (final variant in variants) {
+    final productId = variant.productId;
+    final variantId = variant.id!;
+    
+    if (!predictions.containsKey(productId)) {
+      predictions[productId] = {};
+    }
+
+    predictions[productId]![variantId] = 
+        await _simplePredictionForVariant(variantId, timeHorizon);
+  }
+
+  return predictions;
+}
+
+Future<int> _simplePredictionForVariant(int variantId, int timeHorizon) async {
+  final db = await _sqlDb.db;
+  try {
+    final result = await db.rawQuery('''
+      SELECT AVG(quantity) as avg_sales 
+      FROM stock_movements 
+      WHERE variant_id = ? 
+      AND movement_type = 'sale'
+      AND movement_date >= date('now', '-3 months')
+    ''', [variantId]);
+
+    final avgSales = result.first['avg_sales'] as double? ?? 0;
+    final variant = await _sqlDb.getVariantById(variantId);
+    final currentStock = variant?.stock ?? 0;
+    final predictedSales = (avgSales * (timeHorizon / 30)).round();
+    final stockNeeded = predictedSales - currentStock;
+
+    return stockNeeded > 0 ? stockNeeded : 0;
+  } catch (e) {
+    debugPrint("Erreur dans simplePredictionForVariant: $e");
+    return 0;
+  }
+}
+
+Future<List<Variant>> _getAllVariantsWithSales() async {
+  final db = await _sqlDb.db;
+  final result = await db.rawQuery('''
+    SELECT DISTINCT v.* 
+    FROM variants v
+    JOIN stock_movements sm ON sm.variant_id = v.id
+    WHERE sm.movement_type = 'sale'
+  ''');
+
+  return result.map((map) => Variant.fromMap(map)).toList();
+}
 }
