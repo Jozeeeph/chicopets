@@ -86,7 +86,7 @@ class StockMovementService {
 
     if (timeHorizon != null) {
       whereClause += ' AND movement_date >= ?';
-      whereArgs.add(_getDateCutoff(timeHorizon));
+      whereArgs.add(_getCutoffDate(timeHorizon));
     }
 
     return await db.rawQuery('''
@@ -113,7 +113,7 @@ class StockMovementService {
         : 'product_id = ?';
 
     final whereArgs = timeHorizon != null
-        ? [productId, _getDateCutoff(timeHorizon)]
+        ? [productId, _getCutoffDate(timeHorizon)]
         : [productId];
 
     final result = await db.query(
@@ -130,35 +130,29 @@ class StockMovementService {
   }
 
   Future<List<StockMovement>> getMovementsForVariant(int variantId,
-      {int? limit, String? timeHorizon}) async {
-    if (_variantMovementCache.containsKey(variantId)) {
-      return _filterByTimeHorizon(
-          _variantMovementCache[variantId]!, timeHorizon, limit);
+      {String? timeHorizon}) async {
+    final db = await _sqlDb.db;
+
+    String whereClause = 'variant_id = ?';
+    List<dynamic> whereArgs = [variantId];
+
+    if (timeHorizon != null) {
+      final cutoffDate = _getCutoffDate(timeHorizon);
+      whereClause += ' AND movement_date >= ?';
+      whereArgs.add(cutoffDate);
     }
 
-    final db = await _sqlDb.db;
-    final whereClause = timeHorizon != null
-        ? 'variant_id = ? AND movement_date >= ?'
-        : 'variant_id = ?';
-
-    final whereArgs = timeHorizon != null
-        ? [variantId, _getDateCutoff(timeHorizon)]
-        : [variantId];
-
-    final result = await db.query(
+    final maps = await db.query(
       'stock_movements',
       where: whereClause,
       whereArgs: whereArgs,
       orderBy: 'movement_date DESC',
-      limit: limit,
     );
 
-    final movements = result.map((map) => StockMovement.fromMap(map)).toList();
-    _variantMovementCache[variantId] = movements;
-    return movements;
+    return maps.map((map) => StockMovement.fromMap(map)).toList();
   }
 
-  String _getDateCutoff(String timeHorizon) {
+  String _getCutoffDate(String timeHorizon) {
     final now = DateTime.now();
     switch (timeHorizon) {
       case 'short_term':
@@ -168,7 +162,7 @@ class StockMovementService {
       case 'long_term':
         return now.subtract(Duration(days: 365)).toIso8601String();
       default:
-        return now.subtract(Duration(days: 30)).toIso8601String();
+        return now.toIso8601String();
     }
   }
 
@@ -178,7 +172,7 @@ class StockMovementService {
       return limit != null ? movements.take(limit).toList() : movements;
     }
 
-    final cutoff = _getDateCutoff(timeHorizon);
+    final cutoff = _getCutoffDate(timeHorizon);
     final filtered = movements
         .where((m) => m.movementDate.isAfter(DateTime.parse(cutoff)))
         .toList();
@@ -274,88 +268,92 @@ class StockMovementService {
 
 // stock_movement_service.dart
 
-Future<List<StockMovement>> getPendingCollections() async {
-  final db = await _sqlDb.db;
-  final result = await db.query(
-    'stock_movements',
-    where: 'movement_date > ? AND movement_type = ?',
-    whereArgs: [DateTime.now().toIso8601String(), 'in'],
-    orderBy: 'movement_date ASC',
-  );
-  return result.map((map) => StockMovement.fromMap(map)).toList();
-}
+  Future<List<StockMovement>> getPendingCollections() async {
+    final db = await _sqlDb.db;
+    final result = await db.query(
+      'stock_movements',
+      where: 'movement_date > ? AND movement_type = ?',
+      whereArgs: [DateTime.now().toIso8601String(), 'in'],
+      orderBy: 'movement_date ASC',
+    );
+    return result.map((map) => StockMovement.fromMap(map)).toList();
+  }
 
-Future<void> processPendingCollections() async {
-  final now = DateTime.now();
-  final pendingCollections = await getPendingCollections();
-  final db = await _sqlDb.db;
+  Future<void> processPendingCollections() async {
+    final now = DateTime.now();
+    final pendingCollections = await getPendingCollections();
+    final db = await _sqlDb.db;
 
-  for (var movement in pendingCollections) {
-    if (movement.movementDate.isBefore(now) || movement.movementDate.isAtSameMomentAs(now)) {
-      // Update product stock
-      await _sqlDb.updateProductStock(movement.productId, movement.newStock);
-      // Update the movement date to now to mark it as processed
-      await db.update(
-        'stock_movements',
-        {'movement_date': now.toIso8601String()},
-        where: 'id = ?',
-        whereArgs: [movement.id],
-      );
+    for (var movement in pendingCollections) {
+      if (movement.movementDate.isBefore(now) ||
+          movement.movementDate.isAtSameMomentAs(now)) {
+        // Update product stock
+        await _sqlDb.updateProductStock(movement.productId, movement.newStock);
+        // Update the movement date to now to mark it as processed
+        await db.update(
+          'stock_movements',
+          {'movement_date': now.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [movement.id],
+        );
+      }
     }
   }
-}
 
 // stock_movement_service.dart
 
 // Récupérer les collectes planifiées pour un produit
-Future<List<StockMovement>> getPlannedCollectionsForProduct(int productId) async {
-  final db = await _sqlDb.db;
-  final result = await db.query(
-    'stock_movements',
-    where: 'product_id = ? AND movement_type = ? AND movement_date > ?',
-    whereArgs: [productId, 'in', DateTime.now().toIso8601String()],
-    orderBy: 'movement_date ASC',
-  );
-  return result.map((map) => StockMovement.fromMap(map)).toList();
-}
+  Future<List<StockMovement>> getPlannedCollectionsForProduct(
+      int productId) async {
+    final db = await _sqlDb.db;
+    final result = await db.query(
+      'stock_movements',
+      where: 'product_id = ? AND movement_type = ? AND movement_date > ?',
+      whereArgs: [productId, 'in', DateTime.now().toIso8601String()],
+      orderBy: 'movement_date ASC',
+    );
+    return result.map((map) => StockMovement.fromMap(map)).toList();
+  }
 
-// Confirmer une collecte planifiée
-Future<void> confirmCollection(StockMovement movement, int? updatedQuantity) async {
-  final db = await _sqlDb.db;
-  final now = DateTime.now();
-  
-  // Mettre à jour le stock si la collecte est confirmée
-  await _sqlDb.updateProductStock(movement.productId, movement.newStock);
-  
-  // Mettre à jour la date du mouvement à maintenant et ajuster la quantité si modifiée
-  await db.update(
-    'stock_movements',
-    {
-      'movement_date': now.toIso8601String(),
-      'quantity': updatedQuantity ?? movement.quantity,
-      'new_stock': updatedQuantity != null
-          ? movement.previousStock + updatedQuantity
-          : movement.newStock,
-    },
-    where: 'id = ?',
-    whereArgs: [movement.id],
-  );
-}
+  Future<void> confirmCollection(
+      StockMovement movement, int? updatedQuantity) async {
+    final db = await _sqlDb.db;
+
+    // Mettre à jour le stock
+    await _sqlDb.updateProductStock(
+        movement.productId,
+        updatedQuantity != null
+            ? movement.previousStock + updatedQuantity
+            : movement.newStock);
+
+    // Mettre à jour la quantité si modifiée
+    await db.update(
+      'stock_movements',
+      {
+        'quantity': updatedQuantity ?? movement.quantity,
+        'new_stock': updatedQuantity != null
+            ? movement.previousStock + updatedQuantity
+            : movement.newStock,
+      },
+      where: 'id = ?',
+      whereArgs: [movement.id],
+    );
+  }
 
 // Modifier une collecte planifiée
-Future<void> updatePlannedCollection(StockMovement movement, int newQuantity, DateTime newDate, String? newNotes) async {
-  final db = await _sqlDb.db;
-  await db.update(
-    'stock_movements',
-    {
-      'quantity': newQuantity,
-      'new_stock': movement.previousStock + newQuantity,
-      'movement_date': newDate.toIso8601String(),
-      'notes': newNotes,
-    },
-    where: 'id = ?',
-    whereArgs: [movement.id],
-  );
-}
-  
+  Future<void> updatePlannedCollection(StockMovement movement, int newQuantity,
+      DateTime newDate, String? newNotes) async {
+    final db = await _sqlDb.db;
+    await db.update(
+      'stock_movements',
+      {
+        'quantity': newQuantity,
+        'new_stock': movement.previousStock + newQuantity,
+        'movement_date': newDate.toIso8601String(),
+        'notes': newNotes,
+      },
+      where: 'id = ?',
+      whereArgs: [movement.id],
+    );
+  }
 }
