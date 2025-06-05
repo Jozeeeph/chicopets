@@ -1,4 +1,3 @@
-// stock_movement_service.dart
 import 'package:caissechicopets/models/stock_movement.dart';
 import 'package:caissechicopets/services/sqldb.dart';
 import 'package:sqflite/sqflite.dart';

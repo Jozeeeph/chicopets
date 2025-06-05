@@ -119,15 +119,13 @@ class _SalesReportPageState extends State<SalesReportPage> {
             'total': 0.0,
             'totalDiscount': 0.0,
             'totalBeforeDiscount': 0.0,
-            'totalAfterDiscount': 0.0, 
+            'totalAfterDiscount': 0.0,
             'globalDiscount': 0.0,
             'products': <String, Map<String, dynamic>>{},
             'discountDetails':
                 [], // Pour stocker les détails des remises globales
           };
         }
-
-        
 
         // Ajouter la remise globale si elle existe
         if (order.globalDiscount > 0) {
@@ -208,6 +206,7 @@ class _SalesReportPageState extends State<SalesReportPage> {
       }
     }
 
+    // Dans _getSalesReportByCategory, ligne ~150
     return reportData.entries.map((entry) {
       return <String, dynamic>{
         'category': entry.key,
@@ -215,6 +214,9 @@ class _SalesReportPageState extends State<SalesReportPage> {
         'totalDiscount': entry.value['totalDiscount'],
         'globalDiscount': entry.value['globalDiscount'],
         'totalBeforeDiscount': entry.value['totalBeforeDiscount'],
+        'totalAfterDiscount': entry.value['totalBeforeDiscount'] -
+            entry.value['totalDiscount'] -
+            entry.value['globalDiscount'],
         'discountDetails': entry.value['discountDetails'],
         'products': (entry.value['products'] as Map<String, dynamic>)
             .entries
@@ -224,6 +226,9 @@ class _SalesReportPageState extends State<SalesReportPage> {
             'quantity': product.value['quantity'],
             'total': product.value['total'],
             'totalBeforeDiscount': product.value['totalBeforeDiscount'],
+            'totalAfterDiscount': product.value['totalBeforeDiscount'] -
+                product.value[
+                    'discount'], // Correction ici : remise spécifique au produit
             'discount': product.value['discount'],
             'isPercentage': product.value['isPercentage'],
             'variant': product.value['variant'],
@@ -254,15 +259,36 @@ class _SalesReportPageState extends State<SalesReportPage> {
         if (product == null) continue;
 
         final category = await db.getCategoryNameById(product.categoryId);
-        final categoryName = category;
+        final categoryName = category ?? 'Non catégorisé';
 
         if (!reportData.containsKey(categoryName)) {
           reportData[categoryName] = {
             'total': 0.0,
             'totalDiscount': 0.0,
             'totalBeforeDiscount': 0.0,
+            'globalDiscount': 0.0,
             'products': <String, Map<String, dynamic>>{},
+            'discountDetails':
+                [], // Pour stocker les détails des remises globales
           };
+        }
+
+        // Ajouter la remise globale si elle existe
+        if (order.globalDiscount > 0) {
+          double globalDiscountAmount = order.isPercentageDiscount
+              ? (line.finalPrice * line.quantity) * (order.globalDiscount / 100)
+              : (order.globalDiscount *
+                  (line.finalPrice * line.quantity) /
+                  order.total);
+
+          reportData[categoryName]!['globalDiscount'] += globalDiscountAmount;
+          reportData[categoryName]!['discountDetails'].add({
+            'type': 'Globale',
+            'amount': globalDiscountAmount,
+            'isPercentage': order.isPercentageDiscount,
+            'value': order.globalDiscount,
+            'orderId': order.idOrder,
+          });
         }
 
         // Get variant details if available
@@ -271,13 +297,11 @@ class _SalesReportPageState extends State<SalesReportPage> {
           variant = await db.getVariantById(line.variantId!);
         }
 
-        // Use variant price if available, otherwise use product price
-        final unitPrice = variant?.finalPrice ?? line.prixUnitaire;
-
-        // Calculate line total before discount
+        final unitPrice = variant?.finalPrice ??
+            line.prixUnitaire ??
+            0; // Ajout d'une valeur par défaut
         final lineTotalBeforeDiscount = unitPrice * line.quantity;
 
-        // Calculate discount amount
         double discountAmount = 0;
         if (line.isPercentage) {
           discountAmount = lineTotalBeforeDiscount * (line.discount / 100);
@@ -285,34 +309,44 @@ class _SalesReportPageState extends State<SalesReportPage> {
           discountAmount = line.discount * line.quantity;
         }
 
-        // Calculate final line total
         final lineTotal = lineTotalBeforeDiscount - discountAmount;
-
-        final productsMap = reportData[categoryName]!['products']
-            as Map<String, Map<String, dynamic>>;
-
-        // Create a unique key for the product with variant
         final variantName =
             variant?.combinationName ?? line.variantName ?? 'Standard';
         final productKey = '${product.designation} ($variantName)';
 
-        if (!productsMap.containsKey(productKey)) {
-          productsMap[productKey] = {
+        if (!reportData[categoryName]!['products'].containsKey(productKey)) {
+          reportData[categoryName]!['products'][productKey] = {
             'quantity': 0,
             'total': 0.0,
             'totalBeforeDiscount': 0.0,
             'discount': 0.0,
-            'isPercentage': line.isPercentage,
-            'variant': variantName,
+            'isPercentage': line.isPercentage ?? false,
+            'variant':
+                variant?.combinationName ?? line.variantName ?? 'Standard',
             'unitPrice': unitPrice,
+            'discountDetails': [], // Pour stocker les détails des remises ligne
           };
         }
 
-        productsMap[productKey]!['quantity'] += line.quantity;
-        productsMap[productKey]!['total'] += lineTotal;
-        productsMap[productKey]!['totalBeforeDiscount'] +=
-            lineTotalBeforeDiscount;
-        productsMap[productKey]!['discount'] += discountAmount;
+        // Mise à jour des totaux
+        reportData[categoryName]!['products'][productKey]!['quantity'] +=
+            line.quantity;
+        reportData[categoryName]!['products'][productKey]!['total'] +=
+            lineTotal;
+        reportData[categoryName]!['products']
+            [productKey]!['totalBeforeDiscount'] += lineTotalBeforeDiscount;
+        reportData[categoryName]!['products'][productKey]!['discount'] +=
+            discountAmount;
+
+        // Ajout des détails de remise ligne
+        reportData[categoryName]!['products'][productKey]!['discountDetails']
+            .add({
+          'type': 'Ligne',
+          'amount': discountAmount,
+          'isPercentage': line.isPercentage,
+          'value': line.discount,
+          'orderId': order.idOrder,
+        });
 
         reportData[categoryName]!['total'] += lineTotal;
         reportData[categoryName]!['totalDiscount'] += discountAmount;
@@ -327,6 +361,11 @@ class _SalesReportPageState extends State<SalesReportPage> {
         'total': entry.value['total'],
         'totalDiscount': entry.value['totalDiscount'],
         'totalBeforeDiscount': entry.value['totalBeforeDiscount'],
+        'totalAfterDiscount': entry.value['totalBeforeDiscount'] -
+            entry.value['totalDiscount'] -
+            entry.value['globalDiscount'],
+        'globalDiscount': entry.value['globalDiscount'] ?? 0,
+        'discountDetails': entry.value['discountDetails'] ?? [],
         'products': (entry.value['products'] as Map<String, dynamic>)
             .entries
             .map((product) {
@@ -335,10 +374,13 @@ class _SalesReportPageState extends State<SalesReportPage> {
             'quantity': product.value['quantity'],
             'total': product.value['total'],
             'totalBeforeDiscount': product.value['totalBeforeDiscount'],
+            'totalAfterDiscount': product.value['totalBeforeDiscount'] -
+                product.value['discount'], // Remise spécifique au produit
             'discount': product.value['discount'],
             'isPercentage': product.value['isPercentage'],
             'variant': product.value['variant'],
             'unitPrice': product.value['unitPrice'],
+            'discountDetails': product.value['discountDetails'] ?? [],
           };
         }).toList(),
       };
@@ -418,27 +460,38 @@ class _SalesReportPageState extends State<SalesReportPage> {
   final now = DateTime.now();
 
   pdf.addPage(
-    pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      build: (pw.Context context) {
-        return pw.Column(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat(
+        80 * PdfPageFormat.mm, // Largeur de 80 mm pour un ticket standard
+        297 * PdfPageFormat.mm, // Hauteur par défaut (A4), ajustée dynamiquement par MultiPage
+        marginAll: 4 * PdfPageFormat.mm, // Marges réduites pour le ticket
+      ),
+      build: (pw.Context context) => [
+        pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(
-              child: pw.Text('Rapport des ventes',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  )),
+              child: pw.Text(
+                'Rapport des ventes',
+                style: pw.TextStyle(
+                  fontSize: 14, // Réduit pour compacité
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
             ),
-            pw.SizedBox(height: 10),
+            pw.SizedBox(height: 6),
             pw.Text(
               'Période: ${DateFormat('dd/MM/yyyy').format(_selectedStartDate!)}'
               ' - ${DateFormat('dd/MM/yyyy').format(_selectedEndDate!)}',
-              style: pw.TextStyle(fontSize: 12),
+              style: pw.TextStyle(fontSize: 10),
             ),
-            pw.Divider(),
-            pw.SizedBox(height: 10),
+            if (_groupByUser && _selectedUser != null)
+              pw.Text(
+                'Utilisateur: ${_selectedUser!.username}',
+                style: pw.TextStyle(fontSize: 10),
+              ),
+            pw.Divider(thickness: 0.5),
+            pw.SizedBox(height: 6),
 
             // Détails des ventes
             for (final category in _salesData)
@@ -446,14 +499,16 @@ class _SalesReportPageState extends State<SalesReportPage> {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    (category['category'] ?? 'Non catégorisé').toString().toUpperCase(),
+                    (category['category'] ?? 'Non catégorisé')
+                        .toString()
+                        .toUpperCase(),
                     style: pw.TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
-                  pw.SizedBox(height: 5),
-                  
+                  pw.SizedBox(height: 4),
+
                   // Produits
                   for (final product in category['products'] as List<dynamic>)
                     pw.Column(
@@ -462,31 +517,47 @@ class _SalesReportPageState extends State<SalesReportPage> {
                         pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
-                            pw.Text(
-                              '${product['name']} (${product['variant']})',
-                              style: const pw.TextStyle(fontSize: 12),
+                            pw.Expanded(
+                              child: pw.Text(
+                                '${product['name']} (${product['variant']})',
+                                style: const pw.TextStyle(fontSize: 10),
+                                overflow: pw.TextOverflow.clip,
+                              ),
                             ),
                             pw.Text(
                               '${product['quantity']} x ${product['unitPrice'].toStringAsFixed(2)} DT',
-                              style: const pw.TextStyle(fontSize: 12),
+                              style: const pw.TextStyle(fontSize: 10),
                             ),
                           ],
                         ),
-                        pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Text(
-                              'Total avant remise:',
-                              style: const pw.TextStyle(fontSize: 11),
-                            ),
-                            pw.Text(
-                              '${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
-                              style: const pw.TextStyle(fontSize: 11),
-                            ),
-                          ],
-                        ),
-                        
-                        // Détails des remises produit
+                        if ((product['discount'] as num) > 0) ...[
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text(
+                                'Total avant remise:',
+                                style: const pw.TextStyle(fontSize: 9),
+                              ),
+                              pw.Text(
+                                '${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                                style: const pw.TextStyle(fontSize: 9),
+                              ),
+                            ],
+                          ),
+                          pw.Row(
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                            children: [
+                              pw.Text(
+                                'Total après remise:',
+                                style: const pw.TextStyle(fontSize: 9),
+                              ),
+                              pw.Text(
+                                '${product['totalAfterDiscount'].toStringAsFixed(2)} DT',
+                                style: const pw.TextStyle(fontSize: 9),
+                              ),
+                            ],
+                          ),
+                        ],
                         if ((product['discount'] as num) > 0)
                           pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -494,46 +565,45 @@ class _SalesReportPageState extends State<SalesReportPage> {
                               pw.Text(
                                 'Remises:',
                                 style: pw.TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 9,
                                   fontWeight: pw.FontWeight.bold,
                                 ),
                               ),
-                              ...(product['discountDetails'] as List).map((discount) {
+                              ...(product['discountDetails'] as List)
+                                  .map((discount) {
                                 return pw.Padding(
-                                  padding: const pw.EdgeInsets.only(left: 10),
+                                  padding: const pw.EdgeInsets.only(left: 5),
                                   child: pw.Text(
                                     '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
-                                    style: const pw.TextStyle(fontSize: 10),
+                                    style: const pw.TextStyle(fontSize: 8),
                                   ),
                                 );
                               }).toList(),
                             ],
                           ),
-                        
                         pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                           children: [
                             pw.Text(
                               'Total:',
                               style: pw.TextStyle(
-                                fontSize: 12,
+                                fontSize: 10,
                                 fontWeight: pw.FontWeight.bold,
                               ),
                             ),
                             pw.Text(
-                              '${product['total'].toStringAsFixed(2)} DT',
+                              '${product['totalAfterDiscount'].toStringAsFixed(2)} DT',
                               style: pw.TextStyle(
-                                fontSize: 12,
+                                fontSize: 10,
                                 fontWeight: pw.FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
-                        pw.Divider(),
+                        pw.Divider(thickness: 0.5),
                       ],
                     ),
-                  
-                  // Remises globales
+
                   if ((category['globalDiscount'] as num) > 0)
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -541,79 +611,76 @@ class _SalesReportPageState extends State<SalesReportPage> {
                         pw.Text(
                           'Remises globales:',
                           style: pw.TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                         ...(category['discountDetails'] as List).map((discount) {
                           return pw.Padding(
-                            padding: const pw.EdgeInsets.only(left: 10),
+                            padding: const pw.EdgeInsets.only(left: 5),
                             child: pw.Text(
                               '- ${discount['type']}: ${discount['value']}${discount['isPercentage'] ? '%' : 'DT'} (${discount['amount'].toStringAsFixed(2)} DT)',
-                              style: const pw.TextStyle(fontSize: 11),
+                              style: const pw.TextStyle(fontSize: 9),
                             ),
                           );
                         }).toList(),
                       ],
                     ),
-                  
-                  // Total catégorie
+
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text(
                         'Total catégorie:',
                         style: pw.TextStyle(
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                       pw.Text(
-                        '${category['total'].toStringAsFixed(2)} DT',
+                        '${category['totalAfterDiscount'].toStringAsFixed(2)} DT',
                         style: pw.TextStyle(
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: pw.FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                  pw.Divider(thickness: 1),
+                  pw.Divider(thickness: 0.5),
                 ],
               ),
-            
-            // Total général
-            pw.SizedBox(height: 10),
+
+            pw.SizedBox(height: 6),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
                   'TOTAL GÉNÉRAL:',
                   style: pw.TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: pw.FontWeight.bold,
                   ),
                 ),
                 pw.Text(
-                  '${_salesData.fold(0.0, (sum, category) => sum + (category['total'] as num)).toStringAsFixed(2)} DT',
+                  '${_salesData.fold(0.0, (sum, category) => sum + (category['totalAfterDiscount'] as num)).toStringAsFixed(2)} DT',
                   style: pw.TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: pw.FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            
-            // Pied de page
-            pw.SizedBox(height: 20),
+
+            pw.SizedBox(height: 10),
             pw.Center(
               child: pw.Text(
                 'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
-                style: const pw.TextStyle(fontSize: 10),
+                style: const pw.TextStyle(fontSize: 8),
               ),
             ),
           ],
-        );
-      },
+        ),
+      ],
     ),
   );
 
@@ -908,30 +975,52 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                     color: darkBlue,
                                   ),
                                 ),
+                                // Dans build, ligne ~540, dans ExpansionTile
+                                // Dans build, dans ExpansionTile (~ligne 540)
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'Total avant remise: ${categoryData['totalBeforeDiscount'].toStringAsFixed(2)} DT',
-                                      style: TextStyle(
-                                        color: deepBlue,
-                                        fontSize: 12,
+                                    // Afficher seulement s'il y a des remises
+                                    if ((categoryData['totalDiscount'] as num) +
+                                            (categoryData['globalDiscount']
+                                                as num) >
+                                        0) ...[
+                                      Text(
+                                        'Total avant remise: ${categoryData['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                                        style: TextStyle(
+                                          color: deepBlue,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Remises: ${(categoryData['totalDiscount'] + categoryData['globalDiscount']).toStringAsFixed(2)} DT',
-                                      style: TextStyle(
-                                        color: warmRed,
-                                        fontSize: 12,
+                                      Text(
+                                        'Remises: ${(categoryData['totalDiscount'] + categoryData['globalDiscount']).toStringAsFixed(2)} DT',
+                                        style: TextStyle(
+                                          color: warmRed,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Total: ${categoryData['total'].toStringAsFixed(2)} DT',
-                                      style: TextStyle(
-                                        color: deepBlue,
-                                        fontWeight: FontWeight.bold,
+                                      Text(
+                                        'Total après remise: ${categoryData['totalAfterDiscount'].toStringAsFixed(2)} DT',
+                                        style: TextStyle(
+                                          color: tealGreen,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
+                                    ],
+                                    // Toujours afficher le total si aucune remise
+                                    if ((categoryData['totalDiscount'] as num) +
+                                            (categoryData['globalDiscount']
+                                                as num) ==
+                                        0)
+                                      Text(
+                                        'Total: ${categoryData['totalAfterDiscount'].toStringAsFixed(2)} DT',
+                                        style: TextStyle(
+                                          color: tealGreen,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                   ],
                                 ),
                                 children: [
@@ -957,10 +1046,29 @@ class _SalesReportPageState extends State<SalesReportPage> {
                                                 'Prix unitaire: ${product['unitPrice'].toStringAsFixed(2)} DT',
                                                 style: TextStyle(fontSize: 12),
                                               ),
-                                              Text(
-                                                'Total avant remise: ${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
-                                                style: TextStyle(fontSize: 12),
-                                              ),
+                                              // Afficher seulement s'il y a une remise
+                                              if ((product['discount'] as num) >
+                                                  0) ...[
+                                                Text(
+                                                  'Total avant remise: ${product['totalBeforeDiscount'].toStringAsFixed(2)} DT',
+                                                  style:
+                                                      TextStyle(fontSize: 12),
+                                                ),
+                                                Text(
+                                                  'Total après remise: ${product['totalAfterDiscount'].toStringAsFixed(2)} DT',
+                                                  style:
+                                                      TextStyle(fontSize: 12),
+                                                ),
+                                              ],
+                                              // Toujours afficher le total si aucune remise
+                                              if ((product['discount']
+                                                      as num) ==
+                                                  0)
+                                                Text(
+                                                  'Total: ${product['totalAfterDiscount'].toStringAsFixed(2)} DT',
+                                                  style:
+                                                      TextStyle(fontSize: 12),
+                                                ),
                                             ],
                                           ),
                                         ),
