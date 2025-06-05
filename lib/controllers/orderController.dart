@@ -203,6 +203,15 @@ class OrderController {
     );
   }
 
+  Future<int> updateSynchOrder(int orderId, dbClient) async {
+    return await dbClient.update(
+      'orders',
+      {'is_sync': 1}, // set to true (1)
+      where: 'id_order = ?',
+      whereArgs: [orderId], // assuming your Order has an `id` field
+    );
+  }
+
   Future<int> cancelOrder(int idOrder, dbClient) async {
     return await dbClient.update(
       'orders',
@@ -309,6 +318,45 @@ class OrderController {
               (orderMap['is_percentage_discount'] as int) == 1,
           idClient: orderMap['id_client'] as int?,
           userId: orderMap['user_id'] as int?));
+    }
+
+    return orders;
+  }
+
+  Future<List<Order>> getOrdersToSynch(dbClient) async {
+    final orderMaps = await dbClient.query(
+      'orders',
+      where: 'is_sync = ?',
+      whereArgs: [0], // Only unsynced orders (false)
+    );
+
+    final orders = <Order>[];
+
+    for (final orderMap in orderMaps) {
+      final orderId = orderMap['id_order'] as int;
+
+      final orderLinesData = await dbClient.query(
+        'order_items',
+        where: 'id_order = ?',
+        whereArgs: [orderId],
+      );
+
+      final orderLines = await _buildOrderLines(dbClient, orderLinesData);
+
+      orders.add(Order(
+        idOrder: orderId,
+        date: orderMap['date'],
+        total: (orderMap['total'] as num).toDouble(),
+        modePaiement: orderMap['mode_paiement'] as String,
+        status: orderMap['status'] as String,
+        orderLines: orderLines,
+        remainingAmount: (orderMap['remaining_amount'] as num).toDouble(),
+        globalDiscount: (orderMap['global_discount'] as num).toDouble(),
+        isPercentageDiscount: (orderMap['is_percentage_discount'] as int) == 1,
+        idClient: orderMap['id_client'] as int?,
+        userId: orderMap['user_id'] as int?,
+        isSync: false, // Marked unsynced explicitly
+      ));
     }
 
     return orders;

@@ -43,7 +43,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -103,6 +103,7 @@ class SqlDb {
     global_discount REAL DEFAULT 0.0,
     is_percentage_discount INTEGER DEFAULT 1,
     user_id INTEGER,
+    is_sync INTEGER DEFAULT 0,
     
     -- Payment amounts
     cash_amount REAL,
@@ -614,6 +615,11 @@ class SqlDb {
     return await OrderController().getOrdersWithOrderLines(dbClient);
   }
 
+  Future<List<Order>> getOrdersToSynch() async {
+    final dbClient = await db;
+    return await OrderController().getOrdersToSynch(dbClient);
+  }
+
   Future<List<Order>> getOrders() async {
     final dbClient = await db;
     return await OrderController().getOrders(dbClient);
@@ -627,6 +633,11 @@ class SqlDb {
   Future<int> updateOrderTotal(int orderId, double newTotal) async {
     final dbClient = await db;
     return OrderController().updateOrderTotal(orderId, newTotal, dbClient);
+  }
+
+  Future<int> updateSynchOrder(int orderId) async {
+    final dbClient = await db;
+    return OrderController().updateSynchOrder(orderId,dbClient);
   }
 
   Future<int> cancelOrder(int idOrder) async {

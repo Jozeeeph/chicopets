@@ -13,6 +13,7 @@ class Order {
   double globalDiscount;
   bool isPercentageDiscount;
   final int? userId;
+  bool isSync;
 
   // Payment details
   double? cashAmount;
@@ -97,6 +98,7 @@ class Order {
     this.pointsUsed,
     this.pointsDiscount,
     this.userId,
+    this.isSync = false,
   }) {
     // Validate required fields
     if (total < 0) throw ArgumentError("Total cannot be negative");
@@ -121,6 +123,7 @@ class Order {
       'global_discount': globalDiscount,
       'is_percentage_discount': isPercentageDiscount ? 1 : 0,
       'user_id': userId,
+      'is_sync': isSync ? 1 : 0,
 
       // Payment amounts
       'cash_amount': cashAmount,
@@ -184,6 +187,7 @@ class Order {
       globalDiscount: (map['global_discount'] as num).toDouble(),
       isPercentageDiscount: (map['is_percentage_discount'] as int?) == 1,
       userId: map['user_id'] as int?,
+      isSync: (map['is_sync'] as int?) == 1,
 
       // Payment amounts
       cashAmount: (map['cash_amount'] as num?)?.toDouble(),
@@ -274,6 +278,7 @@ class Order {
     DateTime? virementDate,
     int? pointsUsed,
     double? pointsDiscount,
+    bool? isSync = false,
   }) {
     return Order(
       idOrder: idOrder ?? this.idOrder,
@@ -287,6 +292,7 @@ class Order {
       globalDiscount: globalDiscount ?? this.globalDiscount,
       isPercentageDiscount: isPercentageDiscount ?? this.isPercentageDiscount,
       userId: userId ?? this.userId,
+      isSync: isSync ?? this.isSync,
       cashAmount: cashAmount ?? this.cashAmount,
       cardAmount: cardAmount ?? this.cardAmount,
       checkAmount: checkAmount ?? this.checkAmount,

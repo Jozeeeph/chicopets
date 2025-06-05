@@ -8,6 +8,7 @@ import 'package:caissechicopets/views/reports_views/financial_report_page.dart';
 import 'package:caissechicopets/views/reports_views/sales_report_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_management_page.dart';
 import 'package:caissechicopets/views/stock_views/stock_prediction_page.dart';
+import 'package:caissechicopets/views/synchronisation_view/synchronisation.dart';
 import 'package:caissechicopets/views/user_views/accounts_page.dart';
 import 'package:caissechicopets/views/gallery_views/gallery_page.dart';
 import 'package:caissechicopets/views/order_views/managecommande.dart';
@@ -19,7 +20,6 @@ import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -150,7 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context,
                         label: 'Modes de paiement',
                         icon: Icons.payment,
-                        page:  PaymentMethodManagement(),
+                        page: PaymentMethodManagement(),
                         color: const Color(0xFF4CAF50),
                       ),
                       _buildCard(
@@ -209,6 +209,13 @@ class _DashboardPageState extends State<DashboardPage> {
                       icon: Icons.batch_prediction,
                       page: StockPredictionPage(),
                       color: Color.fromARGB(255, 1, 166, 249),
+                    ),
+                    _buildCard(
+                      context,
+                      label: 'Synchronisation',
+                      icon: Icons.sync,
+                      page: const SyncPage(),
+                      color: const Color(0xFF6A1B9A),
                     ),
                   ],
                 ),
