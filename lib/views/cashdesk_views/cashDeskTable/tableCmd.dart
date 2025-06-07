@@ -572,12 +572,6 @@ class _TableCmdState extends State<TableCmd> {
                     isDisabled: _selectedProductIndex == null,
                   ),
                   _buildActionButton(
-                    icon: Icons.search,
-                    label: 'LISTE PRODUITS',
-                    color: const Color(0xFF0056A6),
-                    onPressed: widget.onSearchProduct,
-                  ),
-                  _buildActionButton(
                     icon: Icons.person,
                     label: 'COMPTES CLIENTS',
                     color: const Color(0xFF0056A6),
