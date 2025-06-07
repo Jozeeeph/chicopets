@@ -680,47 +680,75 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
   }
 
   Widget _buildPieChart(List<MovementPattern> movementPatterns) {
-    final topProducts = movementPatterns.take(5).toList();
-    if (topProducts.isEmpty) {
-      return const Center(child: Text('Aucune donnée disponible'));
-    }
+  final topProducts = movementPatterns.take(5).toList();
+  if (topProducts.isEmpty) {
+    return const Center(child: Text('Aucune donnée disponible'));
+  }
 
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 3,
-        centerSpaceRadius: 0,
-        pieTouchData: PieTouchData(
-          touchCallback: (FlTouchEvent event, pieTouchResponse) {
-            if (event is FlTapUpEvent && pieTouchResponse != null) {
-              // Handle touch for details
-            }
-          },
+  final colors = [
+    const Color(0xFF3B82F6),
+    const Color(0xFF10B981),
+    const Color(0xFFF59E0B),
+    const Color(0xFFEF4444),
+    const Color(0xFF8B5CF6),
+  ];
+
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      SizedBox(
+        height: 200, // Taille fixe pour le pie chart
+        child: PieChart(
+          PieChartData(
+            sectionsSpace: 3,
+            centerSpaceRadius: 40,
+            pieTouchData: PieTouchData(
+              touchCallback: (FlTouchEvent event, pieTouchResponse) {},
+            ),
+            sections: topProducts.asMap().entries.map((entry) {
+              final index = entry.key;
+              final pattern = entry.value;
+              return PieChartSectionData(
+                value: pattern.movementCounts['sale']!.toDouble(),
+                color: colors[index % 5],
+                radius: 60,
+                title: '', // On enlève le titre du pie chart
+              );
+            }).toList(),
+          ),
         ),
-        sections: topProducts.asMap().entries.map((entry) {
+      ),
+      const SizedBox(height: 8),
+      // Légendes sous le graphique
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: topProducts.asMap().entries.map((entry) {
           final index = entry.key;
           final pattern = entry.value;
-          return PieChartSectionData(
-            value: pattern.movementCounts['sale']!.toDouble(),
-            color: [
-              const Color(0xFF3B82F6),
-              const Color(0xFF10B981),
-              const Color(0xFFF59E0B),
-              const Color(0xFFEF4444),
-              const Color(0xFF8B5CF6),
-            ][index % 5],
-            title:
-                '${pattern.productName.length > 10 ? '${pattern.productName.substring(0, 10)}...' : pattern.productName}\n${pattern.movementCounts['sale']} ventes',
-            radius: 120,
-            titleStyle: GoogleFonts.poppins(
-                fontSize: 14, color: Colors.white, fontWeight: FontWeight.w500),
-            titlePositionPercentageOffset: 0.55,
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                color: colors[index % 5],
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${pattern.productName.length > 15 
+                  ? '${pattern.productName.substring(0, 15)}...' 
+                  : pattern.productName} (${pattern.movementCounts['sale']})',
+                style: GoogleFonts.poppins(fontSize: 12),
+              ),
+            ],
           );
         }).toList(),
       ),
-      swapAnimationDuration: const Duration(milliseconds: 300),
-      swapAnimationCurve: Curves.easeInOut,
-    );
-  }
+    ],
+  );
+}
 
   Widget _buildLineChart(List<Order> orders) {
     final Map<int, int> ordersByWeekday = {
@@ -907,19 +935,24 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
     productsWithDaysRemaining
         .sort((a, b) => a['daysRemaining'].compareTo(b['daysRemaining']));
 
-    if (productsWithDaysRemaining.isEmpty) {
-      return const Center(
-          child: Text('Aucun produit avec expiration proche valide'));
-    }
+      if (productsWithDaysRemaining.isEmpty) {
+    return const Center(child: Text('Aucun produit avec expiration proche valide'));
+  }
 
-    final maxY =
-        (productsWithDaysRemaining.first['daysRemaining'] * 1.3).toDouble();
+  // Trouver le maximum des jours restants
+  final maxDaysRemaining = productsWithDaysRemaining.fold(
+    0, 
+    (max, item) => item['daysRemaining'] > max ? item['daysRemaining'] : max
+  );
+  
+  // Ajouter une marge de 20% mais avec un minimum de 5 jours pour éviter les cas où maxY=0
+  final maxY = (maxDaysRemaining * 1.2).clamp(5.0, double.infinity);
 
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: maxY,
-        minY: 0,
+  return BarChart(
+    BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: maxY,
+      minY: 0,
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
@@ -1051,102 +1084,113 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
     );
   }
 
-  Widget _buildTopClientsChart(List<ClientPerformance> clientPerformances) {
-    final topClients = clientPerformances.take(5).toList();
-    if (topClients.isEmpty) {
-      return const Center(child: Text('Aucune donnée disponible'));
-    }
+ Widget _buildTopClientsChart(List<ClientPerformance> clientPerformances) {
+  final topClients = clientPerformances.take(5).toList();
+  if (topClients.isEmpty) {
+    return const Center(child: Text('Aucune donnée disponible'));
+  }
 
-    final maxY = topClients
-            .map((c) => c.performanceScore)
-            .reduce((a, b) => a > b ? a : b) *
-        1.3;
-    final horizontalInterval = maxY / 5 > 0 ? maxY / 5 : 1.0;
+  final maxY = topClients
+          .map((c) => c.performanceScore)
+          .reduce((a, b) => a > b ? a : b) *
+      1.3;
+  final horizontalInterval = (maxY / 5).clamp(1.0, double.infinity);
 
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: maxY,
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              return BarTooltipItem(
-                '${topClients[groupIndex].clientName}\nScore: ${rod.toY.toStringAsFixed(1)}',
-                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
-              );
+  return BarChart(
+    BarChartData(
+      alignment: BarChartAlignment.spaceAround,
+      maxY: maxY,
+      minY: 0,
+      barTouchData: BarTouchData(
+        enabled: true,
+        touchTooltipData: BarTouchTooltipData(
+          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+            return BarTooltipItem(
+              '${topClients[groupIndex].clientName}\nScore: ${rod.toY.toStringAsFixed(1)}',
+              GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+            );
+          },
+        ),
+      ),
+      barGroups: topClients.asMap().entries.map((entry) {
+        final index = entry.key;
+        final client = entry.value;
+        return BarChartGroupData(
+          x: index,
+          barRods: [
+            BarChartRodData(
+              toY: client.performanceScore,
+              color: const Color(0xFF22C55E),
+              width: 24,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ],
+        );
+      }).toList(),
+      titlesData: FlTitlesData(
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 60,
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              if (index >= 0 && index < topClients.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    topClients[index].clientName.length > 12
+                        ? '${topClients[index].clientName.substring(0, 12)}...'
+                        : topClients[index].clientName,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.black54),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              return const Text('');
             },
           ),
         ),
-        barGroups: topClients.asMap().entries.map((entry) {
-          final index = entry.key;
-          final client = entry.value;
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: client.performanceScore,
-                color: const Color(0xFF22C55E),
-                width: 24,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ],
-          );
-        }).toList(),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 60,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index >= 0 && index < topClients.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      topClients[index].clientName.length > 12
-                          ? '${topClients[index].clientName.substring(0, 12)}...'
-                          : topClients[index].clientName,
-                      style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.black54),
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-            ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            interval: horizontalInterval,
+            getTitlesWidget: (value, meta) {
+              if (value == value.toInt().toDouble() || 
+                  value == (value.toInt() + 0.5)) {
+                return Text(
+                  value.toStringAsFixed(value == value.toInt().toDouble() ? 0 : 1),
+                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) => Text(
-                value.toInt().toString(),
-                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
-              ),
-            ),
-          ),
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        borderData: FlBorderData(show: false),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: horizontalInterval,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.withOpacity(0.2),
-            strokeWidth: 1,
-          ),
+        topTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+      ), // ✅ cette accolade fermante manquait
+      borderData: FlBorderData(show: false),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        horizontalInterval: horizontalInterval,
+        getDrawingHorizontalLine: (value) => FlLine(
+          color: Colors.grey.withOpacity(0.2),
+          strokeWidth: 1,
         ),
       ),
-      swapAnimationDuration: const Duration(milliseconds: 300),
-      swapAnimationCurve: Curves.easeInOut,
-    );
-  }
+    ),
+    swapAnimationDuration: const Duration(milliseconds: 300),
+    swapAnimationCurve: Curves.easeInOut,
+  );
+}
+
 
   Widget _buildLowActivityChart(List<MovementPattern> movementPatterns) {
     final lowActivityProducts = movementPatterns

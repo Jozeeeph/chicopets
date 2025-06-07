@@ -389,6 +389,7 @@ Future<void> _loadData() async {
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
           ),
+          
         ],
       ),
       body: _isLoading
@@ -625,25 +626,26 @@ Future<void> _loadData() async {
       String status;
       Color statusColor;
 
-      if (stockNeeded > stock * 0.5) {
-        cardColor = const Color(0xFFFFF0F0);
-        textColor = const Color(0xFFD32F2F);
-        icon = Icons.warning_amber_rounded;
-        status = 'Urgent';
-        statusColor = const Color(0xFFD32F2F);
-      } else if (stockNeeded > 0) {
-        cardColor = const Color(0xFFFFF8E1);
-        textColor = const Color(0xFFF57C00);
-        icon = Icons.trending_up;
-        status = 'À surveiller';
-        statusColor = const Color(0xFFF57C00);
-      } else {
-        cardColor = const Color(0xFFE8F5E9);
-        textColor = const Color(0xFF388E3C);
-        icon = Icons.check_circle_outline;
-        status = 'OK';
-        statusColor = const Color(0xFF388E3C);
-      }
+      // Nouvelle logique de statut
+if (stock == 0 || (stockNeeded > stock && stock < 5)) {
+  cardColor = const Color(0xFFFFF0F0);
+  textColor = const Color(0xFFD32F2F);
+  icon = Icons.warning_amber_rounded;
+  status = 'Urgent';
+  statusColor = const Color(0xFFD32F2F);
+} else if (stockNeeded > stock * 0.5 || stock < 10) {
+  cardColor = const Color(0xFFFFF8E1);
+  textColor = const Color(0xFFF57C00);
+  icon = Icons.trending_up;
+  status = 'À surveiller';
+  statusColor = const Color(0xFFF57C00);
+} else {
+  cardColor = const Color(0xFFE8F5E9);
+  textColor = const Color(0xFF388E3C);
+  icon = Icons.check_circle_outline;
+  status = 'OK';
+  statusColor = const Color(0xFF388E3C);
+}
 
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
