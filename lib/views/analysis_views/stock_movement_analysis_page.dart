@@ -1,9 +1,11 @@
+import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/stock_movement.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/services/stock_movement_service.dart';
+import 'package:caissechicopets/views/paymentmode_views/PaymentModeMgt.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,9 +15,10 @@ import 'package:intl/intl.dart';
 class MovementPattern {
   final int productId;
   final String productName;
-  final Map<String, int> movementCounts; // Map des types de mouvement et leurs quantités
-  final String patternCategory; // e.g., "High Sales, Low Returns", etc.
-  final double movementScore; // Score pour classer l'intensité des mouvements
+  final Map<String, int> movementCounts;
+  final String patternCategory;
+  final double movementScore;
+  final String expirationDate; // Nouvelle propriété
 
   MovementPattern({
     required this.productId,
@@ -23,6 +26,7 @@ class MovementPattern {
     required this.movementCounts,
     required this.patternCategory,
     required this.movementScore,
+    this.expirationDate = '', // Valeur par défaut
   });
 }
 
@@ -47,55 +51,55 @@ class StockMovementAnalysisPage extends StatefulWidget {
   const StockMovementAnalysisPage({super.key});
 
   @override
-  _StockMovementAnalysisPageState createState() => _StockMovementAnalysisPageState();
+  _StockMovementAnalysisPageState createState() =>
+      _StockMovementAnalysisPageState();
 }
 
 class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
   final SqlDb _sqlDb = SqlDb();
   late final StockMovementService _stockMovementService;
-  bool _isLoading = true;
-  List<Product> _products = [];
-  List<MovementPattern> _movementPatterns = [];
-  List<ClientPerformance> _clientPerformances = [];
-  String _selectedTimeHorizon = 'all'; // Filtre de période
-  String _selectedMovementType = 'Ventes Élevées, Faibles Retours'; // Valeur initiale pour l'onglet par défaut
+  String _selectedTimeHorizon = 'all';
+  late Future<Map<String, dynamic>> _dataFuture;
 
   @override
   void initState() {
     super.initState();
     _stockMovementService = StockMovementService(_sqlDb);
-    _loadData();
+    _dataFuture = _loadAllData();
   }
 
-  Future<void> _loadData({String? timeHorizon}) async {
+  Future<Map<String, dynamic>> _loadAllData({String? timeHorizon}) async {
     try {
-      setState(() => _isLoading = true);
       final products = await _sqlDb.getProducts();
-      
-      // Charger les variantes pour chaque produit
       for (final product in products) {
         if (product.hasVariants) {
           product.variants = await _sqlDb.getVariantsByProductId(product.id!);
         }
       }
-      
-      final patterns = await _analyzeMovementPatterns(products, timeHorizon ?? _selectedTimeHorizon);
+      final patterns = await _analyzeMovementPatterns(
+          products, timeHorizon ?? _selectedTimeHorizon);
       final clientPerformances = await _analyzeClientPerformances();
+      final orders = await _sqlDb.getOrders();
 
-      setState(() {
-        _products = products;
-        _movementPatterns = patterns;
-        _clientPerformances = clientPerformances;
-        _isLoading = false;
-      });
+      return {
+        'products': products,
+        'patterns': patterns,
+        'clientPerformances': clientPerformances,
+        'orders': orders,
+      };
     } catch (e) {
-      setState(() => _isLoading = false);
       _showError('Erreur de chargement: ${e.toString()}');
+      return {
+        'products': [],
+        'patterns': [],
+        'clientPerformances': [],
+        'orders': [],
+      };
     }
   }
 
-  // Analyse des patterns de mouvement
-  Future<List<MovementPattern>> _analyzeMovementPatterns(List<Product> products, String timeHorizon) async {
+  Future<List<MovementPattern>> _analyzeMovementPatterns(
+      List<Product> products, String timeHorizon) async {
     List<MovementPattern> patterns = [];
 
     for (final product in products) {
@@ -103,39 +107,37 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
         final pattern = await _analyzeProductMovement(product, timeHorizon);
         patterns.add(pattern);
       }
-      
+
       if (product.hasVariants && product.variants.isNotEmpty) {
         for (final variant in product.variants) {
-          final pattern = await _analyzeVariantMovement(product, variant, timeHorizon);
+          final pattern =
+              await _analyzeVariantMovement(product, variant, timeHorizon);
           patterns.add(pattern);
         }
       }
     }
 
-    // Ajouter les produits avec date d'expiration proche
     final now = DateTime.now();
     final expirationThreshold = now.add(const Duration(days: 30));
     for (final product in products) {
       if (product.dateExpiration.isNotEmpty) {
         try {
-          final expirationDate = DateFormat('dd-MM-yyyy').parse(product.dateExpiration);
+          final expirationDate =
+              DateFormat('dd-MM-yyyy').parse(product.dateExpiration);
           if (expirationDate.isBefore(expirationThreshold)) {
             final pattern = await _createExpirationPattern(product);
             patterns.add(pattern);
           }
         } catch (e) {
-          // Ignorer les erreurs de parsing de date
           continue;
         }
       }
     }
 
-    // Trier par score d'activité
     patterns.sort((a, b) => b.movementScore.compareTo(a.movementScore));
     return patterns;
   }
 
-  // Analyse des performances des clients
   Future<List<ClientPerformance>> _analyzeClientPerformances() async {
     List<ClientPerformance> performances = [];
     final clients = await _sqlDb.getAllClients();
@@ -144,7 +146,6 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
       final orders = await _sqlDb.getClientOrders(client.id!);
       final orderCount = orders.length;
       final loyaltyPoints = client.loyaltyPoints;
-      // Calculer un score de performance (par exemple, combinaison normalisée des commandes et points)
       final performanceScore = (orderCount * 0.6 + loyaltyPoints * 0.4 / 100);
       performances.add(ClientPerformance(
         clientId: client.id!,
@@ -155,12 +156,13 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
       ));
     }
 
-    // Trier par score de performance
-    performances.sort((a, b) => b.performanceScore.compareTo(a.performanceScore));
-    return performances.take(10).toList(); // Limiter aux 10 premiers
+    performances
+        .sort((a, b) => b.performanceScore.compareTo(a.performanceScore));
+    return performances.take(10).toList();
   }
 
-  Future<MovementPattern> _analyzeProductMovement(Product product, String timeHorizon) async {
+  Future<MovementPattern> _analyzeProductMovement(
+      Product product, String timeHorizon) async {
     final movements = await _stockMovementService.getMovementsForProduct(
       product.id!,
       timeHorizon: timeHorizon != 'all' ? timeHorizon : null,
@@ -173,7 +175,8 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
     );
   }
 
-  Future<MovementPattern> _analyzeVariantMovement(Product product, Variant variant, String timeHorizon) async {
+  Future<MovementPattern> _analyzeVariantMovement(
+      Product product, Variant variant, String timeHorizon) async {
     final movements = await _stockMovementService.getMovementsForVariant(
       variant.id!,
       timeHorizon: timeHorizon != 'all' ? timeHorizon : null,
@@ -193,11 +196,21 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
       timeHorizon: null,
     );
 
-    return _createMovementPattern(
-      id: product.id!,
-      name: product.designation,
-      movements: movements,
-      patternCategoryOverride: 'Date d\'Expiration Proche',
+    return MovementPattern(
+      productId: product.id!,
+      productName: product.designation,
+      movementCounts: {
+        'sale': 0,
+        'return': 0,
+        'loss': 0,
+        'in': 0,
+        'out': 0,
+        'adjustment': 0,
+        'transfer': 0,
+      },
+      patternCategory: 'Date d\'Expiration Proche',
+      movementScore: 0,
+      expirationDate: product.dateExpiration, // Ajout de la date d'expiration
     );
   }
 
@@ -220,30 +233,33 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
 
     for (final movement in movements) {
       if (movementCounts.containsKey(movement.movementType)) {
-        movementCounts[movement.movementType] = movementCounts[movement.movementType]! + movement.quantity;
+        movementCounts[movement.movementType] =
+            movementCounts[movement.movementType]! + movement.quantity;
       }
     }
 
     final totalMovements = movementCounts.values.reduce((a, b) => a + b);
-    final movementScore = (
-      movementCounts['sale']! * 1.0 +
-      movementCounts['return']! * 0.8 +
-      movementCounts['loss']! * 0.5 +
-      movementCounts['in']! * 0.3 +
-      movementCounts['out']! * 0.3 +
-      movementCounts['adjustment']! * 0.2 +
-      movementCounts['transfer']! * 0.2
-    ) / (totalMovements == 0 ? 1 : totalMovements);
+    final movementScore = (movementCounts['sale']! * 1.0 +
+            movementCounts['return']! * 0.8 +
+            movementCounts['loss']! * 0.5 +
+            movementCounts['in']! * 0.3 +
+            movementCounts['out']! * 0.3 +
+            movementCounts['adjustment']! * 0.2 +
+            movementCounts['transfer']! * 0.2) /
+        (totalMovements == 0 ? 1 : totalMovements);
 
     String patternCategory = patternCategoryOverride ?? '';
     if (patternCategoryOverride == null) {
-      if (movementCounts['sale']! > 20 && movementCounts['return']! < 5 && movementCounts['loss']! < 5) {
+      if (movementCounts['sale']! > 20 &&
+          movementCounts['return']! < 5 &&
+          movementCounts['loss']! < 5) {
         patternCategory = 'Ventes Élevées, Faibles Retours';
       } else if (movementCounts['return']! > movementCounts['sale']! * 0.3) {
         patternCategory = 'Retours Fréquents';
       } else if (movementCounts['loss']! > movementCounts['sale']! * 0.2) {
         patternCategory = 'Pertes Élevées';
-      } else if (movementCounts['in']! > movementCounts['sale']! * 1.5 && movementCounts['sale']! > 0) {
+      } else if (movementCounts['in']! > movementCounts['sale']! * 1.5 &&
+          movementCounts['sale']! > 0) {
         patternCategory = 'Sur-Approvisionnement';
       } else if (movementCounts['sale']! > 10) {
         patternCategory = 'Activité Modérée';
@@ -268,670 +284,968 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-
-  Widget _buildPatternChip(String text, Color color) {
-    return Chip(
-      backgroundColor: color.withOpacity(0.2),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      label: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          color: color,
-          fontWeight: FontWeight.bold,
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(color: Colors.white),
         ),
+        backgroundColor: const Color(0xFFEF4444),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  Widget _buildStatChip(String text, Color color) {
-    return Chip(
-      backgroundColor: color.withOpacity(0.1),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      label: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          color: color,
-        ),
-      ),
-    );
-  }
+  int _calculateTotalStock(List<Product> products) {
+    int totalStock = 0;
 
-  Widget _buildStatRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(label, style: const TextStyle(fontSize: 14)),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    for (final product in products) {
+      // Ajouter le stock du produit principal
+      totalStock += product.stock;
 
-  Widget _buildMovementChart(MovementPattern pattern) {
-    final movementTypes = ['sale', 'return', 'loss', 'in', 'out', 'adjustment', 'transfer'];
-    final colors = [
-      Colors.blue,
-      Colors.orange,
-      Colors.red,
-      Colors.green,
-      Colors.purple,
-      Colors.teal,
-      Colors.cyan,
-    ];
-    final labels = [
-      'Ventes',
-      'Retours',
-      'Pertes',
-      'Entrées',
-      'Sorties',
-      'Ajustements',
-      'Transferts',
-    ];
-
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.all(16),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: movementTypes
-              .map((type) => pattern.movementCounts[type]!.toDouble())
-              .reduce((a, b) => a > b ? a : b) * 1.2,
-          barGroups: movementTypes.asMap().entries.map((entry) {
-            final index = entry.key;
-            final type = entry.value;
-            return BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: pattern.movementCounts[type]!.toDouble(),
-                  color: colors[index],
-                  width: 10,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            );
-          }).toList(),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index >= 0 && index < labels.length) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        labels[index],
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    );
-                  }
-                  return const Text('');
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    value.toInt().toString(),
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  );
-                },
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(
-            show: true,
-            border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.grey.withOpacity(0.2),
-              strokeWidth: 1,
-            ),
-          ),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                return BarTooltipItem(
-                  '${labels[groupIndex]}: ${rod.toY.toInt()}',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showMovementDetails(BuildContext context, MovementPattern pattern) {
-    final isVariant = pattern.patternCategory.startsWith('[Variante]');
-    
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          constraints: const BoxConstraints(
-            maxWidth: 800,
-            maxHeight: 700,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          pattern.productName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0056A6),
-                          ),
-                        ),
-                        if (isVariant)
-                          Text(
-                            'Variante de produit',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.purple,
-                            ),
-                          ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildPatternChip(
-                  pattern.patternCategory.replaceAll('[Variante] ', ''),
-                  const Color(0xFF0056A6),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Visualisation des Mouvements',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                _buildMovementChart(pattern),
-                const SizedBox(height: 16),
-                const Text(
-                  'Statistiques des Mouvements',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
-                _buildStatRow('Ventes', pattern.movementCounts['sale'].toString(), Colors.blue),
-                _buildStatRow('Retours', pattern.movementCounts['return'].toString(), Colors.orange),
-                _buildStatRow('Pertes', pattern.movementCounts['loss'].toString(), Colors.red),
-                _buildStatRow('Entrées', pattern.movementCounts['in'].toString(), Colors.green),
-                _buildStatRow('Sorties', pattern.movementCounts['out'].toString(), Colors.purple),
-                _buildStatRow('Ajustements', pattern.movementCounts['adjustment'].toString(), Colors.teal),
-                _buildStatRow('Transferts', pattern.movementCounts['transfer'].toString(), Colors.cyan),
-                _buildStatRow('Score d\'Activité', pattern.movementScore.toStringAsFixed(2), Colors.teal),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0056A6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Fermer', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClientPerformanceContent() {
-    if (_clientPerformances.isEmpty) {
-      return Center(
-        child: Text(
-          'Aucun client performant trouvé',
-          style: const TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      );
+      // Ajouter le stock des variantes si elles existent
+      if (product.hasVariants && product.variants.isNotEmpty) {
+        totalStock +=
+            product.variants.fold(0, (sum, variant) => sum + variant.stock);
+      }
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _clientPerformances.length,
-      itemBuilder: (context, index) {
-        final client = _clientPerformances[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Material(
-            borderRadius: BorderRadius.circular(15),
-            color: Colors.white,
-            elevation: 2,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(15),
-              onTap: () {
-                // Optionnel : Ajouter une action au clic, par exemple afficher les détails du client
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF009688).withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.star, color: Color(0xFF009688), size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            client.clientName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Color(0xFF009688),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              _buildStatChip('Commandes: ${client.orderCount}', Colors.blue),
-                              _buildStatChip('Points: ${client.loyaltyPoints}', Colors.orange),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Score: ${client.performanceScore.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          color: Colors.teal,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    return totalStock;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Analyse des Mouvements de Stock'),
-        backgroundColor: const Color(0xFF0056A6),
-        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.analytics, color: Colors.white, size: 32),
+            const SizedBox(width: 12),
+            Text(
+              'Analyse Dynamique des Stocks',
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF3B82F6),
+        elevation: 0,
+        centerTitle: false,
         actions: [
-          DropdownButton<String>(
-            value: _selectedTimeHorizon,
-            icon: const Icon(Icons.filter_list, color: Colors.white),
-            dropdownColor: const Color(0xFF0056A6),
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-            underline: Container(),
-            items: const [
-              DropdownMenuItem(value: 'all', child: Text('Tout')),
-              DropdownMenuItem(value: 'short_term', child: Text('30 jours')),
-              DropdownMenuItem(value: 'medium_term', child: Text('90 jours')),
-              DropdownMenuItem(value: 'long_term', child: Text('1 an')),
-            ],
-            onChanged: (value) {
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
               setState(() {
-                _selectedTimeHorizon = value!;
-                _loadData(timeHorizon: _selectedTimeHorizon);
+                _dataFuture = _loadAllData();
               });
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _loadData(),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _dataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Erreur: ${snapshot.error}',
+                style: GoogleFonts.poppins(color: Colors.red, fontSize: 16),
+              ),
+            );
+          }
+
+          final data = snapshot.data ?? {};
+          final List<Product> products = data['products'] ?? [];
+          final List<MovementPattern> movementPatterns = data['patterns'] ?? [];
+          final List<ClientPerformance> clientPerformances =
+              data['clientPerformances'] ?? [];
+          final List<Order> orders = data['orders'] ?? [];
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          _buildKpiCard(
+                              'Stock Total',
+                              _calculateTotalStock(products).toString(),
+                              const Color(0xFF3B82F6),
+                              Icons.inventory),
+                          _buildKpiCard(
+                              'Ventes Totales',
+                              movementPatterns
+                                  .fold(
+                                      0,
+                                      (sum, p) =>
+                                          sum + p.movementCounts['sale']!)
+                                  .toString(),
+                              const Color(0xFF10B981),
+                              Icons.shopping_cart),
+                          _buildKpiCard(
+                              'Retours Produits',
+                              movementPatterns
+                                  .where((p) => p.patternCategory
+                                      .contains('Retours Fréquents'))
+                                  .length
+                                  .toString(),
+                              const Color(0xFFF59E0B),
+                              Icons.assignment_return),
+                          _buildKpiCard(
+                              'Expirations Proches',
+                              movementPatterns
+                                  .where((p) => p.patternCategory
+                                      .contains('Date d\'Expiration Proche'))
+                                  .length
+                                  .toString(),
+                              const Color(0xFFEF4444),
+                              Icons.warning),
+                          _buildKpiCard(
+                              'Top Clients',
+                              clientPerformances.length.toString(),
+                              const Color(0xFF22C55E),
+                              Icons.star),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Visualisations',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GridView.count(
+                        crossAxisCount:
+                            MediaQuery.of(context).size.width > 800 ? 3 : 1,
+                        crossAxisSpacing: 24,
+                        mainAxisSpacing: 24,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        childAspectRatio: 1.5,
+                        children: [
+                          _buildChartContainer('Stock par Catégorie',
+                              _buildBarChart(products), Icons.category),
+                          _buildChartContainer(
+                              'Répartition des Ventes',
+                              _buildPieChart(movementPatterns),
+                              Icons.pie_chart),
+                          _buildChartContainer('Évolution Journalière',
+                              _buildLineChart(orders), Icons.show_chart),
+                          _buildChartContainer(
+                              'Types de Mouvements',
+                              _buildDoughnutChart(movementPatterns),
+                              Icons.donut_large),
+                          _buildChartContainer(
+                              'Expirations Proches',
+                              _buildExpiryChart(movementPatterns),
+                              Icons.warning),
+                          _buildChartContainer(
+                              'Retours Fréquents',
+                              _buildReturnsChart(movementPatterns),
+                              Icons.assignment_returned),
+                          _buildChartContainer(
+                              'Top Clients',
+                              _buildTopClientsChart(clientPerformances),
+                              Icons.people_alt),
+                          _buildChartContainer(
+                              'Activité Faible',
+                              _buildLowActivityChart(movementPatterns),
+                              Icons.trending_down),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildKpiCard(String title, String value, Color color, IconData icon) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: 284,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      body: DefaultTabController(
-        length: 8, // Ajout d'un onglet pour les clients performants
-        initialIndex: 0,
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: TabBar(
-                isScrollable: true,
-                labelColor: Colors.white,
-                unselectedLabelColor: const Color(0xFF0056A6),
-                indicator: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0056A6), Color(0xFF0075E1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                labelStyle: GoogleFonts.poppins(
-                  fontSize: 14,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 32, color: color),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartContainer(String title, Widget chart, IconData icon) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 24, color: const Color(0xFF3B82F6)),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  color: Colors.black87,
                   fontWeight: FontWeight.w600,
                 ),
-                unselectedLabelStyle: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-                tabs: const [
-                  Tab(
-                    icon: Icon(Icons.trending_up, size: 20),
-                    text: 'Ventes Élevées',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.undo, size: 20),
-                    text: 'Retours Fréquents',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.warning, size: 20),
-                    text: 'Pertes Élevées',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.inventory, size: 20),
-                    text: 'Sur-Approvisionnement',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.analytics, size: 20),
-                    text: 'Activité Modérée',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.low_priority, size: 20),
-                    text: 'Activité Faible',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.event_busy, size: 20),
-                    text: 'Expiration Proche',
-                  ),
-                  Tab(
-                    icon: Icon(Icons.star, size: 20),
-                    text: 'Clients Performants',
-                  ),
-                ],
-                onTap: (index) {
-                  setState(() {
-                    switch (index) {
-                      case 0:
-                        _selectedMovementType = 'Ventes Élevées, Faibles Retours';
-                        break;
-                      case 1:
-                        _selectedMovementType = 'Retours Fréquents';
-                        break;
-                      case 2:
-                        _selectedMovementType = 'Pertes Élevées';
-                        break;
-                      case 3:
-                        _selectedMovementType = 'Sur-Approvisionnement';
-                        break;
-                      case 4:
-                        _selectedMovementType = 'Activité Modérée';
-                        break;
-                      case 5:
-                        _selectedMovementType = 'Activité Faible';
-                        break;
-                      case 6:
-                        _selectedMovementType = 'Date d\'Expiration Proche';
-                        break;
-                      case 7:
-                        _selectedMovementType = 'Clients Performants';
-                        break;
-                    }
-                  });
-                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(child: chart),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarChart(List<Product> products) {
+    final categories = products
+        .map((p) => p.categoryName ?? 'Non catégorisé')
+        .toSet()
+        .toList();
+    final categoryStocks = Map<String, int>.fromIterable(
+      categories,
+      key: (cat) => cat,
+      value: (cat) => products
+          .where((p) =>
+              p.categoryName == cat ||
+              (cat == 'Non catégorisé' && p.categoryName == null))
+          .fold(0, (sum, p) => sum + p.stock),
+    );
+
+    final data = categories.map((cat) => categoryStocks[cat] ?? 0).toList();
+
+    if (data.isEmpty || data.every((d) => d == 0)) {
+      return const Center(child: Text('Aucune donnée disponible'));
+    }
+
+    final maxY = data.reduce((a, b) => a > b ? a : b).toDouble() * 1.3;
+    final horizontalInterval = maxY / 5 > 0 ? maxY / 5 : 1.0;
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${categories[groupIndex]}\n${rod.toY.toInt()} en stock',
+                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+              );
+            },
+          ),
+        ),
+        barGroups: categories.asMap().entries.map((entry) {
+          final index = entry.key;
+          final cat = entry.value;
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: data[index].toDouble(),
+                color: const Color(0xFF3B82F6),
+                width: 24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          );
+        }).toList(),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < categories.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      categories[index].length > 12
+                          ? '${categories[index].substring(0, 12)}...'
+                          : categories[index],
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
               ),
             ),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _movementPatterns.isEmpty && _selectedMovementType != 'Clients Performants'
-                      ? _buildEmptyState()
-                      : _buildAnalysisContent(),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: horizontalInterval,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
+        ),
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
+    );
+  }
+
+  Widget _buildPieChart(List<MovementPattern> movementPatterns) {
+    final topProducts = movementPatterns.take(5).toList();
+    if (topProducts.isEmpty) {
+      return const Center(child: Text('Aucune donnée disponible'));
+    }
+
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 3,
+        centerSpaceRadius: 0,
+        pieTouchData: PieTouchData(
+          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+            if (event is FlTapUpEvent && pieTouchResponse != null) {
+              // Handle touch for details
+            }
+          },
+        ),
+        sections: topProducts.asMap().entries.map((entry) {
+          final index = entry.key;
+          final pattern = entry.value;
+          return PieChartSectionData(
+            value: pattern.movementCounts['sale']!.toDouble(),
+            color: [
+              const Color(0xFF3B82F6),
+              const Color(0xFF10B981),
+              const Color(0xFFF59E0B),
+              const Color(0xFFEF4444),
+              const Color(0xFF8B5CF6),
+            ][index % 5],
+            title:
+                '${pattern.productName.length > 10 ? '${pattern.productName.substring(0, 10)}...' : pattern.productName}\n${pattern.movementCounts['sale']} ventes',
+            radius: 120,
+            titleStyle: GoogleFonts.poppins(
+                fontSize: 14, color: Colors.white, fontWeight: FontWeight.w500),
+            titlePositionPercentageOffset: 0.55,
+          );
+        }).toList(),
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
+    );
+  }
+
+  Widget _buildLineChart(List<Order> orders) {
+    final Map<int, int> ordersByWeekday = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+      6: 0,
+      7: 0,
+    };
+
+    for (final order in orders) {
+      try {
+        final orderDate = DateTime.parse(order.date);
+        final weekday = orderDate.weekday;
+        ordersByWeekday[weekday] = (ordersByWeekday[weekday] ?? 0) + 1;
+      } catch (_) {}
+    }
+
+    final weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+    final spots = List.generate(7, (index) {
+      final weekdayNumber = index + 1;
+      return FlSpot(
+        index.toDouble(),
+        ordersByWeekday[weekdayNumber]?.toDouble() ?? 0,
+      );
+    });
+
+    final maxY = ordersByWeekday.values.isEmpty
+        ? 10.0
+        : ordersByWeekday.values.reduce((a, b) => a > b ? a : b).toDouble() *
+            1.2;
+
+    return LineChart(
+      LineChartData(
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: const Color(0xFF3B82F6),
+            barWidth: 4,
+            belowBarData: BarAreaData(
+              show: true,
+              color: const Color(0xFF3B82F6).withOpacity(0.2),
             ),
-          ],
+          ),
+        ],
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 1,
+              reservedSize: 32,
+              getTitlesWidget: (value, _) {
+                final index = value.toInt();
+                if (index < 0 || index > 6) return const SizedBox.shrink();
+                return Text(
+                  weekdays[index],
+                  style:
+                      GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: maxY / 5,
+              reservedSize: 40,
+              getTitlesWidget: (value, _) => Text(
+                value.toInt().toString(),
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: maxY / 5 > 0 ? maxY / 5 : 1.0,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
+        ),
+        minX: 0,
+        maxX: 6,
+        maxY: maxY,
+      ),
+    );
+  }
+
+  Widget _buildDoughnutChart(List<MovementPattern> movementPatterns) {
+    final movementTypes = ['sale', 'return', 'loss', 'in', 'out'];
+    final labels = ['Ventes', 'Retours', 'Pertes', 'Entrées', 'Sorties'];
+    final data = movementTypes
+        .map((type) => movementPatterns
+            .fold(0, (sum, p) => sum + p.movementCounts[type]!)
+            .toDouble())
+        .toList();
+
+    if (data.isEmpty || data.every((d) => d == 0)) {
+      return const Center(child: Text('Aucune donnée disponible'));
+    }
+
+    return PieChart(
+      PieChartData(
+        pieTouchData: PieTouchData(
+          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+            if (event is FlTapUpEvent && pieTouchResponse != null) {
+              // Handle touch for details
+            }
+          },
+        ),
+        sections: data.asMap().entries.map((entry) {
+          final index = entry.key;
+          return PieChartSectionData(
+            value: entry.value,
+            color: [
+              const Color(0xFF3B82F6),
+              const Color(0xFFF59E0B),
+              const Color(0xFFEF4444),
+              const Color(0xFF10B981),
+              const Color(0xFF8B5CF6),
+            ][index],
+            title: '${labels[index]}\n${entry.value.toInt()}',
+            radius: 60,
+            titleStyle: GoogleFonts.poppins(
+                fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+            titlePositionPercentageOffset: 0.55,
+          );
+        }).toList(),
+        sectionsSpace: 4,
+        centerSpaceRadius: 60,
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
+    );
+  }
+
+  Widget _buildExpiryChart(List<MovementPattern> movementPatterns) {
+    // Filtrer les produits avec expiration proche et ayant une date valide
+    final expiryProducts = movementPatterns
+        .where((p) =>
+            p.patternCategory.contains('Date d\'Expiration Proche') &&
+            p.expirationDate.isNotEmpty)
+        .take(5)
+        .toList();
+
+    if (expiryProducts.isEmpty) {
+      return const Center(child: Text('Aucun produit avec expiration proche'));
+    }
+
+    // Calculer les jours restants pour chaque produit
+    final now = DateTime.now();
+    final List<Map<String, dynamic>> productsWithDaysRemaining = [];
+
+    for (final pattern in expiryProducts) {
+      try {
+        final expirationDate =
+            DateFormat('dd-MM-yyyy').parse(pattern.expirationDate);
+        final daysRemaining = expirationDate.difference(now).inDays;
+        if (daysRemaining >= 0) {
+          // Ne garder que les produits non encore expirés
+          productsWithDaysRemaining.add({
+            'name': pattern.productName,
+            'daysRemaining': daysRemaining,
+            'expirationDate': pattern.expirationDate,
+          });
+        }
+      } catch (e) {
+        continue; // Ignorer les dates mal formatées
+      }
+    }
+
+    // Trier par jours restants (du plus urgent au moins urgent)
+    productsWithDaysRemaining
+        .sort((a, b) => a['daysRemaining'].compareTo(b['daysRemaining']));
+
+    if (productsWithDaysRemaining.isEmpty) {
+      return const Center(
+          child: Text('Aucun produit avec expiration proche valide'));
+    }
+
+    final maxY =
+        (productsWithDaysRemaining.first['daysRemaining'] * 1.3).toDouble();
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY,
+        minY: 0,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final product = productsWithDaysRemaining[groupIndex];
+              return BarTooltipItem(
+                '${product['name']}\nExp: ${product['expirationDate']}\n${product['daysRemaining']} jours restants',
+                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+              );
+            },
+          ),
+        ),
+        barGroups: productsWithDaysRemaining.asMap().entries.map((entry) {
+          final index = entry.key;
+          final daysRemaining = entry.value['daysRemaining'] as int;
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: daysRemaining.toDouble(),
+                color: daysRemaining <= 7
+                    ? const Color(0xFFEF4444)
+                    : daysRemaining <= 14
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF3B82F6),
+                width: 24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          );
+        }).toList(),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < productsWithDaysRemaining.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      productsWithDaysRemaining[index]['name'].length > 12
+                          ? '${productsWithDaysRemaining[index]['name'].substring(0, 12)}...'
+                          : productsWithDaysRemaining[index]['name'],
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                '${value.toInt()}j',
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: maxY / 5 > 0 ? maxY / 5 : 1.0,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.analytics, size: 60, color: const Color(0xFF0056A6).withOpacity(0.3)),
-          const SizedBox(height: 20),
-          const Text(
-            'Aucune analyse disponible',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0056A6),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Aucun mouvement de stock enregistré',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
+  Widget _buildReturnsChart(List<MovementPattern> movementPatterns) {
+    final returnProducts = movementPatterns
+        .where((p) => p.patternCategory.contains('Retours Fréquents'))
+        .take(5)
+        .toList();
+
+    if (returnProducts.isEmpty) {
+      return const Center(child: Text('Aucune donnée disponible'));
+    }
+
+    return PieChart(
+      PieChartData(
+        pieTouchData: PieTouchData(
+          touchCallback: (FlTouchEvent event, pieTouchResponse) {
+            if (event is FlTapUpEvent && pieTouchResponse != null) {
+              // Handle touch for details
+            }
+          },
+        ),
+        sections: returnProducts.asMap().entries.map((entry) {
+          final index = entry.key;
+          final pattern = entry.value;
+          return PieChartSectionData(
+            value: pattern.movementCounts['return']!.toDouble(),
+            color: [
+              const Color(0xFFF59E0B),
+              const Color(0xFFEF4444),
+              const Color(0xFF3B82F6),
+              const Color(0xFF10B981),
+              const Color(0xFF8B5CF6),
+            ][index % 5],
+            title:
+                '${pattern.productName.length > 10 ? '${pattern.productName.substring(0, 10)}...' : pattern.productName}\n${pattern.movementCounts['return']} retours',
+            radius: 80,
+            titleStyle: GoogleFonts.poppins(
+                fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500),
+            titlePositionPercentageOffset: 0.55,
+          );
+        }).toList(),
+        sectionsSpace: 3,
+        centerSpaceRadius: 40,
       ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
     );
   }
 
-  Widget _buildAnalysisContent() {
-    if (_selectedMovementType == 'Clients Performants') {
-      return _buildClientPerformanceContent();
+  Widget _buildTopClientsChart(List<ClientPerformance> clientPerformances) {
+    final topClients = clientPerformances.take(5).toList();
+    if (topClients.isEmpty) {
+      return const Center(child: Text('Aucune donnée disponible'));
     }
 
-    // Filtrer les patterns en fonction du type de mouvement sélectionné
-    final filteredPatterns = _movementPatterns
-        .where((pattern) => pattern.patternCategory.contains(_selectedMovementType))
-        .toList();
+    final maxY = topClients
+            .map((c) => c.performanceScore)
+            .reduce((a, b) => a > b ? a : b) *
+        1.3;
+    final horizontalInterval = maxY / 5 > 0 ? maxY / 5 : 1.0;
 
-    return filteredPatterns.isEmpty
-        ? Center(
-            child: Text(
-              'Aucun produit pour $_selectedMovementType',
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredPatterns.length,
-            itemBuilder: (context, index) {
-              final pattern = filteredPatterns[index];
-              final isVariant = pattern.patternCategory.startsWith('[Variante]');
-              
-              Color cardColor = Colors.white;
-              Color textColor = const Color(0xFF0056A6);
-              IconData icon = Icons.analytics;
-
-              if (pattern.patternCategory.contains('Ventes Élevées')) {
-                cardColor = const Color(0xFFE8F5E9);
-                textColor = const Color(0xFF388E3C);
-                icon = Icons.trending_up;
-              } else if (pattern.patternCategory.contains('Retours Fréquents')) {
-                cardColor = const Color(0xFFFFF0F0);
-                textColor = const Color(0xFFD32F2F);
-                icon = Icons.undo;
-              } else if (pattern.patternCategory.contains('Pertes Élevées')) {
-                cardColor = const Color(0xFFFFF0F0);
-                textColor = const Color(0xFFD32F2F);
-                icon = Icons.warning;
-              } else if (pattern.patternCategory.contains('Sur-Approvisionnement')) {
-                cardColor = const Color(0xFFFFF8E1);
-                textColor = const Color(0xFFF57C00);
-                icon = Icons.inventory;
-              } else if (pattern.patternCategory.contains('Date d\'Expiration Proche')) {
-                cardColor = const Color(0xFFFFE0B2);
-                textColor = const Color(0xFFFF6F00);
-                icon = Icons.event_busy;
-              }
-
-              if (isVariant) {
-                cardColor = cardColor.withOpacity(0.7);
-                textColor = Colors.purple;
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  borderRadius: BorderRadius.circular(15),
-                  color: cardColor,
-                  elevation: 2,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(15),
-                    onTap: () => _showMovementDetails(context, pattern),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: textColor.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(icon, color: textColor, size: 24),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  pattern.productName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: textColor,
-                                  ),
-                                ),
-                                if (isVariant)
-                                  const SizedBox(height: 4),
-                                if (isVariant)
-                                  Text(
-                                    'Variante de produit',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.purple.withOpacity(0.7),
-                                    ),
-                                  ),
-                                const SizedBox(height: 8),
-                                _buildPatternChip(
-                                  pattern.patternCategory.replaceAll('[Variante] ', ''),
-                                  textColor,
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    _buildStatChip('Ventes: ${pattern.movementCounts['sale']}', Colors.blue),
-                                    _buildStatChip('Retours: ${pattern.movementCounts['return']}', Colors.orange),
-                                    _buildStatChip('Pertes: ${pattern.movementCounts['loss']}', Colors.red),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.teal.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Score: ${pattern.movementScore.toStringAsFixed(1)}',
-                              style: const TextStyle(
-                                color: Colors.teal,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${topClients[groupIndex].clientName}\nScore: ${rod.toY.toStringAsFixed(1)}',
+                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
               );
             },
+          ),
+        ),
+        barGroups: topClients.asMap().entries.map((entry) {
+          final index = entry.key;
+          final client = entry.value;
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: client.performanceScore,
+                color: const Color(0xFF22C55E),
+                width: 24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
           );
+        }).toList(),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < topClients.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      topClients[index].clientName.length > 12
+                          ? '${topClients[index].clientName.substring(0, 12)}...'
+                          : topClients[index].clientName,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: horizontalInterval,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
+        ),
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
+    );
+  }
+
+  Widget _buildLowActivityChart(List<MovementPattern> movementPatterns) {
+    final lowActivityProducts = movementPatterns
+        .where((p) => p.patternCategory.contains('Activité Faible'))
+        .take(5)
+        .toList();
+
+    if (lowActivityProducts.isEmpty) {
+      return const Center(child: Text('Aucune donnée disponible'));
+    }
+
+    final maxY = lowActivityProducts
+            .map((p) => p.movementCounts['sale']!.toDouble())
+            .reduce((a, b) => a > b ? a : b) *
+        1.3;
+    final horizontalInterval = maxY / 5 > 0 ? maxY / 5 : 1.0;
+
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxY,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${lowActivityProducts[groupIndex].productName}\n${rod.toY.toInt()} ventes',
+                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+              );
+            },
+          ),
+        ),
+        barGroups: lowActivityProducts.asMap().entries.map((entry) {
+          final index = entry.key;
+          final pattern = entry.value;
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: pattern.movementCounts['sale']!.toDouble(),
+                color: const Color(0xFF8B5CF6),
+                width: 24,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          );
+        }).toList(),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 60,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < lowActivityProducts.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      lowActivityProducts[index].productName.length > 12
+                          ? '${lowActivityProducts[index].productName.substring(0, 12)}...'
+                          : lowActivityProducts[index].productName,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style: GoogleFonts.poppins(fontSize: 12, color: Colors.black54),
+              ),
+            ),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: horizontalInterval,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          ),
+        ),
+      ),
+      swapAnimationDuration: const Duration(milliseconds: 300),
+      swapAnimationCurve: Curves.easeInOut,
+    );
   }
 }

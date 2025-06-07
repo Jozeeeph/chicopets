@@ -4,7 +4,7 @@ import 'package:caissechicopets/services/sqldb.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/models/warehouse.dart';
-import 'package:caissechicopets/models/order.dart'; // make sure this exists
+import 'package:caissechicopets/models/order.dart';
 
 class SyncPage extends StatefulWidget {
   const SyncPage({super.key});
@@ -14,24 +14,34 @@ class SyncPage extends StatefulWidget {
 }
 
 class _SyncPageState extends State<SyncPage> {
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
+
   final SqlDb _sqlDb = SqlDb();
   List<Warehouse> warehouses = [];
   List<Order> orders = [];
   Warehouse? selectedWarehouse;
   bool isLoading = true;
   bool isSyncing = false;
+  int unsyncedCount = 0;
 
   @override
   void initState() {
     super.initState();
     fetchWarehouses();
-    loadUnsyncedOrders(); // 👈 Add this
+    loadUnsyncedOrders();
   }
 
   Future<void> loadUnsyncedOrders() async {
     final unsynced = await _sqlDb.getOrdersToSynch();
     setState(() {
       orders = unsynced;
+      unsyncedCount = unsynced.length;
     });
   }
 
@@ -53,7 +63,10 @@ class _SyncPageState extends State<SyncPage> {
         isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e')),
+        SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: warmRed,
+        ),
       );
     }
   }
@@ -61,34 +74,35 @@ class _SyncPageState extends State<SyncPage> {
   Future<void> synchroniseStock() async {
     if (selectedWarehouse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez choisir un entrepôt')),
+        SnackBar(
+          content: const Text('Veuillez choisir un entrepôt'),
+          backgroundColor: warmRed,
+        ),
       );
       return;
     }
 
-    // Filter unsynced orders
     final unsyncedOrders =
         orders.where((order) => order.isSync == false).toList();
-    print('Unsynced orders count: ${unsyncedOrders.length}');
 
     if (unsyncedOrders.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucune commande à synchroniser')),
+        SnackBar(
+          content: const Text('Aucune commande à synchroniser'),
+          backgroundColor: softOrange,
+        ),
       );
       return;
     }
 
-    // Extract product info
     List<Map<String, dynamic>> productData = [];
     for (var order in unsyncedOrders) {
       for (var line in order.orderLines) {
-        final Map<String, dynamic> productMap = {
+        productData.add({
           'designation': line.productName,
           'variant_code': line.variantCode,
           'quantity': line.quantity,
-        };
-
-        productData.add(productMap);
+        });
       }
     }
 
@@ -109,14 +123,11 @@ class _SyncPageState extends State<SyncPage> {
       if (response.statusCode == 200) {
         for (var order in unsyncedOrders) {
           order.isSync = true;
-
-          // Update in local DB
           await _sqlDb.updateSynchOrder(order.idOrder!);
 
-          // Now update stock per product
           for (var line in order.orderLines) {
             final patchUrl = Uri.parse('http://127.0.0.1:8000/pos/stockitem/');
-            Product? pr = await _sqlDb.getProductById(line.productId!);         
+            Product? pr = await _sqlDb.getProductById(line.productId!);
             final patchPayload = jsonEncode({
               'warehouse_id': selectedWarehouse!.id,
               'designation': line.productName,
@@ -125,20 +136,13 @@ class _SyncPageState extends State<SyncPage> {
             });
 
             try {
-              final patchResponse = await http.patch(
+              await http.patch(
                 patchUrl,
                 headers: {'Content-Type': 'application/json'},
                 body: patchPayload,
               );
-
-              if (patchResponse.statusCode == 200) {
-                print('Stock mis à jour pour le produit ${line.productId}');
-              } else {
-                print(
-                    'Erreur lors de la mise à jour du stock: ${patchResponse.body}');
-              }
             } catch (e) {
-              print('Erreur PATCH: $e');
+              debugPrint('Erreur PATCH: $e');
             }
           }
         }
@@ -148,16 +152,23 @@ class _SyncPageState extends State<SyncPage> {
             content: Text(
               'Synchronisation réussie pour ${selectedWarehouse!.name}',
             ),
+            backgroundColor: tealGreen,
           ),
         );
+        await loadUnsyncedOrders();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la synchronisation')),
+          const SnackBar(
+            content: Text('Erreur lors de la synchronisation'),
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: warmRed,
+        ),
       );
     } finally {
       setState(() {
@@ -169,47 +180,205 @@ class _SyncPageState extends State<SyncPage> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Scaffold(
+        backgroundColor: white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: deepBlue),
+              const SizedBox(height: 20),
+              Text(
+                'Chargement des entrepôts...',
+                style: TextStyle(color: darkBlue),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Synchronisation')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      backgroundColor: white,
+      appBar: AppBar(
+        title: const Text('Synchronisation'),
+        backgroundColor: deepBlue,
+        foregroundColor: white,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DropdownButtonFormField<Warehouse>(
-              decoration: const InputDecoration(
-                labelText: 'Choisissez un entrepôt',
-                border: OutlineInputBorder(),
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              items: warehouses
-                  .map((w) => DropdownMenuItem(
-                        value: w,
-                        child: Text(w.name),
-                      ))
-                  .toList(),
-              value: selectedWarehouse,
-              onChanged: (w) {
-                setState(() {
-                  selectedWarehouse = w;
-                });
-              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Synchronisation des stocks',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: darkBlue,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Cette fonctionnalité permet de synchroniser vos commandes locales avec le stock central. '
+                      'Sélectionnez un entrepôt et cliquez sur "Synchroniser" pour mettre à jour les quantités en stock '
+                      'pour toutes les commandes non synchronisées.',
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: lightGray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: softOrange,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$unsyncedCount commande(s) en attente de synchronisation',
+                              style: TextStyle(
+                                color: darkBlue,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: isSyncing ? null : synchroniseStock,
-              icon: isSyncing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.sync),
-              label: Text(isSyncing ? 'Synchronisation...' : 'Synchroniser'),
-            )
+            const SizedBox(height: 24),
+            Text(
+              'Entrepôt de destination',
+              style: TextStyle(
+                color: darkBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: lightGray),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+              ),
+              child: DropdownButtonFormField<Warehouse>(
+                decoration: InputDecoration(
+                  labelText: 'Sélectionner un entrepôt',
+                  labelStyle: TextStyle(color: Colors.grey[600]),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  filled: true,
+                  fillColor: white,
+                ),
+                items: warehouses
+                    .map((w) => DropdownMenuItem(
+                          value: w,
+                          child: Text(
+                            w.name,
+                            style: TextStyle(color: darkBlue),
+                          ),
+                        ))
+                    .toList(),
+                value: selectedWarehouse,
+                onChanged: (w) {
+                  setState(() {
+                    selectedWarehouse = w;
+                  });
+                },
+                dropdownColor: white,
+                icon: Icon(Icons.arrow_drop_down, color: deepBlue),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: isSyncing ? null : synchroniseStock,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: tealGreen,
+                  foregroundColor: white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isSyncing)
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: white,
+                        ),
+                      )
+                    else
+                      Icon(Icons.sync, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      isSyncing
+                          ? 'Synchronisation en cours...'
+                          : 'Synchroniser',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (isSyncing) ...[
+              const SizedBox(height: 20),
+              LinearProgressIndicator(
+                backgroundColor: lightGray,
+                color: tealGreen,
+                minHeight: 6,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Ne quittez pas cette page pendant la synchronisation',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       ),
