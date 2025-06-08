@@ -96,12 +96,28 @@ class _SyncPageState extends State<SyncPage> {
     }
 
     List<Map<String, dynamic>> productData = [];
+
     for (var order in unsyncedOrders) {
       for (var line in order.orderLines) {
+        if (line.productId == null) continue;
+        Product? pr = await _sqlDb.getProductById(line.productId!);
+        if (pr == null) continue;
+
+        final isVariant = pr.hasVariants == true;
+        int quantity = 0;
+
+        if (isVariant && line.variantCode != null) {
+          quantity = await _sqlDb.getVariantStock(pr.id!, line.variantCode!);
+        } else if (!isVariant) {
+          quantity = pr.stock;
+        }
+
         productData.add({
+          'product_id': pr.id,
           'designation': line.productName,
           'variant_code': line.variantCode,
-          'quantity': line.quantity,
+          'quantity': quantity,
+          'is_variant': isVariant && line.variantCode != null,
         });
       }
     }
@@ -123,24 +139,46 @@ class _SyncPageState extends State<SyncPage> {
       if (response.statusCode == 200) {
         for (var order in unsyncedOrders) {
           order.isSync = true;
-          await _sqlDb.updateSynchOrder(order.idOrder!);
+          if (order.idOrder != null) {
+            await _sqlDb.updateSynchOrder(order.idOrder!);
+          }
 
           for (var line in order.orderLines) {
+            if (line.productId == null) continue;
             final patchUrl = Uri.parse('http://127.0.0.1:8000/pos/stockitem/');
             Product? pr = await _sqlDb.getProductById(line.productId!);
+            if (pr == null) continue;
+
+            final isVariant = pr.hasVariants == true;
+            int quantity = 0;
+
+            if (isVariant && line.variantCode != null) {
+              quantity =
+                  await _sqlDb.getVariantStock(pr.id!, line.variantCode!);
+            } else if (!isVariant) {
+              quantity = pr.stock;
+            } else {
+              continue; // Skip invalid variant without code
+            }
+
             final patchPayload = jsonEncode({
               'warehouse_id': selectedWarehouse!.id,
-              'designation': line.productName,
+              'product_id': pr.id,
+              'is_variant': isVariant && line.variantCode != null,
               'variant_code': line.variantCode,
-              'quantity': pr?.stock ?? 0,
+              'quantity': quantity,
             });
 
             try {
-              await http.patch(
+              final patchResponse = await http.patch(
                 patchUrl,
                 headers: {'Content-Type': 'application/json'},
                 body: patchPayload,
               );
+
+              if (patchResponse.statusCode >= 400) {
+                debugPrint('PATCH failed: ${patchResponse.body}');
+              }
             } catch (e) {
               debugPrint('Erreur PATCH: $e');
             }
@@ -149,12 +187,12 @@ class _SyncPageState extends State<SyncPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Synchronisation réussie pour ${selectedWarehouse!.name}',
-            ),
+            content:
+                Text('Synchronisation réussie pour ${selectedWarehouse!.name}'),
             backgroundColor: tealGreen,
           ),
         );
+
         await loadUnsyncedOrders();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
