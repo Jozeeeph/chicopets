@@ -42,6 +42,26 @@ class ProductController {
     return result.isNotEmpty ? Product.fromMap(result.first) : null;
   }
 
+  Future<bool> doesProductWithCodeExist(String code, dbClient) async {
+    if (code.isEmpty) return false;
+    final result = await dbClient.query(
+      'products',
+      where: 'code = ?',
+      whereArgs: [code],
+    );
+    return result.isNotEmpty;
+  }
+
+  Future<bool> doesProductWithDesignationExist(
+      String designation, dbClient) async {
+    final result = await dbClient.query(
+      'products',
+      where: 'LOWER(designation) = ?',
+      whereArgs: [designation.toLowerCase()],
+    );
+    return result.isNotEmpty;
+  }
+
   Future<Product?> getDesignationByCode(String code, dbClient) async {
     final List<Map<String, Object?>> result = await dbClient.query(
       'products',

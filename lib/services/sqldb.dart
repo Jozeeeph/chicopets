@@ -586,6 +586,16 @@ class SqlDb {
         .updateProductWithVariants(product, dbClient);
   }
 
+  Future<bool> doesProductWithCodeExist(String code) async {
+    final dbClient = await db;
+    return await ProductController().doesProductWithCodeExist(code, dbClient);
+  }
+
+  Future<bool> doesProductWithDesignationExist(String designation) async {
+    final dbClient = await db;
+    return await ProductController().doesProductWithDesignationExist(designation, dbClient);
+  }
+
   Future<List<String>> getProductsInSubCategory(int subCategoryId) async {
     final dbClient = await db;
     return await ProductController()
@@ -818,7 +828,8 @@ class SqlDb {
 
   Future<int> getVariantStock(int productId, String variantCode) async {
     final dbClient = await db;
-    return await Variantcontroller().getVariantStock(productId,variantCode,dbClient);
+    return await Variantcontroller()
+        .getVariantStock(productId, variantCode, dbClient);
   }
 
   Future<List<Variant>> getVariantsByProductCode(String productCode) async {
