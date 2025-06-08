@@ -23,6 +23,21 @@ class Variantcontroller {
     return result.isNotEmpty ? Variant.fromMap(result.first) : null;
   }
 
+  Future<int> getVariantStock(int productId, String variantCode, dbClient) async {
+    final result = await dbClient.query(
+      'variants',
+      columns: ['stock'],
+      where: 'product_id = ? AND code = ?',
+      whereArgs: [productId, variantCode],
+    );
+
+    if (result.isNotEmpty) {
+      return result.first['stock'] as int;
+    } else {
+      return 0;
+    }
+  }
+
   Future<int> addVariant(Variant variant, dbClient) async {
     return await dbClient.transaction((txn) async {
       // Verify parent product exists

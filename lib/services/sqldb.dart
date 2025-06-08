@@ -637,7 +637,7 @@ class SqlDb {
 
   Future<int> updateSynchOrder(int orderId) async {
     final dbClient = await db;
-    return OrderController().updateSynchOrder(orderId,dbClient);
+    return OrderController().updateSynchOrder(orderId, dbClient);
   }
 
   Future<int> cancelOrder(int idOrder) async {
@@ -814,6 +814,11 @@ class SqlDb {
   Future<Variant?> getVariantById(int id) async {
     final dbClient = await db;
     return await Variantcontroller().getVariantById(id, dbClient);
+  }
+
+  Future<int> getVariantStock(int productId, String variantCode) async {
+    final dbClient = await db;
+    return await Variantcontroller().getVariantStock(productId,variantCode,dbClient);
   }
 
   Future<List<Variant>> getVariantsByProductCode(String productCode) async {
@@ -1006,8 +1011,6 @@ class SqlDb {
     final dbClient = await db;
     return await Galleryimagescontroller().updateImageName(id, name, dbClient);
   }
-
-
 
   //Attributs Repository
   Future<int> addAttribute(Attribut attribut) async {
