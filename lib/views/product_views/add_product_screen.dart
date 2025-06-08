@@ -123,6 +123,36 @@ class _AddProductScreenState extends State<AddProductScreen> {
         return null;
       }
 
+      // Check for duplicate code if code is provided
+      if (codeController.text.trim().isNotEmpty) {
+        final codeExists =
+            await _sqlDb.doesProductWithCodeExist(codeController.text.trim());
+        if (codeExists) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+              'Un produit avec ce code existe déjà.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Color(0xFFE53935),
+          ));
+          return null;
+        }
+      }
+
+      // Check for duplicate designation
+      final designationExists = await _sqlDb.doesProductWithDesignationExist(
+          designationController.text.toLowerCase().trim());
+      if (designationExists) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Un produit avec cette désignation existe déjà.',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Color(0xFFE53935),
+        ));
+        return null;
+      }
+
       try {
         final categoryName =
             await _sqlDb.getCategoryNameById(selectedCategoryId!);

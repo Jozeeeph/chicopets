@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:caissechicopets/models/attribute.dart';
-import 'package:caissechicopets/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,12 +9,12 @@ import 'package:caissechicopets/models/product.dart';
 import 'package:caissechicopets/models/variant.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
 
 class ImportProductPage extends StatefulWidget {
   const ImportProductPage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _ImportProductPageState createState() => _ImportProductPageState();
 }
 
@@ -29,250 +27,16 @@ class _ImportProductPageState extends State<ImportProductPage> {
   bool _isImporting = false;
   double _progress = 0.0;
   List<Map<String, dynamic>> productsJson = [];
-  int _exportedProductsCount = 0;
-
-  Future<void> exportAllProductsToDjango() async {
-    setState(() {
-      _importStatus = 'Preparing export...';
-      _isImporting = true;
-      _exportedProductsCount = 0;
-      _importedVariantsCount = 0;
-      _errorMessage = '';
-    });
-
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx'],
-      );
-
-      if (result != null && result.files.isNotEmpty) {
-        PlatformFile file = result.files.first;
-        String? filePath = file.path;
-
-        if (filePath == null) {
-          throw Exception('File path not available');
-        }
-
-        var bytes = File(filePath).readAsBytesSync();
-        var excel = Excel.decodeBytes(bytes);
-
-        var sheet = excel.tables.values.first;
-        var headers = sheet.rows.first
-            .map((cell) => cell?.value?.toString().trim())
-            .toList();
-        if (!_verifyHeaders(headers)) {
-          throw Exception(
-              'Invalid Excel format. Please use the correct template.');
-        }
-
-        Map<String, List<List<Data?>>> productGroups = {};
-        for (var row in sheet.rows.skip(1)) {
-          String productReference = row[3]?.value?.toString() ?? '';
-          String productName = row[2]?.value?.toString() ?? '';
-
-          if (productName.isEmpty) continue;
-
-          String groupKey =
-              productReference.isNotEmpty ? productReference : productName;
-          productGroups.putIfAbsent(groupKey, () => []).add(row);
-        }
-
-        List<Map<String, dynamic>> productsToExport = [];
-
-        for (var entry in productGroups.entries) {
-          String groupKey = entry.key;
-          List<List<Data?>> rows = entry.value;
-
-          try {
-            var firstRow = rows.first;
-
-            String imagePath = firstRow[1]?.value?.toString() ?? '';
-            String productName = firstRow[2]?.value?.toString() ?? '';
-            String reference = firstRow[3]?.value?.toString() ?? '';
-            String categoryName = (firstRow[4]?.value?.toString() ?? '').trim();
-            String brand = (firstRow[5]?.value?.toString() ?? '').trim();
-            String description = firstRow[6]?.value?.toString() ?? '';
-            double costPrice =
-                _parseDouble(firstRow[7]?.value?.toString() ?? '0');
-            double prixHT = _parseDouble(firstRow[8]?.value?.toString() ?? '0');
-            double taxe = _parseDouble(firstRow[9]?.value?.toString() ?? '0');
-            double prixTTC =
-                _parseDouble(firstRow[10]?.value?.toString() ?? '0');
-            bool sellable =
-                (firstRow[12]?.value?.toString() ?? 'TRUE').toUpperCase() ==
-                    'TRUE';
-            bool simpleProduct =
-                (firstRow[13]?.value?.toString() ?? 'TRUE').toUpperCase() ==
-                    'TRUE';
-
-            if (productName.isEmpty) {
-              throw Exception(
-                  'Missing product name for product group $groupKey');
-            }
-
-            if (categoryName.isEmpty) categoryName = 'Default';
-
-            // Prepare product data
-            Map<String, dynamic> productData = {
-              'code': reference,
-              'designation': productName,
-              'description': description,
-              'prixHT': prixHT,
-              'taxe': taxe,
-              'prixTTC': prixTTC,
-              'cost_price': costPrice,
-              'category_name': categoryName,
-              'sellable': sellable,
-              'has_variants': !simpleProduct,
-              'brand': brand.isNotEmpty ? brand : null,
-              'image': imagePath.isNotEmpty ? imagePath : null,
-            };
-
-            if (!simpleProduct) {
-              List<Map<String, dynamic>> variantsData = [];
-              for (var row in rows) {
-                String variantName = row[14]?.value?.toString() ?? '';
-                bool defaultVariant =
-                    (row[15]?.value?.toString() ?? 'FALSE').toUpperCase() ==
-                        'TRUE';
-                double priceImpact =
-                    _parseDouble(row[17]?.value?.toString() ?? '0');
-                int variantStock =
-                    int.tryParse(row[18]?.value?.toString() ?? '0') ?? 0;
-
-                Map<String, String> attributes = {};
-                if (variantName.contains('-')) {
-                  List<String> attributePairs = variantName.split('-');
-                  for (String pair in attributePairs) {
-                    List<String> parts = pair.split(':');
-                    if (parts.length == 2) {
-                      final attrName = parts[0].trim();
-                      final attrValue = parts[1].trim();
-                      attributes[attrName] = attrValue;
-                    }
-                  }
-                }
-
-                variantsData.add({
-                  'combination_name': variantName,
-                  'price_impact': priceImpact,
-                  'stock': variantStock,
-                  'default_variant': defaultVariant,
-                  'attributes': attributes,
-                });
-              }
-              productData['variants'] = variantsData;
-            } else {
-              // For simple products, use the quantity from the sheet
-              int productStock =
-                  int.tryParse(firstRow[11]?.value?.toString() ?? '0') ?? 0;
-              productData['stock'] = productStock;
-            }
-
-            productsToExport.add(productData);
-          } catch (e) {
-            debugPrint(
-                'Error processing product group $groupKey: ${e.toString()}');
-            continue;
-          }
-        }
-
-        if (productsToExport.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No valid products found in the Excel file'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          return;
-        }
-
-        setState(() {
-          _importStatus = 'Exporting ${productsToExport.length} products...';
-          productsJson = productsToExport;
-        });
-
-        await _exportToDjango();
-      }
-    } catch (e) {
-      setState(() {
-        _importStatus = 'Export failed';
-        _errorMessage = e.toString();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error preparing products: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() => _isImporting = false);
-    }
-  }
-
-  Future<void> _exportToDjango() async {
-    if (productsJson.isEmpty) return;
-
-    setState(() => _importStatus = 'Sending to Django...');
-
-    try {
-      final response = await http
-          .post(
-            Uri.parse('${ApiService.baseUrl}/product/import'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization':
-                  'Bearer ${ApiService.getToken()}', // Add if needed
-            },
-            body: jsonEncode({
-              'products': productsJson,
-              'source': 'mobile_app', // Add any additional metadata
-            }),
-          )
-          .timeout(const Duration(seconds: 60)); // Increased timeout
-
-      debugPrint('API Response: ${response.statusCode} - ${response.body}');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        setState(() {
-          _exportedProductsCount = responseData['created_products'] ?? 0;
-          _importedVariantsCount = responseData['created_variants'] ?? 0;
-          _importStatus = 'Export successful!';
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Exported $_exportedProductsCount products and $_importedVariantsCount variants'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        setState(() => _importStatus = 'Export failed: API error');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('API error: ${response.statusCode} - ${response.body}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _importStatus = 'Export failed';
-        _errorMessage = e.toString();
-      });
-      debugPrint('Export error: $e');
-    }
-  }
+  int _rejectedProductsCount = 0;
+  final List<String> _rejectionReasons = [];
 
   Future<void> importProductsWithVariants() async {
     setState(() {
       _importStatus = 'Importing...';
       _importedProductsCount = 0;
       _importedVariantsCount = 0;
+      _rejectedProductsCount = 0;
+      _rejectionReasons.clear();
       _errorMessage = '';
       _isImporting = true;
       _progress = 0.0;
@@ -318,6 +82,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
         int totalProducts = productGroups.length;
         int processedProducts = 0;
+        final db = await _sqlDb.db;
 
         for (var entry in productGroups.entries) {
           if (!_isImporting) break;
@@ -331,6 +96,31 @@ class _ImportProductPageState extends State<ImportProductPage> {
             String imagePath = firstRow[1]?.value?.toString() ?? '';
             String productName = firstRow[2]?.value?.toString() ?? '';
             String reference = firstRow[3]?.value?.toString() ?? '';
+            
+            // Check for duplicate code if provided
+            if (reference.isNotEmpty) {
+              final codeExists = await _sqlDb.doesProductWithCodeExist(reference);
+              if (codeExists) {
+                setState(() {
+                  _rejectedProductsCount++;
+                  _rejectionReasons.add('Product "$productName" rejected: Duplicate code "$reference"');
+                });
+                processedProducts++;
+                continue;
+              }
+            }
+            
+            // Check for duplicate designation
+            final designationExists = await _sqlDb.doesProductWithDesignationExist(productName.toLowerCase());
+            if (designationExists) {
+              setState(() {
+                _rejectedProductsCount++;
+                _rejectionReasons.add('Product "$productName" rejected: Duplicate designation');
+              });
+              processedProducts++;
+              continue;
+            }
+
             String categoryName = (firstRow[4]?.value?.toString() ?? '').trim();
             String brand = (firstRow[5]?.value?.toString() ?? '').trim();
             String description = firstRow[6]?.value?.toString() ?? '';
@@ -348,8 +138,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
                     'TRUE';
 
             if (productName.isEmpty) {
-              throw Exception(
-                  'Missing product name for product group $groupKey');
+              setState(() {
+                _rejectedProductsCount++;
+                _rejectionReasons.add('Product group $groupKey rejected: Missing product name');
+              });
+              processedProducts++;
+              continue;
             }
 
             if (categoryName.isEmpty) categoryName = 'Default';
@@ -360,7 +154,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 await _getOrCreateSubCategoryWithRetry('Default', categoryId);
 
             // Create product with initial stock 0 (will be updated for variants)
-            // In the importProductsWithVariants method, update the marge calculation:
             final product = Product(
               code: reference,
               designation: productName,
@@ -372,7 +165,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               dateExpiration: '',
               categoryId: categoryId,
               subCategoryId: subCategoryId,
-              marge: (prixHT) - (costPrice), // Add null checks
+              marge: (prixHT) - (costPrice),
               remiseMax: 0,
               remiseValeurMax: 0,
               hasVariants: !simpleProduct,
@@ -381,6 +174,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
               image: imagePath.isNotEmpty ? imagePath : null,
               variants: [],
             );
+
             if (!simpleProduct) {
               List<Variant> allVariants = [];
               final attributesMap = <String, Set<String>>{};
@@ -460,8 +254,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
               _progress = processedProducts / totalProducts;
             });
           } catch (e) {
-            debugPrint(
-                'Error processing product group $groupKey: ${e.toString()}');
+            debugPrint('Error processing product group $groupKey: ${e.toString()}');
+            setState(() {
+              _rejectedProductsCount++;
+              _rejectionReasons.add('Product group $groupKey rejected: ${e.toString()}');
+            });
             processedProducts++;
             continue;
           }
@@ -469,18 +266,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
         if (_isImporting) {
           setState(() {
-            _importStatus = 'Import successful!';
+            _importStatus = 'Import completed';
             _isImporting = false;
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Successfully imported $_importedProductsCount products and $_importedVariantsCount variants'),
-              duration: const Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showImportSummary();
         }
       }
     } catch (e) {
@@ -499,15 +289,59 @@ class _ImportProductPageState extends State<ImportProductPage> {
     }
   }
 
+
+  void _showImportSummary() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Import Summary'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('✅ Successfully imported:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('   - $_importedProductsCount products'),
+                Text('   - $_importedVariantsCount variants'),
+                SizedBox(height: 16),
+                if (_rejectedProductsCount > 0) ...[
+                  Text('❌ Rejected products: $_rejectedProductsCount',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                  SizedBox(height: 8),
+                  Text('Rejection reasons:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _rejectionReasons
+                        .map((reason) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: Text('- $reason'),
+                            ))
+                        .toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _exportExcelTemplate() async {
     try {
-      // Create a new Excel document
       var excel = Excel.createExcel();
+      var sheet = excel['Sheet1'];
 
-      // Create sheet (use the correct sheet name)
-      var sheet = excel['Sheet1']; // 'Sheet1' est le nom par défaut
-
-      // Add headers
       List<String> headers = [
         "ACTION",
         "IMAGE",
@@ -530,7 +364,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         "QUANTITYVARIANT"
       ];
 
-      // Add headers to the first row
       for (int i = 0; i < headers.length; i++) {
         sheet.cell(CellIndex.indexByString('${String.fromCharCode(65 + i)}1'))
           ..value = headers[i]
@@ -541,7 +374,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
           );
       }
 
-      // Add example data (simple product)
       sheet.appendRow([
         "CREATE",
         "product_image.jpg",
@@ -564,7 +396,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         ""
       ]);
 
-      // Add example data (product with variants)
       sheet.appendRow([
         "CREATE",
         "product_with_variants.jpg",
@@ -587,7 +418,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         50
       ]);
 
-      // Add second variant for the same product
       sheet.appendRow([
         "",
         "",
@@ -610,7 +440,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         30
       ]);
 
-      // Create instructions sheet
       var instructionsSheet = excel['Instructions'];
       instructionsSheet.appendRow(["Import Instructions"]);
       instructionsSheet.appendRow([""]);
@@ -630,24 +459,20 @@ class _ImportProductPageState extends State<ImportProductPage> {
       instructionsSheet.appendRow(
           ["   - Set DEFAULTVARIANT to TRUE for one variant per product"]);
 
-      // Save the file
       var fileBytes = excel.encode();
       if (fileBytes == null) {
         throw Exception('Failed to generate Excel file');
       }
 
-      // Get download directory
       final directory = await getDownloadsDirectory();
       if (directory == null) {
         throw Exception('Could not access downloads directory');
       }
 
-      // Create file path
       final filePath = '${directory.path}/product_import_template.xlsx';
       final file = File(filePath);
       await file.writeAsBytes(fileBytes, flush: true);
 
-      // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -754,7 +579,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
     final db = await _sqlDb.db;
 
     return await db.transaction((txn) async {
-      // Try to find existing category
       var result = await txn.query(
         'categories',
         where: 'category_name = ? COLLATE NOCASE',
@@ -762,7 +586,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
       );
 
       if (result.isNotEmpty) {
-        // Update image path if it's provided and different from existing
         if (imagePath != null &&
             imagePath.isNotEmpty &&
             result.first['image_path'] != imagePath) {
@@ -776,7 +599,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         return result.first['id_category'] as int;
       }
 
-      // Create new category if not found
       return await txn.insert(
         'categories',
         {
@@ -793,7 +615,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
     final db = await _sqlDb.db;
 
     return await db.transaction((txn) async {
-      // Try to find existing subcategory
       var result = await txn.query(
         'sub_categories',
         where: 'sub_category_name = ? COLLATE NOCASE AND category_id = ?',
@@ -804,7 +625,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
         return result.first['id_sub_category'] as int;
       }
 
-      // Create new subcategory if not found
       return await txn.insert(
         'sub_categories',
         {
@@ -930,23 +750,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
                                 ),
                               ),
                             ),
-                            ElevatedButton(
-                              onPressed: _isImporting
-                                  ? null
-                                  : exportAllProductsToDjango,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 15),
-                              ),
-                              child: Text(
-                                'importer pour Django',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -980,6 +783,13 @@ class _ImportProductPageState extends State<ImportProductPage> {
                     '$_importedVariantsCount variantes importées',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    '$_rejectedProductsCount produits rejetés',
+                    style: GoogleFonts.poppins(
+                      color: Colors.red,
                       fontSize: 16,
                     ),
                   ),
