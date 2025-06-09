@@ -179,14 +179,6 @@ class _CashDeskPageState extends State<CashDeskPage> {
       return;
     }
 
-    if (selectedClient == null || selectedClient == 0) {
-      // Optional: Validate client is selected
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez sélectionner un client")),
-      );
-      return;
-    }
-
     final order = Order(
       date: DateTime.now().toIso8601String(),
       orderLines: [],
@@ -200,7 +192,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Addorder.showPlaceOrderPopup(
       context,
       order,
-      selectedClient,
+      selectedClient!,
       _selectedProducts,
       _quantityProducts,
       _discounts,
