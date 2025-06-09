@@ -43,7 +43,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    //await deleteDatabase(dbPath);
+    // await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -233,7 +233,8 @@ class SqlDb {
             username TEXT NOT NULL UNIQUE,
             code TEXT NOT NULL,
             role TEXT NOT NULL,
-            is_active INTEGER DEFAULT 1
+            is_active INTEGER DEFAULT 1,
+            email TEXT
           );
         ''');
         print("Users table created");

@@ -4,6 +4,7 @@ class User {
   final String code; // Le code d'accès
   final String role; // 'admin' ou 'cashier'
   final bool isActive;
+  final String? email; // Optional email field
 
   User({
     this.id,
@@ -11,6 +12,7 @@ class User {
     required this.code,
     required this.role,
     this.isActive = true,
+    this.email,
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -20,6 +22,7 @@ class User {
       code: map['code'],
       role: map['role'],
       isActive: map['is_active'] == 1,
+      email: map['email'],
     );
   }
 
@@ -30,6 +33,7 @@ class User {
       'code': code,
       'role': role,
       'is_active': isActive ? 1 : 0,
+      'email': email,
     };
   }
 }
