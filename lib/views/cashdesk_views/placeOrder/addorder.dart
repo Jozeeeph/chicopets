@@ -83,7 +83,7 @@ class Addorder {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Fermer'),
+            child: Text('Annuler'),
           ),
         ],
       ),
@@ -93,6 +93,7 @@ class Addorder {
   static Future<bool?> showPlaceOrderPopup(
     BuildContext context,
     Order order,
+    int selectedClientId,
     List<Product> selectedProducts,
     List<int> quantityProducts,
     List<double> discounts,
@@ -104,6 +105,11 @@ class Addorder {
     bool useLoyaltyPoints = false;
     int pointsToUse = 0;
     double pointsDiscount = 0.0;
+
+    if (selectedClientId != 0) {
+      // Assuming 0 means no client
+      selectedClient = await SqlDb().getClientById(selectedClientId);
+    }
 
     // Récupérer les modes de paiement activés
     List<PaymentMethod> paymentMethods =
@@ -779,6 +785,7 @@ class Addorder {
                         child: Column(
                           children: [
                             // Client selection
+                            // Client selection
                             Container(
                               padding: EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -804,21 +811,30 @@ class Addorder {
                                         ),
                                         Text(
                                           selectedClient != null
-                                              ? '${selectedClient!.name} ${selectedClient!.firstName}'
+                                              ? '${selectedClient?.name} ${selectedClient?.firstName}'
                                               : 'Non spécifié',
                                           style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold),
                                         ),
+                                        if (selectedClient != null &&
+                                            selectedClient?.phoneNumber != null)
+                                          Text(
+                                            selectedClient!.phoneNumber,
+                                            style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey[600]),
+                                          ),
                                       ],
                                     ),
                                   ),
                                   IconButton(
                                     icon: Icon(
-                                        selectedClient != null
-                                            ? Icons.edit
-                                            : Icons.add_circle_outline,
-                                        color: Colors.blue),
+                                      selectedClient != null
+                                          ? Icons.edit
+                                          : Icons.add_circle_outline,
+                                      color: Colors.blue,
+                                    ),
                                     onPressed: () {
                                       _showClientSelection(context, (client) {
                                         setState(() {
@@ -828,6 +844,17 @@ class Addorder {
                                     },
                                     tooltip: 'Sélectionner un client',
                                   ),
+                                  if (selectedClient != null)
+                                    IconButton(
+                                      icon:
+                                          Icon(Icons.clear, color: Colors.red),
+                                      onPressed: () {
+                                        setState(() {
+                                          selectedClient = null;
+                                        });
+                                      },
+                                      tooltip: 'Supprimer le client',
+                                    ),
                                 ],
                               ),
                             ),

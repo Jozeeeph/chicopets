@@ -412,14 +412,17 @@ class Getorderlist {
                                   ),
                                   // Add this new edit button
                                   ElevatedButton.icon(
-                                    onPressed: () {
-                                      _editOrder(context, order);
-                                    },
-                                    icon: Icon(Icons.edit, color: Colors.white),
-                                    label: Text("Modifier",
-                                        style: TextStyle(color: Colors.white)),
+                                    onPressed: () => _editOrder(context, order),
+                                    icon: const Icon(Icons.edit,
+                                        color: Colors.white),
+                                    label: const Text(
+                                      "Modifier",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.orange,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 12),
                                     ),
                                   ),
                                   if (isSemiPaid)
@@ -539,6 +542,8 @@ class Getorderlist {
                     typeDiscounts: discountTypes,
                     globalDiscount: order.globalDiscount,
                     isPercentageDiscount: order.isPercentageDiscount,
+                    selectedClient:
+                        order.idClient ?? 0, // Use null-coalescing operator
                     onApplyDiscount: (index) {
                       Applydiscount.showDiscountInput(
                         context,
@@ -578,7 +583,7 @@ class Getorderlist {
                     onFetchOrders: () {
                       Navigator.pop(context);
                     },
-                    onPlaceOrder: () async {
+                    onPlaceOrder: (selectedClient) async {
                       // 1. First validate we have products
                       if (products.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -603,7 +608,9 @@ class Getorderlist {
                         isPercentageDiscount: order.isPercentageDiscount,
                         date: order.date,
                         status: order.status,
-                        idClient: order.idClient,
+                        idClient: selectedClient > 0
+                            ? selectedClient
+                            : null, // Handle client ID properly
                         modePaiement: order.modePaiement,
                         cashAmount: order.cashAmount,
                         cardAmount: order.cardAmount,
@@ -616,15 +623,10 @@ class Getorderlist {
                         orderLines: [], // Initialize empty lines
                       );
 
-                      // Debug print to verify ID before creating lines
-                      debugPrint(
-                          '[onPlaceOrder] Order ID before lines: ${orderToUpdate.idOrder}');
-
                       // 3. Create order lines with proper reference
                       orderToUpdate.orderLines = products.map((product) {
-                        final line = OrderLine(
-                          idOrder: orderToUpdate
-                              .idOrder!, // Use the copied order's ID
+                        return OrderLine(
+                          idOrder: orderToUpdate.idOrder!,
                           productId: product.id,
                           productCode: product.code,
                           productName: product.designation,
@@ -642,15 +644,13 @@ class Getorderlist {
                           isPercentage:
                               discountTypes[products.indexOf(product)],
                         );
-                        debugPrint(
-                            '[onPlaceOrder] Created line with order ID: ${line.idOrder}');
-                        return line;
                       }).toList();
 
                       // 4. Show payment dialog with the COPIED order
                       final shouldUpdate = await Addorder.showPlaceOrderPopup(
                         context,
-                        orderToUpdate, // Pass the copied order
+                        orderToUpdate,
+                        selectedClient,
                         products,
                         quantities,
                         discounts,
@@ -662,8 +662,6 @@ class Getorderlist {
 
                       // 5. Attempt to update with proper error handling
                       try {
-                        debugPrint(
-                            '[onPlaceOrder] Attempting update with ID: ${orderToUpdate.idOrder}');
                         await sqldb.updateOrderInDatabase(orderToUpdate);
 
                         if (!context.mounted) return;

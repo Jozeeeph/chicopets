@@ -23,8 +23,6 @@ class CashDeskPage extends StatefulWidget {
 }
 
 class _CashDeskPageState extends State<CashDeskPage> {
-  final SqlDb _sqldb = SqlDb();
-  Future<List<Product>>? _products;
   final List<Product> _selectedProducts = [];
   final List<int> _quantityProducts = [];
   final List<bool> _typeDiscounts = [];
@@ -34,6 +32,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
   bool _isPercentageDiscount = true;
   String _currentUser = "Non connecté";
   DateTime? _sessionStartTime;
+  int? _selectedClientId;
 
   @override
   void initState() {
@@ -78,7 +77,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
               ListTile(
                 leading: const Icon(Icons.point_of_sale),
                 title: const Text('Transactions en cours'),
-                subtitle: Text('${_selectedProducts.length} produits sélectionnés'),
+                subtitle:
+                    Text('${_selectedProducts.length} produits sélectionnés'),
               ),
             ],
           ),
@@ -171,10 +171,18 @@ class _CashDeskPageState extends State<CashDeskPage> {
     }
   }
 
-  void _handlePlaceOrder() {
+  void _handlePlaceOrder(int? selectedClient) {
     if (_selectedProducts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Aucun produit sélectionné")),
+      );
+      return;
+    }
+
+    if (selectedClient == null || selectedClient == 0) {
+      // Optional: Validate client is selected
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez sélectionner un client")),
       );
       return;
     }
@@ -186,11 +194,13 @@ class _CashDeskPageState extends State<CashDeskPage> {
       modePaiement: "Espèces",
       globalDiscount: _globalDiscount,
       isPercentageDiscount: _isPercentageDiscount,
+      idClient: selectedClient, // Add client ID to order
     );
 
     Addorder.showPlaceOrderPopup(
       context,
       order,
+      selectedClient,
       _selectedProducts,
       _quantityProducts,
       _discounts,
@@ -206,11 +216,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Addprod.showAddProductPopup(
       context: context,
       refreshData: () {
-        setState(() {
-          _products = _sqldb
-              .getProductsWithCategory()
-              .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
-        });
+        setState(() {});
       },
     );
   }
@@ -219,11 +225,7 @@ class _CashDeskPageState extends State<CashDeskPage> {
     Getorderlist.showListOrdersPopUp(context);
   }
 
-  void _loadProducts() {
-    _products = _sqldb
-        .getProductsWithCategory()
-        .then((maps) => maps.map((map) => Product.fromMap(map)).toList());
-  }
+  void _loadProducts() {}
 
   void _handleProductSelected(Product product, [Variant? variant]) {
     setState(() {
@@ -321,9 +323,16 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onPlaceOrder: _handlePlaceOrder,
               isPercentageDiscount: _isPercentageDiscount,
               selectedProductIndex: _selectedProductIndex,
+              selectedClient:_selectedClientId ?? 0, // Use the tracked client ID
               onProductSelected: (index) {
                 setState(() {
                   _selectedProductIndex = index;
+                });
+              },
+              onClientSelected: (clientId) {
+                // Add this callback
+                setState(() {
+                  _selectedClientId = clientId;
                 });
               },
               calculateTotal: (
