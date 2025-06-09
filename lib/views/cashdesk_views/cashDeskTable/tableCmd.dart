@@ -26,11 +26,13 @@ class TableCmd extends StatefulWidget {
   final double Function(List<Product>, List<int>, List<double>, List<bool>,
       double globalDiscount, bool isPercentageDiscount) calculateTotal;
   final VoidCallback onFetchOrders;
-  final VoidCallback onPlaceOrder;
+  final Function(int selectedClient) onPlaceOrder;
   final int? selectedProductIndex;
   final Function(int) onProductSelected;
   final Function(double) onGlobalDiscountChanged;
   final Function(bool) onIsPercentageDiscountChanged;
+  final Function(int)? onClientSelected;
+  final int? selectedClient;
 
   const TableCmd({
     super.key,
@@ -49,6 +51,8 @@ class TableCmd extends StatefulWidget {
     required this.onFetchOrders,
     required this.onPlaceOrder,
     required this.isPercentageDiscount,
+    this.onClientSelected,
+    required this.selectedClient,
     this.selectedProductIndex,
     required this.onProductSelected,
     required this.onGlobalDiscountChanged,
@@ -213,7 +217,12 @@ class _TableCmdState extends State<TableCmd> {
         content: SizedBox(
           width: double.maxFinite,
           child: ClientManagementWidget(
-            onClientSelected: (client) => Navigator.pop(context),
+            onClientSelected: (client) {
+              if (widget.onClientSelected != null) {
+                widget.onClientSelected!(client.id!);
+              }
+              Navigator.pop(context);
+            },
           ),
         ),
         actions: [
@@ -500,9 +509,7 @@ class _TableCmdState extends State<TableCmd> {
                                           ),
                                           Expanded(
                                             child: Text(
-                                              '${_calculateLineTotal(
-                                                          product, index)
-                                                      .toStringAsFixed(2)} DT',
+                                              '${_calculateLineTotal(product, index).toStringAsFixed(2)} DT',
                                             ),
                                           ),
                                         ],
@@ -587,7 +594,8 @@ class _TableCmdState extends State<TableCmd> {
                     icon: Icons.check_circle,
                     label: 'VALIDER COMMANDE',
                     color: const Color(0xFF009688),
-                    onPressed: widget.onPlaceOrder,
+                    onPressed: () => widget
+                        .onPlaceOrder(widget.selectedClient!), // Pass client ID
                   ),
                 ],
               ),

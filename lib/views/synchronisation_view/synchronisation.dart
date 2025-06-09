@@ -110,14 +110,15 @@ class _SyncPageState extends State<SyncPage> {
           quantity = await _sqlDb.getVariantStock(pr.id!, line.variantCode!);
         } else if (!isVariant) {
           quantity = pr.stock;
+        } else {
+          continue; // Skip invalid variant without code
         }
 
         productData.add({
           'product_id': pr.id,
-          'designation': line.productName,
-          'variant_code': line.variantCode,
+          'designation': line.productName?.trim().toLowerCase(),
           'quantity': quantity,
-          'is_variant': isVariant && line.variantCode != null,
+          'variant_code': line.variantCode?.trim().toLowerCase(),
         });
       }
     }
@@ -127,6 +128,7 @@ class _SyncPageState extends State<SyncPage> {
     });
 
     try {
+      // Send POST request to sync stock
       final response = await http.post(
         Uri.parse('http://127.0.0.1:8000/pos/sync-stock/'),
         headers: {'Content-Type': 'application/json'},
@@ -137,51 +139,41 @@ class _SyncPageState extends State<SyncPage> {
       );
 
       if (response.statusCode == 200) {
+        // Update stock items via PATCH requests
+        for (var product in productData) {
+          final patchUrl = Uri.parse('http://127.0.0.1:8000/pos/stockitem/');
+          final patchPayload = jsonEncode({
+            'warehouse_id': selectedWarehouse!.id,
+            'quantity': product['quantity'],
+            'designation': product['designation'],
+            if (product['variant_code'] != null)
+              'variant_code': product['variant_code'],
+          });
+          print('PATCH Payload: $patchPayload');
+
+          try {
+            final patchResponse = await http.patch(
+              patchUrl,
+              headers: {'Content-Type': 'application/json'},
+              body: patchPayload,
+            );
+
+            if (patchResponse.statusCode >= 400) {
+              debugPrint('PATCH failed: ${patchResponse.body}');
+              throw Exception(
+                  'Failed to update stock item: ${patchResponse.body}');
+            }
+          } catch (e) {
+            debugPrint('Erreur PATCH: $e');
+            throw Exception('PATCH request failed: $e');
+          }
+        }
+
+        // Mark orders as synced only after all PATCH requests succeed
         for (var order in unsyncedOrders) {
           order.isSync = true;
           if (order.idOrder != null) {
             await _sqlDb.updateSynchOrder(order.idOrder!);
-          }
-
-          for (var line in order.orderLines) {
-            if (line.productId == null) continue;
-            final patchUrl = Uri.parse('http://127.0.0.1:8000/pos/stockitem/');
-            Product? pr = await _sqlDb.getProductById(line.productId!);
-            if (pr == null) continue;
-
-            final isVariant = pr.hasVariants == true;
-            int quantity = 0;
-
-            if (isVariant && line.variantCode != null) {
-              quantity =
-                  await _sqlDb.getVariantStock(pr.id!, line.variantCode!);
-            } else if (!isVariant) {
-              quantity = pr.stock;
-            } else {
-              continue; // Skip invalid variant without code
-            }
-
-            final patchPayload = jsonEncode({
-              'warehouse_id': selectedWarehouse!.id,
-              'product_id': pr.id,
-              'is_variant': isVariant && line.variantCode != null,
-              'variant_code': line.variantCode,
-              'quantity': quantity,
-            });
-
-            try {
-              final patchResponse = await http.patch(
-                patchUrl,
-                headers: {'Content-Type': 'application/json'},
-                body: patchPayload,
-              );
-
-              if (patchResponse.statusCode >= 400) {
-                debugPrint('PATCH failed: ${patchResponse.body}');
-              }
-            } catch (e) {
-              debugPrint('Erreur PATCH: $e');
-            }
           }
         }
 
@@ -196,8 +188,10 @@ class _SyncPageState extends State<SyncPage> {
         await loadUnsyncedOrders();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la synchronisation'),
+          SnackBar(
+            content:
+                Text('Erreur lors de la synchronisation: ${response.body}'),
+            backgroundColor: warmRed,
           ),
         );
       }
