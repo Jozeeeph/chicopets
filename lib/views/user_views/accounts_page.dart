@@ -2,12 +2,6 @@ import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'dart:io';
 
 class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
@@ -21,20 +15,12 @@ class _AccountsPageState extends State<AccountsPage> {
   List<User> _users = [];
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _newCodeController = TextEditingController();
-  final TextEditingController _confirmNewCodeController = TextEditingController();
+  final TextEditingController _confirmNewCodeController =
+      TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   String _selectedRole = 'cashier';
   bool _isLoading = true;
-
-  // Define the color palette
-  final Color deepBlue = const Color(0xFF0056A6);
-  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
-  final Color white = Colors.white;
-  final Color lightGray = const Color(0xFFE0E0E0);
-  final Color tealGreen = const Color(0xFF009688);
-  final Color softOrange = const Color(0xFFFF9800);
-  final Color warmRed = const Color(0xFFE53935);
 
   @override
   void initState() {
@@ -61,7 +47,7 @@ class _AccountsPageState extends State<AccountsPage> {
         username: _usernameController.text,
         code: _codeController.text,
         role: _selectedRole,
-        email: _emailController.text.isNotEmpty ? _emailController.text : null,
+        mail: _emailController.text.isNotEmpty ? _emailController.text : null,
       );
       await _sqlDb.addUser(newUser);
       _usernameController.clear();
@@ -211,6 +197,90 @@ class _AccountsPageState extends State<AccountsPage> {
     );
   }
 
+  Future<void> _showEditEmailDialog(User user) async {
+    _emailController.text = user.mail ?? '';
+    
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Text(
+            'Modifier l\'email pour ${user.username}',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: darkBlue,
+            ),
+          ),
+          content: TextField(
+            controller: _emailController,
+            decoration: InputDecoration(
+              labelText: 'Email',
+              labelStyle: TextStyle(color: darkBlue),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: deepBlue),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: deepBlue, width: 2),
+              ),
+              prefixIcon: Icon(Icons.email, color: deepBlue),
+            ),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Annuler',
+                style: TextStyle(color: warmRed),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await _sqlDb.updateUserEmail(user.username, _emailController.text);
+                  await _loadUsers();
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Email mis à jour avec succès'),
+                      backgroundColor: tealGreen,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: ${e.toString()}'),
+                      backgroundColor: warmRed,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: tealGreen,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: Text(
+                'Valider',
+                style: GoogleFonts.poppins(
+                  color: white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _deleteUser(int userId) async {
     try {
       await _sqlDb.deleteUser(userId);
@@ -231,142 +301,24 @@ class _AccountsPageState extends State<AccountsPage> {
     }
   }
 
-  Future<File> _generatePdfReport() async {
-    final pdf = pw.Document();
-    
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Header(
-                level: 0, 
-                child: pw.Text(
-                  'Rapport des Utilisateurs', 
-                  style: pw.TextStyle(fontSize: 24)
-                )
-              ),
-              pw.SizedBox(height: 20),
-              pw.Table.fromTextArray(
-                context: context,
-                data: [
-                  ['ID', 'Nom', 'Rôle', 'Email', 'Statut'],
-                  ..._users.map((user) => [
-                    user.id.toString(),
-                    user.username,
-                    user.role == 'admin' ? 'Administrateur' : 'Caissier',
-                    user.email ?? 'N/A',
-                    user.isActive ? 'Actif' : 'Inactif'
-                  ]).toList()
-                ],
-                cellAlignment: pw.Alignment.centerLeft,
-                headerStyle: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blue900,
-                ),
-                cellStyle: const pw.TextStyle(),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Text(
-                'Généré le ${DateTime.now().toLocal()}',
-                style: const pw.TextStyle(fontSize: 10),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    final directory = await getApplicationDocumentsDirectory();
-    final path = '${directory.path}/user_report_${DateTime.now().millisecondsSinceEpoch}.pdf';
-    final file = File(path);
-    
-    await file.writeAsBytes(await pdf.save());
-    return file;
-  }
-
-  Future<void> _sendReportToAdmins() async {
-    try {
-      setState(() => _isLoading = true);
-      
-      final adminUsers = _users.where((user) => 
-        user.role == 'admin' && 
-        user.email != null && 
-        user.email!.isNotEmpty
-      ).toList();
-      
-      if (adminUsers.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Aucun administrateur avec email valide trouvé'),
-            backgroundColor: warmRed,
-          ),
-        );
-        return;
-      }
-
-      final pdfFile = await _generatePdfReport();
-
-      // Configure your SMTP server here
-      final smtpServer = gmail('your.email@gmail.com', 'yourpassword');
-      // For production, use environment variables or OAuth2
-
-      final message = Message()
-        ..from = Address('your.email@gmail.com', 'Caisse Chicopets')
-        ..subject = 'Rapport des Utilisateurs - ${DateTime.now().toLocal().toString().substring(0, 10)}'
-        ..text = '''
-            Bonjour,
-
-Veuillez trouver ci-joint le rapport des utilisateurs actuel.
-
-Nombre total d'utilisateurs: ${_users.length}
-Nombre d'administrateurs: ${_users.where((u) => u.role == 'admin').length}
-Nombre de caissiers: ${_users.where((u) => u.role == 'cashier').length}
-
-Cordialement,
-L'équipe Caisse Chicopets
-'''
-        ..attachments = [FileAttachment(pdfFile)]
-        ..recipients.addAll(adminUsers.map((user) => user.email!));
-
-      await send(message, smtpServer);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Rapport envoyé à ${adminUsers.length} administrateur(s)'),
-          backgroundColor: tealGreen,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } on MailerException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur d\'envoi: ${e.message}'),
-          backgroundColor: warmRed,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
-          backgroundColor: warmRed,
-        ),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   @override
   void dispose() {
     _usernameController.dispose();
     _codeController.dispose();
-    _emailController.dispose();
     _newCodeController.dispose();
     _confirmNewCodeController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
+
+  // Define the color palette
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
 
   @override
   Widget build(BuildContext context) {
@@ -385,14 +337,9 @@ L'équipe Caisse Chicopets
         iconTheme: IconThemeData(color: white),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: white),
+            icon: Icon(Icons.refresh),
             onPressed: _loadUsers,
             tooltip: 'Actualiser',
-          ),
-          IconButton(
-            icon: Icon(Icons.email, color: white),
-            onPressed: _sendReportToAdmins,
-            tooltip: 'Envoyer le rapport aux admins',
           ),
         ],
       ),
@@ -409,6 +356,7 @@ L'équipe Caisse Chicopets
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Add User Card
               Card(
                 elevation: 6,
                 shape: RoundedRectangleBorder(
@@ -585,6 +533,7 @@ L'équipe Caisse Chicopets
                 ),
               ),
               const SizedBox(height: 20),
+              // Users List Header
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Text(
@@ -596,6 +545,7 @@ L'équipe Caisse Chicopets
                   ),
                 ),
               ),
+              // Users List
               Expanded(
                 child: _isLoading
                     ? Center(
@@ -666,9 +616,9 @@ L'équipe Caisse Chicopets
                                           color: darkBlue.withOpacity(0.7),
                                         ),
                                       ),
-                                      if (user.email != null && user.email!.isNotEmpty)
+                                      if (user.mail != null && user.mail!.isNotEmpty)
                                         Text(
-                                          'Email: ${user.email}',
+                                          'Email: ${user.mail}',
                                           style: GoogleFonts.poppins(
                                             color: darkBlue.withOpacity(0.7),
                                             fontSize: 12,
@@ -679,6 +629,11 @@ L'équipe Caisse Chicopets
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: Icon(Icons.email, color: deepBlue),
+                                        onPressed: () => _showEditEmailDialog(user),
+                                        tooltip: 'Modifier l\'email',
+                                      ),
                                       IconButton(
                                         icon: Icon(Icons.vpn_key,
                                             color: tealGreen),

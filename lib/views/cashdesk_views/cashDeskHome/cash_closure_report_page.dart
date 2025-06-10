@@ -9,13 +9,13 @@ import 'package:caissechicopets/services/sqldb.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server/gmail.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class CashClosureReportPage extends StatelessWidget {
@@ -178,11 +178,14 @@ class CashClosureReportPage extends StatelessWidget {
 
       // 4. Get admin emails from database
       final db = await _sqlDb.db;
+      final userJson = await _sqlDb.getAllUsers();
+      print('Users: $userJson');
       final admins = await db.query(
         'users',
         where: 'role = ?',
         whereArgs: ['admin'],
       );
+      print('Admins: $admins');
 
       if (admins.isEmpty) {
         if (context.mounted) {
@@ -194,7 +197,7 @@ class CashClosureReportPage extends StatelessWidget {
       }
 
       final adminEmails = admins
-          .map((a) => a['email'] as String?)
+          .map((a) => a['mail'] as String?)
           .where((email) => email != null && email.isNotEmpty)
           .toList();
 
@@ -232,16 +235,8 @@ class CashClosureReportPage extends StatelessWidget {
 
       // 5. Option 2: Direct SMTP sending (more control)
       try {
-        // Configure your SMTP server - REPLACE WITH YOUR ACTUAL CREDENTIALS
-        final smtpServer = SmtpServer(
-          'smtp.yourdomain.com', // e.g., 'smtp.gmail.com'
-          username: 'your_email@domain.com',
-          password: 'your_password',
-          port: 587,
-          ssl: false,
-          allowInsecure: true,
-        );
-
+        final smtpServer =
+            gmail('bensalahyoussef111@gmail.com', 'awop mxzl myun ikgo');
         final message = Message()
           ..from = Address('noreply@yourdomain.com', 'Caisse Chicopets')
           ..recipients.addAll(adminEmails)
@@ -286,28 +281,21 @@ class CashClosureReportPage extends StatelessWidget {
     }
   }
 
-  Widget _buildReportRow(String title, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-          Text(value.toString(), style: GoogleFonts.poppins()),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Rapport de clôture')),
+      appBar: AppBar(
+        title: Text('Rapport de clôture'),
+      ),
       body: FutureBuilder(
-        future: Future.wait([_getOrdersSinceOpening(), _getCurrentUser()]),
+        future: Future.wait([
+          _getOrdersSinceOpening(),
+          _getCurrentUser(),
+        ]),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return Center(child: CircularProgressIndicator());
+          }
 
           final orders = snapshot.data![0] as List<Order>;
           final user = snapshot.data![1] as User?;
@@ -320,13 +308,17 @@ class CashClosureReportPage extends StatelessWidget {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
+                        // Titre principal
                         Text('Rapport de caisse',
                             style: GoogleFonts.poppins(
                                 fontSize: 20, fontWeight: FontWeight.bold)),
                         SizedBox(height: 16),
+
+                        // Deux colonnes (cards)
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Première colonne (gauche)
                             Expanded(
                               child: Card(
                                 child: Padding(
@@ -359,37 +351,44 @@ class CashClosureReportPage extends StatelessWidget {
                                       FutureBuilder<double>(
                                         future: _calculateTotalSales(orders),
                                         builder: (context, salesSnapshot) {
-                                          if (!salesSnapshot.hasData)
+                                          if (!salesSnapshot.hasData) {
                                             return _buildReportRow(
                                                 'Total ventes', 'Calcul...');
-                                          return _buildReportRow('Total ventes',
-                                              '${salesSnapshot.data!.toStringAsFixed(2)} DT');
+                                          }
+                                          return _buildReportRow(
+                                            'Total ventes',
+                                            '${salesSnapshot.data!.toStringAsFixed(2)} DT',
+                                          );
                                         },
                                       ),
                                       FutureBuilder<double>(
                                         future: _calculateTotalProfit(orders),
                                         builder: (context, profitSnapshot) {
-                                          if (!profitSnapshot.hasData)
+                                          if (!profitSnapshot.hasData) {
                                             return _buildReportRow(
                                                 'Bénéfice total', 'Calcul...');
+                                          }
                                           return _buildReportRow(
-                                              'Bénéfice total',
-                                              '${profitSnapshot.data!.toStringAsFixed(2)} DT');
+                                            'Bénéfice total',
+                                            '${profitSnapshot.data!.toStringAsFixed(2)} DT',
+                                          );
                                         },
                                       ),
                                       FutureBuilder<double>(
                                         future: _calculateTotalSales(orders),
                                         builder: (context, salesSnapshot) {
-                                          if (!salesSnapshot.hasData)
+                                          if (!salesSnapshot.hasData) {
                                             return _buildReportRow(
                                                 'Nouveau fond de caisse',
                                                 'Calcul...');
+                                          }
                                           final newCashAmount =
                                               cashState.initialAmount +
                                                   (salesSnapshot.data ?? 0);
                                           return _buildReportRow(
-                                              'Nouveau fond de caisse',
-                                              '${newCashAmount.toStringAsFixed(2)} DT');
+                                            'Nouveau fond de caisse',
+                                            '${newCashAmount.toStringAsFixed(2)} DT',
+                                          );
                                         },
                                       ),
                                     ],
@@ -397,7 +396,10 @@ class CashClosureReportPage extends StatelessWidget {
                                 ),
                               ),
                             ),
+
                             SizedBox(width: 16),
+
+                            // Deuxième colonne (droite)
                             Expanded(
                               child: Card(
                                 child: Padding(
@@ -406,16 +408,50 @@ class CashClosureReportPage extends StatelessWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text('Actions',
+                                      Text('Produits vendus',
                                           style: GoogleFonts.poppins(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16)),
                                       Divider(),
-                                      ElevatedButton.icon(
-                                        onPressed: () => _printReport(context),
-                                        icon: Icon(Icons.print),
-                                        label: Text('Imprimer rapport'),
+                                      FutureBuilder<Map<String, int>>(
+                                        future: _getProductsSold(orders),
+                                        builder: (context, productsSnapshot) {
+                                          if (!productsSnapshot.hasData) {
+                                            return Center(
+                                                child:
+                                                    CircularProgressIndicator());
+                                          }
+
+                                          return productsSnapshot.data!.isEmpty
+                                              ? Text('Aucun produit vendu')
+                                              : Column(
+                                                  children: productsSnapshot
+                                                      .data!.entries
+                                                      .map((entry) {
+                                                    return _buildReportRow(
+                                                      entry.key,
+                                                      '${entry.value} unités',
+                                                    );
+                                                  }).toList(),
+                                                );
+                                        },
                                       ),
+                                      SizedBox(height: 16),
+                                      Text('Commandes',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16)),
+                                      Divider(),
+                                      orders.isEmpty
+                                          ? Text('Aucune commande')
+                                          : Column(
+                                              children: orders.map((order) {
+                                                return _buildReportRow(
+                                                  '#${order.idOrder} (${DateFormat('dd/MM HH:mm').format(DateTime.parse(order.date))})',
+                                                  '${order.total.toStringAsFixed(2)} DT',
+                                                );
+                                              }).toList(),
+                                            ),
                                     ],
                                   ),
                                 ),
@@ -427,10 +463,91 @@ class CashClosureReportPage extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                // Boutons en bas
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _printReport(context),
+                            icon: Icon(Icons.print),
+                            label: Text(
+                              'Enregistrer et imprimer rapport',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const HomePage()),
+                              );
+                            },
+                            child: Text(
+                              'Retour à l\'accueil',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildReportRow(String label, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (value is DateTime)
+            Text(
+              DateFormat('dd/MM HH:mm').format(value),
+              style: GoogleFonts.poppins(),
+            ),
+          if (value is String)
+            Flexible(
+              child: Text(
+                value,
+                style: GoogleFonts.poppins(),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (value is int)
+            Text(
+              value.toString(),
+              style: GoogleFonts.poppins(),
+            ),
+        ],
       ),
     );
   }
