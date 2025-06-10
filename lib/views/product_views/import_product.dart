@@ -20,7 +20,7 @@ class ImportProductPage extends StatefulWidget {
 
 class _ImportProductPageState extends State<ImportProductPage> {
   final SqlDb _sqlDb = SqlDb();
-  String _importStatus = 'Ready to import';
+  String _importStatus = 'Prêt à importer';
   int _importedProductsCount = 0;
   int _importedVariantsCount = 0;
   String _errorMessage = '';
@@ -29,10 +29,22 @@ class _ImportProductPageState extends State<ImportProductPage> {
   List<Map<String, dynamic>> productsJson = [];
   int _rejectedProductsCount = 0;
   final List<String> _rejectionReasons = [];
+  DateTime? _importStartTime;
+  Duration? _importDuration;
+
+  // Colors
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
 
   Future<void> importProductsWithVariants() async {
+    _importStartTime = DateTime.now();
     setState(() {
-      _importStatus = 'Importing...';
+      _importStatus = 'Importation en cours...';
       _importedProductsCount = 0;
       _importedVariantsCount = 0;
       _rejectedProductsCount = 0;
@@ -40,6 +52,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
       _errorMessage = '';
       _isImporting = true;
       _progress = 0.0;
+      _importDuration = null;
     });
 
     try {
@@ -53,7 +66,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
         String? filePath = file.path;
 
         if (filePath == null) {
-          throw Exception('File path not available');
+          throw Exception('Chemin du fichier non disponible');
         }
 
         var bytes = File(filePath).readAsBytesSync();
@@ -65,7 +78,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
             .toList();
         if (!_verifyHeaders(headers)) {
           throw Exception(
-              'Invalid Excel format. Please use the correct template.');
+              'Format Excel invalide. Veuillez utiliser le bon modèle.');
         }
 
         Map<String, List<List<Data?>>> productGroups = {};
@@ -96,26 +109,30 @@ class _ImportProductPageState extends State<ImportProductPage> {
             String imagePath = firstRow[1]?.value?.toString() ?? '';
             String productName = firstRow[2]?.value?.toString() ?? '';
             String reference = firstRow[3]?.value?.toString() ?? '';
-            
+
             // Check for duplicate code if provided
             if (reference.isNotEmpty) {
-              final codeExists = await _sqlDb.doesProductWithCodeExist(reference);
+              final codeExists =
+                  await _sqlDb.doesProductWithCodeExist(reference);
               if (codeExists) {
                 setState(() {
                   _rejectedProductsCount++;
-                  _rejectionReasons.add('Product "$productName" rejected: Duplicate code "$reference"');
+                  _rejectionReasons.add(
+                      'Produit "$productName" rejeté: Code dupliqué "$reference"');
                 });
                 processedProducts++;
                 continue;
               }
             }
-            
+
             // Check for duplicate designation
-            final designationExists = await _sqlDb.doesProductWithDesignationExist(productName.toLowerCase());
+            final designationExists = await _sqlDb
+                .doesProductWithDesignationExist(productName.toLowerCase());
             if (designationExists) {
               setState(() {
                 _rejectedProductsCount++;
-                _rejectionReasons.add('Product "$productName" rejected: Duplicate designation');
+                _rejectionReasons.add(
+                    'Produit "$productName" rejeté: Désignation dupliquée');
               });
               processedProducts++;
               continue;
@@ -140,18 +157,19 @@ class _ImportProductPageState extends State<ImportProductPage> {
             if (productName.isEmpty) {
               setState(() {
                 _rejectedProductsCount++;
-                _rejectionReasons.add('Product group $groupKey rejected: Missing product name');
+                _rejectionReasons.add(
+                    'Groupe de produits $groupKey rejeté: Nom de produit manquant');
               });
               processedProducts++;
               continue;
             }
 
-            if (categoryName.isEmpty) categoryName = 'Default';
+            if (categoryName.isEmpty) categoryName = 'Défaut';
 
             int categoryId = await _getOrCreateCategoryWithRetry(categoryName,
                 imagePath: imagePath);
             int subCategoryId =
-                await _getOrCreateSubCategoryWithRetry('Default', categoryId);
+                await _getOrCreateSubCategoryWithRetry('Défaut', categoryId);
 
             // Create product with initial stock 0 (will be updated for variants)
             final product = Product(
@@ -254,10 +272,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
               _progress = processedProducts / totalProducts;
             });
           } catch (e) {
-            debugPrint('Error processing product group $groupKey: ${e.toString()}');
+            debugPrint(
+                'Erreur lors du traitement du groupe de produits $groupKey: ${e.toString()}');
             setState(() {
               _rejectedProductsCount++;
-              _rejectionReasons.add('Product group $groupKey rejected: ${e.toString()}');
+              _rejectionReasons
+                  .add('Groupe de produits $groupKey rejeté: ${e.toString()}');
             });
             processedProducts++;
             continue;
@@ -265,8 +285,9 @@ class _ImportProductPageState extends State<ImportProductPage> {
         }
 
         if (_isImporting) {
+          _importDuration = DateTime.now().difference(_importStartTime!);
           setState(() {
-            _importStatus = 'Import completed';
+            _importStatus = 'Importation terminée';
             _isImporting = false;
           });
 
@@ -275,63 +296,197 @@ class _ImportProductPageState extends State<ImportProductPage> {
       }
     } catch (e) {
       setState(() {
-        _importStatus = 'Import failed';
+        _importStatus = 'Échec de l\'importation';
         _errorMessage = e.toString();
         _isImporting = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $_errorMessage'),
-          backgroundColor: Colors.red,
+          content: Text('Erreur: $_errorMessage'),
+          backgroundColor: warmRed,
         ),
       );
     }
   }
 
-
   void _showImportSummary() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Import Summary'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('✅ Successfully imported:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('   - $_importedProductsCount products'),
-                Text('   - $_importedVariantsCount variants'),
-                SizedBox(height: 16),
-                if (_rejectedProductsCount > 0) ...[
-                  Text('❌ Rejected products: $_rejectedProductsCount',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                  SizedBox(height: 8),
-                  Text('Rejection reasons:',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _rejectionReasons
-                        .map((reason) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Text('- $reason'),
-                            ))
-                        .toList(),
-                  ),
-                ],
-              ],
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 10,
+          child: SizedBox(
+            width: 400,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Résumé de l\'importation',
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: deepBlue,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: darkBlue),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: darkBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.timer, color: darkBlue, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Durée: ${_importDuration?.inSeconds ?? 0} secondes',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.black87,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.check_circle,
+                                  color: tealGreen, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Importés avec succès:',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 26, top: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '   - $_importedProductsCount produits',
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.black87),
+                                ),
+                                Text(
+                                  '   - $_importedVariantsCount variantes',
+                                  style: GoogleFonts.poppins(
+                                      color: Colors.black87),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_rejectedProductsCount > 0) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.error, color: warmRed, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Produits rejetés: $_rejectedProductsCount',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _rejectionReasons
+                                      .map((reason) => Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 4.0),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                const Text('• ',
+                                                    style: TextStyle(
+                                                        color: Colors.black87)),
+                                                Expanded(
+                                                  child: Text(
+                                                    reason,
+                                                    style: GoogleFonts.poppins(
+                                                      color: Colors.black87,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: tealGreen,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'OK',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
         );
       },
     );
@@ -377,11 +532,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
       sheet.appendRow([
         "CREATE",
         "product_image.jpg",
-        "Example Simple Product",
+        "Exemple de produit simple",
         "PROD001",
-        "Example Category",
-        "Example Brand",
-        "Product description",
+        "Exemple de catégorie",
+        "Exemple de marque",
+        "Description du produit",
         10.0,
         15.0,
         19.0,
@@ -399,11 +554,11 @@ class _ImportProductPageState extends State<ImportProductPage> {
       sheet.appendRow([
         "CREATE",
         "product_with_variants.jpg",
-        "Example Product with Variants",
+        "Exemple de produit avec variantes",
         "PROD002",
-        "Example Category",
-        "Example Brand",
-        "Product with variants description",
+        "Exemple de catégorie",
+        "Exemple de marque",
+        "Description du produit avec variantes",
         10.0,
         15.0,
         19.0,
@@ -411,7 +566,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
         0,
         "TRUE",
         "FALSE",
-        "Color:Red-Size:L",
+        "Couleur:Rouge-Taille:L",
         "TRUE",
         "variant_red.jpg",
         2.0,
@@ -433,7 +588,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
         "",
         "",
         "",
-        "Color:Blue-Size:M",
+        "Couleur:Bleu-Taille:M",
         "FALSE",
         "variant_blue.jpg",
         1.5,
@@ -441,54 +596,56 @@ class _ImportProductPageState extends State<ImportProductPage> {
       ]);
 
       var instructionsSheet = excel['Instructions'];
-      instructionsSheet.appendRow(["Import Instructions"]);
+      instructionsSheet.appendRow(["Instructions d'importation"]);
       instructionsSheet.appendRow([""]);
-      instructionsSheet.appendRow(["1. Required Fields:"]);
+      instructionsSheet.appendRow(["1. Champs obligatoires:"]);
       instructionsSheet
-          .appendRow(["   - PRODUCTNAME: Product name (required)"]);
+          .appendRow(["   - PRODUCTNAME: Nom du produit (obligatoire)"]);
       instructionsSheet
-          .appendRow(["   - CATEGORY: Product category (required)"]);
+          .appendRow(["   - CATEGORY: Catégorie du produit (obligatoire)"]);
       instructionsSheet.appendRow(
-          ["   - SELLPRICETAXEXCLUDE: Price without tax (required)"]);
+          ["   - SELLPRICETAXEXCLUDE: Prix hors taxes (obligatoire)"]);
       instructionsSheet.appendRow([""]);
-      instructionsSheet.appendRow(["2. For products with variants:"]);
-      instructionsSheet.appendRow(["   - Set SIMPLEPRODUCT to FALSE"]);
-      instructionsSheet.appendRow(["   - Add one row per variant"]);
+      instructionsSheet.appendRow(["2. Pour les produits avec variantes:"]);
+      instructionsSheet.appendRow(["   - Mettre SIMPLEPRODUCT à FALSE"]);
+      instructionsSheet.appendRow(["   - Ajouter une ligne par variante"]);
       instructionsSheet.appendRow(
-          ["   - VARIANTNAME format: Attribute1:Value1-Attribute2:Value2"]);
+          ["   - Format VARIANTNAME: Attribut1:Valeur1-Attribut2:Valeur2"]);
       instructionsSheet.appendRow(
-          ["   - Set DEFAULTVARIANT to TRUE for one variant per product"]);
+          ["   - Mettre DEFAULTVARIANT à TRUE pour une variante par produit"]);
 
       var fileBytes = excel.encode();
       if (fileBytes == null) {
-        throw Exception('Failed to generate Excel file');
+        throw Exception('Échec de la génération du fichier Excel');
       }
 
       final directory = await getDownloadsDirectory();
       if (directory == null) {
-        throw Exception('Could not access downloads directory');
+        throw Exception(
+            'Impossible d\'accéder au répertoire de téléchargement');
       }
 
-      final filePath = '${directory.path}/product_import_template.xlsx';
+      final filePath = '${directory.path}/modele_import_produits.xlsx';
       final file = File(filePath);
       await file.writeAsBytes(fileBytes, flush: true);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Template downloaded to: $filePath'),
-            backgroundColor: Colors.green,
+            content: Text('Modèle téléchargé dans: $filePath'),
+            backgroundColor: tealGreen,
             duration: const Duration(seconds: 5),
           ),
         );
       }
     } catch (e) {
-      debugPrint('Error exporting template: $e');
+      debugPrint('Erreur lors de l\'exportation du modèle: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error exporting template: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            content: Text(
+                'Erreur lors de l\'exportation du modèle: ${e.toString()}'),
+            backgroundColor: warmRed,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -543,14 +700,14 @@ class _ImportProductPageState extends State<ImportProductPage> {
         attempt++;
         if (attempt >= retryCount) {
           debugPrint(
-              'Falling back to default category after $retryCount attempts');
-          return await _getOrCreateCategoryIdByName('Default',
+              'Retour à la catégorie par défaut après $retryCount tentatives');
+          return await _getOrCreateCategoryIdByName('Défaut',
               imagePath: imagePath);
         }
         await Future.delayed(Duration(milliseconds: 100 * attempt));
       }
     }
-    return await _getOrCreateCategoryIdByName('Default', imagePath: imagePath);
+    return await _getOrCreateCategoryIdByName('Défaut', imagePath: imagePath);
   }
 
   Future<int> _getOrCreateSubCategoryWithRetry(
@@ -565,13 +722,13 @@ class _ImportProductPageState extends State<ImportProductPage> {
         attempt++;
         if (attempt >= retryCount) {
           debugPrint(
-              'Falling back to default subcategory after $retryCount attempts');
-          return await _getOrCreateSubCategoryIdByName('Default', categoryId);
+              'Retour à la sous-catégorie par défaut après $retryCount tentatives');
+          return await _getOrCreateSubCategoryIdByName('Défaut', categoryId);
         }
         await Future.delayed(Duration(milliseconds: 100 * attempt));
       }
     }
-    return await _getOrCreateSubCategoryIdByName('Default', categoryId);
+    return await _getOrCreateSubCategoryIdByName('Défaut', categoryId);
   }
 
   Future<int> _getOrCreateCategoryIdByName(String categoryName,
@@ -645,22 +802,91 @@ class _ImportProductPageState extends State<ImportProductPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Cancel Import'),
-          content: const Text('Are you sure you want to cancel the import?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('No'),
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 10,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [deepBlue, darkBlue],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(20),
             ),
-            TextButton(
-              onPressed: () {
-                setState(() => _isImporting = false);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Yes'),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Annuler l\'importation',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: white,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Êtes-vous sûr de vouloir annuler l\'importation?',
+                    style: GoogleFonts.poppins(
+                      color: white,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: TextButton.styleFrom(
+                          backgroundColor: lightGray,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 25, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Non',
+                          style: GoogleFonts.poppins(
+                            color: darkBlue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _isImporting = false);
+                          Navigator.of(context).pop();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: warmRed,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 25, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Oui',
+                          style: GoogleFonts.poppins(
+                            color: white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -670,13 +896,13 @@ class _ImportProductPageState extends State<ImportProductPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Import Products'),
-        backgroundColor: const Color(0xFF0056A6),
+        title: const Text('Importer des Produits'),
+        backgroundColor: deepBlue,
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0056A6), Color(0xFF26A9E0)],
+            colors: [deepBlue, darkBlue],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -692,67 +918,83 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.upload_file,
-                            size: 50, color: Colors.blue),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Produit Importer/Exporter',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.white, lightGray],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.upload_file,
+                              size: 50, color: Colors.blue),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Importer/Exporter des Produits',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "Importer des produits d'un fichier Excel ou télécharger le format",
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            ElevatedButton(
-                              onPressed: _isImporting
-                                  ? null
-                                  : importProductsWithVariants,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF009688),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 15),
-                              ),
-                              child: Text(
-                                _isImporting
-                                    ? "Entrain d'importer"
-                                    : "Importer d'un fichier Excel",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  color: Colors.white,
+                          const SizedBox(height: 10),
+                          Text(
+                            "Importer des produits depuis un fichier Excel ou télécharger le modèle",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton(
+                                onPressed: _isImporting
+                                    ? null
+                                    : importProductsWithVariants,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: tealGreen,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 15),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  _isImporting
+                                      ? "Importation en cours..."
+                                      : "Importer depuis Excel",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    color: white,
+                                  ),
                                 ),
                               ),
-                            ),
-                            ElevatedButton(
-                              onPressed: _exportExcelTemplate,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 15),
-                              ),
-                              child: Text(
-                                'Télécharger le format',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  color: Colors.white,
+                              ElevatedButton(
+                                onPressed: _exportExcelTemplate,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: softOrange,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 15),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Télécharger le modèle',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    color: white,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -766,30 +1008,30 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '${(_progress * 100).toStringAsFixed(1)}% Complet',
+                    '${(_progress * 100).toStringAsFixed(1)}% Terminé',
                     style: GoogleFonts.poppins(
-                      color: Colors.white,
+                      color: white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
                     '$_importedProductsCount produits importés',
                     style: GoogleFonts.poppins(
-                      color: Colors.white,
+                      color: white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
                     '$_importedVariantsCount variantes importées',
                     style: GoogleFonts.poppins(
-                      color: Colors.white,
+                      color: white,
                       fontSize: 16,
                     ),
                   ),
                   Text(
                     '$_rejectedProductsCount produits rejetés',
                     style: GoogleFonts.poppins(
-                      color: Colors.red,
+                      color: warmRed,
                       fontSize: 16,
                     ),
                   ),
@@ -797,10 +1039,16 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   OutlinedButton(
                     onPressed: _confirmCancelImport,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: warmRed,
+                      side: BorderSide(color: warmRed),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    child: const Text("annuler l'import"),
+                    child: Text(
+                      "Annuler l'importation",
+                      style: GoogleFonts.poppins(),
+                    ),
                   ),
                 ],
                 if (_errorMessage.isNotEmpty)
@@ -809,7 +1057,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                     child: Text(
                       _errorMessage,
                       style: GoogleFonts.poppins(
-                        color: Colors.red,
+                        color: warmRed,
                         fontSize: 14,
                       ),
                       textAlign: TextAlign.center,
@@ -818,7 +1066,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 Text(
                   _importStatus,
                   style: GoogleFonts.poppins(
-                    color: Colors.white,
+                    color: white,
                     fontSize: 16,
                   ),
                 ),

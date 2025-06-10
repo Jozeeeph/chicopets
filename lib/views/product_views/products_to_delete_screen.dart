@@ -25,6 +25,15 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
 
+  // Add palette colors as class fields inside _ProductsToDeleteScreenState
+  final Color deepBlue = const Color(0xFF0056A6);
+  final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+  final Color white = Colors.white;
+  final Color lightGray = const Color(0xFFE0E0E0);
+  final Color tealGreen = const Color(0xFF009688);
+  final Color softOrange = const Color(0xFFFF9800);
+  final Color warmRed = const Color(0xFFE53935);
+
   @override
   void initState() {
     super.initState();
@@ -385,6 +394,7 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: deepBlue,
         title: const Text('Produits à supprimer'),
         actions: [
           if (_filteredProducts.isNotEmpty)
@@ -393,37 +403,62 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
                 _selectedProducts.length == _filteredProducts.length
                     ? Icons.deselect
                     : Icons.select_all,
-                color: const Color(0xFF0056A6),
+                color: white,
               ),
+              tooltip: _selectedProducts.length == _filteredProducts.length
+                  ? 'Désélectionner tout'
+                  : 'Tout sélectionner',
               onPressed: _toggleSelectAll,
             ),
           if (_selectedProducts.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete),
+              tooltip: 'Supprimer la sélection',
+              color: warmRed,
               onPressed: () => _confirmDelete(),
             ),
         ],
+        elevation: 6,
+        shadowColor: darkBlue.withOpacity(0.5),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(12.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Rechercher des produits',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                labelStyle: TextStyle(color: darkBlue),
+                prefixIcon: Icon(Icons.search, color: deepBlue),
+                filled: true,
+                fillColor: lightGray,
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: deepBlue, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: lightGray),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
+              cursorColor: deepBlue,
             ),
           ),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredProducts.isEmpty
-                    ? const Center(child: Text('Aucun produit trouvé'))
+                    ? Center(
+                        child: Text(
+                          'Aucun produit trouvé',
+                          style: TextStyle(
+                            color: darkBlue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
                     : ListView.builder(
                         itemCount: _filteredProducts.length,
                         itemBuilder: (context, index) {
@@ -431,35 +466,56 @@ class _ProductsToDeleteScreenState extends State<ProductsToDeleteScreen> {
                           final isSelected =
                               _selectedProducts.contains(product);
                           return Card(
+                            color: white,
                             margin: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                                horizontal: 12, vertical: 6),
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            shadowColor: tealGreen.withOpacity(0.3),
                             child: ListTile(
                               leading: Checkbox(
+                                activeColor: tealGreen,
                                 value: isSelected,
                                 onChanged: (value) {
                                   _toggleProductSelection(product);
                                 },
                               ),
-                              title: Text(product.designation),
+                              title: Text(
+                                product.designation,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(product.code != null
-                                      ? 'Code: ${product.code}'
-                                      : 'Pas de code'),
+                                  Text(
+                                    product.code != null
+                                        ? 'Code: ${product.code}'
+                                        : 'Pas de code',
+                                    style: TextStyle(color: darkBlue),
+                                  ),
                                   if (product.hasVariants)
-                                    Text(
-                                      '${product.variants.length} variante(s)',
-                                      style: const TextStyle(
-                                        color: Colors.orange,
-                                        fontSize: 12,
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        '${product.variants.length} variante(s)',
+                                        style: TextStyle(
+                                          color: softOrange,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                 ],
                               ),
                               trailing: IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete),
+                                color: warmRed,
+                                tooltip: 'Supprimer ce produit',
                                 onPressed: () =>
                                     _confirmDelete(singleProduct: product),
                               ),

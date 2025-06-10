@@ -18,6 +18,7 @@ class _AccountsPageState extends State<AccountsPage> {
   final TextEditingController _newCodeController = TextEditingController();
   final TextEditingController _confirmNewCodeController =
       TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   String _selectedRole = 'cashier';
   bool _isLoading = true;
 
@@ -36,7 +37,7 @@ class _AccountsPageState extends State<AccountsPage> {
   Future<void> _addUser() async {
     if (_usernameController.text.isEmpty || _codeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs')),
+        const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires')),
       );
       return;
     }
@@ -46,10 +47,12 @@ class _AccountsPageState extends State<AccountsPage> {
         username: _usernameController.text,
         code: _codeController.text,
         role: _selectedRole,
+        mail: _emailController.text.isNotEmpty ? _emailController.text : null,
       );
       await _sqlDb.addUser(newUser);
       _usernameController.clear();
       _codeController.clear();
+      _emailController.clear();
       await _loadUsers();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -194,6 +197,90 @@ class _AccountsPageState extends State<AccountsPage> {
     );
   }
 
+  Future<void> _showEditEmailDialog(User user) async {
+    _emailController.text = user.mail ?? '';
+    
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Text(
+            'Modifier l\'email pour ${user.username}',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              color: darkBlue,
+            ),
+          ),
+          content: TextField(
+            controller: _emailController,
+            decoration: InputDecoration(
+              labelText: 'Email',
+              labelStyle: TextStyle(color: darkBlue),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: deepBlue),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: deepBlue, width: 2),
+              ),
+              prefixIcon: Icon(Icons.email, color: deepBlue),
+            ),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Annuler',
+                style: TextStyle(color: warmRed),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await _sqlDb.updateUserEmail(user.username, _emailController.text);
+                  await _loadUsers();
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Email mis à jour avec succès'),
+                      backgroundColor: tealGreen,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: ${e.toString()}'),
+                      backgroundColor: warmRed,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: tealGreen,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: Text(
+                'Valider',
+                style: GoogleFonts.poppins(
+                  color: white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _deleteUser(int userId) async {
     try {
       await _sqlDb.deleteUser(userId);
@@ -220,6 +307,7 @@ class _AccountsPageState extends State<AccountsPage> {
     _codeController.dispose();
     _newCodeController.dispose();
     _confirmNewCodeController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -332,6 +420,26 @@ class _AccountsPageState extends State<AccountsPage> {
                           fillColor: lightGray.withOpacity(0.3),
                         ),
                         obscureText: true,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _emailController,
+                        decoration: InputDecoration(
+                          labelText: 'Email (optionnel)',
+                          labelStyle: TextStyle(color: darkBlue),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: deepBlue),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: deepBlue, width: 2),
+                          ),
+                          prefixIcon: Icon(Icons.email, color: deepBlue),
+                          filled: true,
+                          fillColor: lightGray.withOpacity(0.3),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
@@ -499,15 +607,33 @@ class _AccountsPageState extends State<AccountsPage> {
                                       color: darkBlue,
                                     ),
                                   ),
-                                  subtitle: Text(
-                                    'Rôle: ${user.role == 'admin' ? 'Administrateur' : 'Caissier'}',
-                                    style: GoogleFonts.poppins(
-                                      color: darkBlue.withOpacity(0.7),
-                                    ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Rôle: ${user.role == 'admin' ? 'Administrateur' : 'Caissier'}',
+                                        style: GoogleFonts.poppins(
+                                          color: darkBlue.withOpacity(0.7),
+                                        ),
+                                      ),
+                                      if (user.mail != null && user.mail!.isNotEmpty)
+                                        Text(
+                                          'Email: ${user.mail}',
+                                          style: GoogleFonts.poppins(
+                                            color: darkBlue.withOpacity(0.7),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: Icon(Icons.email, color: deepBlue),
+                                        onPressed: () => _showEditEmailDialog(user),
+                                        tooltip: 'Modifier l\'email',
+                                      ),
                                       IconButton(
                                         icon: Icon(Icons.vpn_key,
                                             color: tealGreen),

@@ -4,6 +4,7 @@ class User {
   final String code; // Le code d'accès
   final String role; // 'admin' ou 'cashier'
   final bool isActive;
+  final String? mail;
 
   User({
     this.id,
@@ -11,6 +12,7 @@ class User {
     required this.code,
     required this.role,
     this.isActive = true,
+    this.mail,
   });
 
   factory User.fromMap(Map<String, dynamic> map) {
@@ -20,6 +22,7 @@ class User {
       code: map['code'],
       role: map['role'],
       isActive: map['is_active'] == 1,
+      mail: map['mail'],
     );
   }
 
@@ -30,6 +33,13 @@ class User {
       'code': code,
       'role': role,
       'is_active': isActive ? 1 : 0,
+      'mail': mail,
     };
+  }
+
+  @override
+  String toString() {
+    return 'User{id: $id, username: "$username", role: "$role", isActive: $isActive, mail: ${mail ?? "null"}}';
+    // Note: We're not showing the code here for security reasons
   }
 }
