@@ -234,7 +234,7 @@ class SqlDb {
             code TEXT NOT NULL,
             role TEXT NOT NULL,
             is_active INTEGER DEFAULT 1,
-            email TEXT
+            mail TEXT
           );
         ''');
         print("Users table created");
@@ -594,7 +594,8 @@ class SqlDb {
 
   Future<bool> doesProductWithDesignationExist(String designation) async {
     final dbClient = await db;
-    return await ProductController().doesProductWithDesignationExist(designation, dbClient);
+    return await ProductController()
+        .doesProductWithDesignationExist(designation, dbClient);
   }
 
   Future<List<String>> getProductsInSubCategory(int subCategoryId) async {
@@ -962,6 +963,21 @@ class SqlDb {
   Future<User?> getUserByUsername(String username) async {
     final dbClient = await db;
     return await UserController().getUserByUsername(username, dbClient);
+  }
+
+  Future<int> updateUserEmail(String username, String email) async {
+    final dbClient = await db;
+    try {
+      // Update the email for the user with the given username
+      return await dbClient.update(
+        'users',
+        {'mail': email.isEmpty ? null : email},
+        where: 'username = ?',
+        whereArgs: [username],
+      );
+    } catch (e) {
+      throw Exception('Failed to update email: $e');
+    }
   }
 
   Future<List<User>> getAllUsers() async {
