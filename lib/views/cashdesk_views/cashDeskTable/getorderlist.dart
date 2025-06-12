@@ -25,7 +25,6 @@ class Getorderlist {
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
- 
   static double calculateTotalBeforeDiscount(Order order) {
     double total = 0.0;
     for (var orderLine in order.orderLines) {
@@ -79,229 +78,287 @@ class Getorderlist {
 
   static void showListOrdersPopUp(BuildContext context) async {
     final SqlDb sqldb = SqlDb();
+
+    // Load orders and filter them
     List<Order> orders = await sqldb.getOrdersWithOrderLines();
     orders = orders
         .where(
             (order) => order.status != 'annulée' && order.orderLines.isNotEmpty)
         .toList();
 
+    // Load all clients and build a map for quick access
+    final clients = await sqldb.getAllClients();
+    final Map<int, Client> clientMap = {
+      for (var client in clients) client.id!: client,
+    };
+
+    TextEditingController searchController = TextEditingController();
+    List<Order> filteredOrders = List.from(orders);
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          title: const Text(
-            "Liste des Commandes",
-            style: TextStyle(
-                fontWeight: FontWeight.bold, color: Color(0xFF0056A6)),
-          ),
-          content: orders.isEmpty
-              ? const Text("Aucune commande disponible.",
-                  style: TextStyle(color: Color(0xFF000000)))
-              : SizedBox(
-                  width: double.maxFinite,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      Order order = orders[index];
-                      bool isCancelled = order.status == 'annulée';
-                      bool isSemiPaid = order.remainingAmount > 0;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void filterOrders(String query) {
+              setState(() {
+                filteredOrders = orders.where((order) {
+                  final idMatch =
+                      order.idOrder.toString().contains(query.trim());
+                  final dateMatch = formatDate(order.date)
+                      .toLowerCase()
+                      .contains(query.toLowerCase().trim());
+                  final clientName = clientMap[order.idClient]?.name ?? '';
+                  final clientMatch = clientName
+                      .toLowerCase()
+                      .contains(query.toLowerCase().trim());
+                  return idMatch || dateMatch || clientMatch;
+                }).toList();
+              });
+            }
 
-                      return Card(
-                        margin: const EdgeInsets.all(8.0),
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        color: isCancelled
-                            ? Colors.red.shade100
-                            : isSemiPaid
-                                ? Colors.orange.shade100
-                                : order.status == "payée"
-                                    ? Colors.green.shade100
-                                    : Colors.white,
-                        child: ExpansionTile(
-                          title: Text(
-                            'Commande #${order.idOrder} - ${formatDate(order.date)}',
-                            style: TextStyle(
-                              color: isCancelled
-                                  ? Colors.red
-                                  : isSemiPaid
-                                      ? Colors.orange
-                                      : order.status == "payée"
-                                          ? Colors.green
-                                          : const Color(0xFF0056A6),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(
-                            isCancelled
-                                ? 'Commande annulée'
-                                : isSemiPaid
-                                    ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT'
-                                    : order.status == "payée"
-                                        ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT'
-                                        : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT',
-                            style: TextStyle(
-                              color: isCancelled
-                                  ? Colors.red
-                                  : isSemiPaid
-                                      ? Colors.orange
-                                      : order.status == "payée"
-                                          ? Colors.green
-                                          : const Color(0xFF009688),
-                            ),
-                          ),
-                          children: [
-                            ...order.orderLines.map((orderLine) {
-                              // Utilisez product_data si disponible, sinon les champs standards
-                              String productName =
-                                  orderLine.productData?['designation'] ??
-                                      orderLine.productName ??
-                                      'Produit inconnu';
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text(
+                "Liste des Commandes",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Color(0xFF0056A6)),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: "Rechercher par ID, Date ou Nom Client",
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: filterOrders,
+                  ),
+                  const SizedBox(height: 10),
+                  filteredOrders.isEmpty
+                      ? const Text("Aucune commande trouvée.",
+                          style: TextStyle(color: Color(0xFF000000)))
+                      : SizedBox(
+                          width: double.maxFinite,
+                          height: 400,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredOrders.length,
+                            itemBuilder: (context, index) {
+                              Order order = filteredOrders[index];
+                              bool isCancelled = order.status == 'annulée';
+                              bool isSemiPaid = order.remainingAmount > 0;
+                              final clientName =
+                                  clientMap[order.idClient]?.name ??
+                                      'Client inconnu';
 
-                              if (orderLine.variantName != null) {
-                                productName += " (${orderLine.variantName})";
-                              }
-
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4.0),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                              return Card(
+                                margin: const EdgeInsets.all(8.0),
+                                elevation: 4,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                color: isCancelled
+                                    ? Colors.red.shade100
+                                    : isSemiPaid
+                                        ? Colors.orange.shade100
+                                        : order.status == "payée"
+                                            ? Colors.green.shade100
+                                            : Colors.white,
+                                child: ExpansionTile(
+                                  title: Text(
+                                    'Commande #${order.idOrder} - ${formatDate(order.date)}',
+                                    style: TextStyle(
+                                      color: isCancelled
+                                          ? Colors.red
+                                          : isSemiPaid
+                                              ? Colors.orange
+                                              : order.status == "payée"
+                                                  ? Colors.green
+                                                  : const Color(0xFF0056A6),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '$clientName\n${isCancelled ? 'Commande annulée' : isSemiPaid ? 'Semi-payée - Reste: ${order.remainingAmount.toStringAsFixed(2)} DT' : order.status == "payée" ? 'Payée - Total: ${order.total.toStringAsFixed(2)} DT' : 'Non payée - Total: ${order.total.toStringAsFixed(2)} DT'}',
+                                    style: TextStyle(
+                                      color: isCancelled
+                                          ? Colors.red
+                                          : isSemiPaid
+                                              ? Colors.orange
+                                              : order.status == "payée"
+                                                  ? Colors.green
+                                                  : const Color(0xFF009688),
+                                    ),
+                                  ),
                                   children: [
-                                    Expanded(
-                                      flex: 1,
-                                      child: Text(
-                                        "x${orderLine.quantity}", // Afficher la quantité
-                                        style: const TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF000000)),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 2,
-                                      child: Text(
-                                        productName,
-                                        style: const TextStyle(
-                                            fontSize: 16,
-                                            color: Color(0xFF000000)),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      flex: 1,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Color(0xFF000000)),
-                                          ),
-                                          if (orderLine.discount > 0)
-                                            Text(
-                                              orderLine.isPercentage
-                                                  ? "-${orderLine.discount.toStringAsFixed(2)}%"
-                                                  : "-${orderLine.discount.toStringAsFixed(2)} DT",
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.red,
-                                                fontWeight: FontWeight.bold,
+                                    ...order.orderLines.map((orderLine) {
+                                      String productName = orderLine
+                                              .productData?['designation'] ??
+                                          orderLine.productName ??
+                                          'Produit inconnu';
+
+                                      if (orderLine.variantName != null) {
+                                        productName +=
+                                            " (${orderLine.variantName})";
+                                      }
+
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 4.0),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                "x${orderLine.quantity}",
+                                                style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: Color(0xFF000000)),
                                               ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                productName,
+                                                style: const TextStyle(
+                                                    fontSize: 16,
+                                                    color: Color(0xFF000000)),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    "${orderLine.prixUnitaire.toStringAsFixed(2)} DT",
+                                                    style: const TextStyle(
+                                                        fontSize: 16,
+                                                        color:
+                                                            Color(0xFF000000)),
+                                                  ),
+                                                  if (orderLine.discount > 0)
+                                                    Text(
+                                                      orderLine.isPercentage
+                                                          ? "-${orderLine.discount.toStringAsFixed(2)}%"
+                                                          : "-${orderLine.discount.toStringAsFixed(2)} DT",
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.red,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                "${(orderLine.finalPrice * orderLine.quantity).toStringAsFixed(2)} DT",
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF000000),
+                                                ),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.delete,
+                                                  color: Colors.red),
+                                              onPressed: () async {
+                                                await deleteOrderLine(
+                                                    context, order, orderLine,
+                                                    () {
+                                                  Navigator.pop(context);
+                                                  showListOrdersPopUp(context);
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          ElevatedButton.icon(
+                                            onPressed: () {
+                                              _showOrderTicketPopup(
+                                                  context, order);
+                                            },
+                                            icon: Icon(Icons.print,
+                                                color: Colors.white),
+                                            label: Text("Imprimer Ticket",
+                                                style: TextStyle(
+                                                    color: Colors.white)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Color(0xFF26A9E0),
+                                            ),
+                                          ),
+                                          ElevatedButton.icon(
+                                            onPressed: () =>
+                                                _editOrder(context, order),
+                                            icon: const Icon(Icons.edit,
+                                                color: Colors.white),
+                                            label: const Text(
+                                              "Modifier",
+                                              style: TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.orange,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 12),
+                                            ),
+                                          ),
+                                          if (isSemiPaid)
+                                            IconButton(
+                                              icon: Icon(Icons.update,
+                                                  color: Colors.blue),
+                                              onPressed: () {
+                                                _updateSemiPaidOrder(
+                                                    context, order);
+                                              },
                                             ),
                                         ],
                                       ),
                                     ),
-                                    Expanded(
-                                      flex: 1,
-                                      child: Text(
-                                        "${(orderLine.finalPrice * orderLine.quantity).toStringAsFixed(2)} DT",
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF000000),
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon:
-                                          Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () async {
-                                        await deleteOrderLine(
-                                            context, order, orderLine, () {
-                                          Navigator.pop(context);
-                                          showListOrdersPopUp(context);
-                                        });
-                                      },
-                                    ),
                                   ],
                                 ),
                               );
-                            }).toList(),
-                            // In the ExpansionTile children where you have other buttons:
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 8.0),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      _showOrderTicketPopup(context, order);
-                                    },
-                                    icon:
-                                        Icon(Icons.print, color: Colors.white),
-                                    label: Text("Imprimer Ticket",
-                                        style: TextStyle(color: Colors.white)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(0xFF26A9E0),
-                                    ),
-                                  ),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _editOrder(context, order),
-                                    icon: const Icon(Icons.edit,
-                                        color: Colors.white),
-                                    label: const Text(
-                                      "Modifier",
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 12),
-                                    ),
-                                  ),
-                                  if (isSemiPaid)
-                                    IconButton(
-                                      icon: Icon(Icons.update,
-                                          color: Colors.blue),
-                                      onPressed: () {
-                                        _updateSemiPaidOrder(context, order);
-                                      },
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
+                            },
+                          ),
                         ),
-                      );
-                    },
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "Fermer",
+                    style: TextStyle(color: Color(0xFF000000)),
                   ),
                 ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "Fermer",
-                style: TextStyle(color: Color(0xFF000000)),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );

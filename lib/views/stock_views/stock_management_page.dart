@@ -28,6 +28,12 @@ class _StockManagementPageState extends State<StockManagementPage> {
     'Collecte par le gérant',
     'Autre raison'
   ];
+  final List<String> _collectionLocations = [
+    'Marché local',
+    'Grossiste X',
+    'Entrepôt Y',
+    'Autre'
+  ];
 
   List<Product> _products = [];
   bool _isLoading = true;
@@ -52,6 +58,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   };
 
+  final Map<int, StockMovement?> _pendingCollections = {};
+  final Map<int, StockMovement?> _readyForConfirmation = {};
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +76,15 @@ class _StockManagementPageState extends State<StockManagementPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  String _getCollectionCountdown(StockMovement movement) {
+    final now = DateTime.now();
+    final difference = movement.movementDate.difference(now);
+    if (difference.isNegative) return 'En retard';
+    final days = difference.inDays;
+    final hours = difference.inHours % 24;
+    return days > 0 ? 'Dans $days jour(s)' : 'Dans $hours heure(s)';
   }
 
   Future<bool> _onWillPop() async {
@@ -140,6 +158,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
           }
         }
         _isLoading = false;
+        _pendingStockChanges.clear();
+        _pendingVariantChanges.clear();
         _hasUnsavedChanges = false;
       });
     } catch (e) {
@@ -678,6 +698,21 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   }
 
+  void _scheduleCollectionAlert(StockMovement movement) {
+    final now = DateTime.now();
+    final durationUntilCollection = movement.movementDate.difference(now);
+
+    Timer(durationUntilCollection, () {
+      if (mounted) {
+        setState(() {
+          // Déplacer le mouvement de _pendingCollections à _readyForConfirmation
+          _pendingCollections.remove(movement.productId);
+          _readyForConfirmation[movement.productId] = movement;
+        });
+      }
+    });
+  }
+
   void _showAddMovementDialog(Product product) {
     final _formKey = GlobalKey<FormState>();
     String _movementType = 'in';
@@ -866,6 +901,1084 @@ class _StockManagementPageState extends State<StockManagementPage> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showNewCollectionDialog(Product product) {
+    final _formKey = GlobalKey<FormState>();
+    int _quantity = _predictions['products']['short_term']?[product.id] != null
+        ? (_predictions['products']['short_term']![product.id]! - product.stock)
+            .clamp(0, double.infinity)
+            .toInt()
+        : 0;
+    String? _location = _collectionLocations.first;
+    DateTime _collectionDateTime = DateTime.now().add(const Duration(hours: 1));
+    String? _notes;
+
+    // Define color palette
+    final Color deepBlue = const Color(0xFF0056A6);
+    final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+    final Color white = Colors.white;
+    final Color lightGray = const Color(0xFFE0E0E0);
+    final Color tealGreen = const Color(0xFF009688);
+    final Color softOrange = const Color(0xFFFF9800);
+    final Color warmRed = const Color(0xFFE53935);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 5,
+            backgroundColor: white,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header with icon and title
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping,
+                          color: deepBlue,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Planifier une collecte',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: darkBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(color: lightGray, thickness: 1),
+                    const SizedBox(height: 16),
+                    // Product designation
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: lightGray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.inventory, color: tealGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Produit: ${product.designation}',
+                              style: TextStyle(fontSize: 16, color: darkBlue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Quantity field
+                    TextFormField(
+                      initialValue: _quantity.toString(),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Quantité à collecter',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon: Icon(Icons.numbers, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'Champ obligatoire';
+                        if (int.tryParse(value) == null || int.parse(value) < 0)
+                          return 'Nombre invalide';
+                        return null;
+                      },
+                      onSaved: (value) => _quantity = int.parse(value!),
+                    ),
+                    const SizedBox(height: 16),
+                    // Location dropdown
+                    DropdownButtonFormField<String>(
+                      value: _location,
+                      items: _collectionLocations
+                          .map((loc) => DropdownMenuItem(
+                                value: loc,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.location_on,
+                                        color: tealGreen, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(loc),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (value) => setState(() => _location = value),
+                      decoration: InputDecoration(
+                        labelText: 'Lieu de collecte',
+                        labelStyle: TextStyle(color: darkBlue),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      validator: (value) =>
+                          value == null ? 'Champ obligatoire' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Date picker field
+                    TextFormField(
+                      initialValue: DateFormat('dd/MM/yyyy HH:mm')
+                          .format(_collectionDateTime),
+                      decoration: InputDecoration(
+                        labelText: 'Date et heure de collecte',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon:
+                            Icon(Icons.calendar_today, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: _collectionDateTime,
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData.light().copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: deepBlue,
+                                  onPrimary: white,
+                                  surface: lightGray,
+                                  onSurface: darkBlue,
+                                ),
+                                dialogBackgroundColor: white,
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedDate != null) {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime:
+                                TimeOfDay.fromDateTime(_collectionDateTime),
+                            builder: (context, child) {
+                              return Theme(
+                                data: ThemeData.light().copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: deepBlue,
+                                    onPrimary: white,
+                                    surface: lightGray,
+                                    onSurface: darkBlue,
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (pickedTime != null) {
+                            setState(() {
+                              _collectionDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                      readOnly: true,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Champ obligatoire'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Notes field
+                    TextFormField(
+                      decoration: InputDecoration(
+                        labelText: 'Notes (optionnel)',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon: Icon(Icons.note, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      maxLines: 2,
+                      onSaved: (value) => _notes = value,
+                    ),
+                    const SizedBox(height: 24),
+                    // Action buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: warmRed,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: warmRed),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.cancel, size: 18, color: warmRed),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Annuler',
+                                style: TextStyle(
+                                  color: warmRed,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (_formKey.currentState!.validate()) {
+                              _formKey.currentState!.save();
+                              try {
+                                final movement = StockMovement(
+                                  productId: product.id!,
+                                  movementType: 'in',
+                                  quantity: _quantity,
+                                  previousStock: product.stock,
+                                  newStock: product.stock + _quantity,
+                                  movementDate: _collectionDateTime,
+                                  notes:
+                                      'Collecte planifiée - Lieu: $_location${_notes != null ? ' - $_notes' : ''}',
+                                );
+                                await _stockMovementService
+                                    .recordMovement(movement);
+                                Navigator.pop(context);
+                                _showSuccess('Collecte planifiée avec succès');
+                                _loadData();
+                                // Planifier l'alerte pour l'heure de la collecte
+                                _scheduleCollectionAlert(movement);
+                              } catch (e) {
+                                _showError('Erreur: ${e.toString()}');
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: deepBlue,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 3,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle, color: white, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Planifier',
+                                style: TextStyle(
+                                  color: white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showPlannedCollectionsDialog(
+      Product product, List<StockMovement> plannedCollections) {
+    // Define color palette
+    final Color deepBlue = const Color(0xFF0056A6);
+    final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+    final Color white = Colors.white;
+    final Color lightGray = const Color(0xFFE0E0E0);
+    final Color tealGreen = const Color(0xFF009688);
+    final Color softOrange = const Color(0xFFFF9800);
+    final Color warmRed = const Color(0xFFE53935);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 5,
+        backgroundColor: white,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with icon and title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.local_shipping,
+                        color: deepBlue,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Collectes planifiées',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: darkBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, size: 24, color: darkBlue),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Divider(color: lightGray, thickness: 1),
+              const SizedBox(height: 16),
+              // Product designation
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: lightGray.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory, color: tealGreen, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Produit: ${product.designation}',
+                        style: TextStyle(fontSize: 16, color: darkBlue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // List of planned collections
+              Expanded(
+                child: plannedCollections.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.event_busy, size: 48, color: lightGray),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Aucune collecte planifiée',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: darkBlue,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: plannedCollections.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final collection = plannedCollections[index];
+                          final isPastDue =
+                              collection.movementDate.isBefore(DateTime.now());
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: lightGray.withOpacity(0.3),
+                                  spreadRadius: 1,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.numbers,
+                                              color: tealGreen, size: 20),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Quantité: ${collection.quantity}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: darkBlue,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        DateFormat('dd/MM/yy HH:mm')
+                                            .format(collection.movementDate),
+                                        style: TextStyle(
+                                          color: darkBlue.withOpacity(0.7),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.access_time,
+                                          color:
+                                              isPastDue ? warmRed : tealGreen,
+                                          size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _getCollectionCountdown(collection),
+                                        style: TextStyle(
+                                          color: isPastDue ? warmRed : darkBlue,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (collection.notes != null &&
+                                      collection.notes!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: lightGray.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(color: lightGray),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.note,
+                                                color: tealGreen, size: 18),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                collection.notes!,
+                                                style: TextStyle(
+                                                  color: darkBlue,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        icon:
+                                            Icon(Icons.edit, color: softOrange),
+                                        onPressed: () =>
+                                            _showEditCollectionDialog(
+                                                product, collection),
+                                        tooltip: 'Modifier',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 16),
+              // New collection button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showNewCollectionDialog(product);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: deepBlue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 3,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add, color: white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Nouvelle collecte',
+                      style: TextStyle(
+                        color: white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditCollectionDialog(Product product, StockMovement collection) {
+    final _formKey = GlobalKey<FormState>();
+    int _quantity = collection.quantity;
+    DateTime _collectionDateTime = collection.movementDate;
+    String? _notes = collection.notes;
+
+    // Define color palette
+    final Color deepBlue = const Color(0xFF0056A6);
+    final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+    final Color white = Colors.white;
+    final Color lightGray = const Color(0xFFE0E0E0);
+    final Color tealGreen = const Color(0xFF009688);
+    final Color softOrange = const Color(0xFFFF9800);
+    final Color warmRed = const Color(0xFFE53935);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            elevation: 5,
+            backgroundColor: white,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header with icon and title
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.edit,
+                          color: softOrange,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Modifier la collecte',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: darkBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(color: lightGray, thickness: 1),
+                    const SizedBox(height: 16),
+                    // Product designation
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: lightGray.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.inventory, color: tealGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Produit: ${product.designation}',
+                              style: TextStyle(fontSize: 16, color: darkBlue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Quantity field
+                    TextFormField(
+                      initialValue: _quantity.toString(),
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Quantité à collecter',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon: Icon(Icons.numbers, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return 'Champ obligatoire';
+                        if (int.tryParse(value) == null || int.parse(value) < 0)
+                          return 'Nombre invalide';
+                        return null;
+                      },
+                      onSaved: (value) => _quantity = int.parse(value!),
+                    ),
+                    const SizedBox(height: 16),
+                    // Date and time picker field
+                    TextFormField(
+                      initialValue: DateFormat('dd/MM/yyyy HH:mm')
+                          .format(_collectionDateTime),
+                      decoration: InputDecoration(
+                        labelText: 'Date et heure de collecte',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon:
+                            Icon(Icons.calendar_today, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: _collectionDateTime,
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData.light().copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: deepBlue,
+                                  onPrimary: white,
+                                  surface: lightGray,
+                                  onSurface: darkBlue,
+                                ),
+                                dialogBackgroundColor: white,
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedDate != null) {
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime:
+                                TimeOfDay.fromDateTime(_collectionDateTime),
+                            builder: (context, child) {
+                              return Theme(
+                                data: ThemeData.light().copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: deepBlue,
+                                    onPrimary: white,
+                                    surface: lightGray,
+                                    onSurface: darkBlue,
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (pickedTime != null) {
+                            setState(() {
+                              _collectionDateTime = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                pickedTime.hour,
+                                pickedTime.minute,
+                              );
+                            });
+                          }
+                        }
+                      },
+                      readOnly: true,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Champ obligatoire'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Notes field
+                    TextFormField(
+                      initialValue: _notes,
+                      decoration: InputDecoration(
+                        labelText: 'Notes (optionnel)',
+                        labelStyle: TextStyle(color: darkBlue),
+                        prefixIcon: Icon(Icons.note, color: tealGreen),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: lightGray),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: deepBlue, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: lightGray.withOpacity(0.2),
+                      ),
+                      maxLines: 2,
+                      onSaved: (value) => _notes = value,
+                    ),
+                    const SizedBox(height: 24),
+                    // Action buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: warmRed,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: warmRed),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.cancel, size: 18, color: warmRed),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Annuler',
+                                style: TextStyle(
+                                  color: warmRed,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (_formKey.currentState!.validate()) {
+                              _formKey.currentState!.save();
+                              try {
+                                Navigator.pop(context);
+                                _showSuccess('Collecte modifiée avec succès');
+                                _loadData();
+                                // Re-planifier l'alerte pour la nouvelle heure
+                                _scheduleCollectionAlert(collection.copyWith(
+                                  quantity: _quantity,
+                                  newStock:
+                                      collection.previousStock + _quantity,
+                                  movementDate: _collectionDateTime,
+                                  notes: _notes,
+                                ));
+                              } catch (e) {
+                                _showError('Erreur: ${e.toString()}');
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: deepBlue,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 3,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle, color: white, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Enregistrer',
+                                style: TextStyle(
+                                  color: white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _confirmCollectionDialog(Product product, StockMovement collection) {
+    final _formKey = GlobalKey<FormState>();
+    int _quantity = collection.quantity;
+
+    // Define color palette
+    final Color deepBlue = const Color(0xFF0056A6);
+    final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
+    final Color white = Colors.white;
+    final Color lightGray = const Color(0xFFE0E0E0);
+    final Color tealGreen = const Color(0xFF009688);
+    final Color warmRed = const Color(0xFFE53935);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 5,
+        backgroundColor: white,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header with icon and title
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: deepBlue,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Confirmer la collecte',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: darkBlue,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Divider(color: lightGray, thickness: 1),
+                const SizedBox(height: 16),
+                // Product designation
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: lightGray.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory, color: tealGreen, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Produit: ${product.designation}',
+                          style: TextStyle(fontSize: 16, color: darkBlue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Quantity field
+                TextFormField(
+                  initialValue: _quantity.toString(),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Quantité collectée',
+                    labelStyle: TextStyle(color: darkBlue),
+                    prefixIcon: Icon(Icons.numbers, color: tealGreen),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: lightGray),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: deepBlue, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: lightGray.withOpacity(0.2),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty)
+                      return 'Champ obligatoire';
+                    if (int.tryParse(value) == null || int.parse(value) < 0)
+                      return 'Nombre invalide';
+                    return null;
+                  },
+                  onSaved: (value) => _quantity = int.parse(value!),
+                ),
+                const SizedBox(height: 24),
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _readyForConfirmation.remove(product.id);
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: warmRed,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: warmRed),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cancel, size: 18, color: warmRed),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Annuler',
+                            style: TextStyle(
+                              color: warmRed,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (_formKey.currentState!.validate()) {
+                          _formKey.currentState!.save();
+                          try {
+                            Navigator.pop(context);
+                            setState(() {
+                              _readyForConfirmation.remove(product.id);
+                            });
+                            _showSuccess('Collecte confirmée avec succès');
+                            _loadData();
+                          } catch (e) {
+                            _showError('Erreur: ${e.toString()}');
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: deepBlue,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 3,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, color: white, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Confirmer',
+                            style: TextStyle(
+                              color: white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1207,7 +2320,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 1, child: Text('Stock', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('          Statut', style: _headerTextStyle())),
+                      child: Text('Statut', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
                       child: Text('Prix Achat', style: _headerTextStyle())),
@@ -1228,6 +2341,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       child:
                           Text('Prédiction (30j)', style: _headerTextStyle())),
                   Expanded(
+                      flex: 2,
+                      child: Text('Collecte', style: _headerTextStyle())),
+                  Expanded(
                       flex: 1, child: Text('MVMT', style: _headerTextStyle())),
                 ],
               ),
@@ -1247,6 +2363,8 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 final shortTermPrediction =
                     _predictions['products']['short_term']?[product.id] ?? 0;
                 final stockNeeded = shortTermPrediction - product.stock;
+                final hasPendingCollection =
+                    _pendingCollections.containsKey(product.id);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -1368,6 +2486,74 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                           : Colors.green,
                                   fontWeight: FontWeight.bold,
                                 ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.local_shipping,
+                                      color: _readyForConfirmation
+                                              .containsKey(product.id)
+                                          ? Colors
+                                              .red // Couleur rouge si la collecte est prête
+                                          : const Color(0xFF0056A6),
+                                    ),
+                                    onPressed: () {
+                                      if (_readyForConfirmation
+                                          .containsKey(product.id)) {
+                                        // Afficher la boîte de dialogue de confirmation si la collecte est prête
+                                        _confirmCollectionDialog(product,
+                                            _readyForConfirmation[product.id]!);
+                                      }
+                                    },
+                                  ),
+                                  if (_pendingCollections
+                                      .containsKey(product.id))
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors
+                                              .orange, // Orange pour les collectes en attente
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          _getCollectionCountdown(
+                                              _pendingCollections[product.id]!),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  if (_readyForConfirmation
+                                      .containsKey(product.id))
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors
+                                              .red, // Rouge pour indiquer que la collecte est prête
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.warning,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             Expanded(

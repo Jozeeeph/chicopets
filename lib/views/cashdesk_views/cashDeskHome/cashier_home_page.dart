@@ -1,3 +1,5 @@
+import 'package:caissechicopets/models/user.dart';
+import 'package:caissechicopets/views/user_views/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/services/cash_service.dart';
 import 'package:caissechicopets/models/cash_state.dart';
@@ -21,6 +23,7 @@ class _CashierHomePageState extends State<CashierHomePage>
   bool _isLoading = true;
   bool _needsInitialAmount = false;
   final TextEditingController _amountController = TextEditingController();
+  User? _currentUser;
 
   @override
   void initState() {
@@ -408,7 +411,15 @@ class _CashierHomePageState extends State<CashierHomePage>
                 child: Text('Annuler'),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () {
+                  // Create an instance and call printReport()
+                  final reportPage = CashClosureReportPage(
+                    cashState: _cashState ??
+                        CashState(initialAmount: 0, isClosed: true),
+                  );
+                  reportPage.printReport(context);
+                  _logout();
+                },
                 child: Text('Confirmer', style: TextStyle(color: Colors.red)),
               ),
             ],
@@ -433,6 +444,15 @@ class _CashierHomePageState extends State<CashierHomePage>
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _logout() async {
+    await SessionManager.clearSession();
+    if (mounted) {
+      setState(() {
+        _currentUser = null;
+      });
     }
   }
 }

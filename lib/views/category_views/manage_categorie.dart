@@ -18,7 +18,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   List<Category> _filteredCategories = [];
   final TextEditingController _searchController = TextEditingController();
   List<Category> _selectedCategories = [];
-  String _importStatus = 'Ready';
+  String _importStatus = 'Prêt';
   String _errorMessage = '';
 
   @override
@@ -36,13 +36,13 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('categories', 'sub_categories')",
       );
       if (tables.length < 2) {
-        throw Exception('Required database tables not found');
+        throw Exception('Tables de base de données requises non trouvées');
       }
       await fetchCategories();
     } catch (e) {
       setState(() {
-        _importStatus = 'Error';
-        _errorMessage = 'Database initialization failed: ${e.toString()}';
+        _importStatus = 'Erreur';
+        _errorMessage = 'Échec de l\'initialisation de la base de données: ${e.toString()}';
       });
     }
   }
@@ -56,7 +56,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
 
   Future<void> fetchCategories() async {
     setState(() {
-      _importStatus = 'Loading';
+      _importStatus = 'Chargement';
       _errorMessage = '';
     });
 
@@ -72,12 +72,12 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       setState(() {
         _categories = fetchedCategories;
         _filteredCategories = fetchedCategories;
-        _importStatus = 'Ready';
+        _importStatus = 'Prêt';
       });
     } catch (e) {
       setState(() {
-        _importStatus = 'Error';
-        _errorMessage = 'Failed to load categories: ${e.toString()}';
+        _importStatus = 'Erreur';
+        _errorMessage = 'Échec du chargement des catégories: ${e.toString()}';
       });
     }
   }
@@ -94,7 +94,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       }
       return false;
     } catch (e) {
-      debugPrint('Error checking products: $e');
+      debugPrint('Erreur lors de la vérification des produits: $e');
       return true; // Fail-safe - assume there are products
     }
   }
@@ -181,18 +181,18 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       bool confirmed = await showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text("Confirm Delete"),
+              title: const Text("Confirmer la suppression"),
               content: Text(
-                  "Are you sure you want to delete ${categoriesToDelete.length} category(ies)?"),
+                  "Êtes-vous sûr de vouloir supprimer ${categoriesToDelete.length} catégorie(s)?"),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text("Cancel"),
+                  child: const Text("Annuler"),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
                   child:
-                      const Text("Delete", style: TextStyle(color: Colors.red)),
+                      const Text("Supprimer", style: TextStyle(color: Colors.red)),
                 ),
               ],
             ),
@@ -203,7 +203,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         await _deleteCategories(categoriesToDelete);
       }
     } catch (e) {
-      _showMessage("Error during deletion process: ${e.toString()}");
+      _showMessage("Erreur lors du processus de suppression: ${e.toString()}");
     }
   }
 
@@ -217,7 +217,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             const Icon(Icons.warning, size: 40, color: Colors.orange),
             const SizedBox(height: 8),
             Text(
-              "Cannot Delete Category",
+              "Impossible de supprimer la catégorie",
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -230,8 +230,8 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "This category contains ${productCodes.length} product(s). "
-              "You must delete these products first.",
+              "Cette catégorie contient ${productCodes.length} produit(s). "
+              "Vous devez d'abord supprimer ces produits.",
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 16),
@@ -242,7 +242,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                "Products: ${productCodes.take(5).join(', ')}${productCodes.length > 5 ? '...' : ''}",
+                "Produits: ${productCodes.take(5).join(', ')}${productCodes.length > 5 ? '...' : ''}",
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -252,7 +252,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: const Text("Annuler"),
           ),
           ElevatedButton(
             onPressed: () {
@@ -270,7 +270,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).primaryColor,
             ),
-            child: const Text("View Products",
+            child: const Text("Voir les produits",
                 style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -304,11 +304,11 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
       });
 
       if (successCount > 0) {
-        _showMessage("Deleted $successCount category(ies)");
+        _showMessage("$successCount catégorie(s) supprimée(s)");
         await fetchCategories();
       }
     } catch (e) {
-      _showMessage("Error deleting categories: ${e.toString()}");
+      _showMessage("Erreur lors de la suppression des catégories: ${e.toString()}");
     }
   }
 
@@ -339,7 +339,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
         children: [
           CircularProgressIndicator(),
           SizedBox(height: 16),
-          Text("Loading categories..."),
+          Text("Chargement des catégories..."),
         ],
       ),
     );
@@ -353,7 +353,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
           const Icon(Icons.error_outline, size: 48, color: Colors.red),
           const SizedBox(height: 16),
           Text(
-            "Error loading categories",
+            "Erreur de chargement des catégories",
             style: TextStyle(
               fontSize: 18,
               color: Theme.of(context).colorScheme.error,
@@ -368,7 +368,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: fetchCategories,
-            child: const Text("Retry"),
+            child: const Text("Réessayer"),
           ),
         ],
       ),
@@ -383,13 +383,13 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
           const Icon(Icons.category_outlined, size: 48, color: Colors.grey),
           const SizedBox(height: 16),
           const Text(
-            "No categories found",
+            "Aucune catégorie trouvée",
             style: TextStyle(fontSize: 18),
           ),
           const SizedBox(height: 8),
           TextButton(
             onPressed: _navigateToAddCategory,
-            child: const Text("Add your first category"),
+            child: const Text("Ajouter votre première catégorie"),
           ),
         ],
       ),
@@ -438,7 +438,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  "$subcategoryCount ${subcategoryCount == 1 ? 'subcategory' : 'subcategories'}",
+                  "$subcategoryCount ${subcategoryCount == 1 ? 'sous-catégorie' : 'sous-catégories'}",
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,
@@ -449,12 +449,12 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit, color: Colors.blue),
-                      tooltip: 'Edit category',
+                      tooltip: 'Modifier la catégorie',
                       onPressed: () => _editCategory(category),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      tooltip: 'Delete category',
+                      tooltip: 'Supprimer la catégorie',
                       onPressed: () => _confirmDelete(singleCategory: category),
                     ),
                   ],
@@ -472,7 +472,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Categories'),
+        title: const Text('Gérer les Catégories'),
         backgroundColor: const Color(0xFF0056A6),
         actions: [
           IconButton(
@@ -502,7 +502,7 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Search categories',
+                labelText: 'Rechercher des catégories',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -511,9 +511,9 @@ class _ManageCategoriePageState extends State<ManageCategoriePage> {
             ),
           ),
           Expanded(
-            child: _importStatus == 'Loading'
+            child: _importStatus == 'Chargement'
                 ? _buildLoadingState()
-                : _importStatus == 'Error'
+                : _importStatus == 'Erreur'
                     ? _buildErrorState()
                     : _filteredCategories.isEmpty
                         ? _buildEmptyState()
