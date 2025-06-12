@@ -588,6 +588,34 @@ Future<void> _loadData() async {
       });
     }
   }
+    items.sort((a, b) {
+    int getPriority(dynamic item) {
+      final stock = item['stock'] as int;
+      final prediction = item['prediction'] as int;
+      final stockNeeded = prediction - stock;
+      
+      if (stock == 0 || (stockNeeded > stock && stock < 5)) {
+        return 0; // Urgent - priorité la plus haute
+      } else if (stockNeeded > stock * 0.5 || stock < 10) {
+        return 1; // À surveiller - priorité moyenne
+      } else {
+        return 2; // OK - priorité la plus basse
+      }
+    }
+    
+    
+     final priorityA = getPriority(a);
+  final priorityB = getPriority(b);
+  
+  if (priorityA != priorityB) {
+    return priorityA.compareTo(priorityB);
+  } else {
+    // Si même priorité, trier par stock nécessaire (descendant)
+    final stockNeededA = (a['prediction'] as int) - (a['stock'] as int);
+    final stockNeededB = (b['prediction'] as int) - (b['stock'] as int);
+    return stockNeededB.compareTo(stockNeededA);
+  }
+});
 
   if (items.isEmpty) {
     return Center(

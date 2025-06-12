@@ -66,10 +66,6 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
     });
   }
 
-
-
- 
-
   Future<void> _deleteClients(List<Client> clients) async {
     for (var client in clients) {
       await _sqlDb.deleteClient(client.id!);
@@ -473,107 +469,6 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
     );
   }
 
-  Future<void> _updateDebt(Client client) async {
-    final amountController = TextEditingController(
-      text: client.debt.abs().toStringAsFixed(2),
-    );
-
-    final isPayment = client.debt > 0;
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title:
-            Text(isPayment ? 'Enregistrer un paiement' : 'Ajouter une dette'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Client: ${client.name} ${client.firstName}'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: amountController,
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Montant (DT)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = double.tryParse(amountController.text) ?? 0;
-              if (amount <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Le montant doit être positif')),
-                );
-                return;
-              }
-
-              final newDebt =
-                  isPayment ? client.debt - amount : client.debt + amount;
-
-              try {
-                await _sqlDb.updateClientDebt(client.id!, newDebt);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isPayment
-                        ? 'Paiement enregistré avec succès'
-                        : 'Dette mise à jour'),
-                    backgroundColor: widget.tealGreen,
-                  ),
-                );
-                _loadClients();
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur: ${e.toString()}'),
-                    backgroundColor: widget.warmRed,
-                  ),
-                );
-              }
-            },
-            child: Text(isPayment ? 'Enregistrer paiement' : 'Ajouter dette'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isPayment ? widget.tealGreen : widget.softOrange,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDebtCell(Client client) {
-  return InkWell(
-    onTap: () => _updateDebt(client),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: client.debt > 0
-            ? widget.warmRed.withOpacity(0.1)
-            : widget.tealGreen.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Center(
-        child: Text(
-          '${client.debt.toStringAsFixed(2)} DT',
-          style: _cellTextStyle().copyWith(
-            color: client.debt > 0 ? widget.warmRed : widget.tealGreen,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    ),
-  );
-}
   Future<void> _showClientOrders(BuildContext context, Client client) async {
     final orders = await _sqlDb.getClientOrders(client.id!);
 
@@ -705,7 +600,7 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Code: ${product['product_code'] ?? 'N/A'}'),
+                        Text('Code: ${product['code'] ?? 'N/A'}'),
                         Text(
                             'Quantité totale: ${product['total_quantity'] ?? 0}'),
                         Text(
@@ -813,242 +708,238 @@ class _ClientManagementWidgetState extends State<ClientManagementWidget> {
     );
   }
 
- Widget _buildClientTable() {
-  return SingleChildScrollView(
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: widget.deepBlue.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
+  Widget _buildClientTable() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: widget.deepBlue.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Code',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Center(
+                      child: Text(
+                        'Nom & Prénom',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Téléphone',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Points',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Commandes',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Produits',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Center(
+                      child: Text(
+                        'Actions',
+                        style: _headerTextStyle(),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Code',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Center(
-                    child: Text(
-                      'Nom & Prénom',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Téléphone',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Points',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Crédit',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Commandes',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Produits',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Center(
-                    child: Text(
-                      'Actions',
-                      style: _headerTextStyle(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _filteredClients.length,
-            itemBuilder: (context, index) {
-              final client = _filteredClients[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                elevation: 2,
-                child: InkWell(
-                  onTap: () {
-                    if (widget.onClientSelected != null) {
-                      widget.onClientSelected!(client);
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: Text(
-                              client.id.toString(),
-                              style: _cellTextStyle(),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 8),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _filteredClients.length,
+              itemBuilder: (context, index) {
+                final client = _filteredClients[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: () {
+                      if (widget.onClientSelected != null) {
+                        widget.onClientSelected!(client);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: Text(
+                                client.id.toString(),
+                                style: _cellTextStyle(),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Center(
-                            child: Text(
-                              '${client.name} ${client.firstName}',
-                              style: _cellTextStyle(),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+                          Expanded(
+                            flex: 3,
+                            child: Center(
+                              child: Text(
+                                '${client.name} ${client.firstName}',
+                                style: _cellTextStyle(),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: Text(
-                              client.phoneNumber,
-                              style: _cellTextStyle(),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: Text(
+                                client.phoneNumber,
+                                style: _cellTextStyle(),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: Text(
-                              client.loyaltyPoints.toString(),
-                              style: _cellTextStyle(),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: Text(
+                                client.loyaltyPoints.toString(),
+                                style: _cellTextStyle(),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: _buildDebtCell(client),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: IconButton(
-                              icon: Icon(Icons.receipt, color: widget.deepBlue),
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _showClientOrders(context, client),
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: IconButton(
+                                icon:
+                                    Icon(Icons.receipt, color: widget.deepBlue),
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                onPressed: () =>
+                                    _showClientOrders(context, client),
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: IconButton(
-                              icon: Icon(Icons.shopping_basket, color: widget.softOrange),
-                              padding: const EdgeInsets.all(4),
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _showClientProducts(context, client),
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: IconButton(
+                                icon: Icon(Icons.shopping_basket,
+                                    color: widget.softOrange),
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                onPressed: () =>
+                                    _showClientProducts(context, client),
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.card_giftcard,
-                                    color: client.loyaltyPoints > 0
-                                        ? widget.tealGreen
-                                        : Colors.grey,
+                          Expanded(
+                            flex: 2,
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.card_giftcard,
+                                      color: client.loyaltyPoints > 0
+                                          ? widget.tealGreen
+                                          : Colors.grey,
+                                    ),
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    onPressed: client.loyaltyPoints > 0
+                                        ? () =>
+                                            _showVoucherOptions(context, client)
+                                        : null,
+                                    tooltip: 'Options de bon d\'achat',
                                   ),
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
-                                  onPressed: client.loyaltyPoints > 0
-                                      ? () => _showVoucherOptions(context, client)
-                                      : null,
-                                  tooltip: 'Options de bon d\'achat',
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.edit, color: widget.softOrange),
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => _showClientForm(client),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: widget.warmRed),
-                                  padding: const EdgeInsets.all(4),
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => _confirmDelete(singleClient: client),
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: Icon(Icons.edit,
+                                        color: widget.softOrange),
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () => _showClientForm(client),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete,
+                                        color: widget.warmRed),
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () =>
+                                        _confirmDelete(singleClient: client),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   TextStyle _headerTextStyle() {
     return TextStyle(
       fontWeight: FontWeight.bold,
