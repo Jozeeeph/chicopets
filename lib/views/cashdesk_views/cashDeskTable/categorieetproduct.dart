@@ -30,7 +30,10 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   late Future<List<Category>> categories;
   late Future<List<Product>> products;
   int? selectedCategoryId;
-  
+  int? selectedSubCategoryId;
+  Category? selectedCategory;
+  bool showSubCategories = false;
+
   // Add ScrollControllers
   final ScrollController _categoryScrollController = ScrollController();
   final ScrollController _productScrollController = ScrollController();
@@ -298,9 +301,35 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     }
   }
 
-  void _onCategorySelected(int? categoryId) {
+  void _onCategorySelected(Category category) {
+    if (category.subCategories != null && category.subCategories!.isNotEmpty) {
+      setState(() {
+        selectedCategory = category;
+        showSubCategories = true;
+        selectedCategoryId = category.id;
+        selectedSubCategoryId = null;
+      });
+    } else {
+      setState(() {
+        selectedCategoryId = category.id;
+        selectedSubCategoryId = null;
+        showSubCategories = false;
+      });
+    }
+  }
+
+  void _onSubCategorySelected(int? subCategoryId) {
     setState(() {
-      selectedCategoryId = categoryId;
+      selectedSubCategoryId = subCategoryId;
+    });
+  }
+
+  void _goBackToCategories() {
+    setState(() {
+      showSubCategories = false;
+      selectedCategory = null;
+      selectedCategoryId = null;
+      selectedSubCategoryId = null;
     });
   }
 
@@ -308,7 +337,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
       child: GestureDetector(
-        onTap: () => _onCategorySelected(category.id),
+        onTap: () => _onCategorySelected(category),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -320,7 +349,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                     ? tealGreen.withOpacity(0.2)
                     : darkBlue.withOpacity(0.1),
                 border: Border.all(
-                  color: selectedCategoryId == category.id ? tealGreen : deepBlue,
+                  color:
+                      selectedCategoryId == category.id ? tealGreen : deepBlue,
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(35),
@@ -335,6 +365,57 @@ class _CategorieetproductState extends State<Categorieetproduct> {
               width: 70,
               child: Text(
                 category.name,
+                style: TextStyle(
+                  color: deepBlue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (category.subCategories != null &&
+                category.subCategories.isNotEmpty)
+              Icon(Icons.arrow_drop_down, size: 16, color: deepBlue),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubCategoryButton(SubCategory subCategory) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 8),
+      child: GestureDetector(
+        onTap: () => _onSubCategorySelected(subCategory.id),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: selectedSubCategoryId == subCategory.id
+                    ? tealGreen.withOpacity(0.2)
+                    : darkBlue.withOpacity(0.1),
+                border: Border.all(
+                  color: selectedSubCategoryId == subCategory.id
+                      ? tealGreen
+                      : deepBlue,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(35),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(35),
+              ),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 70,
+              child: Text(
+                subCategory.name,
                 style: TextStyle(
                   color: deepBlue,
                   fontSize: 12,
@@ -393,7 +474,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   Widget _buildProductCard(Product product) {
     int totalStock = product.stock;
     if (product.hasVariants && product.variants.isNotEmpty) {
-      totalStock = product.variants.fold(0, (sum, variant) => sum + variant.stock);
+      totalStock =
+          product.variants.fold(0, (sum, variant) => sum + variant.stock);
     }
 
     if (totalStock <= 0) return const SizedBox.shrink();
@@ -493,6 +575,69 @@ class _CategorieetproductState extends State<Categorieetproduct> {
     );
   }
 
+  Widget _buildCategoryHeader() {
+    if (!showSubCategories) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            color: deepBlue,
+            onPressed: _goBackToCategories,
+          ),
+          Expanded(
+            child: Text(
+              selectedCategory?.name ?? '',
+              style: TextStyle(
+                color: deepBlue,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 48), // To balance the row
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryList(List<Category> categories) {
+    return GridView.builder(
+      controller: _categoryScrollController,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.9, // Reduced from 1 to give more vertical space
+        mainAxisSpacing: 0.1,
+        crossAxisSpacing: 2,
+      ),
+      padding: const EdgeInsets.all(4),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        return _buildCategoryButton(categories[index]);
+      },
+    );
+  }
+
+  Widget _buildSubCategoryList(List<SubCategory> subCategories) {
+    return GridView.builder(
+      controller: _categoryScrollController,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1,
+        mainAxisSpacing: 4,
+        crossAxisSpacing: 4,
+      ),
+      padding: const EdgeInsets.all(4),
+      itemCount: subCategories.length,
+      itemBuilder: (context, index) {
+        return _buildSubCategoryButton(subCategories[index]);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -517,25 +662,20 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       } else if (snapshot.hasError) {
                         return Center(child: Text('Error: ${snapshot.error}'));
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(child: Text('No categories available'));
+                        return const Center(
+                            child: Text('No categories available'));
                       }
 
-                      return Scrollbar(
-                        controller: _categoryScrollController,
-                        child: GridView.builder(
-                          controller: _categoryScrollController,
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: 1,
-                            mainAxisSpacing: 4,
-                            crossAxisSpacing: 4,
+                      return Column(
+                        children: [
+                          _buildCategoryHeader(),
+                          Expanded(
+                            child: showSubCategories && selectedCategory != null
+                                ? _buildSubCategoryList(
+                                    selectedCategory!.subCategories!)
+                                : _buildCategoryList(snapshot.data!),
                           ),
-                          padding: const EdgeInsets.all(4),
-                          itemCount: snapshot.data!.length,
-                          itemBuilder: (context, index) {
-                            return _buildCategoryButton(snapshot.data![index]);
-                          },
-                        ),
+                        ],
                       );
                     },
                   ),
@@ -559,27 +699,42 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                       } else if (snapshot.hasError) {
                         return Center(child: Text('Error: ${snapshot.error}'));
                       } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(child: Text('No products available'));
+                        return const Center(
+                            child: Text('No products available'));
                       }
 
                       final productMap = <int, Product>{};
                       for (final product in snapshot.data!) {
                         if (product.id != null) {
                           int totalStock = product.stock;
-                          if (product.hasVariants && product.variants.isNotEmpty) {
-                            totalStock = product.variants.fold(0, (sum, v) => sum + v.stock);
+                          if (product.hasVariants &&
+                              product.variants.isNotEmpty) {
+                            totalStock = product.variants
+                                .fold(0, (sum, v) => sum + v.stock);
                           }
 
-                          if (totalStock > 0 && !productMap.containsKey(product.id!)) {
+                          if (totalStock > 0 &&
+                              !productMap.containsKey(product.id!)) {
                             productMap[product.id!] = product;
                           }
                         }
                       }
 
                       final uniqueProducts = productMap.values.toList();
-                      final filteredProducts = selectedCategoryId == null
-                          ? uniqueProducts
-                          : uniqueProducts.where((p) => p.categoryId == selectedCategoryId).toList();
+                      List<Product> filteredProducts;
+
+                      if (selectedSubCategoryId != null) {
+                        filteredProducts = uniqueProducts
+                            .where(
+                                (p) => p.subCategoryId == selectedSubCategoryId)
+                            .toList();
+                      } else if (selectedCategoryId != null) {
+                        filteredProducts = uniqueProducts
+                            .where((p) => p.categoryId == selectedCategoryId)
+                            .toList();
+                      } else {
+                        filteredProducts = uniqueProducts;
+                      }
 
                       if (filteredProducts.isEmpty) {
                         return Center(
@@ -598,7 +753,8 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                         controller: _productScrollController,
                         child: GridView.builder(
                           controller: _productScrollController,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
                             childAspectRatio: 1,
                             mainAxisSpacing: 0.1,

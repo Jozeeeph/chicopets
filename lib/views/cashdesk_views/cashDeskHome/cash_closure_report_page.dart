@@ -106,7 +106,7 @@ class CashClosureReportPage extends StatelessWidget {
     return productsSold;
   }
 
-  Future<void> _printReport(BuildContext context) async {
+  Future<void> printReport(BuildContext context) async {
     try {
       // 1. Fetch all necessary data
       final orders = await _getOrdersSinceOpening();
@@ -473,7 +473,7 @@ class CashClosureReportPage extends StatelessWidget {
                         child: SizedBox(
                           height: 50,
                           child: ElevatedButton.icon(
-                            onPressed: () => _printReport(context),
+                            onPressed: () => printReport(context),
                             icon: Icon(Icons.print),
                             label: Text(
                               'Enregistrer et imprimer rapport',
