@@ -951,19 +951,29 @@ class Addorder {
                                         ],
                                       ),
                                       if (useLoyaltyPoints) ...[
-                                        Slider(
-                                          min: 0,
-                                          max: selectedClient!.loyaltyPoints
-                                              .toDouble(),
-                                          divisions:
-                                              selectedClient!.loyaltyPoints,
-                                          value: pointsToUse.toDouble(),
+                                        SizedBox(height: 10),
+                                        TextField(
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText:
+                                                "Nombre de points à utiliser",
+                                            border: OutlineInputBorder(),
+                                            suffixText: 'points',
+                                            hintText:
+                                                "Max: ${selectedClient!.loyaltyPoints} points",
+                                          ),
                                           onChanged: (value) {
+                                            final points =
+                                                int.tryParse(value) ?? 0;
                                             setState(() {
-                                              pointsToUse = value.toInt();
+                                              pointsToUse = points.clamp(
+                                                  0,
+                                                  selectedClient!
+                                                      .loyaltyPoints);
                                               pointsDiscount = pointsToUse *
                                                   rules.dinarPerPoint;
 
+                                              // Limiter la réduction selon le pourcentage maximum autorisé
                                               final maxDiscount =
                                                   totalBeforeDiscount *
                                                       (rules.maxPercentageUse /
@@ -992,8 +1002,12 @@ class Addorder {
                                             });
                                           },
                                         ),
+                                        SizedBox(height: 8),
                                         Text(
-                                            'Utiliser $pointsToUse points (${pointsDiscount.toStringAsFixed(2)} DT)'),
+                                          'Utilisation de $pointsToUse points (${pointsDiscount.toStringAsFixed(2)} DT)',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
                                         Text(
                                             'Nouveau solde: ${selectedClient!.loyaltyPoints - pointsToUse} points'),
                                       ],
@@ -1001,7 +1015,6 @@ class Addorder {
                                   );
                                 },
                               ),
-
                             SizedBox(height: 16),
 
                             // Global discount (if no product discounts)
