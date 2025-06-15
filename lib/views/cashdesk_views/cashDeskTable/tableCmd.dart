@@ -591,11 +591,17 @@ class _TableCmdState extends State<TableCmd> {
                     onPressed: widget.onFetchOrders,
                   ),
                   _buildActionButton(
+                    icon: Icons.search,
+                    label: 'RECHERCHER',
+                    color: const Color(0xFF0056A6),
+                    onPressed: () => widget.onSearchProduct(),
+                  ),
+                  _buildActionButton(
                     icon: Icons.check_circle,
                     label: 'VALIDER COMMANDE',
                     color: const Color(0xFF009688),
-                    onPressed: () => widget
-                        .onPlaceOrder(widget.selectedClient!), // Pass client ID
+                    onPressed: () =>
+                        widget.onPlaceOrder(widget.selectedClient!),
                   ),
                 ],
               ),

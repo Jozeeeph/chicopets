@@ -360,6 +360,7 @@ class Order {
     return 'Order{'
         'id: $idOrder, '
         'date: $date, '
+        'lines: ${orderLines}, '
         'total: $total DT, '
         'payment: $modePaiement, '
         'status: $status, '

@@ -766,226 +766,237 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
   }
 
   Future<void> _exportToPDF() async {
-  final pdf = pw.Document();
-  final now = DateTime.now();
+    final pdf = pw.Document();
+    final now = DateTime.now();
 
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat(
-        80 * PdfPageFormat.mm, // Largeur de 80 mm pour un ticket standard
-        297 * PdfPageFormat.mm, // Hauteur par défaut (A4), ajustée dynamiquement par MultiPage
-        marginAll: 4 * PdfPageFormat.mm, // Marges réduites pour le ticket
-      ),
-      build: (pw.Context context) => [
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Center(
-              child: pw.Text(
-                'Rapport Financier',
+    // Utiliser Page au lieu de MultiPage pour permettre une hauteur dynamique
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat(
+          70 * PdfPageFormat.mm, // Largeur fixe de 70mm
+          double.infinity, // Hauteur dynamique
+          marginAll: 4 * PdfPageFormat.mm, // Marges de 4mm
+        ),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // En-tête
+              pw.Center(
+                child: pw.Text(
+                  'Rapport Financier',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Text(
+                'Période: ${DateFormat('dd/MM/yyyy').format(_startDate!)}'
+                '${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
+                style: pw.TextStyle(fontSize: 8),
+              ),
+              pw.Divider(thickness: 0.5),
+              pw.SizedBox(height: 5),
+
+              // Total des ventes
+              pw.Text(
+                'Chiffre d\'affaires',
                 style: pw.TextStyle(
-                  fontSize: 14, // Réduit de 18 à 14 pour compacité
+                  fontSize: 10,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-            ),
-            pw.SizedBox(height: 6), // Réduit de 10 à 6
-            pw.Text(
-              'Période: ${DateFormat('dd/MM/yyyy').format(_startDate!)}'
-              '${_endDate != null ? ' - ${DateFormat('dd/MM/yyyy').format(_endDate!)}' : ''}',
-              style: pw.TextStyle(fontSize: 10), // Réduit de 12 à 10
-            ),
-            pw.Divider(thickness: 0.5), // Réduit l'épaisseur
-            pw.SizedBox(height: 6), // Réduit de 10 à 6
+              _buildPdfSummaryRow('TOTAL VENTES', _totalAll, isMain: true),
+              pw.SizedBox(height: 5),
 
-            // Total des ventes
-            pw.Text(
-              'Chiffre d\'affaires',
-              style: pw.TextStyle(
-                fontSize: 12, // Titre de section
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            _buildPdfSummaryRow('TOTAL VENTES', _totalAll, isMain: true),
-            pw.SizedBox(height: 6),
-
-            // Détails des paiements
-            pw.Text(
-              'Détails des paiements',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            if (_totalCash > 0) _buildPdfDetailRow('Espèces', _totalCash),
-            if (_totalCard > 0) _buildPdfDetailRow('Carte', _totalCard),
-            if (_totalCheck > 0) _buildPdfDetailRow('Chèque', _totalCheck),
-            if (_totalTicketRestaurant > 0)
-              _buildPdfDetailRow('Ticket Restaurant', _totalTicketRestaurant),
-            if (_totalGiftTicket > 0)
-              _buildPdfDetailRow('Ticket cadeau', _totalGiftTicket),
-            if (_totalTraite > 0) _buildPdfDetailRow('Traite', _totalTraite),
-            if (_totalVirement > 0)
-              _buildPdfDetailRow('Virement', _totalVirement),
-            if (_totalVoucher > 0)
-              _buildPdfDetailRow('Bon d\'achat', _totalVoucher),
-            if (_totalMixed > 0) _buildPdfDetailRow('Mixtes', _totalMixed),
-            pw.SizedBox(height: 6),
-
-            // Remises
-            pw.Text(
-              'Remises appliquées',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            if (_totalPercentageDiscount == 0 && _totalFixedDiscount == 0)
+              // Détails des paiements
               pw.Text(
-                'Aucune remise faite',
+                'Paiements',
                 style: pw.TextStyle(
-                  fontSize: 9,
-                  fontStyle: pw.FontStyle.italic,
-                  color: PdfColor.fromInt(0xFF616161), // Gris
-                ),
-              )
-            else ...[
-              if (_totalPercentageDiscount > 0)
-                _buildPdfSummaryRow('Remise (%)', _totalPercentageDiscount,
-                    isDiscount: true, suffix: '%'),
-              if (_totalFixedDiscount > 0)
-                _buildPdfSummaryRow('Remise (DT)', _totalFixedDiscount,
-                    isDiscount: true),
-            ],
-            pw.SizedBox(height: 6),
-
-            // Montants en attente
-            if (_totalRemaining > 0) ...[
-              pw.Text(
-                'En attente',
-                style: pw.TextStyle(
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              _buildPdfSummaryRow('À recevoir', _totalRemaining, isAlert: true),
-              pw.SizedBox(height: 6),
+              if (_totalCash > 0) _buildPdfDetailRow('Espèces', _totalCash),
+              if (_totalCard > 0) _buildPdfDetailRow('Carte', _totalCard),
+              if (_totalCheck > 0) _buildPdfDetailRow('Chèque', _totalCheck),
+              if (_totalTicketRestaurant > 0)
+                _buildPdfDetailRow('T.Resto', _totalTicketRestaurant),
+              if (_totalGiftTicket > 0)
+                _buildPdfDetailRow('T.Cadeau', _totalGiftTicket),
+              if (_totalTraite > 0) _buildPdfDetailRow('Traite', _totalTraite),
+              if (_totalVirement > 0)
+                _buildPdfDetailRow('Virement', _totalVirement),
+              if (_totalVoucher > 0) _buildPdfDetailRow('Bon', _totalVoucher),
+              if (_totalMixed > 0) _buildPdfDetailRow('Mixtes', _totalMixed),
+              pw.SizedBox(height: 5),
+
+              // Remises
+              pw.Text(
+                'Remises',
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              if (_totalPercentageDiscount == 0 && _totalFixedDiscount == 0)
+                pw.Text(
+                  'Aucune remise',
+                  style: pw.TextStyle(
+                    fontSize: 7,
+                    fontStyle: pw.FontStyle.italic,
+                    color: PdfColors.grey600,
+                  ),
+                )
+              else ...[
+                if (_totalPercentageDiscount > 0)
+                  _buildPdfSummaryRow('Remise %', _totalPercentageDiscount,
+                      isDiscount: true, suffix: '%'),
+                if (_totalFixedDiscount > 0)
+                  _buildPdfSummaryRow('Remise DT', _totalFixedDiscount,
+                      isDiscount: true),
+              ],
+              pw.SizedBox(height: 5),
+
+              // Montants en attente
+              if (_totalRemaining > 0) ...[
+                pw.Text(
+                  'En attente',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                _buildPdfSummaryRow('À recevoir', _totalRemaining,
+                    isAlert: true),
+                pw.SizedBox(height: 5),
+              ],
+
+              // Statistiques
+              pw.Text(
+                'Stats',
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatItem('Clients', _clientCount),
+                  _buildStatItem('Articles', _articleCount),
+                ],
+              ),
+              pw.Divider(thickness: 0.5),
+
+              // Pied de page
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Text(
+                  'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
+                  style: pw.TextStyle(fontSize: 7),
+                ),
+              ),
             ],
-
-            // Statistiques
-            pw.Text(
-              'Statistiques',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-            _buildPdfSummaryRow('Clients', _clientCount.toDouble(),
-                isCount: true),
-            _buildPdfSummaryRow('Articles', _articleCount.toDouble(),
-                isCount: true),
-            pw.Divider(thickness: 0.5),
-
-            // Pied de page
-            pw.SizedBox(height: 10),
-            pw.Center(
-              child: pw.Text(
-                'Généré le ${DateFormat('dd/MM/yyyy à HH:mm').format(now)}',
-                style: pw.TextStyle(fontSize: 8), // Réduit de 10 à 8
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  final bytes = await pdf.save();
-  await Printing.sharePdf(
-    bytes: bytes,
-    filename:
-        'rapport_financier_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
-  );
-}
-
-// Méthodes helpers pour construire les lignes du PDF
-pw.Widget _buildPdfSummaryRow(
-  String label,
-  double value, {
-  bool isMain = false,
-  bool isDiscount = false,
-  bool isCount = false,
-  bool isAlert = false,
-  String suffix = '',
-}) {
-  return pw.Row(
-    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-    children: [
-      pw.Text(
-        label,
-        style: pw.TextStyle(
-          fontSize: isMain ? 10 : 9, // Réduit de 10/8 à 10/9
-          fontWeight: isMain ? pw.FontWeight.bold : pw.FontWeight.normal,
-        ),
+          );
+        },
       ),
-      pw.Text(
-        isCount
-            ? '${value.toInt()}$suffix'
-            : isDiscount && suffix == '%'
-                ? '${value.toStringAsFixed(1)}$suffix'
-                : '${value.toStringAsFixed(2)}$suffix',
-        style: pw.TextStyle(
-          fontSize: isMain ? 11 : 10, // Réduit de 11/9 à 11/10
-          fontWeight: pw.FontWeight.bold,
-          color: isDiscount
-              ? PdfColor.fromInt(0xFFE53935) // Rouge pour les remises
-              : isAlert
-                  ? PdfColor.fromInt(0xFFE53935) // Rouge pour les alertes
-                  : null,
-        ),
-      ),
-    ],
-  );
-}
+    );
 
-pw.Widget _buildPdfDetailRow(String label, double value) {
-  return pw.Padding(
-    padding: const pw.EdgeInsets.only(left: 5), // Réduit de 8 à 5
-    child: pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+    final bytes = await pdf.save();
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename:
+          'rapport_financier_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+    );
+  }
+
+// Méthode helper pour les éléments de statistique
+  pw.Widget _buildStatItem(String label, int count) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        pw.Expanded(
-          child: pw.Text(
-            label,
-            style: pw.TextStyle(fontSize: 9), // Réduit de 8 à 9
-            overflow: pw.TextOverflow.clip,
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: 8,
           ),
         ),
         pw.Text(
-          '${value.toStringAsFixed(2)} DT',
+          count.toString(),
           style: pw.TextStyle(
-            fontSize: 9, // Réduit de 8 à 9
+            fontSize: 9,
             fontWeight: pw.FontWeight.bold,
           ),
         ),
       ],
-    ),
-  );
+    );
+  }
+
+// Méthodes helpers pour construire les lignes du PDF
+  pw.Widget _buildPdfSummaryRow(
+    String label,
+    double value, {
+    bool isMain = false,
+    bool isDiscount = false,
+    bool isCount = false,
+    bool isAlert = false,
+    String suffix = '',
+  }) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(
+          label,
+          style: pw.TextStyle(
+            fontSize: isMain ? 10 : 9, // Réduit de 10/8 à 10/9
+            fontWeight: isMain ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+        pw.Text(
+          isCount
+              ? '${value.toInt()}$suffix'
+              : isDiscount && suffix == '%'
+                  ? '${value.toStringAsFixed(1)}$suffix'
+                  : '${value.toStringAsFixed(2)}$suffix',
+          style: pw.TextStyle(
+            fontSize: isMain ? 11 : 10, // Réduit de 11/9 à 11/10
+            fontWeight: pw.FontWeight.bold,
+            color: isDiscount
+                ? PdfColor.fromInt(0xFFE53935) // Rouge pour les remises
+                : isAlert
+                    ? PdfColor.fromInt(0xFFE53935) // Rouge pour les alertes
+                    : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildPdfDetailRow(String label, double value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(left: 5), // Réduit de 8 à 5
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Expanded(
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(fontSize: 9), // Réduit de 8 à 9
+              overflow: pw.TextOverflow.clip,
+            ),
+          ),
+          pw.Text(
+            '${value.toStringAsFixed(2)} DT',
+            style: pw.TextStyle(
+              fontSize: 9, // Réduit de 8 à 9
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

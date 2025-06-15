@@ -1,4 +1,3 @@
-import 'package:caissechicopets/models/user.dart';
 import 'package:caissechicopets/views/user_views/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:caissechicopets/services/cash_service.dart';
@@ -23,7 +22,6 @@ class _CashierHomePageState extends State<CashierHomePage>
   bool _isLoading = true;
   bool _needsInitialAmount = false;
   final TextEditingController _amountController = TextEditingController();
-  User? _currentUser;
 
   @override
   void initState() {
@@ -451,7 +449,6 @@ class _CashierHomePageState extends State<CashierHomePage>
     await SessionManager.clearSession();
     if (mounted) {
       setState(() {
-        _currentUser = null;
       });
     }
   }

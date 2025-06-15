@@ -9,7 +9,6 @@ import 'package:caissechicopets/models/order.dart';
 import 'package:caissechicopets/views/cashdesk_views/placeOrder/deleteline.dart';
 import 'package:caissechicopets/views/cashdesk_views/placeOrder/modifyquantity.dart';
 import 'package:caissechicopets/models/product.dart';
-import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/views/cashdesk_views/cashDeskTable/tableCmd.dart';
 import 'package:caissechicopets/views/product_views/addprod.dart';
 import 'package:caissechicopets/views/product_views/searchprod.dart';
@@ -201,7 +200,51 @@ class _CashDeskPageState extends State<CashDeskPage> {
   }
 
   void _handleSearchProduct() {
-    Searchprod.showProductSearchPopup(context);
+    Searchprod.showProductSearchPopup(
+      context,
+      onProductSelected: (Product product, [Variant? variant]) {
+        setState(() {
+          // Crée un identifiant unique pour cette combinaison produit+variante
+          String uniqueId = '${product.id}';
+          if (variant != null) {
+            uniqueId += '_${variant.id}';
+          }
+
+          // Vérifie si cette combinaison existe déjà
+          int existingIndex = -1;
+          for (int i = 0; i < _selectedProducts.length; i++) {
+            String currentId = '${_selectedProducts[i].id}';
+            if (_selectedProducts[i].variants.isNotEmpty) {
+              currentId += '_${_selectedProducts[i].variants.first.id}';
+            }
+            if (currentId == uniqueId) {
+              existingIndex = i;
+              break;
+            }
+          }
+
+          if (existingIndex >= 0) {
+            // Incrémente la quantité si la même combinaison existe
+            _quantityProducts[existingIndex]++;
+            _selectedProductIndex = existingIndex;
+          } else {
+            // Crée une nouvelle instance avec seulement la variante sélectionnée
+            final productToAdd = variant != null
+                ? product.copyWith(
+                    variants: [variant],
+                    prixTTC: variant.finalPrice,
+                  )
+                : product;
+
+            _selectedProducts.add(productToAdd);
+            _quantityProducts.add(1);
+            _discounts.add(0.0);
+            _typeDiscounts.add(true);
+            _selectedProductIndex = _selectedProducts.length - 1;
+          }
+        });
+      },
+    );
   }
 
   void _handleAddProduct() {
@@ -315,7 +358,8 @@ class _CashDeskPageState extends State<CashDeskPage> {
               onPlaceOrder: _handlePlaceOrder,
               isPercentageDiscount: _isPercentageDiscount,
               selectedProductIndex: _selectedProductIndex,
-              selectedClient:_selectedClientId ?? 0, // Use the tracked client ID
+              selectedClient:
+                  _selectedClientId ?? 0, // Use the tracked client ID
               onProductSelected: (index) {
                 setState(() {
                   _selectedProductIndex = index;

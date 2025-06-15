@@ -105,7 +105,6 @@ class _HomePageState extends State<HomePage> {
         _currentUser = null;
       });
     }
-    // Pas besoin de navigation car on est déjà sur la home page
   }
 
   @override

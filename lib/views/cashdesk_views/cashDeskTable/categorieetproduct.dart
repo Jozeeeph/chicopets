@@ -302,7 +302,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
   }
 
   void _onCategorySelected(Category category) {
-    if (category.subCategories != null && category.subCategories!.isNotEmpty) {
+    if (category.subCategories.isNotEmpty) {
       setState(() {
         selectedCategory = category;
         showSubCategories = true;
@@ -375,8 +375,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (category.subCategories != null &&
-                category.subCategories.isNotEmpty)
+            if (category.subCategories.isNotEmpty)
               Icon(Icons.arrow_drop_down, size: 16, color: deepBlue),
           ],
         ),
@@ -672,7 +671,7 @@ class _CategorieetproductState extends State<Categorieetproduct> {
                           Expanded(
                             child: showSubCategories && selectedCategory != null
                                 ? _buildSubCategoryList(
-                                    selectedCategory!.subCategories!)
+                                    selectedCategory!.subCategories)
                                 : _buildCategoryList(snapshot.data!),
                           ),
                         ],

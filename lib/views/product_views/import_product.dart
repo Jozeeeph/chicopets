@@ -95,7 +95,6 @@ class _ImportProductPageState extends State<ImportProductPage> {
 
         int totalProducts = productGroups.length;
         int processedProducts = 0;
-        final db = await _sqlDb.db;
 
         for (var entry in productGroups.entries) {
           if (!_isImporting) break;
@@ -199,6 +198,8 @@ class _ImportProductPageState extends State<ImportProductPage> {
               int totalVariantStock = 0;
 
               for (var row in rows) {
+                String variantCode = row[16]?.value?.toString() ?? '';
+                print("variaant coode : $variantCode");
                 String variantName = row[14]?.value?.toString() ?? '';
                 bool defaultVariant =
                     (row[15]?.value?.toString() ?? 'FALSE').toUpperCase() ==
@@ -226,7 +227,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
                 }
 
                 final variant = Variant(
-                  code: '',
+                  code: variantCode,
                   combinationName: variantName,
                   price: prixHT + priceImpact,
                   priceImpact: priceImpact,
@@ -235,12 +236,12 @@ class _ImportProductPageState extends State<ImportProductPage> {
                   attributes: attributes,
                   productId: product.id ?? 0,
                 );
+                print("variant : $variant");
                 allVariants.add(variant);
               }
 
               // Update product with total variant stock before inserting
-              product.id = await _sqlDb
-                  .addProduct(product.copyWith(stock: totalVariantStock));
+              product.id = await _sqlDb.addProduct(product.copyWith(stock: totalVariantStock));
 
               for (final entry in attributesMap.entries) {
                 final attribut = Attribut(
@@ -671,7 +672,7 @@ class _ImportProductPageState extends State<ImportProductPage> {
       "SIMPLEPRODUCT",
       "VARIANTNAME",
       "DEFAULTVARIANT",
-      "VARIANTIMAGE",
+      "VARIANTCODE",
       "IMPACTPRICE",
       "QUANTITYVARIANT"
     ];
