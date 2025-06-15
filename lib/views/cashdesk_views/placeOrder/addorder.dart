@@ -2690,6 +2690,8 @@ class Addorder {
         price = variant.finalPrice;
       }
 
+      print("variant code added issssss ${variant?.code}");
+
       orderLines.add(OrderLine(
         idOrder: 0,
         productCode: product.code ?? 'PROD_${product.id}',
@@ -2705,6 +2707,7 @@ class Addorder {
         productData: product.toMap(), // Sauvegarde des données du produit
       ));
     }
+    print("Order lines created: ${orderLines}");
 
     // Get current user
     final prefs = await SharedPreferences.getInstance();
@@ -2816,7 +2819,6 @@ class Addorder {
 
     try {
       int orderId;
-      print("Before saving - Order ID: ${order.idOrder}");
       if (isUpdating) {
         print("Updating existing order");
         orderId = await SqlDb().updateOrderInDatabase(order);
@@ -2824,7 +2826,7 @@ class Addorder {
         print("Creating new order");
         orderId = await SqlDb().addOrder(order);
       }
-      print("After saving - Order ID: $orderId");
+      print("After saving - Order: $order");
 
       // Dans la méthode _confirmPlaceOrder, après la validation de la commande
       final stockMovementService = StockMovementService(SqlDb());

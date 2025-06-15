@@ -51,6 +51,7 @@ class OrderController {
             'discount': orderLine.discount,
             'isPercentage': orderLine.isPercentage ? 1 : 0,
             'variant_id': orderLine.variantId,
+            'variant_code': orderLine.variantCode,
             'variant_name': orderLine.variantName,
             'product_data':
                 productData != null ? jsonEncode(productData) : null,
@@ -126,6 +127,7 @@ class OrderController {
               line['product_name']?.toString() ?? productData['designation'],
           productId: line['product_id'] as int?,
           variantId: line['variant_id'] as int?,
+          variantCode: line['variant_code'] as String?,
           variantName: line['variant_name'] as String?,
           quantity: line['quantity'] as int,
           prixUnitaire: (line['prix_unitaire'] as num).toDouble(),
@@ -166,6 +168,7 @@ class OrderController {
         productName: line['product_name']?.toString() ?? product?.designation,
         productId: line['product_id'] as int?,
         variantId: line['variant_id'] as int?,
+        variantCode: line['variant_code'] as String?,
         variantName: line['variant_name'] as String?,
         quantity: line['quantity'] as int,
         prixUnitaire: (line['prix_unitaire'] as num).toDouble(),

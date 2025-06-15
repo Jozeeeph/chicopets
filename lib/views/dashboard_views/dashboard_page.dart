@@ -155,13 +155,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       _buildCard(
                         context,
-                        label: 'Comptes client',
-                        icon: Icons.person,
-                        page: null,
-                        color: const Color(0xFF607D8B),
-                      ),
-                      _buildCard(
-                        context,
                         label: 'Rapports des ventes',
                         icon: Icons.bar_chart,
                         page: SalesReportPage(), // Updated this line

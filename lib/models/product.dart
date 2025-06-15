@@ -24,7 +24,7 @@ class Product {
   String status;
   String? image; // Added image attribute
   String? brand; // Added brand attribute
- 
+
   Product({
     this.id, // Changed from default 0 to nullable
     this.code,
@@ -105,6 +105,35 @@ class Product {
     );
   }
 
+  // Dans votre classe Product, ajoutez cette méthode
+  Product copyWithVariant(Variant variant) {
+    return Product(
+      id: id,
+      code: code,
+      designation: designation,
+      description: description,
+      stock: variant.stock,
+      prixHT: variant.price,
+      taxe: taxe,
+      prixTTC: variant.finalPrice,
+      dateExpiration: dateExpiration,
+      categoryId: categoryId,
+      subCategoryId: subCategoryId,
+      categoryName: categoryName,
+      subCategoryName: subCategoryName,
+      isDeleted: isDeleted,
+      marge: marge,
+      variants: [variant], // Garde seulement la variante sélectionnée
+      remiseMax: remiseMax,
+      remiseValeurMax: remiseValeurMax,
+      hasVariants: true,
+      sellable: sellable,
+      status: status,
+      image: image,
+      brand: brand,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     final map = {
       'code': code,
@@ -180,8 +209,6 @@ class Product {
     }
     return prixHT;
   }
-
-
 
   Map<String, dynamic> toExportMap() {
     return {

@@ -1076,7 +1076,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
               ],
             ),
             child: DataTable(
-              columnSpacing: 8,
+              columnSpacing: 16,
               horizontalMargin: 12,
               dividerThickness: 1,
               dataRowHeight: 60,
@@ -1135,34 +1135,54 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     ),
                     DataCell(Text(variant.combinationName)),
                     DataCell(
-                      TextFormField(
-                        initialValue: variant.price.toStringAsFixed(2),
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            variant.price = double.tryParse(value) ?? 0.0;
-                            variant.finalPrice =
-                                variant.price + variant.priceImpact;
-                          });
-                        },
+                      SizedBox(
+                        width: 80,
+                        child: TextFormField(
+                          initialValue: variant.price.toStringAsFixed(2),
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.right,
+                          onChanged: (value) {
+                            setState(() {
+                              variant.price = double.tryParse(value) ?? 0.0;
+                              variant.finalPrice =
+                                  variant.price + variant.priceImpact;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 8),
+                          ),
+                        ),
                       ),
                     ),
                     DataCell(
-                      TextFormField(
-                        initialValue: variant.priceImpact.toStringAsFixed(2),
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            variant.priceImpact = double.tryParse(value) ?? 0.0;
-                            variant.finalPrice =
-                                variant.price + variant.priceImpact;
-                          });
-                        },
+                      SizedBox(
+                        width: 80,
+                        child: TextFormField(
+                          initialValue: variant.priceImpact.toStringAsFixed(2),
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.right,
+                          onChanged: (value) {
+                            setState(() {
+                              variant.priceImpact =
+                                  double.tryParse(value) ?? 0.0;
+                              variant.finalPrice =
+                                  variant.price + variant.priceImpact;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 8),
+                          ),
+                        ),
                       ),
                     ),
                     DataCell(
                       Text(
                         variant.finalPrice.toStringAsFixed(2),
+                        textAlign: TextAlign.right,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.green.shade700,
@@ -1170,23 +1190,40 @@ class _EditProductScreenState extends State<EditProductScreen> {
                       ),
                     ),
                     DataCell(
-                      TextFormField(
-                        initialValue: variant.stock.toString(),
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            variant.stock = int.tryParse(value) ?? 0;
-                            updateTotalStock();
-                          });
-                        },
+                      SizedBox(
+                        width: 80,
+                        child: TextFormField(
+                          initialValue: variant.stock.toString(),
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.right,
+                          onChanged: (value) {
+                            setState(() {
+                              variant.stock = int.tryParse(value) ?? 0;
+                              updateTotalStock();
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 8),
+                          ),
+                        ),
                       ),
                     ),
                     DataCell(
-                      TextFormField(
-                        initialValue: variant.code,
-                        onChanged: (value) {
-                          variant.code = value;
-                        },
+                      SizedBox(
+                        width: 120,
+                        child: TextFormField(
+                          initialValue: variant.code,
+                          onChanged: (value) {
+                            variant.code = value;
+                          },
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 8),
+                          ),
+                        ),
                       ),
                     ),
                   ],

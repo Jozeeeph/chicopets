@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:caissechicopets/services/sqldb.dart';
 import 'package:caissechicopets/views/product_views/add_product_screen.dart';
 import 'package:caissechicopets/models/product.dart';
+import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 
 class ManageProductPage extends StatefulWidget {
   const ManageProductPage({super.key});
@@ -64,7 +65,27 @@ class _ManageProductPageState extends State<ManageProductPage> {
     });
   }
 
+  Future<void> _scanBarcode() async {
+    try {
+      final barcode = await FlutterBarcodeScanner.scanBarcode(
+        '#FF0056A6', // Scanner line color
+        'Annuler', // Cancel button text
+        true, // Show flash option
+        ScanMode.BARCODE, // Scan mode
+      );
 
+      if (barcode != '-1') {
+        // -1 is returned when scan is cancelled
+        _searchController.text = barcode;
+        _onSearchChanged();
+        FocusScope.of(context).unfocus(); // Hide keyboard if it was showing
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de scan: ${e.toString()}')),
+      );
+    }
+  }
 
   Future<void> _confirmDelete({Product? singleProduct}) async {
     TextEditingController confirmController = TextEditingController();
@@ -77,8 +98,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
           builder: (context, setState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+                  borderRadius: BorderRadius.circular(15)),
               title: Row(
                 children: [
                   const Icon(Icons.warning, color: Colors.red),
@@ -138,9 +158,8 @@ class _ManageProductPageState extends State<ManageProductPage> {
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        isConfirmed ? Colors.red : Colors.grey[400],
-                  ),
+                      backgroundColor:
+                          isConfirmed ? Colors.red : Colors.grey[400]),
                   child: const Text('Supprimer'),
                 ),
               ],
@@ -165,8 +184,6 @@ class _ManageProductPageState extends State<ManageProductPage> {
     _loadProducts(); // Recharge directement la liste des produits
   }
 
-
-
   void _toggleSelectAll() {
     setState(() {
       if (_selectedProducts.length == _filteredProducts.length) {
@@ -176,7 +193,6 @@ class _ManageProductPageState extends State<ManageProductPage> {
       }
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -234,6 +250,11 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   hintText: 'Code, désignation ou catégorie',
                   prefixIcon:
                       const Icon(Icons.search, color: Color(0xFF0056A6)),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner,
+                        color: Color(0xFF0056A6)),
+                    onPressed: _scanBarcode,
+                  ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -242,13 +263,16 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
+                onSubmitted: (value) {
+                  _onSearchChanged();
+                },
               ),
             ),
           ),
           Expanded(
             child: _filteredProducts.isEmpty
                 ? _buildEmptyState()
-                : _buildProductTable(context), // <== CONTEXT ajouté ici
+                : _buildProductTable(context),
           ),
         ],
       ),
@@ -276,14 +300,12 @@ class _ManageProductPageState extends State<ManageProductPage> {
     );
   }
 
-// ==> CONTEXT passé en paramètre ici aussi
   Widget _buildProductTable(BuildContext context) {
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // En-têtes du tableau sous forme de ligne (optionnel)
             Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF0056A6).withOpacity(0.05),
@@ -292,7 +314,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               child: Row(
                 children: [
-                  const SizedBox(width: 40), // Espace pour la checkbox
+                  const SizedBox(width: 40),
                   Expanded(
                       flex: 2, child: Text('Code', style: _headerTextStyle())),
                   Expanded(
@@ -318,7 +340,6 @@ class _ManageProductPageState extends State<ManageProductPage> {
               ),
             ),
             const SizedBox(height: 8),
-            // Contenu sous forme de cartes
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -421,7 +442,7 @@ class _ManageProductPageState extends State<ManageProductPage> {
                                               color: Color(0xFF009688)),
                                           const SizedBox(width: 4),
                                           Text(
-                                              '      ${product.variants.length} variantes'),
+                                              '${product.variants.length} variantes'),
                                         ],
                                       ),
                                     ),

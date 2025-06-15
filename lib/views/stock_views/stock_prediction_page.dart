@@ -29,11 +29,6 @@ class _StockPredictionPageState extends State<StockPredictionPage> {
     }
   };
   
- Map<String, Map<int, Map<int, int>>> _variantPredictions = {
-    'short_term': {},
-    'medium_term': {},
-    'long_term': {},
-  };
 
   @override
   void initState() {

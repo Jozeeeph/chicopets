@@ -39,6 +39,7 @@ class _SyncPageState extends State<SyncPage> {
 
   Future<void> loadUnsyncedOrders() async {
     final unsynced = await _sqlDb.getOrdersToSynch();
+    print('Unsynced Orders aaaarrreeeee: $unsynced');
     setState(() {
       orders = unsynced;
       unsyncedCount = unsynced.length;
@@ -96,23 +97,30 @@ class _SyncPageState extends State<SyncPage> {
     }
 
     List<Map<String, dynamic>> productData = [];
+    print('Unsynced Orders: $unsyncedOrders');
 
     for (var order in unsyncedOrders) {
       for (var line in order.orderLines) {
         if (line.productId == null) continue;
         Product? pr = await _sqlDb.getProductById(line.productId!);
+        
         if (pr == null) continue;
 
         final isVariant = pr.hasVariants == true;
         int quantity = 0;
+        print("isVariant for product ${pr.designation} $isVariant");
+        print("quantity $quantity");
+        print("line $line");
+        print("product $pr");
+        print("variants ${pr.variants}");
 
         if (isVariant && line.variantCode != null) {
           quantity = await _sqlDb.getVariantStock(pr.id!, line.variantCode!);
         } else if (!isVariant) {
           quantity = pr.stock;
-        } else {
-          continue; // Skip invalid variant without code
         }
+
+        print("quantity $quantity");
 
         productData.add({
           'product_id': pr.id,
@@ -120,9 +128,12 @@ class _SyncPageState extends State<SyncPage> {
           'quantity': quantity,
           'variant_code': line.variantCode?.trim().toLowerCase(),
         });
+        print('Product Data: $productData');
       }
     }
-
+    print('Product Data: $productData');
+    // Avant l'envoi de la requête
+    if (!mounted) return;
     setState(() {
       isSyncing = true;
     });
@@ -146,8 +157,7 @@ class _SyncPageState extends State<SyncPage> {
             'warehouse_id': selectedWarehouse!.id,
             'quantity': product['quantity'],
             'designation': product['designation'],
-            if (product['variant_code'] != null)
-              'variant_code': product['variant_code'],
+            'variant_code': product['variant_code'],
           });
           print('PATCH Payload: $patchPayload');
 
@@ -203,9 +213,11 @@ class _SyncPageState extends State<SyncPage> {
         ),
       );
     } finally {
-      setState(() {
-        isSyncing = false;
-      });
+      if (mounted) {
+        setState(() {
+          isSyncing = false;
+        });
+      }
     }
   }
 
