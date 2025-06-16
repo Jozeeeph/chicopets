@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:caissechicopets/controllers/userController.dart';
 import 'package:caissechicopets/models/client.dart';
 import 'package:caissechicopets/models/orderline.dart';
 import 'package:caissechicopets/models/product.dart';
@@ -84,7 +85,8 @@ class Getorderlist {
     orders = orders
         .where(
             (order) => order.status != 'annulée' && order.orderLines.isNotEmpty)
-        .toList();
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date)); // Tri par date décroissante
 
     // Load all clients and build a map for quick access
     final clients = await sqldb.getAllClients();
@@ -1265,6 +1267,7 @@ class Getorderlist {
 
     final SqlDb sqldb = SqlDb();
     final pdf = pw.Document();
+    final user = sqldb.getUserById(order.userId!);
     bool isPercentageDiscount = order.isPercentageDiscount;
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 

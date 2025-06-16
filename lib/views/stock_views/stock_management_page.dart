@@ -53,8 +53,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   };
 
- 
-
   @override
   void initState() {
     super.initState();
@@ -71,8 +69,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
     _searchController.dispose();
     super.dispose();
   }
-
-
 
   Future<bool> _onWillPop() async {
     if (!_hasUnsavedChanges) return true;
@@ -431,12 +427,54 @@ class _StockManagementPageState extends State<StockManagementPage> {
   }
 
   List<Product> get _filteredProducts {
-    if (_searchQuery.isEmpty) return _products;
-    return _products.where((product) {
-      return product.designation.toLowerCase().contains(_searchQuery) ||
-          (product.code?.toLowerCase().contains(_searchQuery) ?? false) ||
-          (product.categoryName?.toLowerCase().contains(_searchQuery) ?? false);
-    }).toList();
+    List<Product> filtered;
+    if (_searchQuery.isEmpty) {
+      filtered = List.from(_products);
+    } else {
+      filtered = _products.where((product) {
+        return product.designation.toLowerCase().contains(_searchQuery) ||
+            (product.code?.toLowerCase().contains(_searchQuery) ?? false) ||
+            (product.categoryName?.toLowerCase().contains(_searchQuery) ??
+                false);
+      }).toList();
+    }
+
+    // Trier par date d'expiration la plus proche
+    return _sortProductsByExpiration(filtered);
+  }
+
+  List<Product> _sortProductsByExpiration(List<Product> products) {
+    return products
+      ..sort((a, b) {
+        // Gérer les cas où la date d'expiration est vide
+        if (a.dateExpiration.isEmpty && b.dateExpiration.isEmpty) return 0;
+        if (a.dateExpiration.isEmpty) return 1;
+        if (b.dateExpiration.isEmpty) return -1;
+
+        try {
+          final dateA = _parseDate(a.dateExpiration);
+          final dateB = _parseDate(b.dateExpiration);
+          return dateA.compareTo(dateB);
+        } catch (e) {
+          return 0; // En cas d'erreur de parsing, on ne change pas l'ordre
+        }
+      });
+  }
+
+  DateTime _parseDate(String dateString) {
+    final possibleFormats = [
+      DateFormat('yyyy-MM-dd'),
+      DateFormat('dd-MM-yyyy'),
+      DateFormat('MM/dd/yyyy'),
+      DateFormat('dd/MM/yyyy'),
+    ];
+
+    for (final format in possibleFormats) {
+      try {
+        return format.parseStrict(dateString);
+      } catch (_) {}
+    }
+    throw FormatException('Date format not recognized');
   }
 
   Future<List<StockMovement>> _getProductMovements(int productId) async {
@@ -877,8 +915,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
     );
   }
 
- 
-
   Future<String?> _showReasonSelectionDialog(BuildContext context) async {
     String? selectedReason;
     final TextEditingController _customReasonController =
@@ -1114,6 +1150,31 @@ class _StockManagementPageState extends State<StockManagementPage> {
           title: const Text('Gestion de Stock'),
           backgroundColor: const Color(0xFF0056A6),
           foregroundColor: Colors.white,
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                setState(() {
+                  if (value == 'expiration') {
+                    _products = _sortProductsByExpiration(_products);
+                  } else if (value == 'default') {
+                    // Réinitialiser le tri original si nécessaire
+                    _loadData();
+                  }
+                });
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem<String>(
+                  value: 'default',
+                  child: Text('Trier par défaut'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'expiration',
+                  child: Text('Trier par date d\'expiration'),
+                ),
+              ],
+              icon: const Icon(Icons.sort),
+            ),
+          ],
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
@@ -1138,11 +1199,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                     hintText: 'Code, désignation ou catégorie',
                     prefixIcon:
                         const Icon(Icons.search, color: Color(0xFF0056A6)),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.barcode_reader,
-                          color: Color(0xFF0056A6)),
-                      onPressed: _scanBarcode,
-                    ),
+                    
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -1249,10 +1306,12 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 2,
                       child: Text('Catégorie', style: _headerTextStyle())),
                   Expanded(
-                      flex: 1, child: Text('   Stock', style: _headerTextStyle())),
+                      flex: 1,
+                      child: Text('   Stock', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('           Statut', style: _headerTextStyle())),
+                      child:
+                          Text('           Statut', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
                       child: Text('   Prix Achat', style: _headerTextStyle())),
@@ -1264,7 +1323,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       child: Text('  Profit', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('  Expiration', style: _headerTextStyle())),
+                      child: Text('      Expiration', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
                       child: Text('Ventes', style: _headerTextStyle())),
@@ -1272,7 +1331,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 2,
                       child:
                           Text('Prédiction (30j)', style: _headerTextStyle())),
-
                   Expanded(
                       flex: 1, child: Text('MVMT', style: _headerTextStyle())),
                 ],
@@ -1385,12 +1443,17 @@ class _StockManagementPageState extends State<StockManagementPage> {
                             ),
                             Expanded(
                               flex: 2,
-                              child: Text(
-                                _formatExpirationDate(product.dateExpiration),
-                                style: _cellTextStyle().copyWith(
-                                  color: isExpiring ? Colors.red : null,
-                                  fontWeight:
-                                      isExpiring ? FontWeight.bold : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                child: Text(
+                                  _formatExpirationDate(product.dateExpiration),
+                                  style: _cellTextStyle().copyWith(
+                                    color: isExpiring ? Colors.red : null,
+                                    fontWeight:
+                                        isExpiring ? FontWeight.bold : null,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
@@ -1416,7 +1479,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                 ),
                               ),
                             ),
-                            
                             Expanded(
                               flex: 1,
                               child: IconButton(

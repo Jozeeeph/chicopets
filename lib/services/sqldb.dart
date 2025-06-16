@@ -965,6 +965,11 @@ class SqlDb {
     return await UserController().getUserByUsername(username, dbClient);
   }
 
+  Future<User> getUserById(int id) async {
+    final dbClient = await db;
+    return await UserController().getUserById(id, dbClient);
+  }
+
   Future<int> updateUserEmail(String username, String email) async {
     final dbClient = await db;
     try {

@@ -20,6 +20,17 @@ class UserController {
     return result.isNotEmpty ? User.fromMap(result.first) : null;
   }
 
+  Future<User> getUserById(int id,dbClient) async {
+    final User result = await dbClient.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return result;
+  }
+
+
   Future<List<User>> getAllUsers(dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query('users');
     return result.map((map) => User.fromMap(map)).toList();
