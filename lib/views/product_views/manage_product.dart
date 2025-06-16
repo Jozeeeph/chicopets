@@ -37,6 +37,9 @@ class _ManageProductPageState extends State<ManageProductPage> {
   Future<void> _loadProducts() async {
     List<Product> products = await sqldb.getProducts();
 
+    // Trier les produits par ID décroissant (les plus récents en premier)
+    products.sort((a, b) => (b.id ?? 0).compareTo(a.id ?? 0));
+
     // Load variants for each product
     for (var product in products) {
       if (product.id != null) {
@@ -250,11 +253,6 @@ class _ManageProductPageState extends State<ManageProductPage> {
                   hintText: 'Code, désignation ou catégorie',
                   prefixIcon:
                       const Icon(Icons.search, color: Color(0xFF0056A6)),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code_scanner,
-                        color: Color(0xFF0056A6)),
-                    onPressed: _scanBarcode,
-                  ),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(

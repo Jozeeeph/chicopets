@@ -409,15 +409,7 @@ class _CashierHomePageState extends State<CashierHomePage>
                 child: Text('Annuler'),
               ),
               TextButton(
-                onPressed: () {
-                  // Create an instance and call printReport()
-                  final reportPage = CashClosureReportPage(
-                    cashState: _cashState ??
-                        CashState(initialAmount: 0, isClosed: true),
-                  );
-                  reportPage.printReport(context);
-                  _logout();
-                },
+                onPressed: () => Navigator.pop(context, true),
                 child: Text('Confirmer', style: TextStyle(color: Colors.red)),
               ),
             ],
@@ -426,6 +418,7 @@ class _CashierHomePageState extends State<CashierHomePage>
         false;
 
     if (shouldClose) {
+      // Mettre à jour l'état de la caisse
       await _cashService.saveCashState(CashState(
         initialAmount: _cashState?.initialAmount ?? 0,
         openingTime: _cashState?.openingTime,
@@ -433,23 +426,32 @@ class _CashierHomePageState extends State<CashierHomePage>
         isClosed: true,
       ));
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CashClosureReportPage(
-            cashState:
-                _cashState ?? CashState(initialAmount: 0, isClosed: true),
-          ),
-        ),
+      // Envoyer le rapport par email
+      final reportPage = CashClosureReportPage(
+        cashState: _cashState ?? CashState(initialAmount: 0, isClosed: true),
       );
+      await reportPage.sendEmailReport(context);
+
+      // Déconnecter l'utilisateur
+      await _logout();
+
+      // Retour à la page d'accueil
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
     }
   }
 
   Future<void> _logout() async {
     await SessionManager.clearSession();
     if (mounted) {
-      setState(() {
-      });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
     }
   }
 }

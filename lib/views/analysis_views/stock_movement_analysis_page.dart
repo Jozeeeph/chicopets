@@ -468,7 +468,7 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
                               Icons.assignment_returned),
                           _buildChartContainer(
                               'Top Clients',
-                              _buildTopClientsChart(clientPerformances),
+                              _buildTopClientsTable(clientPerformances),
                               Icons.people_alt),
                           _buildChartContainer(
                               'Activité Faible',
@@ -575,6 +575,13 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
         .map((p) => p.categoryName ?? 'Non catégorisé')
         .toSet()
         .toList();
+
+    // Fonction pour abréger les noms des catégories
+    String abbreviateCategory(String category, {int maxLength = 10}) {
+      if (category.length <= maxLength) return category;
+      return '${category.substring(0, maxLength - 3)}...';
+    }
+
     final categoryStocks = {
       for (var cat in categories)
         cat: products
@@ -602,7 +609,7 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
-                '${categories[groupIndex]}\n${rod.toY.toInt()} en stock',
+                '${categories[groupIndex]}\n${rod.toY.toInt()} en stock', // Nom complet dans le tooltip
                 GoogleFonts.poppins(color: Colors.white, fontSize: 12),
               );
             },
@@ -626,18 +633,20 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 60,
+              reservedSize: 80, // Augmente l'espace réservé pour les titres
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index >= 0 && index < categories.length) {
                   return Transform.rotate(
-                    angle: -0.785, 
+                    angle: -0.785, // Garde l'angle de rotation
                     child: Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
-                        categories[index],
+                        abbreviateCategory(categories[index]), // Nom abrégé
                         style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.black54),
+                          fontSize: 10, // Réduit légèrement la taille
+                          color: Colors.black54,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -1082,114 +1091,139 @@ class _StockMovementAnalysisPageState extends State<StockMovementAnalysisPage> {
     );
   }
 
-  Widget _buildTopClientsChart(List<ClientPerformance> clientPerformances) {
-    final topClients = clientPerformances.take(5).toList();
-    if (topClients.isEmpty) {
-      return const Center(child: Text('Aucune donnée disponible'));
-    }
+Widget _buildTopClientsTable(List<ClientPerformance?> clientPerformances) {
+  // Filter out null entries and take top 5 clients, sorted by performance score (descending)
+  final topClients = clientPerformances
+      .asMap()
+      .entries
+      .where((entry) => entry.value != null) // Remove null entries
+      .map((entry) => {'index': entry.key, 'client': entry.value!})
+      .toList()
+    ..sort((a, b) {
+      final scoreA = (a['client'] as ClientPerformance?)?.performanceScore ?? 0.0;
+      final scoreB = (b['client'] as ClientPerformance?)?.performanceScore ?? 0.0;
+      return scoreB.compareTo(scoreA); // Descending order
+    })
+    ..take(5);
 
-    final maxY = topClients
-            .map((c) => c.performanceScore)
-            .reduce((a, b) => a > b ? a : b) *
-        1.3;
-    final horizontalInterval = (maxY / 5).clamp(1.0, double.infinity);
+  if (topClients.isEmpty) {
+    return const Center(child: Text('Aucune donnée disponible'));
+  }
 
-    return BarChart(
-      BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: maxY,
-        minY: 0,
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              return BarTooltipItem(
-                '${topClients[groupIndex].clientName}\nScore: ${rod.toY.toStringAsFixed(1)}',
-                GoogleFonts.poppins(color: Colors.white, fontSize: 12),
-              );
-            },
-          ),
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.2),
+          spreadRadius: 2,
+          blurRadius: 5,
+          offset: const Offset(0, 3),
         ),
-        barGroups: topClients.asMap().entries.map((entry) {
-          final index = entry.key;
-          final client = entry.value;
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: client.performanceScore,
-                color: const Color(0xFF22C55E),
-                width: 24,
-                borderRadius: BorderRadius.circular(8),
+      ],
+    ),
+    child: Column(
+      children: [
+        // Header Row
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF22C55E), // Green header
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Rang',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 5,
+                child: Text(
+                  'Client',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Score',
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ],
-          );
-        }).toList(),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 60,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index >= 0 && index < topClients.length) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      topClients[index].clientName.length > 12
-                          ? '${topClients[index].clientName.substring(0, 12)}...'
-                          : topClients[index].clientName,
-                      style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.black54),
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                }
-                return const Text('');
-              },
-            ),
-          ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              interval: horizontalInterval,
-              getTitlesWidget: (value, meta) {
-                if (value == value.toInt().toDouble() ||
-                    value == (value.toInt() + 0.5)) {
-                  return Text(
-                    value.toStringAsFixed(
-                        value == value.toInt().toDouble() ? 0 : 1),
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: Colors.black54),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-        ), // ✅ cette accolade fermante manquait
-        borderData: FlBorderData(show: false),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: horizontalInterval,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.withOpacity(0.2),
-            strokeWidth: 1,
           ),
         ),
-      ),
-      swapAnimationDuration: const Duration(milliseconds: 300),
-      swapAnimationCurve: Curves.easeInOut,
-    );
-  }
+        // Data Rows
+        ...topClients.asMap().entries.map((entry) {
+          final rank = entry.key + 1;
+          final client = entry.value['client'] as ClientPerformance;
+          return Container(
+            color: rank % 2 == 0 ? Colors.grey[100] : Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '$rank',
+                    style: GoogleFonts.poppins(
+                      color: Colors.black87,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    client.clientName.length > 20
+                        ? '${client.clientName.substring(0, 20)}...'
+                        : client.clientName,
+                    style: GoogleFonts.poppins(
+                      color: Colors.black87,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    client.performanceScore.toStringAsFixed(1),
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.poppins(
+                      color: Colors.black87,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
+    ),
+  );
+}
 
   Widget _buildLowActivityChart(List<MovementPattern> movementPatterns) {
     final lowActivityProducts = movementPatterns
