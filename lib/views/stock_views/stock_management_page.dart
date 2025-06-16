@@ -53,8 +53,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
     }
   };
 
-  final Map<int, StockMovement?> _pendingCollections = {};
-  final Map<int, StockMovement?> _readyForConfirmation = {};
+ 
 
   @override
   void initState() {
@@ -73,14 +72,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
     super.dispose();
   }
 
-  String _getCollectionCountdown(StockMovement movement) {
-    final now = DateTime.now();
-    final difference = movement.movementDate.difference(now);
-    if (difference.isNegative) return 'En retard';
-    final days = difference.inDays;
-    final hours = difference.inHours % 24;
-    return days > 0 ? 'Dans $days jour(s)' : 'Dans $hours heure(s)';
-  }
+
 
   Future<bool> _onWillPop() async {
     if (!_hasUnsavedChanges) return true;
@@ -885,188 +877,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
     );
   }
 
-  void _confirmCollectionDialog(Product product, StockMovement collection) {
-    final _formKey = GlobalKey<FormState>();
-    int _quantity = collection.quantity;
-
-    // Define color palette
-    final Color deepBlue = const Color(0xFF0056A6);
-    final Color darkBlue = const Color.fromARGB(255, 1, 42, 79);
-    final Color white = Colors.white;
-    final Color lightGray = const Color(0xFFE0E0E0);
-    final Color tealGreen = const Color(0xFF009688);
-    final Color warmRed = const Color(0xFFE53935);
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 5,
-        backgroundColor: white,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header with icon and title
-                Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: deepBlue,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Confirmer la collecte',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: darkBlue,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Divider(color: lightGray, thickness: 1),
-                const SizedBox(height: 16),
-                // Product designation
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: lightGray.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.inventory, color: tealGreen, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Produit: ${product.designation}',
-                          style: TextStyle(fontSize: 16, color: darkBlue),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Quantity field
-                TextFormField(
-                  initialValue: _quantity.toString(),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Quantité collectée',
-                    labelStyle: TextStyle(color: darkBlue),
-                    prefixIcon: Icon(Icons.numbers, color: tealGreen),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: lightGray),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: deepBlue, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: lightGray.withOpacity(0.2),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return 'Champ obligatoire';
-                    if (int.tryParse(value) == null || int.parse(value) < 0)
-                      return 'Nombre invalide';
-                    return null;
-                  },
-                  onSaved: (value) => _quantity = int.parse(value!),
-                ),
-                const SizedBox(height: 24),
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        setState(() {
-                          _readyForConfirmation.remove(product.id);
-                        });
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: warmRed,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: warmRed),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.cancel, size: 18, color: warmRed),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Annuler',
-                            style: TextStyle(
-                              color: warmRed,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (_formKey.currentState!.validate()) {
-                          _formKey.currentState!.save();
-                          try {
-                            Navigator.pop(context);
-                            setState(() {
-                              _readyForConfirmation.remove(product.id);
-                            });
-                            _showSuccess('Collecte confirmée avec succès');
-                            _loadData();
-                          } catch (e) {
-                            _showError('Erreur: ${e.toString()}');
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: deepBlue,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle, color: white, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Confirmer',
-                            style: TextStyle(
-                              color: white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+ 
 
   Future<String?> _showReasonSelectionDialog(BuildContext context) async {
     String? selectedReason;
@@ -1438,22 +1249,22 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 2,
                       child: Text('Catégorie', style: _headerTextStyle())),
                   Expanded(
-                      flex: 1, child: Text('Stock', style: _headerTextStyle())),
+                      flex: 1, child: Text('   Stock', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('Statut', style: _headerTextStyle())),
+                      child: Text('           Statut', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('Prix Achat', style: _headerTextStyle())),
+                      child: Text('   Prix Achat', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('Prix Vente', style: _headerTextStyle())),
+                      child: Text('  Prix Vente', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('Profit', style: _headerTextStyle())),
+                      child: Text('  Profit', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
-                      child: Text('Expiration', style: _headerTextStyle())),
+                      child: Text('  Expiration', style: _headerTextStyle())),
                   Expanded(
                       flex: 2,
                       child: Text('Ventes', style: _headerTextStyle())),
@@ -1461,9 +1272,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       flex: 2,
                       child:
                           Text('Prédiction (30j)', style: _headerTextStyle())),
-                  Expanded(
-                      flex: 2,
-                      child: Text('Collecte', style: _headerTextStyle())),
+
                   Expanded(
                       flex: 1, child: Text('MVMT', style: _headerTextStyle())),
                 ],
@@ -1484,7 +1293,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 final shortTermPrediction =
                     _predictions['products']['short_term']?[product.id] ?? 0;
                 final stockNeeded = shortTermPrediction - product.stock;
-                _pendingCollections.containsKey(product.id);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -1608,74 +1416,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                                 ),
                               ),
                             ),
-                            Expanded(
-                              flex: 2,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.local_shipping,
-                                      color: _readyForConfirmation
-                                              .containsKey(product.id)
-                                          ? Colors
-                                              .red // Couleur rouge si la collecte est prête
-                                          : const Color(0xFF0056A6),
-                                    ),
-                                    onPressed: () {
-                                      if (_readyForConfirmation
-                                          .containsKey(product.id)) {
-                                        // Afficher la boîte de dialogue de confirmation si la collecte est prête
-                                        _confirmCollectionDialog(product,
-                                            _readyForConfirmation[product.id]!);
-                                      }
-                                    },
-                                  ),
-                                  if (_pendingCollections
-                                      .containsKey(product.id))
-                                    Positioned(
-                                      right: 0,
-                                      top: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(
-                                          color: Colors
-                                              .orange, // Orange pour les collectes en attente
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          _getCollectionCountdown(
-                                              _pendingCollections[product.id]!),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  if (_readyForConfirmation
-                                      .containsKey(product.id))
-                                    Positioned(
-                                      right: 0,
-                                      top: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(
-                                          color: Colors
-                                              .red, // Rouge pour indiquer que la collecte est prête
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.warning,
-                                          color: Colors.white,
-                                          size: 12,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
+                            
                             Expanded(
                               flex: 1,
                               child: IconButton(

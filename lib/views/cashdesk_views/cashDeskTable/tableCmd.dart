@@ -97,9 +97,11 @@ class _TableCmdState extends State<TableCmd> {
   void _handleKeyEvent(RawKeyEvent event) {
     if (event is RawKeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.enter) {
+        // Quand on détecte la touche Entrée, on traite le code-barres scanné
         _handleBarcodeScan(_scannedBarcode);
-        _scannedBarcode = "";
+        _scannedBarcode = ""; // Réinitialise pour le prochain scan
       } else {
+        // Sinon, on accumule les caractères du code-barres
         _scannedBarcode += event.character ?? "";
       }
     }
@@ -108,14 +110,17 @@ class _TableCmdState extends State<TableCmd> {
   Future<void> _handleBarcodeScan(String barcodeScanRes) async {
     if (barcodeScanRes.isEmpty) return;
 
+    // Recherche le produit correspondant au code-barres
     final Product? scannedProduct =
         await _sqldb.getProductByCode(barcodeScanRes);
 
     if (scannedProduct != null) {
       setState(() {
+        // Vérifie si c'est une variante de produit
         final bool isVariant = scannedProduct.hasVariants &&
             scannedProduct.variants.any((v) => v.code == barcodeScanRes);
 
+        // Cherche si le produit est déjà dans la liste
         final int index = widget.selectedProducts.indexWhere((p) {
           if (isVariant) {
             return p.hasVariants &&
@@ -125,8 +130,10 @@ class _TableCmdState extends State<TableCmd> {
         });
 
         if (index != -1) {
+          // Produit déjà présent: incrémente la quantité
           widget.quantityProducts[index]++;
         } else {
+          // Nouveau produit: l'ajoute à la liste
           widget.selectedProducts.add(scannedProduct);
           widget.quantityProducts.add(1);
           widget.discounts.add(0.0);
