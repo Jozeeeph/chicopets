@@ -43,7 +43,7 @@ class SqlDb {
     // Get the application support directory for storing the database
     final appSupportDir = await getApplicationSupportDirectory();
     final dbPath = join(appSupportDir.path, 'cashdesk1.db');
-    // await deleteDatabase(dbPath);
+    await deleteDatabase(dbPath);
 
     // Ensure the directory exists
     final directory = Directory(appSupportDir.path);
@@ -965,7 +965,7 @@ class SqlDb {
     return await UserController().getUserByUsername(username, dbClient);
   }
 
-  Future<User> getUserById(int id) async {
+  Future<User?> getUserById(int id) async {
     final dbClient = await db;
     return await UserController().getUserById(id, dbClient);
   }

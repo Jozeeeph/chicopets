@@ -30,8 +30,10 @@ class _ClientFormState extends State<ClientForm> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.client?.name ?? '');
-    _firstNameController = TextEditingController(text: widget.client?.firstName ?? '');
-    _phoneController = TextEditingController(text: widget.client?.phoneNumber ?? '');
+    _firstNameController =
+        TextEditingController(text: widget.client?.firstName ?? '');
+    _phoneController =
+        TextEditingController(text: widget.client?.phoneNumber ?? '');
   }
 
   @override
@@ -110,13 +112,17 @@ class _ClientFormState extends State<ClientForm> {
                 if (value == null || value.isEmpty) {
                   return 'Veuillez entrer un numéro de téléphone';
                 }
+                if (!RegExp(r'^[234579]\d{7}$').hasMatch(value)) {
+                  return 'Numéro tunisien invalide (8 chiffres, commençant par 2, 3, 4, 5, 7 ou 9)';
+                }
                 return null;
               },
             ),
             SizedBox(height: 24),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: widget.tealGreen, // Changed from primary to backgroundColor
+                backgroundColor:
+                    widget.tealGreen, // Changed from primary to backgroundColor
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),

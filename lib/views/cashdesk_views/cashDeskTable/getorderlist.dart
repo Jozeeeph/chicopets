@@ -1267,7 +1267,11 @@ class Getorderlist {
 
     final SqlDb sqldb = SqlDb();
     final pdf = pw.Document();
-    final user = sqldb.getUserById(order.userId!);
+    final user = await sqldb.getUserById(order.userId!);
+    if (user == null) {
+      throw Exception("User not found for order ${order.idOrder}");
+    }
+
     bool isPercentageDiscount = order.isPercentageDiscount;
     double totalBeforeDiscount = calculateTotalBeforeDiscount(order);
 
@@ -1367,7 +1371,6 @@ class Getorderlist {
             ),
             pw.Divider(),
 
-            // Items list
             // Items list
             ...order.orderLines.map((orderLine) {
               double discountedPrice =
@@ -1549,6 +1552,11 @@ class Getorderlist {
                 ),
               ),
             ],
+
+            pw.Text(
+              "Caissier: ${user.username}",
+              style: pw.TextStyle(font: ttf, fontSize: 8),
+            ),
 
             // Footer
             pw.Center(
