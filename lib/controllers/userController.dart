@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:caissechicopets/models/user.dart';
 
 class UserController {
-  Future<int> addUser(User user,dbClient) async {
+  Future<int> addUser(User user, dbClient) async {
     return await dbClient.insert(
       'users',
       user.toMap(),
@@ -10,7 +10,7 @@ class UserController {
     );
   }
 
-  Future<User?> getUserByUsername(String username,dbClient) async {
+  Future<User?> getUserByUsername(String username, dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query(
       'users',
       where: 'username = ?',
@@ -20,16 +20,19 @@ class UserController {
     return result.isNotEmpty ? User.fromMap(result.first) : null;
   }
 
-  Future<User> getUserById(int id,dbClient) async {
-    final User result = await dbClient.query(
+  Future<User?> getUserById(int id, Database dbClient) async {
+    final List<Map<String, dynamic>> results = await dbClient.query(
       'users',
       where: 'id = ?',
       whereArgs: [id],
       limit: 1,
     );
-    return result;
-  }
 
+    if (results.isNotEmpty) {
+      return User.fromMap(results.first);
+    }
+    return null;
+  }
 
   Future<List<User>> getAllUsers(dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query('users');
@@ -44,7 +47,7 @@ class UserController {
     return count != null && count > 0;
   }
 
-  Future<bool> verifyCode(String code,dbClient) async {
+  Future<bool> verifyCode(String code, dbClient) async {
     final count = Sqflite.firstIntValue(
       await dbClient
           .rawQuery('SELECT COUNT(*) FROM users WHERE code = ?', [code]),
@@ -52,7 +55,7 @@ class UserController {
     return count != null && count > 0;
   }
 
-  Future<User?> getUserByCode(String code,dbClient) async {
+  Future<User?> getUserByCode(String code, dbClient) async {
     final List<Map<String, dynamic>> result = await dbClient.query(
       'users',
       where: 'code = ?',
@@ -62,7 +65,7 @@ class UserController {
     return result.isNotEmpty ? User.fromMap(result.first) : null;
   }
 
-  Future<int> updateUserCode(String username, String newCode,dbClient) async {
+  Future<int> updateUserCode(String username, String newCode, dbClient) async {
     return await dbClient.update(
       'users',
       {'code': newCode},
@@ -71,7 +74,7 @@ class UserController {
     );
   }
 
-  Future<int> deleteUser(int userId,dbClient) async {
+  Future<int> deleteUser(int userId, dbClient) async {
     return await dbClient.delete(
       'users',
       where: 'id = ?',
